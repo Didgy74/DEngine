@@ -1,0 +1,18 @@
+
+if (MSVC)
+
+    set(GLEW_INCLUDE_DIRS ${CMAKE_CURRENT_LIST_DIR}/MSVC/include)
+    set(GLEW_LIBDIR ${CMAKE_CURRENT_LIST_DIR}/MSVC/lib)
+
+    set(GLEW_LIBRARIES "${GLEW_LIBDIR}/glew32s.lib;${GLEW_LIBDIR}/glew32.lib")
+
+elseif(MINGW)
+
+    set(GLEW_INCLUDE_DIRS ${CMAKE_CURRENT_LIST_DIR}/MinGW/include)
+
+    set(GLEW_LIBDIR ${CMAKE_CURRENT_LIST_DIR}/MinGW/lib)
+    set(GLEW_LIBRARIES "-L${GLEW_LIBDIR} -lglew32 -lglew32mx")
+
+endif()
+
+#string(STRIP "${GLEW_LIBRARIES}" GLEW_LIBRARIES)

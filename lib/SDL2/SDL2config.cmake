@@ -1,0 +1,18 @@
+
+if (MSVC)
+
+    set(SDL2_INCLUDE_DIRS ${CMAKE_CURRENT_LIST_DIR}/MSVC/include)
+    set(SDL2_LIBDIR ${CMAKE_CURRENT_LIST_DIR}/MSVC/lib)
+
+    set(SDL2_LIBRARIES "${SDL2_LIBDIR}/SDL2.lib;${SDL2_LIBDIR}/SDL2main.lib")
+
+elseif(MINGW)
+
+    set(SDL2_INCLUDE_DIRS ${CMAKE_CURRENT_LIST_DIR}/MinGW/include)
+
+    set(SDL2_LIBDIR ${CMAKE_CURRENT_LIST_DIR}/MinGW/lib)
+    set(SDL2_LIBRARIES "-L${SDL2_LIBDIR} -lmingw32 -lSDL2main -lSDL2")
+
+endif()
+
+#string(STRIP "${SDL2_LIBRARIES}" SDL2_LIBRARIES)
