@@ -19,11 +19,6 @@ Engine::MeshRenderer::MeshRenderer(SceneObject& owningSceneObject, size_t indexI
 
 Engine::MeshRenderer::~MeshRenderer()
 {
-	if (GetMesh() != Asset::Mesh::None)
-	{
-		InvalidateRenderScene();
-		Renderer::RemoveMeshReference(static_cast<size_t>(GetMesh()));
-	}
 }
 
 Asset::Mesh Engine::MeshRenderer::GetMesh() const { return mesh; }
@@ -37,19 +32,7 @@ void Engine::MeshRenderer::SetMesh(Asset::Mesh newMesh)
 
 	assert(Asset::CheckValid(newMesh));
 
-	if (GetMesh() == Asset::Mesh::None && newMesh != Asset::Mesh::None)
-		Renderer::AddMeshReference(static_cast<Renderer::AssetID>(newMesh));
-	else if (GetMesh() != Asset::Mesh::None && newMesh != Asset::Mesh::None)
-	{
-		Renderer::RemoveMeshReference(static_cast<Renderer::AssetID>(GetMesh()));
-		Renderer::AddMeshReference(static_cast<Renderer::AssetID>(newMesh));
-	}
-	else if (GetMesh() != Asset::Mesh::None && newMesh == Asset::Mesh::None)
-		Renderer::RemoveMeshReference(static_cast<Renderer::AssetID>(GetMesh()));
-
 	mesh = newMesh;
-
-	InvalidateRenderScene();
 }
 
 Math::Matrix<4, 3> Engine::MeshRenderer::GetModel_Reduced(Space space) const

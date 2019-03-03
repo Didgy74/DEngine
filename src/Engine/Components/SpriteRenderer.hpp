@@ -27,8 +27,6 @@ namespace Engine
 		Math::Matrix<3, 2> GetModel2D_Reduced(Space space) const;
 		Math::Matrix4x4 GetModel(Space space) const;
 
-		explicit operator Renderer::AssetID() const;
-
 		Math::Vector2D position;
 		float rotation;
 		Math::Vector2D scale;

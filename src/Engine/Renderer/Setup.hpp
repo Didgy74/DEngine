@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 namespace Engine
 {
 	class Scene;
@@ -9,6 +11,8 @@ namespace Engine
 		namespace Setup
 		{
 			using SceneType = Engine::Scene;
+
+			constexpr std::string_view assetPath = "Data";
 		}
 	}
 }

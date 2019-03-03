@@ -19,7 +19,7 @@ Engine::Scene::~Scene()
 
 Engine::SceneObject& Engine::Scene::NewSceneObject()
 {
-	sceneObjects.push_back(new SceneObject(*this, sceneObjects.size()));
+	sceneObjects.emplace_back(new SceneObject(*this, sceneObjects.size()));
 	return *sceneObjects.back();
 }
 

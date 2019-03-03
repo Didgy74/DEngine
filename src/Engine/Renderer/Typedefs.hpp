@@ -6,6 +6,13 @@ namespace Engine
 {
 	namespace Renderer
 	{
-		using AssetID = uint32_t;
+		namespace Core
+		{
+			using AssetIntegerType = uint32_t;
+		}
+
+		enum class SpriteID : Core::AssetIntegerType {};
+
+		enum class MeshID : Core::AssetIntegerType {};
 	}
 }

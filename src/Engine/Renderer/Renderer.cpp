@@ -10,6 +10,7 @@
 #include "Math/LinearTransform3D.hpp"
 
 #include <functional>
+#include <iostream>
 
 namespace Engine
 {
@@ -19,39 +20,39 @@ namespace Engine
 		{
 			struct Data
 			{
-				API activeAPI;
+			    RenderGraph renderGraph;
+			    RenderGraphTransform renderGraphTransform;
+			    CameraInfo cameraInfo;
 
-				std::unordered_map<AssetID, size_t> meshReferences;
-				std::unordered_map<AssetID, size_t> spriteReferences;
+			    size_t sceneIDCounter = 0;
 
-				std::vector<AssetID> loadMeshQueue;
-				std::vector<AssetID> unloadMeshQueue;
-				std::vector<AssetID> loadSpriteQueue;
-				std::vector<AssetID> unloadSpriteQueue;
+				API activeAPI = API::None;
+
+				std::unordered_map<MeshID, size_t> meshReferences;
+				std::unordered_map<SpriteID, size_t> spriteReferences;
+
+				std::vector<MeshID> loadMeshQueue;
+				std::vector<MeshID> unloadMeshQueue;
+				std::vector<SpriteID> loadSpriteQueue;
+				std::vector<SpriteID> unloadSpriteQueue;
 
 				std::vector<std::unique_ptr<Viewport>> viewports;
 
-				std::function<void(void*&)> Initialize = nullptr;
-				std::function<void(void*&)> Terminate = nullptr;
-				std::function<void(void)> Draw = nullptr;
-				std::function<void(void)> PrepareRendering = nullptr;
+				std::function<void(void*&)> Initialize;
+				std::function<void(void*&)> Terminate;
+				std::function<void(void)> Draw;
+				std::function<void(const std::vector<SpriteID>& loadSpriteQueue)> PrepareRenderingEarly;
+				std::function<void(void)> PrepareRenderingLate;
 
 				void* apiData = nullptr;
 			};
 
 			static std::unique_ptr<Data> data;
 
-			class PrivateAccessor
-			{
-			public:
-				static void PrepareRenderingEarly();
-				static void PrepareRenderingLate();
-				static void AfterDrawComplete();
-			};
+			void UpdateAssetReferences(Data& data, const RenderGraph& oldRG, const RenderGraph* newRG);
 		}
 	}
 }
-
 
 Engine::Renderer::Viewport& Engine::Renderer::NewViewport(Utility::ImgDim dimensions, void* surfaceHandle)
 {
@@ -59,89 +60,9 @@ Engine::Renderer::Viewport& Engine::Renderer::NewViewport(Utility::ImgDim dimens
 	return *Core::data->viewports.back();
 }
 
-const std::vector<std::unique_ptr<Engine::Renderer::Viewport>>& Engine::Renderer::GetViewports() { return Core::data->viewports; }
-
 size_t Engine::Renderer::GetViewportCount() { return Core::data->viewports.size(); }
 
 Engine::Renderer::Viewport& Engine::Renderer::GetViewport(size_t index) { return *Core::data->viewports[index]; }
-
-const std::vector<Engine::Renderer::AssetID>& Engine::Renderer::Core::GetMeshLoadQueue() { return data->loadMeshQueue; }
-
-const std::vector<Engine::Renderer::AssetID>& Engine::Renderer::Core::GetMeshUnloadQueue() { return data->unloadMeshQueue; }
-
-const std::vector<Engine::Renderer::AssetID>& Engine::Renderer::Core::GetSpriteLoadQueue() { return data->loadSpriteQueue; }
-
-const std::vector<Engine::Renderer::AssetID>& Engine::Renderer::Core::GetSpriteUnloadQueue() { return data->unloadSpriteQueue; }
-
-size_t Engine::Renderer::GetMeshReferenceCount(AssetID id)
-{
-	auto iterator = Core::data->meshReferences.find(id);
-	if (iterator != Core::data->meshReferences.end())
-		return iterator->second;
-	else
-		return 0;
-}
-
-void Engine::Renderer::AddMeshReference(AssetID id)
-{ 
-	auto newIterator = Core::data->meshReferences.find(id);
-	if (newIterator != Core::data->meshReferences.end())
-		newIterator->second++;
-	else
-	{
-		Core::data->meshReferences.insert({ id, 1 });
-		Core::data->loadMeshQueue.push_back(id);
-	}
-}
-
-void Engine::Renderer::RemoveMeshReference(AssetID id)
-{
-	auto oldIterator = Core::data->meshReferences.find(id);
-	assert(oldIterator != Core::data->meshReferences.end());
-	oldIterator->second--;
-	if (oldIterator->second == 0)
-	{
-		Core::data->unloadMeshQueue.push_back(id);
-		Core::data->meshReferences.erase(oldIterator);
-	}
-}
-
-size_t Engine::Renderer::GetSpriteReferenceCount(AssetID id)
-{
-	auto iterator = Core::data->spriteReferences.find(id);
-	if (iterator != Core::data->spriteReferences.end())
-		return iterator->second;
-	else
-		return 0;
-}
-
-void Engine::Renderer::AddSpriteReference(AssetID id)
-{
-	auto newIterator = Core::data->spriteReferences.find(id);
-	if (newIterator != Core::data->spriteReferences.end())
-		newIterator->second++;
-	else
-	{
-		Core::data->spriteReferences.insert({ id, 1 });
-		Core::data->loadSpriteQueue.push_back(id);
-	}
-
-	AddMeshReference(static_cast<AssetID>(Asset::Mesh::SpritePlane));
-}
-
-void Engine::Renderer::RemoveSpriteReference(AssetID id)
-{ 
-	auto oldIterator = Core::data->spriteReferences.find(id);
-	assert(oldIterator != Core::data->spriteReferences.end());
-	oldIterator->second--;
-	if (oldIterator->second == 0)
-	{
-		Core::data->unloadSpriteQueue.push_back(id);
-		Core::data->spriteReferences.erase(oldIterator);
-	}
-
-	RemoveMeshReference(static_cast<AssetID>(Asset::Mesh::SpritePlane));
-}
 
 Engine::Renderer::API Engine::Renderer::GetActiveAPI() { return Core::data->activeAPI; }
 
@@ -160,13 +81,16 @@ bool Engine::Renderer::Core::Initialize(API api, Utility::ImgDim dimensions, voi
 		data->Initialize = Vulkan::Initialize;
 		data->Terminate = Vulkan::Terminate;
 		data->Draw = Vulkan::Draw;
-		data->PrepareRendering = Vulkan::PrepareRendering;
+		//data->PrepareRendering = Vulkan::PrepareRendering;
 		break;
 	case API::OpenGL:
 		data->Initialize = OpenGL::Initialize;
 		data->Terminate = OpenGL::Terminate;
 		data->Draw = OpenGL::Draw;
-		data->PrepareRendering = OpenGL::PrepareRendering;
+		data->PrepareRenderingEarly = OpenGL::PrepareRenderingEarly;
+		data->PrepareRenderingLate = OpenGL::PrepareRenderingLate;
+		break;
+	default:
 		break;
 	}
 
@@ -182,150 +106,69 @@ void Engine::Renderer::Core::Terminate()
 	data = nullptr;
 }
 
-void Engine::Renderer::Core::PrivateAccessor::PrepareRenderingEarly()
+void Engine::Renderer::Core::PrepareRenderingEarly(RenderGraph& renderGraphInput)
 {
-	auto& viewports = data->viewports;
-	for (auto& item : viewports)
-	{
-		Viewport& viewport = *item;
-		if (viewport.GetScene() == nullptr)
-			continue;
+    auto& renderGraph = data->renderGraph;
 
-		const SceneType& scene = *viewport.GetScene();
+	UpdateAssetReferences(*data, renderGraph, &renderGraphInput);
 
-		if (scene.RenderSceneValid() == false)
-			viewport.renderInfoValidated = false;
+	std::swap(renderGraph, renderGraphInput);
 
-		const auto& spritesOpt = scene.GetComponents<Engine::SpriteRenderer>();
-		if (spritesOpt)
-		{
-			const auto& sprites = *spritesOpt;
-			viewport.renderInfo.sprites.resize(sprites.size());
-			viewport.renderInfo.spriteTransforms.resize(sprites.size());
-			for (size_t i = 0; i < sprites.size(); i++)
-				viewport.renderInfo.sprites[i] = static_cast<AssetID>(*sprites[i]);
-		}
-		
+	if (!data->loadSpriteQueue.empty())
+		std::cout << "Loading sprite resource(s)..." << std::endl;
+	data->PrepareRenderingEarly(data->loadSpriteQueue);
 
-		const auto& meshesOpt = scene.GetComponents<Engine::MeshRenderer>();
-		if (meshesOpt)
-		{
-			const auto& meshes = *meshesOpt;
-			viewport.renderInfo.meshes.resize(meshes.size());
-			viewport.renderInfo.meshTransforms.resize(meshes.size());
-			for (size_t i = 0; i < meshes.size(); i++)
-				viewport.renderInfo.meshes[i] = static_cast<AssetID>(meshes[i]->GetMeshID());
-		}
-	}
-}
-
-void Engine::Renderer::Core::PrivateAccessor::PrepareRenderingLate()
-{
-	auto& viewports = data->viewports;
-	for (auto& item : viewports)
-	{
-		Viewport& viewport = *item;
-		if (viewport.GetScene() == nullptr)
-			continue;
-		const SceneType& scene = *viewport.GetScene();
-
-		// Sprites
-		const auto& spritesOpt = scene.GetComponents<Engine::SpriteRenderer>();
-		if (spritesOpt)
-		{
-			const auto& sprites = *spritesOpt;
-			for (size_t i = 0; i < sprites.size(); i++)
-				viewport.renderInfo.spriteTransforms[i] = sprites[i]->GetModel(Engine::Space::World);
-		}
-		
-
-
-		// Meshes
-		const auto& meshOpt = scene.GetComponents<Engine::MeshRenderer>();
-		if (meshOpt)
-		{
-			const auto& meshes = *meshOpt;
-			//for (size_t i = 0; i < meshes.size(); i++)
-				//viewport.renderInfo.meshTransforms[i] = meshes[i].
-		}
-
-		const auto& camerasOpt = scene.GetComponents<Engine::Camera>();
-		assert(camerasOpt);
-
-		const auto& cameras = *camerasOpt;
-		viewport.renderInfo.cameraInfo = static_cast<Renderer::CameraInfo>(*cameras[viewport.GetCameraIndex()]);
-	}
-}
-
-void Engine::Renderer::Core::PrivateAccessor::AfterDrawComplete()
-{
-	data->loadMeshQueue.clear();
-	data->unloadMeshQueue.clear();
 	data->loadSpriteQueue.clear();
 	data->unloadSpriteQueue.clear();
-
-	for (auto& item : data->viewports)
-	{
-		Viewport& viewport = *item;
-		viewport.renderInfoValidated = true;
-	}
 }
 
-void Engine::Renderer::Core::PrepareRendering()
+void Engine::Renderer::Core::PrepareRenderingLate(RenderGraphTransform &input)
 {
-	Core::PrivateAccessor::PrepareRenderingEarly();
-	
-	data->PrepareRendering();
+	const auto& renderGraph = data->renderGraph;
+	auto& renderGraphTransform = data->renderGraphTransform;
+
+	assert(IsCompatible(renderGraph, input));
+
+	std::swap(renderGraphTransform, input);
 }
 
 void Engine::Renderer::Core::Draw()
 {
-	Core::PrivateAccessor::PrepareRenderingLate();
-
 	data->Draw();
-
-	Core::PrivateAccessor::AfterDrawComplete();
 }
 
-const Engine::Renderer::SceneInfo& Engine::Renderer::Viewport::GetRenderInfo() const { return renderInfo; }
-
-bool Engine::Renderer::Viewport::IsRenderInfoValidated() const { return renderInfoValidated; }
-
-Math::Matrix4x4 Engine::Renderer::Viewport::GetCameraModel() const
+const Engine::Renderer::RenderGraph &Engine::Renderer::Core::GetRenderGraph()
 {
-	const CameraInfo& cameraInfo = renderInfo.cameraInfo;
-	switch (GetActiveAPI())
-	{
-	case API::Vulkan:
-		return Math::LinearTransform3D::PerspectiveRH_ZO(cameraInfo.fovY, GetDimensions().AspectRatio(), 0.1f, 100.f) * cameraInfo.transform;
-	case API::OpenGL:
-		return Math::LinearTransform3D::PerspectiveRH_NO(cameraInfo.fovY, GetDimensions().AspectRatio(), 0.1f, 100.f) * cameraInfo.transform;
-	default:
-		return {};
-	}
+	return data->renderGraph;
 }
 
-Utility::Color Engine::Renderer::Viewport::GetWireframeColor() const { return wireframeColor; }
+const Engine::Renderer::RenderGraphTransform &Engine::Renderer::Core::GetRenderGraphTransform()
+{
+	return data->renderGraphTransform;
+}
+
+const Engine::Renderer::CameraInfo &Engine::Renderer::Core::GetCameraInfo()
+{
+	return data->cameraInfo;
+}
+
+void Engine::Renderer::Core::SetCameraInfo(const CameraInfo &input)
+{
+	data->cameraInfo = input;
+}
+
+Engine::Renderer::SceneData::SceneData()
+{
+    sceneID = Core::data->sceneIDCounter;
+    Core::data->sceneIDCounter++;
+}
 
 Engine::Renderer::Viewport::Viewport(Utility::ImgDim dimensions, void* surfaceHandle) :
 	sceneRef(nullptr),
 	cameraIndex(0),
 	dimensions(dimensions),
-	surfaceHandle(surfaceHandle),
-	renderMode(Mode::Shaded),
-	renderInfoValidated(false),
-	wireframeColor(Utility::Color::White())
+	surfaceHandle(surfaceHandle)
 {
-	
-}
-
-const Engine::Renderer::SceneType* Engine::Renderer::Viewport::GetScene() const { return sceneRef; }
-
-Engine::Renderer::SceneType* Engine::Renderer::Viewport::GetScene() { return sceneRef; }
-
-void Engine::Renderer::Viewport::SetScene(SceneType* scene)
-{
-	sceneRef = scene;
 }
 
 Utility::ImgDim Engine::Renderer::Viewport::GetDimensions() const { return dimensions; }
@@ -334,12 +177,74 @@ size_t Engine::Renderer::Viewport::GetCameraIndex() const { return cameraIndex; 
 
 void* Engine::Renderer::Viewport::GetSurfaceHandle() { return surfaceHandle; }
 
-Engine::Renderer::Mode Engine::Renderer::Viewport::GetRenderMode() const { return renderMode; }
-
-void Engine::Renderer::Viewport::SetRenderMode(Mode newRenderMode)
+void Engine::Renderer::Viewport::SetSceneRef(const Engine::Renderer::SceneType* scene)
 {
-	if (newRenderMode == GetRenderMode())
-		return;
+	sceneRef = scene;
+}
 
-	renderInfoValidated = false;
+bool Engine::Renderer::IsCompatible(const RenderGraph &renderGraph, const RenderGraphTransform &transforms)
+{
+	bool compatible = true;
+	if (renderGraph.sprites.size() != transforms.sprites.size())
+		return false;
+
+	return true;
+}
+
+void Engine::Renderer::Core::UpdateAssetReferences(Data& data, const RenderGraph& oldRG, const RenderGraph* newRG)
+{
+	// Add new references
+	if (newRG)
+	{
+		for(const auto& item : newRG->sprites)
+		{
+			auto& referenceCount = data.spriteReferences[item];
+			referenceCount++;
+			if (referenceCount == 1)
+				data.loadSpriteQueue.emplace_back(item);
+		}
+	}
+
+	// Remove existing references
+	for (const auto& item : oldRG.sprites)
+	{
+		auto iterator = data.spriteReferences.find(item);
+		iterator->second--;
+		if (iterator->second <= 0)
+		{
+			data.unloadSpriteQueue.emplace_back(item);
+			data.spriteReferences.erase(iterator);
+		}
+	}
+}
+
+size_t Engine::Renderer::RenderGraph::GetTotalObjectCount() const
+{
+	size_t totalObjectCount = 0;
+
+	totalObjectCount += sprites.size();
+
+	return totalObjectCount;
+}
+
+Math::Matrix4x4 Engine::Renderer::CameraInfo::GetModel(float aspectRatio) const
+{
+	if (projectMode == ProjectMode::Perspective)
+	{
+		switch (GetActiveAPI())
+		{
+			case API::OpenGL:
+				return Math::LinTran3D::PerspectiveRH_NO(fovY, aspectRatio, zNear, zFar) *  transform;
+			case API::Vulkan:
+				return Math::LinTran3D::PerspectiveRH_ZO(fovY, aspectRatio, zNear, zFar) * transform;
+			default:
+				assert(false);
+				return {};
+		}
+	}
+	else // Orthogonal
+	{
+		assert(false);
+		return {};
+	}
 }

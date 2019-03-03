@@ -40,6 +40,6 @@ namespace Engine
 		
 		void LookAt(const Math::Vector3D& newTarget);
 
-		explicit operator Renderer::CameraInfo() const;
+		Renderer::CameraInfo GetCameraInfo() const;
 	};
 }

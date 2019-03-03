@@ -27,6 +27,7 @@ namespace Asset
 	std::string GetName(Mesh mesh);
 
 	MeshDocument LoadMeshDocument(Mesh mesh);
+	MeshDocument LoadMeshDocument(const std::string& path);
 	TextureDocument LoadTextureDocument(Sprite texture);
 }
 

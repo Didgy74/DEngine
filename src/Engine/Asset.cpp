@@ -80,9 +80,14 @@ std::string Asset::GetName(Mesh mesh)
 
 Asset::MeshDocument Asset::LoadMeshDocument(Mesh mesh)
 {
+	const auto& path = GetPath(mesh);
+	return LoadMeshDocument(path);
+}
+
+Asset::MeshDocument Asset::LoadMeshDocument(const std::string &path)
+{
 	MeshDocument::CreateInfo createInfo{};
 
-	std::string path = GetPath(mesh);
 	const auto gltfDocument = fx::gltf::LoadFromText(path);
 	auto& primitive = gltfDocument.meshes[0].primitives[0];
 
@@ -108,8 +113,8 @@ Asset::MeshDocument Asset::LoadMeshDocument(Mesh mesh)
 
 	auto& indexAccessor = gltfDocument.accessors[primitive.indices];
 	assert(indexAccessor.type == fx::gltf::Accessor::Type::Scalar);
-	assert(indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedShort 
-		|| indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedInt);
+	assert(indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedShort
+		   || indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedInt);
 	auto& indexBufferView = gltfDocument.bufferViews[indexAccessor.bufferView];
 	createInfo.indexData.byteOffset = indexBufferView.byteOffset + indexAccessor.byteOffset;
 	createInfo.indexData.byteLength = indexBufferView.byteLength;
@@ -122,7 +127,7 @@ Asset::MeshDocument Asset::LoadMeshDocument(Mesh mesh)
 
 Asset::TextureDocument Asset::LoadTextureDocument(Sprite texture)
 {
-	TextureDocument::CreateInfo createInfo;
+	TextureDocument::CreateInfo createInfo{};
 
 	// Grab pixels as char array from image.
 	int32_t x = 0;
@@ -136,7 +141,7 @@ Asset::TextureDocument Asset::LoadTextureDocument(Sprite texture)
 		channelCount = desiredChannelCount;
 
 	createInfo.byteArray = pixels;
-	createInfo.channelCount = channelCount;
+	createInfo.channelCount = static_cast<uint8_t>(channelCount);
 
 	using ValueType = decltype(createInfo.dimensions)::ValueType;
 	createInfo.dimensions = { static_cast<ValueType>(x), static_cast<ValueType>(y) };
@@ -179,15 +184,27 @@ size_t Asset::MeshDocument::GetTotalByteLength() const
 
 Asset::MeshDocument::IndexType Asset::MeshDocument::GetIndexType() const { return indexType; }
 
-uint32_t Asset::MeshDocument::GetIndexCount() const { return static_cast<uint32_t>(data[static_cast<size_t>(Attribute::Index)].byteLength / IndexTypeToByteSize(indexType)); }
+uint32_t Asset::MeshDocument::GetIndexCount() const
+{
+	return static_cast<uint32_t>(data[static_cast<size_t>(Attribute::Index)].byteLength / IndexTypeToByteSize(indexType));
+}
 
-uint32_t Asset::MeshDocument::GetVertexCount() const { return static_cast<uint32_t>(data[static_cast<size_t>(Attribute::Position)].byteLength / sizeof(PositionType)); }
+uint32_t Asset::MeshDocument::GetVertexCount() const
+{
+	return static_cast<uint32_t>(data[static_cast<size_t>(Attribute::Position)].byteLength / sizeof(PositionType));
+}
 
-const uint8_t* Asset::MeshDocument::GetDataPtr(Attribute type) const { return byteArray.data() + data[static_cast<size_t>(type)].byteOffset; }
+const uint8_t* Asset::MeshDocument::GetDataPtr(Attribute type) const
+{
+	return byteArray.data() + data[static_cast<size_t>(type)].byteOffset;
+}
 
 Asset::MeshDocument::Data Asset::MeshDocument::GetData(Attribute type) const { return data[static_cast<size_t>(type)]; }
 
-uint8_t Asset::MeshDocument::IndexTypeToByteSize(IndexType indexType) { return indexType == IndexType::Uint16 ? 2 : 4; }
+uint8_t Asset::MeshDocument::IndexTypeToByteSize(IndexType indexType)
+{
+	return indexType == IndexType::Uint16 ? uint8_t(2) : uint8_t(4);
+}
 
 Asset::TextureDocument::TextureDocument(CreateInfo&& right) :
 	byteArray(right.byteArray),
@@ -208,11 +225,8 @@ Asset::TextureDocument::TextureDocument(TextureDocument&& right) :
 
 Asset::TextureDocument::~TextureDocument()
 {
-	if (owner == true)
-	{
-		auto length = GetByteLength();
+	if (owner)
 		delete[] byteArray;
-	}
 }
 
 Utility::ImgDim Asset::TextureDocument::GetDimensions() const { return dimensions; }

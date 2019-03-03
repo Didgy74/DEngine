@@ -3,7 +3,6 @@
 #include <vector>
 #include <memory>
 
-
 namespace Engine
 {
 	class Scene;
@@ -17,7 +16,6 @@ namespace Engine
 	public:
 		static void Run();
 		static void Destroy(SceneObject& sceneObject);
-		static void TickEnd(Scene& scene);
 
 		static std::vector<std::unique_ptr<Engine::Scene>> scenes;
 	};

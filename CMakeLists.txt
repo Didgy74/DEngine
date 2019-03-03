@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.13)
-project(VulkanProject1)
+project(DEngine)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_subdirectory(src)
+#add_definitions("-static-libgcc -static-libstdc++")
 
+file(GLOB_RECURSE SOURCE_FILES "src/*.cpp" "src/*.hpp")
+add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PRIVATE include)
 
 # SDL2
@@ -20,6 +22,7 @@ else()
     target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
 endif()
+
 
 # GLEW
 if (WIN32)

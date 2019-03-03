@@ -13,6 +13,7 @@
 #include <fstream>
 #include <iostream>
 #include <array>
+#include <optional>
 
 namespace Engine
 {
@@ -28,14 +29,14 @@ namespace Engine
 
 			struct Data;
 
-			void UpdateVBODatabase();
-			void UpdateIBODatabase();
+			void UpdateVBODatabase(Data& data, const std::vector<MeshID>& loadQueue);
+			std::optional<VBO> VBOFromPath(const std::string& path);
+			void UpdateIBODatabase(Data& data, const std::vector<SpriteID>& loadQueue);
 
 			Data& GetData();
 		}
 	}
 }
-
 
 struct Engine::Renderer::OpenGL::VertexBufferObject
 {
@@ -68,14 +69,17 @@ struct Engine::Renderer::OpenGL::Data
 	Data(const Data&) = delete;
 	Data(Data&&) = delete;
 
-	std::unordered_map<Renderer::AssetID, VBO> vboDatabase;
+	std::unordered_map<MeshID, VBO> vboDatabase;
+	VBO quadVBO;
 
-	std::unordered_map<Renderer::AssetID, IBO> iboDatabase;
+	std::unordered_map<SpriteID, IBO> iboDatabase;
 
 	GLuint program;
 	GLint modelUniform;
 	GLint viewProjectionUniform;
-	GLint test;
+	GLint samplerUniform;
+
+	GLuint samplerObject;
 };
 
 Engine::Renderer::OpenGL::Data& Engine::Renderer::OpenGL::GetData() { return *static_cast<Data*>(Core::GetAPIData()); }
@@ -157,44 +161,60 @@ void Engine::Renderer::OpenGL::Initialize(void*& apiData)
 	assert(glInitResult == 0);
 
 	apiData = new Data();
+	Data& data = *static_cast<Data*>(apiData);
+
+	// Gen sampler
+	glGenSamplers(1, &data.samplerObject);
+	glSamplerParameteri(data.samplerObject, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glSamplerParameteri(data.samplerObject, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glSamplerParameteri(data.samplerObject, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glSamplerParameteri(data.samplerObject, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	// Load sprite VBO
+	auto quadVBOOpt = VBOFromPath(static_cast<std::string>(Renderer::Setup::assetPath) + "/Meshes/SpritePlane/SpritePlane.gltf");
+	if (quadVBOOpt.has_value())
+		data.quadVBO = quadVBOOpt.value();
+	else
+		assert(false);
 
 	glEnable(GL_DEPTH_TEST);
 
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
-	GetData().program = glCreateProgram();
+	// Create shader
+	data.program = glCreateProgram();
 
-	std::array<GLint, 2> shaders;
+	std::array<GLuint, 2> shaders{};
 	shaders[0] = CreateShader(LoadShader("Data/Shaders/Sprite/OpenGL/sprite.vert"), GL_VERTEX_SHADER);
 	shaders[1] = CreateShader(LoadShader("Data/Shaders/Sprite/OpenGL/sprite.frag"), GL_FRAGMENT_SHADER);
 
 	for (unsigned int i = 0; i < 2; i++)
-		glAttachShader(GetData().program, shaders[i]);
+		glAttachShader(data.program, shaders[i]);
 
-	glBindAttribLocation(GetData().program, 0, "position");
-	glBindAttribLocation(GetData().program, 1, "texCoord");
-	glBindAttribLocation(GetData().program, 2, "normal");
+	glBindAttribLocation(data.program, 0, "position");
+	glBindAttribLocation(data.program, 1, "texCoord");
+	glBindAttribLocation(data.program, 2, "normal");
 
-	glLinkProgram(GetData().program);
-	CheckShaderError(GetData().program, GL_LINK_STATUS, true, "Error linking shader program");
+	glLinkProgram(data.program);
+	CheckShaderError(data.program, GL_LINK_STATUS, true, "Error linking shader program");
 
-	glValidateProgram(GetData().program);
-	CheckShaderError(GetData().program, GL_LINK_STATUS, true, "Invalid shader program");
+	glValidateProgram(data.program);
+	CheckShaderError(data.program, GL_LINK_STATUS, true, "Invalid shader program");
 
 	for (unsigned int i = 0; i < 2; i++)
 		glDeleteShader(shaders[i]);
 
-	GetData().modelUniform = glGetUniformLocation(GetData().program, "model");
-	GetData().viewProjectionUniform = glGetUniformLocation(GetData().program, "viewProjection");
+	// Grab uniforms
+	data.modelUniform = glGetUniformLocation(GetData().program, "model");
+	data.viewProjectionUniform = glGetUniformLocation(GetData().program, "viewProjection");
 
-	GetData().test = glGetUniformLocation(GetData().program, "sampler");
-
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	data.samplerUniform = glGetUniformLocation(GetData().program, "sampler");
 }
 
 void Engine::Renderer::OpenGL::Terminate(void*& apiData)
 {
+	GetData().quadVBO.DeallocateDeviceBuffers();
 	for (auto& vboItem : GetData().vboDatabase)
 		vboItem.second.DeallocateDeviceBuffers();
 
@@ -207,53 +227,46 @@ void Engine::Renderer::OpenGL::Terminate(void*& apiData)
 	apiData = nullptr;
 }
 
-void Engine::Renderer::OpenGL::PrepareRendering()
+void Engine::Renderer::OpenGL::PrepareRenderingEarly(const std::vector<SpriteID>& spriteLoadQueue)
 {
-	// Loops through every viewport to see if we need to buffer anything new
-	bool updateNeeded = false;
-	for (size_t i = 0; i < GetViewportCount(); i++)
-	{
-		if (GetViewport(i).IsRenderInfoValidated() == false)
-		{
-			updateNeeded = true;
-			break;
-		}
-	}
+	UpdateIBODatabase(GetData(), spriteLoadQueue);
+}
 
-	if (updateNeeded == true)
-	{
-		UpdateVBODatabase();
-		UpdateIBODatabase();
-	}
+void Engine::Renderer::OpenGL::PrepareRenderingLate()
+{
 }
 
 void Engine::Renderer::OpenGL::Draw()
 {
+	Data& data = GetData();
+
 	glClearColor(0.f, 0.f, 0.f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	auto& viewport = Renderer::GetViewport(0);
 
 	// Sprite render pass
-	const auto& sprites = viewport.GetRenderInfo().sprites;
-	if (sprites.size() > 0)
+	const auto& sprites = Core::GetRenderGraph().sprites;
+	if (!sprites.empty())
 	{
-		glDisable(GL_DEPTH_TEST);
-		glUseProgram(GetData().program);
+		glUseProgram(data.program);
 
-		auto viewMat = viewport.GetCameraModel();
-		glProgramUniformMatrix4fv(GetData().program, GetData().viewProjectionUniform, 1, GL_FALSE, viewMat.data.data());
+		auto viewMat = Core::GetCameraInfo().GetModel(viewport.GetDimensions().GetAspectRatio());
+		glProgramUniformMatrix4fv(data.program, data.viewProjectionUniform, 1, GL_FALSE, viewMat.data.data());
 
-		const auto& spriteVBO = GetData().vboDatabase[static_cast<AssetID>(Asset::Mesh::SpritePlane)];
+		glProgramUniform1ui(data.program, data.samplerUniform, 0);
+		glBindSampler(0, data.samplerObject);
+
+		const auto& spriteVBO = data.quadVBO;
 		glBindVertexArray(spriteVBO.vertexArrayObject);
 
-		const auto& spriteTransforms = viewport.GetRenderInfo().spriteTransforms;
+		const auto& spriteTransforms = Core::GetRenderGraphTransform().sprites;
 		for (size_t i = 0; i < sprites.size(); i++)
 		{
-			auto model = spriteTransforms[i];
-			glProgramUniformMatrix4fv(GetData().program, GetData().modelUniform, 1, GL_FALSE, model.data.data());
+			glProgramUniformMatrix4fv(GetData().program, GetData().modelUniform, 1, GL_FALSE, spriteTransforms[i].data.data());
 
-			const auto& ibo = GetData().iboDatabase[sprites[i]];
+			glActiveTexture(GL_TEXTURE0);
+			const auto& ibo = data.iboDatabase[sprites[i]];
 			glBindTexture(GL_TEXTURE_2D, ibo.texture);
 
 			glDrawElements(GL_TRIANGLES, spriteVBO.numIndices, spriteVBO.indexType, 0);
@@ -263,59 +276,20 @@ void Engine::Renderer::OpenGL::Draw()
 	Engine::Application::Core::GL_SwapWindow(viewport.GetSurfaceHandle());
 }
 
-void Engine::Renderer::OpenGL::UpdateVBODatabase()
+void Engine::Renderer::OpenGL::UpdateVBODatabase(Data& data, const std::vector<MeshID>& loadQueue)
 {
-	const auto& loadQueue = Renderer::Core::GetMeshLoadQueue();
-
 	for (const auto& id : loadQueue)
 	{
-		using namespace Asset;
-		auto meshDocument = LoadMeshDocument(static_cast<Mesh>(id));
-
 		VBO vbo;
 
-		vbo.indexType = meshDocument.GetIndexType() == Asset::MeshDocument::IndexType::Uint16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
-		vbo.numIndices = meshDocument.GetIndexCount();
 
-		glGenVertexArrays(1, &vbo.vertexArrayObject);
-		glBindVertexArray(vbo.vertexArrayObject);
-
-		glGenBuffers(static_cast<GLint>(vbo.attributeBuffers.size()), vbo.attributeBuffers.data());
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[static_cast<size_t>(VBO::Attribute::Position)]);
-		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetData(Asset::MeshDocument::Attribute::Position).byteLength, meshDocument.GetDataPtr(Asset::MeshDocument::Attribute::Position), GL_STATIC_DRAW);
-		glEnableVertexAttribArray(static_cast<size_t>(VBO::Attribute::Position));
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[static_cast<size_t>(VBO::Attribute::TexCoord)]);
-		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetData(Asset::MeshDocument::Attribute::TexCoord).byteLength, meshDocument.GetDataPtr(Asset::MeshDocument::Attribute::TexCoord), GL_STATIC_DRAW);
-		glEnableVertexAttribArray(static_cast<size_t>(VBO::Attribute::TexCoord));
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[static_cast<size_t>(VBO::Attribute::Normal)]);
-		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetData(Asset::MeshDocument::Attribute::Normal).byteLength, meshDocument.GetDataPtr(Asset::MeshDocument::Attribute::Normal), GL_STATIC_DRAW);
-		glEnableVertexAttribArray(static_cast<size_t>(VBO::Attribute::Normal));
-		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo.attributeBuffers[static_cast<size_t>(VBO::Attribute::Index)]);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshDocument.GetData(Asset::MeshDocument::Attribute::Index).byteLength, meshDocument.GetDataPtr(Asset::MeshDocument::Attribute::Index), GL_STATIC_DRAW);
-
-		GetData().vboDatabase.insert({ id, vbo });
-	}
-
-	const auto& unloadQueue = Renderer::Core::GetMeshUnloadQueue();
-	for (const auto& item : unloadQueue)
-	{
-		const auto& iterator = GetData().vboDatabase.find(item);
-		iterator->second.DeallocateDeviceBuffers();
-		GetData().vboDatabase.erase(iterator);
+		data.vboDatabase.insert({ id, vbo });
 	}
 }
 
-void Engine::Renderer::OpenGL::UpdateIBODatabase()
+void Engine::Renderer::OpenGL::UpdateIBODatabase(Data& data, const std::vector<SpriteID>& loadQueue)
 {
-	const auto& loadQueue = Renderer::Core::GetSpriteLoadQueue();
-
+	glActiveTexture(GL_TEXTURE0);
 	for (const auto& id : loadQueue)
 	{
 		auto texDocument = Asset::LoadTextureDocument(static_cast<Asset::Sprite>(id));
@@ -325,22 +299,9 @@ void Engine::Renderer::OpenGL::UpdateIBODatabase()
 		glGenTextures(1, &ibo.texture);
 		glBindTexture(GL_TEXTURE_2D, ibo.texture);
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texDocument.GetDimensions().width, texDocument.GetDimensions().height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texDocument.GetData());
 
-		GetData().iboDatabase.insert({ id, ibo });
-	}
-
-	const auto& unloadQueue = Renderer::Core::GetSpriteUnloadQueue();
-	for (const auto& item : unloadQueue)
-	{
-		const auto& iterator = GetData().iboDatabase.find(item);
-		iterator->second.DeallocateDeviceBuffers();
-		GetData().iboDatabase.erase(iterator);
+		data.iboDatabase.insert({ id, ibo });
 	}
 }
 
@@ -353,4 +314,40 @@ void Engine::Renderer::OpenGL::VBO::DeallocateDeviceBuffers()
 void Engine::Renderer::OpenGL::IBO::ImageBufferObject::DeallocateDeviceBuffers()
 {
 	glDeleteTextures(1, &texture);
+}
+
+std::optional<Engine::Renderer::OpenGL::VBO> Engine::Renderer::OpenGL::VBOFromPath(const std::string& path)
+{
+	using namespace Asset;
+	auto meshDocument = LoadMeshDocument(path);
+
+	VBO vbo;
+
+	vbo.indexType = meshDocument.GetIndexType() == MeshDocument::IndexType::Uint16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+	vbo.numIndices = meshDocument.GetIndexCount();
+
+	glGenVertexArrays(1, &vbo.vertexArrayObject);
+	glBindVertexArray(vbo.vertexArrayObject);
+
+	glGenBuffers(static_cast<GLint>(vbo.attributeBuffers.size()), vbo.attributeBuffers.data());
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[static_cast<size_t>(VBO::Attribute::Position)]);
+	glBufferData(GL_ARRAY_BUFFER, meshDocument.GetData(MeshDocument::Attribute::Position).byteLength, meshDocument.GetDataPtr(Asset::MeshDocument::Attribute::Position), GL_STATIC_DRAW);
+	glEnableVertexAttribArray(static_cast<size_t>(VBO::Attribute::Position));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[static_cast<size_t>(VBO::Attribute::TexCoord)]);
+	glBufferData(GL_ARRAY_BUFFER, meshDocument.GetData(MeshDocument::Attribute::TexCoord).byteLength, meshDocument.GetDataPtr(Asset::MeshDocument::Attribute::TexCoord), GL_STATIC_DRAW);
+	glEnableVertexAttribArray(static_cast<size_t>(VBO::Attribute::TexCoord));
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[static_cast<size_t>(VBO::Attribute::Normal)]);
+	glBufferData(GL_ARRAY_BUFFER, meshDocument.GetData(MeshDocument::Attribute::Normal).byteLength, meshDocument.GetDataPtr(Asset::MeshDocument::Attribute::Normal), GL_STATIC_DRAW);
+	glEnableVertexAttribArray(static_cast<size_t>(VBO::Attribute::Normal));
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo.attributeBuffers[static_cast<size_t>(VBO::Attribute::Index)]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshDocument.GetData(Asset::MeshDocument::Attribute::Index).byteLength, meshDocument.GetDataPtr(Asset::MeshDocument::Attribute::Index), GL_STATIC_DRAW);
+
+	return vbo;
 }

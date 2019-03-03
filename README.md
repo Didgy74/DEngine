@@ -13,10 +13,10 @@ Linux:
 
 
 The engine uses the following libraries:
-GLEW
-SDL2
-OpenGL
-Vulkan LunarG
-nlohmann
-fx-gltf
-stb_image
+* GLEW
+* SDL2
+* OpenGL
+* Vulkan LunarG
+* nlohmann
+* fx-gltf
+* stb_image

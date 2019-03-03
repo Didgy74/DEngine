@@ -39,11 +39,7 @@ void Engine::Time::Core::TickEnd(SceneData& scene)
 
 	if (scene.fixedTickIntervalChanged)
 	{
-		// Can't use the literal 1 in the expression, since it throws a narrowing warning.
-		// Static-cast is just way too verbose in this case, but the C++-purist in me didn't allow a C-style cast.
-		// That's why I have this ridiculous constant here.
-		constexpr uint8_t one = 1;
-		scene.fixedTickIntervalBufferIndex = (scene.fixedTickIntervalBufferIndex + one) % static_cast<uint8_t>(scene.fixedTickInterval.size() - 1);
+		scene.fixedTickIntervalBufferIndex = (scene.fixedTickIntervalBufferIndex + uint8_t(1)) % static_cast<uint8_t>(scene.fixedTickInterval.size() - 1);
 		scene.fixedTickIntervalChanged = false;
 	}
 
@@ -81,3 +77,5 @@ float Engine::Time::SceneData::GetFixedDeltaTime() const
 }
 
 uint16_t Engine::Time::SceneData::GetFPS() const { return static_cast<uint16_t>(1.f / deltaTime); }
+
+size_t Engine::Time::SceneData::GetTickCount() const { return tickCount; }

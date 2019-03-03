@@ -19,42 +19,34 @@ namespace Engine
 	{
 		using SceneType = Setup::SceneType;
 		enum class API;
-		enum class Mode;
-		class SceneInfo;
 		class Viewport;
-		struct Transform;
 		struct CameraInfo;
+		class SceneData;
+		struct RenderGraph;
+		struct RenderGraphTransform;
 
 		Viewport& NewViewport(Utility::ImgDim dimensions, void* surfaceHandle);
-		const std::vector<std::unique_ptr<Viewport>>& GetViewports();
 		size_t GetViewportCount();
 		Viewport& GetViewport(size_t index);
 
-		size_t GetMeshReferenceCount(AssetID id);
-		void AddMeshReference(AssetID id);
-		void RemoveMeshReference(AssetID id);
-
-		size_t GetSpriteReferenceCount(AssetID id);
-		void AddSpriteReference(AssetID id);
-		void RemoveSpriteReference(AssetID id);
-
 		API GetActiveAPI();
+
+		bool IsCompatible(const RenderGraph& renderGraph, const RenderGraphTransform& transforms);
 
 		namespace Core
 		{
 			bool Initialize(API api, Utility::ImgDim dimensions, void* surfaceHandle);
-			void PrepareRendering();
+			void PrepareRenderingEarly(RenderGraph& renderGraphInput);
+			void PrepareRenderingLate(RenderGraphTransform& sceneData);
 			void Draw();
 			void Terminate();
 
 			void* GetAPIData();
 
-			const std::vector<AssetID>& GetMeshLoadQueue();
-			const std::vector<AssetID>& GetMeshUnloadQueue();
-			const std::vector<AssetID>& GetSpriteLoadQueue();
-			const std::vector<AssetID>& GetSpriteUnloadQueue();
-
-			class PrivateAccessor;
+			const RenderGraph& GetRenderGraph();
+			const RenderGraphTransform& GetRenderGraphTransform();
+			const CameraInfo& GetCameraInfo();
+			void SetCameraInfo(const CameraInfo& input);
 		};
 	}
 
@@ -65,69 +57,61 @@ namespace Engine
 		Vulkan
 	};
 
-	enum class Renderer::Mode
+	struct Renderer::RenderGraph
 	{
-		Shaded,
-		Wireframe,
-		Flat
+		std::vector<SpriteID> sprites;
+
+		size_t GetTotalObjectCount() const;
+	};
+
+	struct Renderer::RenderGraphTransform
+	{
+		std::vector<Math::Matrix4x4> sprites;
+	};
+
+	class Renderer::SceneData
+	{
+	public:
+	    SceneData();
+
+        size_t GetSceneID() const;
+	private:
+		size_t sceneID;
 	};
 
 	struct Renderer::CameraInfo
 	{
 		enum class ProjectMode
 		{
-			Projection,
-			Orthogonal
+			Perspective,
+			Orthographic
 		};
 
 		Math::Matrix4x4 transform;
 		ProjectMode projectMode;
 		float fovY;
-	};
+		float zNear;
+		float zFar;
+		float orthoWidth;
 
-	class Renderer::SceneInfo
-	{
-	public:
-		CameraInfo cameraInfo;
-
-		std::vector<AssetID> meshes;
-		std::vector<Math::Matrix4x4> meshTransforms;
-
-		std::vector<AssetID> sprites;
-		std::vector<Math::Matrix4x4> spriteTransforms;
-
-		std::vector<Math::Vector2D> particle2Ds;
+		Math::Matrix4x4 GetModel(float aspectRatio) const;
 	};
 
 	class Renderer::Viewport
 	{
 	public:
-		const SceneType* GetScene() const;
-		SceneType* GetScene();
-		void SetScene(SceneType* scene);
+		Viewport(Utility::ImgDim dimensions, void* surfaceHandle);
+
+		void SetSceneRef(const SceneType* scene);
 		Utility::ImgDim GetDimensions() const;
 		size_t GetCameraIndex() const;
 		void* GetSurfaceHandle();
-		Mode GetRenderMode() const;
-		void SetRenderMode(Mode newRenderMode);
-		const SceneInfo& GetRenderInfo() const;
-		bool IsRenderInfoValidated() const;
-		Math::Matrix4x4 GetCameraModel() const;
-		Utility::Color GetWireframeColor() const;
-
-		Viewport(Utility::ImgDim dimensions, void* surfaceHandle);
 
 	private:
-		SceneType* sceneRef;
+		const SceneType* sceneRef;
 		size_t cameraIndex;
 		Utility::ImgDim dimensions;
 		void* surfaceHandle;
-		Mode renderMode;
-		SceneInfo renderInfo;
-		bool renderInfoValidated;
-		Utility::Color wireframeColor;
-
-		friend class Core::PrivateAccessor;
 	};
 }
 

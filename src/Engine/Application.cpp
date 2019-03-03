@@ -148,11 +148,6 @@ void Engine::Application::Core::Initialize(API3D api)
 		SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
 		SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-		//SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-		//SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
-
-		SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
-
 		auto result = SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 		if (result != 0)
         {

@@ -25,9 +25,9 @@ void Engine::Core::Run()
 	Physics2D::Core::Initialize();
 	Renderer::Core::Initialize(Renderer::API::OpenGL, Application::GetViewportSize(), Application::Core::GetSDLWindowHandle());
 
-	// Create scene and make viewport point to scene 1.
+	// Create scene and make viewport 0 point to scene 0.
 	Scene& scene1 = Engine::NewScene();
-	Renderer::GetViewport(0).SetScene(&scene1);
+	Renderer::GetViewport(0).SetSceneRef(&scene1);
 
 
 
@@ -40,7 +40,11 @@ void Engine::Core::Run()
 	auto& camera = objCamera.AddComponent<Camera>();
 	camera.position.z = 5.f;
 
-	
+
+	Renderer::RenderGraph graph;
+	Renderer::RenderGraphTransform graphTransform;
+
+
 	while (Application::Core::UpdateEvents(), Application::IsRunning())
 	{
 		// Handles origin movement for camera
@@ -62,16 +66,25 @@ void Engine::Core::Run()
 
 		std::cout << scene1.GetTimeData().GetFPS() << std::endl;
 
-		Renderer::Core::PrepareRendering();
 
-		//if (Time::Core::StartFixedTick())
+
+
+
+		if (scene1.GetTimeData().GetTickCount() == 0 || scene1.GetTimeData().GetTickCount() == 1)
 		{
-			//Physics2D::Core::FixedTick(scene1);
+			graph.sprites.push_back(static_cast<Renderer::SpriteID>(Asset::Sprite::Default));
+			graphTransform.sprites.push_back(sprite1.GetModel(Space::World));
 		}
+
+		Renderer::Core::SetCameraInfo(camera.GetCameraInfo());
+
+		Renderer::Core::PrepareRenderingEarly(graph);
+
+		Renderer::Core::PrepareRenderingLate(graphTransform);
 
 		Renderer::Core::Draw();
 
-		TickEnd(scene1);
+		Time::Core::TickEnd(scene1.GetTimeData());
 	}
 
 	scenes.clear();
@@ -85,11 +98,6 @@ void Engine::Core::Run()
 void Engine::Core::Destroy(SceneObject& sceneObject)
 {
 	sceneObject.GetScene().RemoveSceneObject(sceneObject);
-}
-
-void Engine::Core::TickEnd(Engine::Scene &scene)
-{
-	Time::Core::TickEnd(scene.GetTimeData());
 }
 
 Engine::Scene& Engine::NewScene() 

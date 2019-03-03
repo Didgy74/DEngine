@@ -23,7 +23,7 @@ namespace Engine
 
 			float GetTimeSinceAppStart() const;
 			float GetTimeSinceSceneStart() const;
-			size_t GetFrameCount() const;
+			size_t GetTickCount() const;
 			float GetFixedDeltaTime() const;
 			void SetFixedTickInterval(float intervalLength);
 			float GetDeltaTime() const;
@@ -31,6 +31,7 @@ namespace Engine
 
 		private:
 			size_t tickCount;
+			size_t fixedTickCount;
             std::chrono::high_resolution_clock::time_point startTime;
             std::chrono::high_resolution_clock::time_point previousFrameEndTime;
             float deltaTime;

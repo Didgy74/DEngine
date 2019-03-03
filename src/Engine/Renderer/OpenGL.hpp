@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Typedefs.hpp"
+#include <vector>
+
 namespace Engine
 {
 	namespace Renderer
@@ -8,7 +11,8 @@ namespace Engine
 		{
 			void Initialize(void*& apiData);
 			void Terminate(void*& apiData);
-			void PrepareRendering();
+			void PrepareRenderingEarly(const std::vector<SpriteID>& sprites);
+			void PrepareRenderingLate();
 			void Draw();
 		}
 	}

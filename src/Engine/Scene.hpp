@@ -5,8 +5,6 @@ namespace Engine
 	class Core;
 	class Scene;
 	class SceneObject;
-	class ComponentBase;
-	class SingletonComponentBase;
 }
 
 #include "Physics2D.hpp"
@@ -61,8 +59,7 @@ namespace Engine
 
 		size_t indexInEngine;
 		std::vector<SceneObject*> sceneObjects;
-		std::unordered_map<std::type_index, std::vector<ComponentBase*>> components;
-		std::unordered_map<std::type_index, std::vector<SingletonComponentBase*>> singletonComponents;
+		std::unordered_map<std::type_index, void*> components;
 		bool renderSceneValid;
 
 		Time::SceneData timeData;
@@ -76,39 +73,29 @@ namespace Engine
 	template<typename ComponentType>
 	const std::vector<ComponentType*>* Scene::GetComponents() const
 	{
-		if constexpr (ComponentType::isSingleton == true)
-		{
-            auto iterator = singletonComponents.find(typeid(ComponentType));
-            if (iterator == singletonComponents.end())
-                return nullptr;
-            else
-                return reinterpret_cast<const std::vector<ComponentType*>*>(&iterator->second);
-		}
-		else
-		{
-			auto iterator = components.find(typeid(ComponentType));
-			if (iterator == components.end())
-				return nullptr;
-			else
-				return reinterpret_cast<const std::vector<ComponentType*>*>(&iterator->second);
-		}
+		return nullptr;
 	}
 
 	template<typename ComponentType>
 	ComponentType& Scene::AddComponentFromSceneObject(SceneObject& owningObject, size_t indexInSceneObject)
 	{
-		std::vector<ComponentBase*>& vector = components[typeid(ComponentType)];
-		ComponentType* newObj = new ComponentType(owningObject, indexInSceneObject, vector.size());
-		vector.push_back(newObj);
+		void*& ptr = components[typeid(ComponentType)];
+		if (!ptr)
+			ptr = new std::vector<ComponentType*>();
+
+		std::vector<ComponentType*>& vector = *static_cast<std::vector<ComponentType*>*>(ptr);
+		auto* newObj = new ComponentType(owningObject, indexInSceneObject, vector.size());
+		vector.emplace_back(newObj);
 		return *newObj;
 	}
 
 	template<typename ComponentType>
 	ComponentType& Scene::AddSingletonComponentFromSceneObject(SceneObject& owningObject)
 	{
-		std::vector<SingletonComponentBase*>& vector = singletonComponents[typeid(ComponentType)];
-		ComponentType* newObj = new ComponentType(owningObject, vector.size());
-		vector.push_back(newObj);
+		//std::vector<SingletonComponentBase*>& vector = singletonComponents[typeid(ComponentType)];
+		//ComponentType* newObj = new ComponentType(owningObject, vector.size());
+		ComponentType* newObj = new ComponentType(owningObject, 0);
+		//vector.push_back(newObj);
 		return *newObj;
 	}
 }

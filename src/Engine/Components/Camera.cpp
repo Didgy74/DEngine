@@ -2,6 +2,8 @@
 
 #include "Math/LinearTransform3D.hpp"
 
+#include "../Renderer/Renderer.hpp"
+
 Engine::Camera::Camera(SceneObject& owningObject, size_t indexInSceneObject, size_t indexInScene) noexcept :
 	ParentType(owningObject, indexInSceneObject, indexInScene),
 	position(),
@@ -24,17 +26,19 @@ void Engine::Camera::LookAt(const Math::Vector3D& newTarget)
 	forward = (newTarget - position).GetNormalized();
 }
 
-Engine::Camera::operator Engine::Renderer::CameraInfo() const
+Engine::Renderer::CameraInfo Engine::Camera::GetCameraInfo() const
 {
 	Renderer::CameraInfo cameraInfo;
 
-	cameraInfo.transform = Math::LinTran3D::LookAtRH(position, position + forward, up);
 	cameraInfo.fovY = fov;
-	
+	cameraInfo.orthoWidth = orthographicWidth;
+	cameraInfo.zNear = zNear;
+	cameraInfo.zFar = zFar;
+
 	if (activeProjectionMode == ProjectionMode::Perspective)
-		cameraInfo.projectMode = Renderer::CameraInfo::ProjectMode::Projection;
-	else
-		cameraInfo.projectMode = Renderer::CameraInfo::ProjectMode::Orthogonal;
+		cameraInfo.projectMode = Renderer::CameraInfo::ProjectMode::Perspective;
+
+	cameraInfo.transform = Math::LinTran3D::LookAtRH(position, position + forward, up);
 
 	return cameraInfo;
 }

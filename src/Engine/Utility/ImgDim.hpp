@@ -13,14 +13,14 @@ namespace Utility
 		ValueType width;
 		ValueType height;
 
-		constexpr float AspectRatio() const;
+		constexpr float GetAspectRatio() const;
 
 		void Swap();
 
 		std::string ToString() const;
 	};
 
-	constexpr float ImgDim::AspectRatio() const { return static_cast<float>(width) / static_cast<float>(height); }
+	constexpr float ImgDim::GetAspectRatio() const { return static_cast<float>(width) / static_cast<float>(height); }
 
 	inline void ImgDim::Swap() { std::swap(width, height); }
 

@@ -7,7 +7,6 @@
 
 #include "vulkan/vulkan.hpp"
 
-
 #include <array>
 #include <set>
 #include <vector>
@@ -95,7 +94,7 @@ namespace Engine
 			void UpdateEssentialUniforms(Data& data, uint8_t inFlightIndex);
 			void MemoryCleanup(Data& data, uint8_t inFlightIndex);
 
-			void UpdateVBOs(Data& data);
+			void UpdateVBOs(Data& data, const std::vector<MeshID>& loadQueue);
 
 			uint32_t FindMemoryType(PhysicalDevice& device, uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 			std::pair<vk::Buffer, vk::DeviceMemory> MakeAndBindBuffer(vk::Device& device, vk::DeviceSize bufferSize, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags memoryProperties);
@@ -159,7 +158,7 @@ size_t Engine::Renderer::Vulkan::VBO::GetByteOffset(Attribute attribute) const
 {
 	size_t offset = 0;
 	for (size_t i = 0; i < static_cast<size_t>(attribute); i++)
-		offset += attributeSizes[i];
+		offset += static_cast<size_t>(attributeSizes[i]);
 	return offset;
 }
 
@@ -258,8 +257,8 @@ struct Engine::Renderer::Vulkan::Data
 
 	vk::Sampler sampler = nullptr;
 
-	std::unordered_map<AssetID, VBO> vboDatabase;
-	std::unordered_map<AssetID, IBO> iboDatabase;
+	std::unordered_map<MeshID, VBO> vboDatabase;
+	std::unordered_map<SpriteID, IBO> iboDatabase;
 	std::vector<DeletionQueues> deletionQueues;
 
 	std::vector<const char*> availableInstanceExtensions;
@@ -428,8 +427,8 @@ void Engine::Renderer::Vulkan::SetUpDebugCallback(Data& data)
 
 	VkDebugReportCallbackCreateInfoEXT createInfoTemp = createInfo;
 	VkDebugReportCallbackEXT callback;
-	data.createDebugReportCallbackPtr(GetData().instance, &createInfoTemp, nullptr, &callback);
-	data.debugReportCallback = callback;
+	data.createDebugReportCallbackPtr(static_cast<VkInstance>(data.instance), &createInfoTemp, nullptr, &callback);
+	data.debugReportCallback = static_cast<vk::DebugReportCallbackEXT>(callback);
 
 	// Bind vkDestroyDebugReportCallbackEXT for destruction upon Vulkan termination.
 	data.destroyDebugReportCallbackPtr = reinterpret_cast<PFN_vkDestroyDebugReportCallbackEXT>(data.instance.getProcAddr(destroyDebugReportCallbackName.data()));
@@ -442,7 +441,7 @@ void Engine::Renderer::Vulkan::CreateSurface(Data& data)
 
 	VkSurfaceKHR surface;
 	Engine::Application::Core::Vulkan_CreateSurface(viewport.GetSurfaceHandle(), &data.instance, &surface);
-	data.surface = surface;
+	data.surface = static_cast<vk::SurfaceKHR>(surface);
 
 	data.swapchain.surfaceFormat = { vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear };
 
@@ -684,7 +683,7 @@ void Engine::Renderer::Vulkan::CreateEssentialUniforms(Data& data)
 	auto& modelCount = data.essentialUniforms.modelCount;
 	modelCount = 1000;
 
-	size_t totalBufferSize = (cameraTransformSize + modelTransformSize * modelCount) * inFlightCount;
+	auto totalBufferSize = static_cast<size_t>((cameraTransformSize + modelTransformSize * modelCount) * inFlightCount);
 	{
 		auto temp = MakeAndBindBuffer(data.device, totalBufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible);
 
@@ -901,18 +900,6 @@ void Engine::Renderer::Vulkan::HandleGraphicsCommandBuffers()
 {
 	Data& data = GetData();
 
-	if (Renderer::GetViewport(0).IsRenderInfoValidated() == false)
-	{
-		for (auto& item : data.primaryCommandBuffers)
-			item.upToDate = false;
-	}
-
-	bool& upToDate = data.primaryCommandBuffers[data.currentFrame].upToDate;
-	if (upToDate == true)
-		return;
-	else
-		upToDate = true;
-
 	const auto& cmdBuffer = data.primaryCommandBuffers[data.currentFrame].handle;
 
 	vk::CommandBufferBeginInfo beginInfo;
@@ -935,13 +922,13 @@ void Engine::Renderer::Vulkan::HandleGraphicsCommandBuffers()
 
 	cmdBuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
 
-	const auto& sprites = Renderer::GetViewport(0).GetRenderInfo().sprites;
+	const auto& sprites = std::vector<SpriteID>();
 	if (sprites.size() > 0)
 	{
 		cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, data.pipeline);
 
 		// Load VBO for spriteplane
-		const auto& vbo = data.vboDatabase[static_cast<AssetID>(Asset::Mesh::SpritePlane)];
+		const auto& vbo = data.vboDatabase[static_cast<MeshID>(Asset::Mesh::SpritePlane)];
 		std::array<vk::Buffer, 3> vertexBuffers{ vbo.buffer, vbo.buffer, vbo.buffer };
 		std::array<vk::DeviceSize, 3> vboOffsets
 		{
@@ -1085,7 +1072,10 @@ void Engine::Renderer::Vulkan::Terminate(void*& apiData)
 
 	// Destroy debug report callback
 	if constexpr (enableDebug)
-		data.destroyDebugReportCallbackPtr(data.instance, data.debugReportCallback, nullptr);
+		data.destroyDebugReportCallbackPtr(
+				static_cast<VkInstance>(data.instance),
+				static_cast<VkDebugReportCallbackEXT>(data.debugReportCallback),
+				nullptr);
 
 	// Destroy logical device
 	data.device.destroy();
@@ -1100,11 +1090,9 @@ void Engine::Renderer::Vulkan::Terminate(void*& apiData)
 	apiData = nullptr;
 }
 
-void Engine::Renderer::Vulkan::UpdateVBOs(Data& data)
+void Engine::Renderer::Vulkan::UpdateVBOs(Data& data, const std::vector<MeshID>& loadQueue)
 {
-	const auto& meshLoadQueue = Core::GetMeshLoadQueue();
-
-	for (auto& item : meshLoadQueue)
+	for (auto& item : loadQueue)
 	{
 		using namespace Asset;
 
@@ -1150,42 +1138,11 @@ void Engine::Renderer::Vulkan::UpdateVBOs(Data& data)
 
 		data.vboDatabase.insert({ item, vbo });
 	}
-
-	// Queue meshes for deletion
-	const auto& deletionJobQueue = data.deletionQueues[data.currentInFlight].deletionJobs[0];
-	const auto& unloadQueue = Core::GetMeshUnloadQueue();
-	for (auto& item : unloadQueue)
-	{
-		auto vboIterator = data.vboDatabase.find(item);
-		auto& vbo = vboIterator->second;
-
-		DeletionQueues::DeletionJob job;
-		job.buffer = vbo.buffer;
-		job.memory = vbo.deviceMemory;
-
-		data.deletionQueues[data.currentInFlight].deletionJobs[0].push_back({});
-
-		data.vboDatabase.erase(vboIterator);
-	}
 }
 
 void Engine::Renderer::Vulkan::PrepareRendering()
 {
 	bool updateRequired = false;
-	for (size_t i = 0; i < Renderer::GetViewportCount(); i++)
-	{
-		if (Renderer::GetViewport(i).IsRenderInfoValidated() == false)
-		{
-			updateRequired = true;
-			break;
-		}
-	}
-
-	if (updateRequired)
-	{
-		Data& data = GetData();
-		UpdateVBOs(data);
-	}
 }
 
 void Engine::Renderer::Vulkan::UpdateEssentialUniforms(Data& data, uint8_t inFlightIndex)
@@ -1197,19 +1154,10 @@ void Engine::Renderer::Vulkan::UpdateEssentialUniforms(Data& data, uint8_t inFli
 
 	auto& viewport = GetViewport(0);
 
-	auto temp = viewport.GetCameraModel();
+	auto temp = Math::Matrix4x4();
 	std::memcpy(ptr, &temp, sizeof(temp));
 
 	ptr = ptr + data.essentialUniforms.cameraTransformSize;
-
-	for (size_t i = 0; i < viewport.GetRenderInfo().spriteTransforms.size(); i++)
-	{
-		std::byte* newPtr = ptr + (i * data.essentialUniforms.modelTransformSize);
-
-		auto temp = viewport.GetRenderInfo().spriteTransforms[i];
-
-		std::memcpy(newPtr, &temp, sizeof(temp));
-	}
 }
 
 void Engine::Renderer::Vulkan::MemoryCleanup(Data& data, uint8_t inFlightIndex)
@@ -1275,7 +1223,7 @@ void Engine::Renderer::Vulkan::Draw()
 	auto presentResult = data.graphicsQueue.presentKHR(presentInfo);
 	assert(presentResult == vk::Result::eSuccess);
 
-	data.currentInFlight = (data.currentInFlight + 1) % data.swapchain.numInFlight;
+	data.currentInFlight = (data.currentInFlight + uint8_t(1)) % data.swapchain.numInFlight;
 }
 
 

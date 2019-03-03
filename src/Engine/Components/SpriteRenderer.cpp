@@ -19,11 +19,6 @@ Engine::SpriteRenderer::SpriteRenderer(SceneObject& owningObject, size_t indexIn
 
 Engine::SpriteRenderer::~SpriteRenderer()
 {
-	if (GetSprite() != Asset::Sprite::None)
-	{
-		InvalidateRenderScene();
-		Renderer::RemoveSpriteReference(static_cast<Renderer::AssetID>(*this));
-	}
 }
 
 void Engine::SpriteRenderer::SetSprite(Asset::Sprite newSprite)
@@ -33,19 +28,7 @@ void Engine::SpriteRenderer::SetSprite(Asset::Sprite newSprite)
 
 	assert(Asset::CheckValid(newSprite));
 
-	if (GetSprite() == Asset::Sprite::None && newSprite != Asset::Sprite::None)
-		Renderer::AddSpriteReference(static_cast<Renderer::AssetID>(newSprite));
-	else if (GetSprite() != Asset::Sprite::None && newSprite != Asset::Sprite::None)
-	{
-		Renderer::RemoveSpriteReference(static_cast<Renderer::AssetID>(GetSprite()));
-		Renderer::AddSpriteReference(static_cast<Renderer::AssetID>(newSprite));
-	}
-	else if (GetSprite() != Asset::Sprite::None && newSprite == Asset::Sprite::None)
-		Renderer::RemoveSpriteReference(static_cast<Renderer::AssetID>(GetSprite()));
-
 	sprite = newSprite;
-
-	InvalidateRenderScene();
 }
 
 Asset::Sprite Engine::SpriteRenderer::GetSprite() const { return sprite; }
@@ -80,5 +63,3 @@ Math::Matrix4x4 Engine::SpriteRenderer::GetModel(Space space) const
 		newMatrix[3][y] = model[2][y];
 	return newMatrix;
 }
-
-Engine::SpriteRenderer::operator Engine::Renderer::AssetID() const { return static_cast<Renderer::AssetID>(GetSprite()); }

@@ -12,7 +12,7 @@ namespace Engine
 	{
 		constexpr Utility::ImgDim defaultWindowSize = { 1280, 720 };
 		constexpr Utility::ImgDim minimumWindowSize = { 800, 600 };
-		constexpr float narrowestAspectRatio = minimumWindowSize.AspectRatio();
+		constexpr float narrowestAspectRatio = minimumWindowSize.GetAspectRatio();
 		constexpr std::string_view defaultApplicationName = "VulkanProject1";
 
 		enum class API3D
