@@ -5,8 +5,8 @@
 #include "../Scene.hpp"
 #include "../SceneObject.hpp"
 
-Engine::CircleCollider2D::CircleCollider2D(SceneObject& owningObject, size_t indexInSceneObject, size_t indexInScene) :
-	ParentType(owningObject, indexInSceneObject, indexInScene),
+Engine::CircleCollider2D::CircleCollider2D(SceneObject& owningObject) :
+	ParentType(owningObject),
 	radius(0.5f),
 	position{0, 0}
 {

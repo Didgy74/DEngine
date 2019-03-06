@@ -1,11 +1,12 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
+
 namespace Engine
 {
     class SceneObject;
 }
-
-#include "../SceneObject.hpp"
 
 namespace Engine
 {
@@ -14,22 +15,17 @@ namespace Engine
     public:
         static constexpr bool isSingleton = true;
 
-        SingletonComponentBase(SceneObject& owningObject, size_t indexInScene) noexcept;
-        SingletonComponentBase(const SingletonComponentBase& right) = delete;
-        SingletonComponentBase(SingletonComponentBase&& right) noexcept = delete;
+        explicit SingletonComponentBase(SceneObject& owningObject);
 
         virtual ~SingletonComponentBase() = 0;
-
-        SingletonComponentBase& operator=(const SingletonComponentBase& right) = delete;
-        SingletonComponentBase& operator=(SingletonComponentBase&& right) = delete;
 
         [[nodiscard]] SceneObject& GetSceneObject();
         [[nodiscard]] const SceneObject& GetSceneObject() const;
         [[nodiscard]] size_t GetIndexInScene() const;
 
+        [[nodiscard]] size_t GetID() const;
     private:
         std::reference_wrapper<SceneObject> sceneObjectRef;
-        size_t indexInScene;
     };
 }
 

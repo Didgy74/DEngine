@@ -34,6 +34,12 @@ namespace Engine
 			void UpdateIBODatabase(Data& data, const std::vector<SpriteID>& loadQueue);
 
 			Data& GetData();
+
+			void Draw_SpritePass(const Data& data, const std::vector<SpriteID>& sprites, const std::vector<Math::Matrix4x4>& transforms);
+			void Draw_MeshPass(const Data& data, const std::vector<MeshID>& meshes, const std::vector<Math::Matrix4x4>& transforms);
+
+			void LoadSpriteShader(Data& data);
+			void LoadMeshShader(Data& data);
 		}
 	}
 }
@@ -74,10 +80,14 @@ struct Engine::Renderer::OpenGL::Data
 
 	std::unordered_map<SpriteID, IBO> iboDatabase;
 
-	GLuint program;
-	GLint modelUniform;
-	GLint viewProjectionUniform;
-	GLint samplerUniform;
+	GLuint spriteProgram;
+	GLint spriteModelUniform;
+	GLint spriteViewUniform;
+	GLint spriteSamplerUniform;
+
+	GLuint meshProgram;
+	GLint meshModelUniform;
+	GLint meshViewUniform;
 
 	GLuint samplerObject;
 };
@@ -155,6 +165,68 @@ static GLuint CreateShader(const std::string& text, GLuint type)
 	return shader;
 }
 
+void Engine::Renderer::OpenGL::LoadSpriteShader(Data& data)
+{
+	// Create shader
+	data.spriteProgram = glCreateProgram();
+
+	std::array<GLuint, 2> shaders{};
+	shaders[0] = CreateShader(LoadShader("Data/Shaders/Sprite/OpenGL/sprite.vert"), GL_VERTEX_SHADER);
+	shaders[1] = CreateShader(LoadShader("Data/Shaders/Sprite/OpenGL/sprite.frag"), GL_FRAGMENT_SHADER);
+
+	for (unsigned int i = 0; i < 2; i++)
+		glAttachShader(data.spriteProgram, shaders[i]);
+
+	glBindAttribLocation(data.spriteProgram, 0, "position");
+	glBindAttribLocation(data.spriteProgram, 1, "texCoord");
+	glBindAttribLocation(data.spriteProgram, 2, "normal");
+
+	glLinkProgram(data.spriteProgram);
+	CheckShaderError(data.spriteProgram, GL_LINK_STATUS, true, "Error linking shader program");
+
+	glValidateProgram(data.spriteProgram);
+	CheckShaderError(data.spriteProgram, GL_LINK_STATUS, true, "Invalid shader program");
+
+	for (unsigned int i = 0; i < 2; i++)
+		glDeleteShader(shaders[i]);
+
+	// Grab uniforms
+	data.spriteModelUniform = glGetUniformLocation(data.spriteProgram, "model");
+	data.spriteViewUniform = glGetUniformLocation(data.spriteProgram, "viewProjection");
+
+	data.spriteSamplerUniform = glGetUniformLocation(data.spriteProgram, "sampler");
+}
+
+void Engine::Renderer::OpenGL::LoadMeshShader(Engine::Renderer::OpenGL::Data &data)
+{
+	// Create shader
+	data.meshProgram = glCreateProgram();
+
+	std::array<GLuint, 2> shader{};
+	shader[0] = CreateShader(LoadShader("Data/Shaders/Mesh/OpenGL/Mesh.vert"), GL_VERTEX_SHADER);
+	shader[1] = CreateShader(LoadShader("Data/Shaders/Mesh/OpenGL/Mesh.frag"), GL_FRAGMENT_SHADER);
+
+	for (unsigned int i = 0; i < 2; i++)
+		glAttachShader(data.meshProgram, shader[i]);
+
+	glBindAttribLocation(data.meshProgram, 0, "position");
+	glBindAttribLocation(data.meshProgram, 1, "texCoord");
+	glBindAttribLocation(data.meshProgram, 2, "normal");
+
+	glLinkProgram(data.meshProgram);
+	CheckShaderError(data.meshProgram, GL_LINK_STATUS, true, "Error linking shader program");
+
+	glValidateProgram(data.meshProgram);
+	CheckShaderError(data.meshProgram, GL_LINK_STATUS, true, "Invalid shader program");
+
+	for (unsigned int i = 0; i < 2; i++)
+		glDeleteShader(shader[i]);
+
+	// Grab uniforms
+	data.meshModelUniform = glGetUniformLocation(data.meshProgram, "model");
+	data.meshViewUniform = glGetUniformLocation(data.meshProgram, "viewProjection");
+}
+
 void Engine::Renderer::OpenGL::Initialize(void*& apiData)
 {
 	auto glInitResult = glewInit();
@@ -182,54 +254,31 @@ void Engine::Renderer::OpenGL::Initialize(void*& apiData)
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
-	// Create shader
-	data.program = glCreateProgram();
-
-	std::array<GLuint, 2> shaders{};
-	shaders[0] = CreateShader(LoadShader("Data/Shaders/Sprite/OpenGL/sprite.vert"), GL_VERTEX_SHADER);
-	shaders[1] = CreateShader(LoadShader("Data/Shaders/Sprite/OpenGL/sprite.frag"), GL_FRAGMENT_SHADER);
-
-	for (unsigned int i = 0; i < 2; i++)
-		glAttachShader(data.program, shaders[i]);
-
-	glBindAttribLocation(data.program, 0, "position");
-	glBindAttribLocation(data.program, 1, "texCoord");
-	glBindAttribLocation(data.program, 2, "normal");
-
-	glLinkProgram(data.program);
-	CheckShaderError(data.program, GL_LINK_STATUS, true, "Error linking shader program");
-
-	glValidateProgram(data.program);
-	CheckShaderError(data.program, GL_LINK_STATUS, true, "Invalid shader program");
-
-	for (unsigned int i = 0; i < 2; i++)
-		glDeleteShader(shaders[i]);
-
-	// Grab uniforms
-	data.modelUniform = glGetUniformLocation(GetData().program, "model");
-	data.viewProjectionUniform = glGetUniformLocation(GetData().program, "viewProjection");
-
-	data.samplerUniform = glGetUniformLocation(GetData().program, "sampler");
+	LoadSpriteShader(data);
+	LoadMeshShader(data);
 }
 
 void Engine::Renderer::OpenGL::Terminate(void*& apiData)
 {
-	GetData().quadVBO.DeallocateDeviceBuffers();
-	for (auto& vboItem : GetData().vboDatabase)
+	Data& data = *static_cast<Data*>(apiData);
+
+	data.quadVBO.DeallocateDeviceBuffers();
+	for (auto& vboItem : data.vboDatabase)
 		vboItem.second.DeallocateDeviceBuffers();
 
-	for (auto& iboItem : GetData().vboDatabase)
+	for (auto& iboItem : data.vboDatabase)
 		iboItem.second.DeallocateDeviceBuffers();
 
-	glDeleteProgram(GetData().program);
+	glDeleteProgram(data.spriteProgram);
 
 	delete static_cast<Data*>(apiData);
 	apiData = nullptr;
 }
 
-void Engine::Renderer::OpenGL::PrepareRenderingEarly(const std::vector<SpriteID>& spriteLoadQueue)
+void Engine::Renderer::OpenGL::PrepareRenderingEarly(const std::vector<SpriteID>& spriteLoadQueue, const std::vector<MeshID>& meshLoadQueue)
 {
 	UpdateIBODatabase(GetData(), spriteLoadQueue);
+	UpdateVBODatabase(GetData(), meshLoadQueue);
 }
 
 void Engine::Renderer::OpenGL::PrepareRenderingLate()
@@ -240,50 +289,91 @@ void Engine::Renderer::OpenGL::Draw()
 {
 	Data& data = GetData();
 
-	glClearColor(0.f, 0.f, 0.f, 1.f);
+	glClearColor(1.f, 0.f, 0.f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	auto& viewport = Renderer::GetViewport(0);
 
+	const auto& renderGraph = Core::GetRenderGraph();
+	const auto& renderGraphTransform = Core::GetRenderGraphTransform();
+
+
+	Draw_SpritePass(data, renderGraph.sprites, renderGraphTransform.sprites);
+	Draw_MeshPass(data, renderGraph.meshes, renderGraphTransform.meshes);
+
+
+	Engine::Application::Core::GL_SwapWindow(viewport.GetSurfaceHandle());
+}
+
+void Engine::Renderer::OpenGL::Draw_SpritePass(const Data& data,
+		 									   const std::vector<SpriteID>& sprites,
+											   const std::vector<Math::Matrix4x4>& transforms)
+{
+	auto& viewport = Renderer::GetViewport(0);
+
 	// Sprite render pass
-	const auto& sprites = Core::GetRenderGraph().sprites;
 	if (!sprites.empty())
 	{
-		glUseProgram(data.program);
+		glUseProgram(data.spriteProgram);
 
 		auto viewMat = Core::GetCameraInfo().GetModel(viewport.GetDimensions().GetAspectRatio());
-		glProgramUniformMatrix4fv(data.program, data.viewProjectionUniform, 1, GL_FALSE, viewMat.data.data());
+		glProgramUniformMatrix4fv(data.spriteProgram, data.spriteViewUniform, 1, GL_FALSE, viewMat.data.data());
 
-		glProgramUniform1ui(data.program, data.samplerUniform, 0);
+		glProgramUniform1ui(data.spriteProgram, data.spriteSamplerUniform, 0);
 		glBindSampler(0, data.samplerObject);
 
 		const auto& spriteVBO = data.quadVBO;
 		glBindVertexArray(spriteVBO.vertexArrayObject);
 
-		const auto& spriteTransforms = Core::GetRenderGraphTransform().sprites;
 		for (size_t i = 0; i < sprites.size(); i++)
 		{
-			glProgramUniformMatrix4fv(GetData().program, GetData().modelUniform, 1, GL_FALSE, spriteTransforms[i].data.data());
+			glProgramUniformMatrix4fv(data.spriteProgram, data.spriteModelUniform, 1, GL_FALSE, transforms[i].data.data());
 
 			glActiveTexture(GL_TEXTURE0);
-			const auto& ibo = data.iboDatabase[sprites[i]];
+			const IBO& ibo = data.iboDatabase.at(sprites[i]);
 			glBindTexture(GL_TEXTURE_2D, ibo.texture);
 
-			glDrawElements(GL_TRIANGLES, spriteVBO.numIndices, spriteVBO.indexType, 0);
+			glDrawElements(GL_TRIANGLES, spriteVBO.numIndices, spriteVBO.indexType, nullptr);
 		}
 	}
-
-	Engine::Application::Core::GL_SwapWindow(viewport.GetSurfaceHandle());
 }
+
+void Engine::Renderer::OpenGL::Draw_MeshPass(const Engine::Renderer::OpenGL::Data &data,
+											 const std::vector<Engine::Renderer::MeshID> &meshes,
+											 const std::vector<Math::Matrix4x4> &transforms)
+{
+	auto& viewport = Renderer::GetViewport(0);
+
+	if (!meshes.empty())
+	{
+		glUseProgram(data.meshProgram);
+
+		auto viewMat = Core::GetCameraInfo().GetModel(viewport.GetDimensions().GetAspectRatio());
+		glProgramUniformMatrix4fv(data.meshProgram, data.meshViewUniform, 1, GL_FALSE, viewMat.data.data());
+
+		for (size_t i = 0; i < meshes.size(); i++)
+		{
+			glProgramUniformMatrix4fv(data.meshProgram, data.meshModelUniform, 1, GL_FALSE, transforms[i].data.data());
+
+			const VBO& vbo = data.vboDatabase.at(meshes[i]);
+			glBindVertexArray(vbo.vertexArrayObject);
+
+			glDrawElements(GL_TRIANGLES, vbo.numIndices, vbo.indexType, nullptr);
+		}
+	}
+}
+
 
 void Engine::Renderer::OpenGL::UpdateVBODatabase(Data& data, const std::vector<MeshID>& loadQueue)
 {
 	for (const auto& id : loadQueue)
 	{
-		VBO vbo;
+		std::string path = Asset::GetPath(static_cast<Asset::Mesh>(id));
 
+		auto vboOpt = VBOFromPath(path);
+		assert(vboOpt.has_value());
 
-		data.vboDatabase.insert({ id, vbo });
+		data.vboDatabase.insert({ id, vboOpt.value() });
 	}
 }
 

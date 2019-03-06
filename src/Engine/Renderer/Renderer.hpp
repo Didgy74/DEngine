@@ -61,12 +61,15 @@ namespace Engine
 	{
 		std::vector<SpriteID> sprites;
 
+		std::vector<MeshID> meshes;
+
 		size_t GetTotalObjectCount() const;
 	};
 
 	struct Renderer::RenderGraphTransform
 	{
 		std::vector<Math::Matrix4x4> sprites;
+		std::vector<Math::Matrix4x4> meshes;
 	};
 
 	class Renderer::SceneData

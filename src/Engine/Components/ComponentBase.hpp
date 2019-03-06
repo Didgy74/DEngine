@@ -2,7 +2,6 @@
 
 namespace Engine
 {
-	class Scene;
 	class SceneObject;
 }
 
@@ -15,24 +14,14 @@ namespace Engine
 	public:
 		static constexpr bool isSingleton = false;
 
-		ComponentBase(SceneObject& owningObject, size_t indexInSceneObject, size_t indexInScene) noexcept;
-		ComponentBase(const ComponentBase& right) = delete;
-		ComponentBase(ComponentBase&& right) noexcept = delete;
+		explicit ComponentBase(SceneObject& owningObject);
 
 		virtual ~ComponentBase();
 
-		ComponentBase& operator=(const ComponentBase& right) = delete;
-		ComponentBase& operator=(ComponentBase&& right) = delete;
-
 		[[nodiscard]] SceneObject& GetSceneObject();
 		[[nodiscard]] const SceneObject& GetSceneObject() const;
-		[[nodiscard]] size_t GetIndexInScene() const;
 
 	private:
 		std::reference_wrapper<SceneObject> sceneObjectRef;
-		size_t indexInScene;
-		size_t indexInSceneObject;
-
-		friend Scene;
 	};
 }

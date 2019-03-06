@@ -1,14 +1,13 @@
 #include "BoxCollider2D.hpp"
 
 #include "Math/LinearTransform2D.hpp"
-#include "../Scene.hpp"
 #include "../SceneObject.hpp"
 
 #include <cassert>
 #include <iostream>
 
-Engine::BoxCollider2D::BoxCollider2D(SceneObject& owningObject, size_t indexInSceneObject, size_t indexInScene) :
-	ParentType(owningObject, indexInSceneObject, indexInScene),
+Engine::BoxCollider2D::BoxCollider2D(SceneObject& owningObject) :
+	ParentType(owningObject),
 	size{ 1.f, 1.f },
 	position{ 0, 0 },
 	rotation{ 0 }

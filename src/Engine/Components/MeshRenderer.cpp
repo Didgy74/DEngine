@@ -11,9 +11,12 @@
 #include "../Scene.hpp"
 #include "../SceneObject.hpp"
 
-Engine::MeshRenderer::MeshRenderer(SceneObject& owningSceneObject, size_t indexInSceneObject, size_t indexInScene) : 
-	ParentType(owningSceneObject, indexInSceneObject, indexInScene), 
-	mesh(Asset::Mesh::None)
+Engine::MeshRenderer::MeshRenderer(SceneObject& owningSceneObject) :
+	ParentType(owningSceneObject),
+	mesh(Asset::Mesh::None),
+	position{ 0, 0, 0},
+	scale{1, 1, 1},
+	rotation()
 {
 }
 
@@ -35,18 +38,16 @@ void Engine::MeshRenderer::SetMesh(Asset::Mesh newMesh)
 	mesh = newMesh;
 }
 
-Math::Matrix<4, 3> Engine::MeshRenderer::GetModel_Reduced(Space space) const
+Math::Matrix4x4 Engine::MeshRenderer::GetModel(Space space) const
 {
-	const auto& scaleModel = Math::LinTran3D::Scale_Reduced(scale);
-	const auto& rotateModel = Math::LinTran3D::Rotate_Reduced(rotation);
-	auto localModel = Math::LinTran3D::Multiply(scaleModel, rotateModel);
-	Math::LinTran3D::AddTranslation(localModel, position);
+	using namespace Math::LinTran3D;
+	auto localModel = Multiply(Scale_Reduced(scale), Rotate_Reduced(rotation));
+	AddTranslation(localModel, position);
 
 	if (space == Space::Local)
-		return localModel;
+		return AsMat4(localModel);
 	else
-	{
-		auto parentModel = GetSceneObject().transform.GetModel_Reduced(space);
-		return Math::LinTran3D::Multiply(parentModel, localModel);
-	}
+		return AsMat4(Multiply(GetSceneObject().transform.GetModel_Reduced(Space::World), localModel));
 }
+
+

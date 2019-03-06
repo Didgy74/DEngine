@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Collider2D.hpp"
+#include "ComponentBase.hpp"
 #include "../Enum.hpp"
 
 #include "Math/Vector/Vector.hpp"
@@ -8,12 +8,12 @@
 
 namespace Engine
 {
-	class BoxCollider2D : public Collider2D
+	class BoxCollider2D : public ComponentBase
 	{
 	public:
-		using ParentType = Collider2D;
+		using ParentType = ComponentBase;
 
-		BoxCollider2D(SceneObject& owningObject, size_t indexInSceneObject, size_t indexInScene);
+		explicit BoxCollider2D(SceneObject& owningObject);
 		~BoxCollider2D();
 
 		Math::Matrix3x3 GetModel2D(Space space) const;

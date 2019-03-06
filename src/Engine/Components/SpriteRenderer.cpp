@@ -8,8 +8,8 @@
 
 #include "Math/LinearTransform2D.hpp"
 
-Engine::SpriteRenderer::SpriteRenderer(SceneObject& owningObject, size_t indexInSceneObject, size_t indexInScene) :
-	ParentType(owningObject, indexInSceneObject, indexInScene),
+Engine::SpriteRenderer::SpriteRenderer(SceneObject& owningObject) :
+	ParentType(owningObject),
 	sprite(Asset::Sprite::None),
 	position{0, 0},
 	rotation(0),

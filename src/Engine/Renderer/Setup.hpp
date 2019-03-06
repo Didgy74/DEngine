@@ -12,7 +12,7 @@ namespace Engine
 		{
 			using SceneType = Engine::Scene;
 
-			constexpr std::string_view assetPath = "Data";
+			constexpr std::string_view assetPath = "Data/DRenderer";
 		}
 	}
 }

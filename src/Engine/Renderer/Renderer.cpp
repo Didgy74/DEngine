@@ -41,7 +41,7 @@ namespace Engine
 				std::function<void(void*&)> Initialize;
 				std::function<void(void*&)> Terminate;
 				std::function<void(void)> Draw;
-				std::function<void(const std::vector<SpriteID>& loadSpriteQueue)> PrepareRenderingEarly;
+				std::function<void(const std::vector<SpriteID>&, const std::vector<MeshID>&)> PrepareRenderingEarly;
 				std::function<void(void)> PrepareRenderingLate;
 
 				void* apiData = nullptr;
@@ -114,12 +114,14 @@ void Engine::Renderer::Core::PrepareRenderingEarly(RenderGraph& renderGraphInput
 
 	std::swap(renderGraph, renderGraphInput);
 
-	if (!data->loadSpriteQueue.empty())
-		std::cout << "Loading sprite resource(s)..." << std::endl;
-	data->PrepareRenderingEarly(data->loadSpriteQueue);
+	if (!data->loadSpriteQueue.empty() || !data->loadMeshQueue.empty())
+		std::cout << "Loading sprite/mesh resource(s)..." << std::endl;
+	data->PrepareRenderingEarly(data->loadSpriteQueue, data->loadMeshQueue);
 
 	data->loadSpriteQueue.clear();
 	data->unloadSpriteQueue.clear();
+	data->loadMeshQueue.clear();
+	data->unloadMeshQueue.clear();
 }
 
 void Engine::Renderer::Core::PrepareRenderingLate(RenderGraphTransform &input)
@@ -184,8 +186,10 @@ void Engine::Renderer::Viewport::SetSceneRef(const Engine::Renderer::SceneType* 
 
 bool Engine::Renderer::IsCompatible(const RenderGraph &renderGraph, const RenderGraphTransform &transforms)
 {
-	bool compatible = true;
 	if (renderGraph.sprites.size() != transforms.sprites.size())
+		return false;
+
+	if (renderGraph.meshes.size() != transforms.meshes.size())
 		return false;
 
 	return true;
@@ -196,12 +200,22 @@ void Engine::Renderer::Core::UpdateAssetReferences(Data& data, const RenderGraph
 	// Add new references
 	if (newRG)
 	{
+		// Sprites
 		for(const auto& item : newRG->sprites)
 		{
 			auto& referenceCount = data.spriteReferences[item];
 			referenceCount++;
 			if (referenceCount == 1)
 				data.loadSpriteQueue.emplace_back(item);
+		}
+
+		// Meshes
+		for (const auto& item : newRG->meshes)
+		{
+			auto& referenceCount = data.meshReferences[item];
+			referenceCount++;
+			if (referenceCount == 1)
+				data.loadMeshQueue.emplace_back(item);
 		}
 	}
 
@@ -214,6 +228,17 @@ void Engine::Renderer::Core::UpdateAssetReferences(Data& data, const RenderGraph
 		{
 			data.unloadSpriteQueue.emplace_back(item);
 			data.spriteReferences.erase(iterator);
+		}
+	}
+
+	for (const auto& item : oldRG.meshes)
+	{
+		auto iterator = data.meshReferences.find(item);
+		iterator->second--;
+		if (iterator->second <= 0)
+		{
+			data.unloadMeshQueue.emplace_back(item);
+			data.meshReferences.erase(iterator);
 		}
 	}
 }

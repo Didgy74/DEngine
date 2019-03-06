@@ -25,7 +25,7 @@ namespace Engine
 		static constexpr float defaultZFar = 100.f;
 		static constexpr ProjectionMode defaultProjectionMode = ProjectionMode::Perspective;
 
-		Camera(SceneObject& owningObject, size_t indexInSceneObject, size_t indexInScene) noexcept;
+		explicit Camera(SceneObject& owningObject);
 		~Camera();
 
 		Math::Vector3D position;

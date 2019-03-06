@@ -1,7 +1,5 @@
 #include "Time.hpp"
 
-#include "Scene.hpp"
-
 #include <chrono>
 #include <memory>
 #include <array>

@@ -4,8 +4,8 @@
 
 #include "../Renderer/Renderer.hpp"
 
-Engine::Camera::Camera(SceneObject& owningObject, size_t indexInSceneObject, size_t indexInScene) noexcept :
-	ParentType(owningObject, indexInSceneObject, indexInScene),
+Engine::Camera::Camera(SceneObject& owningObject) :
+	ParentType(owningObject),
 	position(),
 	fov(defaultFovY),
 	forward(Math::Vector3D::Back()),

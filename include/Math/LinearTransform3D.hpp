@@ -17,6 +17,7 @@ namespace Math
 	namespace LinearTransform3D
 	{
 		[[nodiscard]] constexpr Matrix<4, 3> Multiply(const Matrix<4, 3>& left, const Matrix<4, 3>& right);
+		[[nodiscard]] constexpr Matrix4x4 AsMat4(const Matrix<4, 3>& input);
 
 		[[nodiscard]] constexpr Matrix4x4 Translate(float x, float y, float z);
 		[[nodiscard]] constexpr Matrix4x4 Translate(const Vector3D& input);
@@ -41,8 +42,10 @@ namespace Math
 		[[nodiscard]] constexpr Matrix4x4 Rotate_Homo(const UnitQuaternion<>& quat);
 		[[nodiscard]] constexpr Matrix<4, 3> Rotate_Reduced(const UnitQuaternion<>& quat);
 
-		[[nodiscard]] constexpr Matrix4x4 Scale(float x, float y, float z);
-		[[nodiscard]] constexpr Matrix4x4 Scale(const Vector3D& input);
+		[[nodiscard]] constexpr Matrix3x3 Scale(float x, float y, float z);
+		[[nodiscard]] constexpr Matrix3x3 Scale(const Vector3D& input);
+		[[nodiscard]] constexpr Matrix4x4 Scale_Homo(float x, float y, float z);
+		[[nodiscard]] constexpr Matrix4x4 Scale_Homo(const Vector3D& input);
 		[[nodiscard]] constexpr Matrix<4, 3> Scale_Reduced(float x, float y, float z);
 		[[nodiscard]] constexpr Matrix<4, 3> Scale_Reduced(const Vector3D& input);
 
@@ -82,6 +85,21 @@ constexpr Math::Matrix<4, 3> Math::LinearTransform3D::Multiply(const Matrix<4, 3
 
 	return newMatrix;
 }
+
+constexpr Math::Matrix4x4 Math::LinearTransform3D::AsMat4(const Math::Matrix<4, 3>& input)
+{
+	Matrix4x4 newMat{};
+
+	for (size_t x = 0; x < 4; x++)
+	{
+		for (size_t y = 0; y < 3; y++)
+			newMat.At(x, y) = input.At(x, y);
+	}
+
+	newMat.Back() = 1;
+	return newMat;
+}
+
 
 constexpr Math::Matrix4x4 Math::LinearTransform3D::Translate(float x, float y, float z)
 {
@@ -204,20 +222,35 @@ constexpr Math::Matrix<4, 3> Math::LinearTransform3D::Rotate_Reduced(const UnitQ
 	return static_cast<Math::Matrix<4, 3>>(quat);
 }
 
-constexpr Math::Matrix4x4 Math::LinearTransform3D::Scale(float x, float y, float z)
+constexpr Math::Matrix3x3 Math::LinearTransform3D::Scale(float x, float y, float z)
 {
-	return Matrix4x4
+	return Matrix3x3
 	({
-		x, 0, 0, 0,
-		0, y, 0, 0,
-		0, 0, z, 0,
-		0, 0, 0, 1
+		x, 0, 0,
+		0, y, 0,
+		0, 0, z
 	});
 }
 
-constexpr Math::Matrix4x4 Math::LinearTransform3D::Scale(const Vector3D& input)
+constexpr Math::Matrix3x3 Math::LinearTransform3D::Scale(const Vector3D& input)
 {
 	return Scale(input.x, input.y, input.z);
+}
+
+constexpr Math::Matrix4x4 Math::LinearTransform3D::Scale_Homo(float x, float y, float z)
+{
+	return Matrix4x4
+	({
+		 x, 0, 0, 0,
+		 0, y, 0, 0,
+		 0, 0, z, 0,
+		 0, 0, 0, 1
+	});
+}
+
+constexpr Math::Matrix4x4 Math::LinearTransform3D::Scale_Homo(const Math::Vector3D &input)
+{
+	return Scale_Homo(input.x, input.y, input.z);
 }
 
 constexpr Math::Matrix<4, 3> Math::LinearTransform3D::Scale_Reduced(float x, float y, float z)

@@ -8,10 +8,13 @@ namespace Engine
 }
 
 #include "Physics2D.hpp"
-#include "Time.hpp"
+#include "Time/Time.hpp"
+#include "ComponentReference.hpp"
 
 #include <vector>
+#include <any>
 #include <functional>
+#include <memory>
 #include <typeindex>
 #include <unordered_map>
 
@@ -20,82 +23,122 @@ namespace Engine
 	class Scene
 	{
 	public:
-		Scene(size_t indexInEngine);
-		Scene(const Scene& right) = delete;
-		Scene(Scene&& right) noexcept = delete;
+		explicit Scene(size_t indexInEngine);
+
+		Scene(const Scene &right) = delete;
+
+		Scene(Scene &&right) noexcept = delete;
+
 		~Scene();
 
-		Scene& operator=(const Scene& right) = delete;
-		Scene& operator=(Scene&& right) = delete;
+		Scene& operator=(const Scene &right) = delete;
 
-		SceneObject& NewSceneObject();
+		Scene& operator=(Scene &&right) = delete;
+
+		SceneObject &NewSceneObject();
 		const SceneObject& GetSceneObject(size_t index) const;
 		SceneObject& GetSceneObject(size_t index);
 		size_t GetSceneObjectCount() const;
 
 		template<typename ComponentType>
-		const std::vector<ComponentType*>* GetComponents() const;
-		template<typename ComponentType>
-		const ComponentType& GetComponent(size_t index) const;
-		template<typename ComponentType>
-		ComponentType& GetComponent(size_t index);
-		template<typename ComponentType>
 		size_t GetComponentCount() const;
+		template<typename ComponentType>
+		ComponentType* GetComponent(const CompRef<ComponentType>& ref);
+		template<typename ComponentType>
+		const std::vector<ComponentType>* GetAllComponents() const;
+
 
 		[[nodiscard]] size_t GetIndexInEngine() const;
 
-		[[nodiscard]] bool RenderSceneValid() const;
+		void Clear();
 
 	private:
-		Time::SceneData& GetTimeData();
-
-		void InvalidateRenderScene();
+		template<typename T>
+		struct Table
+		{
+			std::vector<size_t> id;
+			std::vector<T> data;
+		};
 
 		template<typename ComponentType>
-		[[nodiscard]] ComponentType& AddComponentFromSceneObject(SceneObject& owningObject, size_t indexInSceneObject);
-		template<typename ComponentType>
-		[[nodiscard]] ComponentType& AddSingletonComponentFromSceneObject(SceneObject& owningObject);
-		void RemoveSceneObject(SceneObject& owningObject);
+		[[nodiscard]] std::pair<size_t, std::reference_wrapper<ComponentType>> AddComponent(SceneObject &owningObject);
+		std::unordered_map<std::type_index, std::any> components;
+		size_t componentGUIDCounter;
+
+		Time::SceneData &GetTimeData();
+
+		void RemoveSceneObject(SceneObject &owningObject);
 
 		size_t indexInEngine;
 		std::vector<SceneObject*> sceneObjects;
-		std::unordered_map<std::type_index, void*> components;
-		bool renderSceneValid;
-
 		Time::SceneData timeData;
 		Physics2D::SceneData physics2DData;
 
 		friend class Engine::Core;
 		friend class Engine::SceneObject;
-		friend class RenderComponent;
 	};
+}
 
-	template<typename ComponentType>
-	const std::vector<ComponentType*>* Scene::GetComponents() const
+template<typename ComponentType>
+std::pair<size_t, std::reference_wrapper<ComponentType>> Engine::Scene::AddComponent(SceneObject& owningObject)
+{
+	using ContainerType = Table<ComponentType>;
+
+	auto iterator = components.find(typeid(ComponentType));
+	if (iterator == components.end())
 	{
+		// No component-vector for this type, make one.
+		auto iteratorOpt = components.insert({typeid(ComponentType), std::make_any<ContainerType>()});
+		assert(iteratorOpt.second);
+		iterator = iteratorOpt.first;
+	}
+
+	auto& table = std::any_cast<ContainerType&>(iterator->second);
+	table.data.emplace_back(owningObject);
+	table.id.emplace_back(componentGUIDCounter);
+	componentGUIDCounter++;
+	return { table.id.back(), table.data.back() };
+}
+
+template<typename ComponentType>
+size_t Engine::Scene::GetComponentCount() const
+{
+	auto iterator = components.find(typeid(ComponentType));
+	if (iterator == components.end())
+		return 0;
+
+	using ContainerType = Table<ComponentType>;
+	const auto& container = std::any_cast<ContainerType&>(iterator->second);
+	return container.data.size();
+}
+
+template<typename ComponentType>
+ComponentType* Engine::Scene::GetComponent(const CompRef<ComponentType> &ref)
+{
+	auto iterator = components.find(typeid(ComponentType));
+	if (iterator == components.end())
 		return nullptr;
-	}
 
-	template<typename ComponentType>
-	ComponentType& Scene::AddComponentFromSceneObject(SceneObject& owningObject, size_t indexInSceneObject)
-	{
-		void*& ptr = components[typeid(ComponentType)];
-		if (!ptr)
-			ptr = new std::vector<ComponentType*>();
+	using ContainerType = Table<ComponentType>;
+	auto& table = std::any_cast<ContainerType&>(iterator->second);
 
-		std::vector<ComponentType*>& vector = *static_cast<std::vector<ComponentType*>*>(ptr);
-		auto* newObj = new ComponentType(owningObject, indexInSceneObject, vector.size());
-		vector.emplace_back(newObj);
-		return *newObj;
-	}
+	auto idIterator = std::find(table.id.begin(), table.id.end(), ref.GetGUID());
+	if (idIterator == table.id.end())
+		return nullptr;
 
-	template<typename ComponentType>
-	ComponentType& Scene::AddSingletonComponentFromSceneObject(SceneObject& owningObject)
-	{
-		//std::vector<SingletonComponentBase*>& vector = singletonComponents[typeid(ComponentType)];
-		//ComponentType* newObj = new ComponentType(owningObject, vector.size());
-		ComponentType* newObj = new ComponentType(owningObject, 0);
-		//vector.push_back(newObj);
-		return *newObj;
-	}
+	auto index = std::distance(table.id.begin(), idIterator);
+
+	return &table.data[index];
+}
+
+template<typename ComponentType>
+const std::vector<ComponentType>* Engine::Scene::GetAllComponents() const
+{
+	auto iterator = components.find(typeid(ComponentType));
+	if (iterator == components.end())
+		return nullptr;
+
+	using ContainerType = Table<ComponentType>;
+	const auto& table = std::any_cast<const ContainerType&>(iterator->second);
+	return &table.data;
 }

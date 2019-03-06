@@ -11,7 +11,7 @@ namespace Engine
 	public:
 		using ParentType = SingletonComponentBase;
 
-		RigidBody2D(SceneObject& owningObject, size_t indexInScene);
+		explicit RigidBody2D(SceneObject& owningObject);
 		~RigidBody2D() override;
 
 		Math::Vector2D position;

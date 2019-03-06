@@ -3,8 +3,8 @@
 #include "../Scene.hpp"
 #include "../SceneObject.hpp"
 
-Engine::RigidBody2D::RigidBody2D(SceneObject& owningObject, size_t indexInScene) :
-	ParentType(owningObject, indexInScene),
+Engine::RigidBody2D::RigidBody2D(SceneObject& owningObject) :
+	ParentType(owningObject),
 	velocity(),
 	inverseMass(1.f),
 	torque()

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "RenderComponent.hpp"
+#include "ComponentBase.hpp"
 
 #include "../Asset.hpp"
 
@@ -13,12 +13,12 @@
 
 namespace Engine
 {
-	class SpriteRenderer : public RenderComponent
+	class SpriteRenderer : public ComponentBase
 	{
 	public:
-		using ParentType = RenderComponent;
+		using ParentType = ComponentBase;
 
-		SpriteRenderer(SceneObject& owningObject, size_t indexInSceneObject, size_t indexInScene);
+		explicit SpriteRenderer(SceneObject& owningObject);
 		~SpriteRenderer();
 
 		void SetSprite(Asset::Sprite newTexture);

@@ -10,11 +10,13 @@ namespace Engine
 
 #include "Scene.hpp"
 #include "Transform.hpp"
+#include "ComponentReference.hpp"
 
 #include <vector>
 #include <functional>
 #include <unordered_map>
 #include <typeindex>
+#include <type_traits>
 
 namespace Engine
 {
@@ -36,10 +38,7 @@ namespace Engine
 		[[nodiscard]] SceneObject* GetParent() const;
 
 		template<typename ComponentType>
-		ComponentType& AddComponent();
-
-		template<typename ComponentType>
-		ComponentType* GetComponent() const;
+		std::pair<std::reference_wrapper<ComponentType>, CompRef<ComponentType>> AddComponent();
 
 		Transform transform;
 		
@@ -47,65 +46,33 @@ namespace Engine
 		std::reference_wrapper<Scene> sceneRef;
 		SceneObject* parent;
 		std::vector<SceneObject*> children;
-		std::unordered_map<std::type_index, std::vector<std::reference_wrapper<ComponentBase>>> components;
-		std::unordered_map<std::type_index, std::reference_wrapper<SingletonComponentBase>> singletonComponents;
+		std::unordered_map<std::type_index, std::vector<size_t>> components;
+		std::unordered_map<std::type_index, size_t> singletonComponents;
 	};
 
 	template<typename ComponentType>
-	ComponentType& SceneObject::AddComponent()
+	std::pair<std::reference_wrapper<ComponentType>, CompRef<ComponentType>> SceneObject::AddComponent()
 	{
-		if constexpr (ComponentType::isSingleton == true)
-		{
-			auto iterator = singletonComponents.find(typeid(ComponentType));
-			if (iterator != singletonComponents.end())
-			{
-				// We found an existing component. Return it.
-				return static_cast<ComponentType&>(iterator->second.get());
-			}
-			else
-			{
-				// We found no existing component, make one.
-				ComponentType& newComponent = GetScene().AddSingletonComponentFromSceneObject<ComponentType>(*this);
-				singletonComponents.insert({typeid(ComponentType), newComponent});
-				return newComponent;
-			}
-		}
-		else
-		{
-			std::vector<std::reference_wrapper<ComponentBase>>& compVector = components[typeid(ComponentType)];
-			ComponentType& newComponent = GetScene().AddComponentFromSceneObject<ComponentType>(*this, compVector.size());
-			compVector.emplace_back(newComponent);
-			return newComponent;
-		}
-
-	}
-
-	template<typename ComponentType>
-	ComponentType* SceneObject::GetComponent() const
-	{
-		if constexpr (ComponentType::isSingleton == true)
-		{
-			auto iterator = singletonComponents.find(typeid(ComponentType));
-			if (iterator == singletonComponents.end())
-				return nullptr;
-			else
-			{
-				auto& ref = iterator->second.get();
-				return static_cast<ComponentType*>(&ref);
-			}
-		}
-		else
+		static_assert(std::is_base_of<ComponentBase, ComponentType>() || std::is_base_of<SingletonComponentBase, ComponentType>(),
+		              "Component added to SceneObject must inherit from ComponentBase or SingletonComponentBase");
+		if constexpr (ComponentType::isSingleton == false)
 		{
 			auto iterator = components.find(typeid(ComponentType));
 			if (iterator == components.end())
-				return nullptr;
-			else
 			{
-				auto& ref = iterator->second.front().get();
-				return static_cast<ComponentType*>(&ref);
+				// No vector for this component type found, make one
+				auto iteratorOpt = components.insert({typeid(ComponentType), {}});
+				assert(iteratorOpt.second);
+				iterator = iteratorOpt.first;
 			}
+
+			auto& vector = iterator->second;
+
+			auto guidRefPair = GetScene().AddComponent<ComponentType>(*this);
+
+			vector.emplace_back(guidRefPair.first);
+
+			return { guidRefPair.second, CompRef<ComponentType>(GetScene(), guidRefPair.first) };
 		}
-
-
 	}
 }

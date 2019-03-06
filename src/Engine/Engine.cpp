@@ -5,8 +5,11 @@
 #include "Application.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Components/SpriteRenderer.hpp"
-#include "Time.hpp"
+#include "Components/MeshRenderer.hpp"
+#include "Time/Time.hpp"
 #include "Input/InputRaw.hpp"
+#include "Scene.hpp"
+#include "SceneObject.hpp"
 
 #include "Components/Camera.hpp"
 #include "Components/RigidBody2D.hpp"
@@ -16,6 +19,11 @@
 #include <iostream>
 
 std::vector<std::unique_ptr<Engine::Scene>> Engine::Core::scenes;
+
+namespace Engine
+{
+	void BuildRenderGraph(const Scene& scene, Renderer::RenderGraph& graph, Renderer::RenderGraphTransform& transforms);
+}
 
 void Engine::Core::Run()
 {
@@ -32,14 +40,13 @@ void Engine::Core::Run()
 
 
 	auto& sceneObject1 = scene1.NewSceneObject();
-	auto& sprite1 = sceneObject1.AddComponent<SpriteRenderer>();
-	sprite1.SetSprite(Asset::Sprite::Default);
-	auto& rb1 = sceneObject1.AddComponent<RigidBody2D>();
+	auto& sprite1 = sceneObject1.AddComponent<MeshRenderer>().first.get();
+	sprite1.SetMesh(Asset::Mesh::Cube);
 
 	auto& objCamera = scene1.NewSceneObject();
-	auto& camera = objCamera.AddComponent<Camera>();
-	camera.position.z = 5.f;
+	auto& camera = objCamera.AddComponent<Camera>().first.get();
 
+	camera.position.z = 5.f;
 
 	Renderer::RenderGraph graph;
 	Renderer::RenderGraphTransform graphTransform;
@@ -64,19 +71,14 @@ void Engine::Core::Run()
 			camera.position += Math::Vector3D::Down() * speed * scene1.GetTimeData().GetDeltaTime();
 		camera.LookAt({ 0, 0, 0 });
 
-		std::cout << scene1.GetTimeData().GetFPS() << std::endl;
+		//std::cout << scene1.GetTimeData().GetFPS() << std::endl;
 
 
 
-
-
-		if (scene1.GetTimeData().GetTickCount() == 0 || scene1.GetTimeData().GetTickCount() == 1)
-		{
-			graph.sprites.push_back(static_cast<Renderer::SpriteID>(Asset::Sprite::Default));
-			graphTransform.sprites.push_back(sprite1.GetModel(Space::World));
-		}
+		BuildRenderGraph(scene1, graph, graphTransform);
 
 		Renderer::Core::SetCameraInfo(camera.GetCameraInfo());
+
 
 		Renderer::Core::PrepareRenderingEarly(graph);
 
@@ -107,3 +109,42 @@ Engine::Scene& Engine::NewScene()
 }
 
 std::vector<std::unique_ptr<Engine::Scene>>& Engine::GetScenes() { return Core::scenes; }
+
+void Engine::BuildRenderGraph(const Scene& scene, Renderer::RenderGraph& graph, Renderer::RenderGraphTransform& transforms)
+{
+	auto spriteComponentsPtr = scene.GetAllComponents<SpriteRenderer>();
+	if (spriteComponentsPtr == nullptr)
+	{
+		graph.sprites.clear();
+		transforms.sprites.clear();
+	}
+	else
+	{
+		const auto& spriteComponents = *spriteComponentsPtr;
+		graph.sprites.resize(spriteComponents.size());
+		transforms.sprites.resize(spriteComponents.size());
+		for (size_t i = 0; i < spriteComponents.size(); i++)
+		{
+			graph.sprites[i] = static_cast<Renderer::SpriteID>(spriteComponents[i].GetSprite());
+			transforms.sprites[i] = spriteComponents[i].GetModel(Space::World);
+		}
+	}
+
+	auto meshComponentsPtr = scene.GetAllComponents<MeshRenderer>();
+	if (meshComponentsPtr == nullptr)
+	{
+		graph.meshes.clear();
+		transforms.meshes.clear();
+	}
+	else
+	{
+		const auto& meshComponents = *meshComponentsPtr;
+		graph.meshes.resize(meshComponents.size());
+		transforms.meshes.resize(meshComponents.size());
+		for (size_t i = 0; i < meshComponents.size(); i++)
+		{
+			graph.meshes[i] = static_cast<Renderer::MeshID>(meshComponents[i].GetMesh());
+			transforms.meshes[i] = meshComponents[i].GetModel(Space::World);
+		}
+	}
+}

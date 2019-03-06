@@ -7,9 +7,9 @@
 
 Engine::Scene::Scene(size_t indexInEngine) :
 	indexInEngine(indexInEngine),
-	renderSceneValid(true),
 	timeData(),
-	physics2DData()
+	physics2DData(),
+	componentGUIDCounter(0)
 {
 }
 
@@ -25,16 +25,22 @@ Engine::SceneObject& Engine::Scene::NewSceneObject()
 
 size_t Engine::Scene::GetIndexInEngine() const { return indexInEngine; }
 
-bool Engine::Scene::RenderSceneValid() const { return renderSceneValid; }
-
 Engine::Time::SceneData& Engine::Scene::GetTimeData() { return timeData; }
-
-void Engine::Scene::InvalidateRenderScene()
-{
-	renderSceneValid = false;
-}
 
 void Engine::Scene::RemoveSceneObject(SceneObject& owningObject)
 {
 
 }
+
+const Engine::SceneObject& Engine::Scene::GetSceneObject(size_t index) const { return *sceneObjects[index]; }
+
+Engine::SceneObject& Engine::Scene::GetSceneObject(size_t index) { return *sceneObjects[index]; }
+
+size_t Engine::Scene::GetSceneObjectCount() const { return sceneObjects.size(); }
+
+void Engine::Scene::Clear()
+{
+	components.clear();
+}
+
+
