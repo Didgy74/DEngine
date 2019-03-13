@@ -14,8 +14,6 @@
 #include "Components/Camera.hpp"
 #include "Components/RigidBody2D.hpp"
 
-#include <chrono>
-
 #include <iostream>
 
 std::vector<std::unique_ptr<Engine::Scene>> Engine::Core::scenes;
@@ -78,7 +76,6 @@ void Engine::Core::Run()
 		BuildRenderGraph(scene1, graph, graphTransform);
 
 		Renderer::Core::SetCameraInfo(camera.GetCameraInfo());
-
 
 		Renderer::Core::PrepareRenderingEarly(graph);
 
