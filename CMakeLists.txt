@@ -43,7 +43,7 @@ find_package(OpenGL 3.3 REQUIRED)
 target_link_libraries(${PROJECT_NAME} OpenGL::GL)
 
 # Vulkan
-#find_package(Vulkan 1.1 QUIET)
+find_package(Vulkan 1.1 QUIET)
 if(Vulkan_FOUND)
 	target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
 else()
