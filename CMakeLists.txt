@@ -7,6 +7,19 @@ file(GLOB_RECURSE SOURCE_FILES "src/*.cpp")
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PRIVATE include)
 
+# Add custom command to copy Data directory to build directory
+# Remove Data directory in build directory if present
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+				   COMMAND ${CMAKE_COMMAND} -E remove_directory
+				   ${CMAKE_BINARY_DIR}/Data
+				   )
+# Copy directory from source folder to build folder
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+				   COMMAND ${CMAKE_COMMAND} -E copy_directory
+                   ${PROJECT_SOURCE_DIR}/Data
+				   ${CMAKE_BINARY_DIR}/Data
+				   )
+
 # SDL2
 find_package(SDL2 QUIET)
 if (SDL2_FOUND)
