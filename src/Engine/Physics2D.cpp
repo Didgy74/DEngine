@@ -39,8 +39,8 @@ namespace Engine
 		struct Collision
 		{
 			Math::Vector2D normal;
-			RigidBody2D* left;
-			RigidBody2D* right;
+			Components::RigidBody2D* left;
+			Components::RigidBody2D* right;
 			float penetrationDepth;
 		};
 

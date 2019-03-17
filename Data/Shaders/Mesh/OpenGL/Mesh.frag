@@ -1,8 +1,17 @@
-#version 330
+#version 330 core
 
-in vec2 fragUV;
+in FragData
+{
+	vec3 wsPosition;
+	vec3 wsNormal;
+	vec2 uv;
+} fragData;
+
+vec3 lightPos = vec3(4.0, 5.0, 6.0);
 
 void main()
-{	
-	gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+{
+	vec3 pointToLight = normalize(lightPos - fragData.wsPosition);
+	float test = max(dot(pointToLight, fragData.wsNormal), 0);
+	gl_FragColor = vec4(test, test, test, test);
 }

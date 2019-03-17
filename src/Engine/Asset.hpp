@@ -133,6 +133,7 @@ enum class Asset::Mesh : uint32_t
 	Plane,
 	Cube,
 	SpritePlane,
+	Helmet,
 #ifdef ASSET_MESH_COUNT
 	COUNT
 #endif

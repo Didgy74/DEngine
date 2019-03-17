@@ -4,13 +4,12 @@ namespace Engine
 {
 	class Scene;
 	class SceneObject;
-	class ComponentBase;
-	class SingletonComponentBase;
 }
 
 #include "Scene.hpp"
 #include "Transform.hpp"
 #include "ComponentReference.hpp"
+#include "Components/Components.hpp"
 
 #include <vector>
 #include <functional>
@@ -37,8 +36,8 @@ namespace Engine
 
 		[[nodiscard]] SceneObject* GetParent() const;
 
-		template<typename ComponentType>
-		std::pair<std::reference_wrapper<ComponentType>, CompRef<ComponentType>> AddComponent();
+		template<typename T>
+		std::pair<std::reference_wrapper<T>, CompRef<T>> AddComponent();
 
 		Transform transform;
 		
@@ -50,29 +49,29 @@ namespace Engine
 		std::unordered_map<std::type_index, size_t> singletonComponents;
 	};
 
-	template<typename ComponentType>
-	std::pair<std::reference_wrapper<ComponentType>, CompRef<ComponentType>> SceneObject::AddComponent()
+	template<typename T>
+	std::pair<std::reference_wrapper<T>, CompRef<T>> SceneObject::AddComponent()
 	{
-		static_assert(std::is_base_of<ComponentBase, ComponentType>() || std::is_base_of<SingletonComponentBase, ComponentType>(),
-		              "Component added to SceneObject must inherit from ComponentBase or SingletonComponentBase");
-		if constexpr (ComponentType::isSingleton == false)
+		if constexpr (Components::IsSingleton<T>() == false)
 		{
-			auto iterator = components.find(typeid(ComponentType));
+			auto iterator = components.find(typeid(T));
 			if (iterator == components.end())
 			{
 				// No vector for this component type found, make one
-				auto iteratorOpt = components.insert({typeid(ComponentType), {}});
+				auto iteratorOpt = components.insert({typeid(T), {}});
 				assert(iteratorOpt.second);
 				iterator = iteratorOpt.first;
 			}
 
 			auto& vector = iterator->second;
 
-			auto guidRefPair = GetScene().AddComponent<ComponentType>(*this);
+			if constexpr (std::is_base_of<Components::ComponentBase, T>())
+			{
+				auto guidRefPair = GetScene().AddComponent<T>(*this);
+				vector.emplace_back(guidRefPair.first);
 
-			vector.emplace_back(guidRefPair.first);
-
-			return { guidRefPair.second, CompRef<ComponentType>(GetScene(), guidRefPair.first) };
+				return { guidRefPair.second, CompRef<T>(GetScene(), guidRefPair.first) };
+			}
 		}
 	}
 }

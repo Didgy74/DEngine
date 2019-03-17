@@ -254,7 +254,7 @@ void Engine::Renderer::OpenGL::Initialize(void*& apiData)
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
-	LoadSpriteShader(data);
+	//LoadSpriteShader(data);
 	LoadMeshShader(data);
 }
 

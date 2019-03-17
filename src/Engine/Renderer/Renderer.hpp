@@ -18,12 +18,6 @@ namespace Engine
 	namespace Renderer
 	{
 		using SceneType = Setup::SceneType;
-		enum class API;
-		class Viewport;
-		struct CameraInfo;
-		class SceneData;
-		struct RenderGraph;
-		struct RenderGraphTransform;
 
 		Viewport& NewViewport(Utility::ImgDim dimensions, void* surfaceHandle);
 		size_t GetViewportCount();
@@ -57,19 +51,23 @@ namespace Engine
 		Vulkan
 	};
 
+	struct Renderer::PointLight
+	{
+		float intensity;
+	};
+
 	struct Renderer::RenderGraph
 	{
 		std::vector<SpriteID> sprites;
-
 		std::vector<MeshID> meshes;
-
-		size_t GetTotalObjectCount() const;
+		std::vector<PointLight> pointLights;
 	};
 
 	struct Renderer::RenderGraphTransform
 	{
-		std::vector<Math::Matrix4x4> sprites;
-		std::vector<Math::Matrix4x4> meshes;
+		std::vector<Math::Matrix<4, 4, float>> sprites;
+		std::vector<Math::Matrix<4, 4, float>> meshes;
+		std::vector<Math::Vector<3, float>> pointLights;
 	};
 
 	class Renderer::SceneData

@@ -1,29 +1,37 @@
 #pragma once
 
-#include "SingletonComponentBase.hpp"
+#include "Components.hpp"
 
 #include "Math/Vector/Vector.hpp"
 
 namespace Engine
 {
-	class RigidBody2D : public SingletonComponentBase
+	namespace Components
 	{
-	public:
-		using ParentType = SingletonComponentBase;
+		template<>
+		constexpr bool IsSingleton<class RigidBody2D>() { return true; }
 
-		explicit RigidBody2D(SceneObject& owningObject);
-		~RigidBody2D() override;
+		class RigidBody2D : public ComponentBase
+		{
+		public:
+			using ParentType = ComponentBase;
 
-		Math::Vector2D position;
-		Math::Vector2D velocity;
-		float torque;
+			explicit RigidBody2D(SceneObject& owningObject);
+			~RigidBody2D();
 
-		float GetMass() const;
-		void SetMass(float newMass);
-		float GetInverseMass() const;
-		void SetInverseMass(float newInverseMass);
+			Math::Vector2D position;
+			Math::Vector2D velocity;
+			float torque;
 
-	private:
-		float inverseMass;
-	};
+			float GetMass() const;
+			void SetMass(float newMass);
+			float GetInverseMass() const;
+			void SetInverseMass(float newInverseMass);
+
+		private:
+			float inverseMass;
+		};
+	}
+
+	
 }

@@ -32,6 +32,7 @@ static const std::map<Asset::Mesh, AssetInfo> meshInfos
 	{ Asset::Mesh::None, {"None", ""} },
 	{ Asset::Mesh::Cube, {"Cube", "Cube/Cube.gltf"} },
 	{ Asset::Mesh::SpritePlane, {"SpritePlane", "SpritePlane/SpritePlane.gltf"} },
+	{ Asset::Mesh::Helmet, {"Helmet", "Helmet/Helmet.gltf"} },
 };
 
 bool Asset::CheckValid(Sprite sprite)

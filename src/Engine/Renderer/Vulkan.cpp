@@ -1,4 +1,4 @@
-#include "Renderer.hpp"
+﻿#include "Renderer.hpp"
 #include "Vulkan.hpp"
 
 #include "../Asset.hpp"
@@ -31,26 +31,25 @@ namespace Engine
 
 			constexpr bool preferTripleBuffering = true;
 
-			constexpr std::string_view createDebugReportCallbackName = "vkCreateDebugReportCallbackEXT";
-			constexpr std::string_view destroyDebugReportCallbackName = "vkDestroyDebugReportCallbackEXT";
-
-			constexpr std::string_view vkKHRSurfaceExtensionName = VK_KHR_SURFACE_EXTENSION_NAME;
-			constexpr std::string_view vkEXTDebugReportExtensionName = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
-			constexpr char vkKHRSwapchainExtensionName[] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+			constexpr std::string_view VkKHRSurfaceExtensionName = VK_KHR_SURFACE_EXTENSION_NAME;
+			constexpr std::string_view VkKHRSwapchainExtensionName = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+			constexpr std::string_view VkEXTDebugUtilsExtensionName = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+			
 
 			constexpr std::array requiredValidationLayers
 			{
-				"VK_LAYER_LUNARG_standard_validation"
+				"VK_LAYER_LUNARG_standard_validation",
+				"VK_LAYER_RENDERDOC_Capture"
 			};
 
-			constexpr std::array requiredInstanceExtensions
+			constexpr std::array<const char*, 1> requiredInstanceExtensions
 			{
-				vkKHRSurfaceExtensionName
+				VkKHRSurfaceExtensionName.data()
 			};
 
-			constexpr std::array requiredDeviceExtensions
+			constexpr std::array<const char*, 1> requiredDeviceExtensions
 			{
-				vkKHRSwapchainExtensionName
+				VkKHRSwapchainExtensionName.data()
 			};
 
 			struct PhysicalDevice;
@@ -213,9 +212,9 @@ struct Engine::Renderer::Vulkan::Data
 
 	vk::Instance instance = nullptr;
 
-	PFN_vkCreateDebugReportCallbackEXT createDebugReportCallbackPtr = nullptr;
-	PFN_vkDestroyDebugReportCallbackEXT destroyDebugReportCallbackPtr = nullptr;
-	vk::DebugReportCallbackEXT debugReportCallback = nullptr;
+	PFN_vkCreateDebugUtilsMessengerEXT createDebugUtilsMessengerPFN = nullptr;
+	PFN_vkDestroyDebugUtilsMessengerEXT destroyDebugUtilsMessengerPFN = nullptr;
+	vk::DebugUtilsMessengerEXT debugUtilsMessenger = nullptr;
 
 	vk::SurfaceKHR surface = nullptr;
 
@@ -308,7 +307,7 @@ void Engine::Renderer::Vulkan::LoadInstanceExtensions(Data& data)
 	auto availableInstanceExtensions = vk::enumerateInstanceExtensionProperties();
 	data.availableInstanceExtensions.reserve(availableInstanceExtensions.size());
 	for (const auto& item : availableInstanceExtensions)
-		GetData().availableInstanceExtensions.push_back(item.extensionName);
+		data.availableInstanceExtensions.push_back(item.extensionName);
 
 	Renderer::Viewport& viewport = Renderer::GetViewport(0);
 
@@ -321,24 +320,24 @@ void Engine::Renderer::Vulkan::LoadInstanceExtensions(Data& data)
 		bool extensionFound = false;
 		for (const auto& item2 : requiredExtensions)
 		{
-			if (std::strcmp(item1.data(), item2) == 0)
+			if (std::strcmp(item1, item2) == 0)
 			{
 				extensionFound = true;
 				break;
 			}
 		}
 		if (extensionFound == false)
-			requiredExtensions.push_back(item1.data());
+			requiredExtensions.push_back(item1);
 	}
 
 	if constexpr (enableDebug)
-		requiredExtensions.push_back(vkEXTDebugReportExtensionName.data());
+		requiredExtensions.push_back(VkEXTDebugUtilsExtensionName.data());
 
 	// Checks if all the required extensions are available.
 	for (const auto& item1 : requiredExtensions)
 	{
 		bool extensionFound = false;
-		for (const auto& item2 : GetData().availableInstanceExtensions)
+		for (const auto& item2 : data.availableInstanceExtensions)
 		{
 			if (std::strcmp(item1, item2) == 0)
 			{
@@ -348,7 +347,7 @@ void Engine::Renderer::Vulkan::LoadInstanceExtensions(Data& data)
 		}
 		assert(extensionFound);
 	}
-	GetData().activeInstanceExtensions = std::move(requiredExtensions);
+	data.activeInstanceExtensions = std::move(requiredExtensions);
 }
 
 bool Engine::Renderer::Vulkan::CheckValidationLayerSupport(const std::vector<vk::LayerProperties>& availableLayers)
@@ -398,41 +397,60 @@ void Engine::Renderer::Vulkan::CreateInstance(Data& data)
 
 #pragma warning( push )
 #pragma warning( disable : 4100 )
-VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback
-(
-	VkDebugReportFlagsEXT flags,
-	VkDebugReportObjectTypeEXT objType,
-	uint64_t obj,
-	size_t location,
-	int32_t code,
-	const char* layerPrefix,
-	const char* msg,
-	void* userData)
+namespace Engine
 {
-	std::cerr << "Vulkan Validation Layer:\n" << msg << '\n' << std::endl;
+	namespace Renderer
+	{
+		namespace Vulkan
+		{
+			VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback
+			(
+				VkDebugUtilsMessageSeverityFlagBitsEXT inMessageSeverity,
+				VkDebugUtilsMessageTypeFlagsEXT inMessageType,
+				const VkDebugUtilsMessengerCallbackDataEXT* pInCallbackData,
+				void* pUserData
+			)
+			{
+				const vk::DebugUtilsMessageSeverityFlagsEXT messageSeverity = static_cast<vk::DebugUtilsMessageSeverityFlagsEXT>(inMessageSeverity);
+				const vk::DebugUtilsMessageTypeFlagsEXT messageType = static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(inMessageType);
+				const vk::DebugUtilsMessengerCallbackDataEXT callbackData = static_cast<vk::DebugUtilsMessengerCallbackDataEXT>(*pInCallbackData);
 
-	return VK_FALSE;
+				std::cerr << "Vulkan Validation Layer:" << std::endl << callbackData.pMessage << std::endl << std::endl;
+
+				return VK_FALSE;
+			}
+		}
+	}
 }
 #pragma warning( pop )
 
 void Engine::Renderer::Vulkan::SetUpDebugCallback(Data& data)
 {
-	vk::DebugReportCallbackCreateInfoEXT createInfo;
-	createInfo.flags = vk::DebugReportFlagBitsEXT::eError | vk::DebugReportFlagBitsEXT::eWarning | vk::DebugReportFlagBitsEXT::ePerformanceWarning;
-	createInfo.pfnCallback = VulkanDebugCallback;
+	vk::DebugUtilsMessengerCreateInfoEXT createInfo;
+	// Set flags for what message-severities to report.
+	createInfo.messageSeverity =
+		  vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
+		| vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
+		| vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
+		| vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
+		;
+	// Set flags for what message types to report.
+	createInfo.messageType = 
+		vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | 
+		vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | 
+		vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
+	createInfo.pfnUserCallback = DebugMessengerCallback;
 
-	// Bind vkCreateDebugReportCallbackEXT and create debug report callback.
-	data.createDebugReportCallbackPtr = reinterpret_cast<PFN_vkCreateDebugReportCallbackEXT>(data.instance.getProcAddr(createDebugReportCallbackName.data()));
-	assert(data.createDebugReportCallbackPtr);
+	// Grab create/destroy functions for DebugUtilsMessenger
+	data.createDebugUtilsMessengerPFN = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(data.instance.getProcAddr("vkCreateDebugUtilsMessengerEXT"));
+	assert(data.createDebugUtilsMessengerPFN);
+	data.destroyDebugUtilsMessengerPFN = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(data.instance.getProcAddr("vkCreateDebugUtilsMessengerEXT"));
+	assert(data.destroyDebugUtilsMessengerPFN);
 
-	VkDebugReportCallbackCreateInfoEXT createInfoTemp = createInfo;
-	VkDebugReportCallbackEXT callback;
-	data.createDebugReportCallbackPtr(static_cast<VkInstance>(data.instance), &createInfoTemp, nullptr, &callback);
-	data.debugReportCallback = static_cast<vk::DebugReportCallbackEXT>(callback);
-
-	// Bind vkDestroyDebugReportCallbackEXT for destruction upon Vulkan termination.
-	data.destroyDebugReportCallbackPtr = reinterpret_cast<PFN_vkDestroyDebugReportCallbackEXT>(data.instance.getProcAddr(destroyDebugReportCallbackName.data()));
-	assert(data.destroyDebugReportCallbackPtr);
+	VkDebugUtilsMessengerCreateInfoEXT createInfoTemp = createInfo;
+	VkDebugUtilsMessengerEXT handle;
+	data.createDebugUtilsMessengerPFN(static_cast<VkInstance>(data.instance), &createInfoTemp, nullptr, &handle);
+	data.debugUtilsMessenger = static_cast<vk::DebugUtilsMessengerEXT>(handle);
 }
 
 void Engine::Renderer::Vulkan::CreateSurface(Data& data)
@@ -975,8 +993,8 @@ void Engine::Renderer::Vulkan::Initialize(void*& apiData)
 	// Can't be multi-threaded start
 	if constexpr (enableDebug)
 	{
-		GetData().availableValidationLayers = vk::enumerateInstanceLayerProperties();
-		assert(CheckValidationLayerSupport(GetData().availableValidationLayers));
+		data.availableValidationLayers = vk::enumerateInstanceLayerProperties();
+		assert(CheckValidationLayerSupport(data.availableValidationLayers));
 	}
 
 	LoadInstanceExtensions(data);
@@ -1072,10 +1090,15 @@ void Engine::Renderer::Vulkan::Terminate(void*& apiData)
 
 	// Destroy debug report callback
 	if constexpr (enableDebug)
-		data.destroyDebugReportCallbackPtr(
-				static_cast<VkInstance>(data.instance),
-				static_cast<VkDebugReportCallbackEXT>(data.debugReportCallback),
-				nullptr);
+	{
+		data.destroyDebugUtilsMessengerPFN
+		(
+			static_cast<VkInstance>(data.instance),
+			static_cast<VkDebugUtilsMessengerEXT>(data.debugUtilsMessenger),
+			nullptr
+		);
+	}
+		
 
 	// Destroy logical device
 	data.device.destroy();

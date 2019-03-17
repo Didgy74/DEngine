@@ -243,15 +243,6 @@ void Engine::Renderer::Core::UpdateAssetReferences(Data& data, const RenderGraph
 	}
 }
 
-size_t Engine::Renderer::RenderGraph::GetTotalObjectCount() const
-{
-	size_t totalObjectCount = 0;
-
-	totalObjectCount += sprites.size();
-
-	return totalObjectCount;
-}
-
 Math::Matrix4x4 Engine::Renderer::CameraInfo::GetModel(float aspectRatio) const
 {
 	if (projectMode == ProjectMode::Perspective)

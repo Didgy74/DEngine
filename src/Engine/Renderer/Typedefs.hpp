@@ -14,5 +14,13 @@ namespace Engine
 		enum class SpriteID : Core::AssetIntegerType {};
 
 		enum class MeshID : Core::AssetIntegerType {};
+
+		enum class API;
+		class Viewport;
+		class SceneData;
+		struct RenderGraph;
+		struct RenderGraphTransform;
+		struct CameraInfo;
+		struct PointLight;
 	}
 }

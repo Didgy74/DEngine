@@ -40,12 +40,12 @@ namespace Engine
 		SceneObject& GetSceneObject(size_t index);
 		size_t GetSceneObjectCount() const;
 
-		template<typename ComponentType>
+		template<typename T>
 		size_t GetComponentCount() const;
-		template<typename ComponentType>
-		ComponentType* GetComponent(const CompRef<ComponentType>& ref);
-		template<typename ComponentType>
-		const std::vector<ComponentType>* GetAllComponents() const;
+		template<typename T>
+		T* GetComponent(const CompRef<T>& ref);
+		template<typename T>
+		const std::vector<T>* GetAllComponents() const;
 
 
 		[[nodiscard]] size_t GetIndexInEngine() const;
@@ -60,8 +60,8 @@ namespace Engine
 			std::vector<T> data;
 		};
 
-		template<typename ComponentType>
-		[[nodiscard]] std::pair<size_t, std::reference_wrapper<ComponentType>> AddComponent(SceneObject &owningObject);
+		template<typename T>
+		[[nodiscard]] std::pair<size_t, std::reference_wrapper<T>> AddComponent(SceneObject &owningObject);
 		std::unordered_map<std::type_index, std::any> components;
 		size_t componentGUIDCounter;
 
@@ -70,7 +70,7 @@ namespace Engine
 		void RemoveSceneObject(SceneObject &owningObject);
 
 		size_t indexInEngine;
-		std::vector<SceneObject*> sceneObjects;
+		std::vector<std::unique_ptr<SceneObject>> sceneObjects;
 		Time::SceneData timeData;
 		Physics2D::SceneData physics2DData;
 
@@ -79,16 +79,16 @@ namespace Engine
 	};
 }
 
-template<typename ComponentType>
-std::pair<size_t, std::reference_wrapper<ComponentType>> Engine::Scene::AddComponent(SceneObject& owningObject)
+template<typename T>
+std::pair<size_t, std::reference_wrapper<T>> Engine::Scene::AddComponent(SceneObject& owningObject)
 {
-	using ContainerType = Table<ComponentType>;
+	using ContainerType = Table<T>;
 
-	auto iterator = components.find(typeid(ComponentType));
+	auto iterator = components.find(typeid(T));
 	if (iterator == components.end())
 	{
 		// No component-vector for this type, make one.
-		auto iteratorOpt = components.insert({typeid(ComponentType), std::make_any<ContainerType>()});
+		auto iteratorOpt = components.insert({typeid(T), std::make_any<ContainerType>()});
 		assert(iteratorOpt.second);
 		iterator = iteratorOpt.first;
 	}
@@ -100,26 +100,26 @@ std::pair<size_t, std::reference_wrapper<ComponentType>> Engine::Scene::AddCompo
 	return { table.id.back(), table.data.back() };
 }
 
-template<typename ComponentType>
+template<typename T>
 size_t Engine::Scene::GetComponentCount() const
 {
-	auto iterator = components.find(typeid(ComponentType));
+	auto iterator = components.find(typeid(T));
 	if (iterator == components.end())
 		return 0;
 
-	using ContainerType = Table<ComponentType>;
+	using ContainerType = Table<T>;
 	const auto& container = std::any_cast<ContainerType&>(iterator->second);
 	return container.data.size();
 }
 
-template<typename ComponentType>
-ComponentType* Engine::Scene::GetComponent(const CompRef<ComponentType> &ref)
+template<typename T>
+T* Engine::Scene::GetComponent(const CompRef<T> &ref)
 {
-	auto iterator = components.find(typeid(ComponentType));
+	auto iterator = components.find(typeid(T));
 	if (iterator == components.end())
 		return nullptr;
 
-	using ContainerType = Table<ComponentType>;
+	using ContainerType = Table<T>;
 	auto& table = std::any_cast<ContainerType&>(iterator->second);
 
 	auto idIterator = std::find(table.id.begin(), table.id.end(), ref.GetGUID());
@@ -131,14 +131,14 @@ ComponentType* Engine::Scene::GetComponent(const CompRef<ComponentType> &ref)
 	return &table.data[index];
 }
 
-template<typename ComponentType>
-const std::vector<ComponentType>* Engine::Scene::GetAllComponents() const
+template<typename T>
+const std::vector<T>* Engine::Scene::GetAllComponents() const
 {
-	auto iterator = components.find(typeid(ComponentType));
+	auto iterator = components.find(typeid(T));
 	if (iterator == components.end())
 		return nullptr;
 
-	using ContainerType = Table<ComponentType>;
+	using ContainerType = Table<T>;
 	const auto& table = std::any_cast<const ContainerType&>(iterator->second);
 	return &table.data;
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ComponentBase.hpp"
+#include "Components.hpp"
 
 #include "Math/Vector/Vector.hpp"
 
@@ -8,38 +8,41 @@
 
 namespace Engine
 {
-	class Camera : public ComponentBase
+	namespace Components
 	{
-	public:
-		using ParentType = ComponentBase;
-
-		enum class ProjectionMode
+		class Camera : public ComponentBase
 		{
-			Perspective,
-			Orthgraphic
+		public:
+			using ParentType = ComponentBase;
+
+			enum class ProjectionMode
+			{
+				Perspective,
+				Orthgraphic
+			};
+
+			static constexpr float defaultFovY = 50.f;
+			static constexpr float defaultOrtographicWidth = 10.f;
+			static constexpr float defaultZNear = 0.1f;
+			static constexpr float defaultZFar = 100.f;
+			static constexpr ProjectionMode defaultProjectionMode = ProjectionMode::Perspective;
+
+			explicit Camera(SceneObject& owningObject);
+			~Camera();
+
+			Math::Vector3D position;
+			Math::Vector3D forward;
+			Math::Vector3D up;
+
+			float fov;
+			float orthographicWidth;
+			float zNear;
+			float zFar;
+			ProjectionMode activeProjectionMode;
+
+			void LookAt(const Math::Vector3D& newTarget);
+
+			Renderer::CameraInfo GetCameraInfo() const;
 		};
-
-		static constexpr float defaultFovY = 50.f;
-		static constexpr float defaultOrtographicWidth = 10.f;
-		static constexpr float defaultZNear = 0.1f;
-		static constexpr float defaultZFar = 100.f;
-		static constexpr ProjectionMode defaultProjectionMode = ProjectionMode::Perspective;
-
-		explicit Camera(SceneObject& owningObject);
-		~Camera();
-
-		Math::Vector3D position;
-		Math::Vector3D forward;
-		Math::Vector3D up;
-
-		float fov;
-		float orthographicWidth;
-		float zNear;
-		float zFar;
-		ProjectionMode activeProjectionMode;
-		
-		void LookAt(const Math::Vector3D& newTarget);
-
-		Renderer::CameraInfo GetCameraInfo() const;
-	};
+	}
 }

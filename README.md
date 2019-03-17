@@ -11,6 +11,8 @@ Linux:
 * Vulkan
 * OpenGL
 
+NOTE! 32-bit is not supported.
+
 
 The engine uses the following libraries:
 * GLEW

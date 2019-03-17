@@ -1,23 +1,26 @@
 #pragma once
 
-#include "ComponentBase.hpp"
+#include "Components.hpp"
 #include "../Enum.hpp"
 
 #include "Math/Vector/Vector.hpp"
 
 namespace Engine
 {
-	class CircleCollider2D : public ComponentBase
+	namespace Components
 	{
-	public:
-		using ParentType = ComponentBase;
+		class CircleCollider2D : public ComponentBase
+		{
+		public:
+			using ParentType = ComponentBase;
 
-		explicit CircleCollider2D(SceneObject& owningObject);
-		~CircleCollider2D();
+			explicit CircleCollider2D(SceneObject& owningObject);
+			~CircleCollider2D();
 
-		Math::Matrix<3, 2> GetModel2D_Reduced(Space space) const;
+			Math::Matrix<3, 2> GetModel2D_Reduced(Space space) const;
 
-		Math::Vector2D position;
-		float radius;
-	};
+			Math::Vector2D positionOffset;
+			float radius;
+		};
+	}
 }

@@ -14,14 +14,13 @@
 #include "Components/Camera.hpp"
 #include "Components/RigidBody2D.hpp"
 
+#include "Systems/RenderSystem.hpp"
+
+#include "Math/LinearTransform3D.hpp"
+
 #include <iostream>
 
 std::vector<std::unique_ptr<Engine::Scene>> Engine::Core::scenes;
-
-namespace Engine
-{
-	void BuildRenderGraph(const Scene& scene, Renderer::RenderGraph& graph, Renderer::RenderGraphTransform& transforms);
-}
 
 void Engine::Core::Run()
 {
@@ -38,11 +37,15 @@ void Engine::Core::Run()
 
 
 	auto& sceneObject1 = scene1.NewSceneObject();
-	auto& sprite1 = sceneObject1.AddComponent<MeshRenderer>().first.get();
-	sprite1.SetMesh(Asset::Mesh::Cube);
+	auto& sprite1 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
+	sprite1.SetMesh(Asset::Mesh::Helmet);
+
+	auto& mesh2 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
+	mesh2.SetMesh(Asset::Mesh::Cube);
+	mesh2.position.x = 2.5f;
 
 	auto& objCamera = scene1.NewSceneObject();
-	auto& camera = objCamera.AddComponent<Camera>().first.get();
+	auto& camera = objCamera.AddComponent<Components::Camera>().first.get();
 
 	camera.position.z = 5.f;
 
@@ -72,8 +75,9 @@ void Engine::Core::Run()
 		//std::cout << scene1.GetTimeData().GetFPS() << std::endl;
 
 
+		RenderSystem::BuildRenderGraph(scene1, graph, graphTransform);
 
-		BuildRenderGraph(scene1, graph, graphTransform);
+
 
 		Renderer::Core::SetCameraInfo(camera.GetCameraInfo());
 
@@ -107,41 +111,3 @@ Engine::Scene& Engine::NewScene()
 
 std::vector<std::unique_ptr<Engine::Scene>>& Engine::GetScenes() { return Core::scenes; }
 
-void Engine::BuildRenderGraph(const Scene& scene, Renderer::RenderGraph& graph, Renderer::RenderGraphTransform& transforms)
-{
-	auto spriteComponentsPtr = scene.GetAllComponents<SpriteRenderer>();
-	if (spriteComponentsPtr == nullptr)
-	{
-		graph.sprites.clear();
-		transforms.sprites.clear();
-	}
-	else
-	{
-		const auto& spriteComponents = *spriteComponentsPtr;
-		graph.sprites.resize(spriteComponents.size());
-		transforms.sprites.resize(spriteComponents.size());
-		for (size_t i = 0; i < spriteComponents.size(); i++)
-		{
-			graph.sprites[i] = static_cast<Renderer::SpriteID>(spriteComponents[i].GetSprite());
-			transforms.sprites[i] = spriteComponents[i].GetModel(Space::World);
-		}
-	}
-
-	auto meshComponentsPtr = scene.GetAllComponents<MeshRenderer>();
-	if (meshComponentsPtr == nullptr)
-	{
-		graph.meshes.clear();
-		transforms.meshes.clear();
-	}
-	else
-	{
-		const auto& meshComponents = *meshComponentsPtr;
-		graph.meshes.resize(meshComponents.size());
-		transforms.meshes.resize(meshComponents.size());
-		for (size_t i = 0; i < meshComponents.size(); i++)
-		{
-			graph.meshes[i] = static_cast<Renderer::MeshID>(meshComponents[i].GetMesh());
-			transforms.meshes[i] = meshComponents[i].GetModel(Space::World);
-		}
-	}
-}

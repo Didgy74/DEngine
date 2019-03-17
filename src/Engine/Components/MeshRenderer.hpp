@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ComponentBase.hpp"
+#include "Components.hpp"
 
 #include "../Asset.hpp"
 
@@ -12,26 +12,28 @@
 
 namespace Engine
 {
-	class MeshRenderer : public ComponentBase
+	namespace Components
 	{
-	public:
-		using ParentType = ComponentBase;
+		class MeshRenderer : public ComponentBase
+		{
+		public:
+			using ParentType = ComponentBase;
 
-		explicit MeshRenderer(SceneObject& owningObject);
-		~MeshRenderer();
+			explicit MeshRenderer(SceneObject& owningObject);
+			~MeshRenderer();
 
-		[[nodiscard]] Asset::Mesh GetMesh() const;
-		std::underlying_type_t<Asset::Mesh> GetMeshID() const;
-		void SetMesh(Asset::Mesh newMesh);
+			[[nodiscard]] Asset::Mesh GetMesh() const;
+			std::underlying_type_t<Asset::Mesh> GetMeshID() const;
+			void SetMesh(Asset::Mesh newMesh);
 
-		Math::Matrix4x4 GetModel(Space space) const;
+			Math::Matrix4x4 GetModel(Space space) const;
 
-		Math::Vector3D position;
-		Math::UnitQuaternion<> rotation;
-		Math::Vector3D scale;
+			Math::Vector3D position;
+			Math::UnitQuaternion<> rotation;
+			Math::Vector3D scale;
 
-
-	private:
-		Asset::Mesh mesh;
-	};
+		private:
+			Asset::Mesh mesh;
+		};
+	}
 }
