@@ -1,8 +1,6 @@
 #include "Renderer.hpp"
 #include "OpenGL.hpp"
 
-#include "../Application.hpp"
-
 #include "../Asset.hpp"
 
 #include "GL/glew.h"
@@ -71,9 +69,7 @@ struct Engine::Renderer::OpenGL::ImageBufferObject
 
 struct Engine::Renderer::OpenGL::Data
 {
-	Data() = default;
-	Data(const Data&) = delete;
-	Data(Data&&) = delete;
+	std::function<void(void*)> glSwapBuffers;
 
 	std::unordered_map<MeshID, VBO> vboDatabase;
 	VBO quadVBO;
@@ -92,7 +88,7 @@ struct Engine::Renderer::OpenGL::Data
 	GLuint samplerObject;
 };
 
-Engine::Renderer::OpenGL::Data& Engine::Renderer::OpenGL::GetData() { return *static_cast<Data*>(Core::GetAPIData()); }
+Engine::Renderer::OpenGL::Data& Engine::Renderer::OpenGL::GetData() { return std::any_cast<Data&>(Core::GetAPIData()); }
 
 static std::string LoadShader(const std::string& fileName)
 {
@@ -171,8 +167,8 @@ void Engine::Renderer::OpenGL::LoadSpriteShader(Data& data)
 	data.spriteProgram = glCreateProgram();
 
 	std::array<GLuint, 2> shaders{};
-	shaders[0] = CreateShader(LoadShader("Data/Shaders/Sprite/OpenGL/sprite.vert"), GL_VERTEX_SHADER);
-	shaders[1] = CreateShader(LoadShader("Data/Shaders/Sprite/OpenGL/sprite.frag"), GL_FRAGMENT_SHADER);
+	shaders[0] = CreateShader(LoadShader("Data/Shaders/Sprite/sprite.vert"), GL_VERTEX_SHADER);
+	shaders[1] = CreateShader(LoadShader("Data/Shaders/Sprite/sprite.frag"), GL_FRAGMENT_SHADER);
 
 	for (unsigned int i = 0; i < 2; i++)
 		glAttachShader(data.spriteProgram, shaders[i]);
@@ -203,8 +199,8 @@ void Engine::Renderer::OpenGL::LoadMeshShader(Engine::Renderer::OpenGL::Data &da
 	data.meshProgram = glCreateProgram();
 
 	std::array<GLuint, 2> shader{};
-	shader[0] = CreateShader(LoadShader("Data/Shaders/Mesh/OpenGL/Mesh.vert"), GL_VERTEX_SHADER);
-	shader[1] = CreateShader(LoadShader("Data/Shaders/Mesh/OpenGL/Mesh.frag"), GL_FRAGMENT_SHADER);
+	shader[0] = CreateShader(LoadShader("Data/Shaders/Mesh/Mesh.vert"), GL_VERTEX_SHADER);
+	shader[1] = CreateShader(LoadShader("Data/Shaders/Mesh/Mesh.frag"), GL_FRAGMENT_SHADER);
 
 	for (unsigned int i = 0; i < 2; i++)
 		glAttachShader(data.meshProgram, shader[i]);
@@ -227,13 +223,18 @@ void Engine::Renderer::OpenGL::LoadMeshShader(Engine::Renderer::OpenGL::Data &da
 	data.meshViewUniform = glGetUniformLocation(data.meshProgram, "viewProjection");
 }
 
-void Engine::Renderer::OpenGL::Initialize(void*& apiData)
+void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& createInfo)
 {
 	auto glInitResult = glewInit();
 	assert(glInitResult == 0);
 
-	apiData = new Data();
-	Data& data = *static_cast<Data*>(apiData);
+
+	apiData = std::make_any<Data>();
+	Data& data = std::any_cast<Data&>(apiData);
+
+	data.glSwapBuffers = std::move(createInfo.glSwapBuffers);
+
+
 
 	// Gen sampler
 	glGenSamplers(1, &data.samplerObject);
@@ -258,9 +259,9 @@ void Engine::Renderer::OpenGL::Initialize(void*& apiData)
 	LoadMeshShader(data);
 }
 
-void Engine::Renderer::OpenGL::Terminate(void*& apiData)
+void Engine::Renderer::OpenGL::Terminate(std::any& apiData)
 {
-	Data& data = *static_cast<Data*>(apiData);
+	Data& data = std::any_cast<Data&>(apiData);
 
 	data.quadVBO.DeallocateDeviceBuffers();
 	for (auto& vboItem : data.vboDatabase)
@@ -271,8 +272,8 @@ void Engine::Renderer::OpenGL::Terminate(void*& apiData)
 
 	glDeleteProgram(data.spriteProgram);
 
-	delete static_cast<Data*>(apiData);
-	apiData = nullptr;
+	//delete static_cast<Data*>(apiData);
+	//apiData = nullptr;
 }
 
 void Engine::Renderer::OpenGL::PrepareRenderingEarly(const std::vector<SpriteID>& spriteLoadQueue, const std::vector<MeshID>& meshLoadQueue)
@@ -301,8 +302,7 @@ void Engine::Renderer::OpenGL::Draw()
 	Draw_SpritePass(data, renderGraph.sprites, renderGraphTransform.sprites);
 	Draw_MeshPass(data, renderGraph.meshes, renderGraphTransform.meshes);
 
-
-	Engine::Application::Core::GL_SwapWindow(viewport.GetSurfaceHandle());
+	data.glSwapBuffers(viewport.GetSurfaceHandle());
 }
 
 void Engine::Renderer::OpenGL::Draw_SpritePass(const Data& data,

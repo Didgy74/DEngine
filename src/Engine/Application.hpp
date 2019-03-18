@@ -22,7 +22,6 @@ namespace Engine
 		};
 
 		Utility::ImgDim GetWindowSize();
-		Utility::ImgDim GetViewportSize();
 		uint16_t GetRefreshRate();
 
 		bool IsMinimized();
@@ -35,10 +34,8 @@ namespace Engine
 
 		namespace Core
 		{
-			void* GetSDLWindowHandle();
-			void GL_SwapWindow(void* sdlWindow);
-			std::vector<const char*> Vulkan_GetInstanceExtensions(void* windowHandle);
-			void Vulkan_CreateSurface(void* windowHandle, void* vkInstance, void* surfaceHandle);
+			void* GetMainWindowHandle();
+			void GL_SwapWindow(void* windowHandle);
 
 			void UpdateEvents();
 

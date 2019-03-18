@@ -28,7 +28,13 @@ void Engine::Core::Run()
 	Time::Core::Initialize();
 	Input::Core::Initialize();
 	Physics2D::Core::Initialize();
-	Renderer::Core::Initialize(Renderer::API::OpenGL, Application::GetViewportSize(), Application::Core::GetSDLWindowHandle());
+
+	Renderer::CreateInfo rendererCreateInfo;
+	rendererCreateInfo.preferredAPI = Renderer::API::OpenGL;
+	rendererCreateInfo.surfaceDimensions = Application::GetWindowSize();
+	rendererCreateInfo.surfaceHandle = Application::Core::GetMainWindowHandle();
+	rendererCreateInfo.openGLCreateInfo.glSwapBuffers = Application::Core::GL_SwapWindow;
+	Renderer::Core::Initialize(std::move(rendererCreateInfo));
 
 	// Create scene and make viewport 0 point to scene 0.
 	Scene& scene1 = Engine::NewScene();
@@ -68,7 +74,7 @@ void Engine::Core::Run()
 			camera.position -= camera.forward * speed * scene1.GetTimeData().GetDeltaTime();
 		if (Input::Raw::GetValue(Input::Raw::Button::Space))
 			camera.position += Math::Vector3D::Up() * speed * scene1.GetTimeData().GetDeltaTime();
-		if (Input::Raw::GetValue(Input::Raw::Button::Ctrl))
+		if (Input::Raw::GetValue(Input::Raw::Button::LeftCtrl))
 			camera.position += Math::Vector3D::Down() * speed * scene1.GetTimeData().GetDeltaTime();
 		camera.LookAt({ 0, 0, 0 });
 

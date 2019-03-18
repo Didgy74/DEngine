@@ -2,8 +2,6 @@
 #include "InputRaw.hpp"
 #include "Math/Vector/Vector.hpp"
 
-#include "SDL2/SDL.h"
-
 #include <array>
 #include <memory>
 

@@ -2,6 +2,8 @@
 
 #include "Typedefs.hpp"
 #include <vector>
+#include <any>
+#include <functional>
 
 namespace Engine
 {
@@ -9,8 +11,8 @@ namespace Engine
 	{
 		namespace OpenGL
 		{
-			void Initialize(void*& apiData);
-			void Terminate(void*& apiData);
+			void Initialize(std::any& apiData, CreateInfo&& createInfo);
+			void Terminate(std::any& apiData);
 			void PrepareRenderingEarly(const std::vector<SpriteID>& spriteLoadQueue, const std::vector<MeshID>& meshLoadQueue);
 			void PrepareRenderingLate();
 			void Draw();

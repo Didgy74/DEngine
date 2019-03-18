@@ -2,6 +2,7 @@
 
 #include "Setup.hpp"
 #include "Typedefs.hpp"
+#include "OpenGLCreateInfo.hpp"
 
 #include "../Utility/ImgDim.hpp"
 #include "../Utility/Color.hpp"
@@ -12,6 +13,8 @@
 #include <memory>
 #include <vector>
 #include <map>
+#include <any>
+#include <array>
 
 namespace Engine
 {
@@ -29,13 +32,13 @@ namespace Engine
 
 		namespace Core
 		{
-			bool Initialize(API api, Utility::ImgDim dimensions, void* surfaceHandle);
+			bool Initialize(CreateInfo&& createInfo);
 			void PrepareRenderingEarly(RenderGraph& renderGraphInput);
 			void PrepareRenderingLate(RenderGraphTransform& sceneData);
 			void Draw();
 			void Terminate();
 
-			void* GetAPIData();
+			std::any& GetAPIData();
 
 			const RenderGraph& GetRenderGraph();
 			const RenderGraphTransform& GetRenderGraphTransform();
@@ -49,6 +52,14 @@ namespace Engine
 		None,
 		OpenGL,
 		Vulkan
+	};
+
+	struct Renderer::CreateInfo
+	{
+		API preferredAPI = API::None;
+		Utility::ImgDim surfaceDimensions{};
+		void* surfaceHandle = nullptr;
+		OpenGL::CreateInfo openGLCreateInfo{};
 	};
 
 	struct Renderer::PointLight

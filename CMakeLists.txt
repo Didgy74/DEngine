@@ -19,23 +19,6 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
                    ${PROJECT_SOURCE_DIR}/Data
 				   ${CMAKE_BINARY_DIR}/Data
 				   )
-
-# SDL2
-find_package(SDL2 QUIET)
-if (SDL2_FOUND)
-    target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
-    target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
-else()
-	if(UNIX)
-		message(FATAL_ERROR "Error. Building on UNIX without SDL2 packages installed is not supported.")
-	elseif(WIN32)
-		set(SDL2_DIR lib/SDL2)
-		find_package(SDL2 CONFIG REQUIRED)
-		target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
-		target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
-	endif()
-endif()
-
 # GLEW
 find_package(GLEW 2.0 QUIET)
 if (GLEW_FOUND)
@@ -52,20 +35,12 @@ else()
 endif()
 
 # OpenGL
+
 find_package(OpenGL 3.3 REQUIRED)
 target_link_libraries(${PROJECT_NAME} OpenGL::GL)
 
-# Vulkan
-find_package(Vulkan 1.1 QUIET)
-if(Vulkan_FOUND)
-	target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
-else()
-	if (UNIX)
-		message(FATAL_ERROR "Error. Building on UNIX without Vulkan SDK installed is not supported.")
-	elseif(WIN32)
-		set(Vulkan_DIR lib/Vulkan)
-		find_package(Vulkan CONFIG REQUIRED)
-		target_include_directories(${PROJECT_NAME} PRIVATE ${Vulkan_INCLUDE_DIRS})
-		target_link_libraries(${PROJECT_NAME} ${Vulkan_LIBRARIES})
-	endif()
-endif()
+# GLFW
+set(GLFW_DIR lib/GLFW)
+find_package(GLFW CONFIG REQUIRED)
+target_include_directories(${PROJECT_NAME} PRIVATE ${GLFW_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} ${GLFW_LIBRARIES})

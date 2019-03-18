@@ -1,6 +1,5 @@
 #include "Renderer.hpp"
 #include "OpenGL.hpp"
-#include "Vulkan.hpp"
 
 #include "../Scene.hpp"
 #include "../Components/SpriteRenderer.hpp"
@@ -38,13 +37,11 @@ namespace Engine
 
 				std::vector<std::unique_ptr<Viewport>> viewports;
 
-				std::function<void(void*&)> Initialize;
-				std::function<void(void*&)> Terminate;
 				std::function<void(void)> Draw;
 				std::function<void(const std::vector<SpriteID>&, const std::vector<MeshID>&)> PrepareRenderingEarly;
 				std::function<void(void)> PrepareRenderingLate;
 
-				void* apiData = nullptr;
+				std::any apiData = nullptr;
 			};
 
 			static std::unique_ptr<Data> data;
@@ -66,26 +63,19 @@ Engine::Renderer::Viewport& Engine::Renderer::GetViewport(size_t index) { return
 
 Engine::Renderer::API Engine::Renderer::GetActiveAPI() { return Core::data->activeAPI; }
 
-void* Engine::Renderer::Core::GetAPIData() { return data->apiData; }
+std::any& Engine::Renderer::Core::GetAPIData() { return data->apiData; }
 
-bool Engine::Renderer::Core::Initialize(API api, Utility::ImgDim dimensions, void* surfaceHandle)
+bool Engine::Renderer::Core::Initialize(CreateInfo&& createInfo)
 {
 	data = std::make_unique<Data>();
-	data->activeAPI = api;
+	data->activeAPI = createInfo.preferredAPI;
 
-	NewViewport(dimensions, surfaceHandle);
+	NewViewport(createInfo.surfaceDimensions, createInfo.surfaceHandle);
 
 	switch (data->activeAPI)
 	{
-	case API::Vulkan:
-		data->Initialize = Vulkan::Initialize;
-		data->Terminate = Vulkan::Terminate;
-		data->Draw = Vulkan::Draw;
-		//data->PrepareRendering = Vulkan::PrepareRendering;
-		break;
 	case API::OpenGL:
-		data->Initialize = OpenGL::Initialize;
-		data->Terminate = OpenGL::Terminate;
+		OpenGL::Initialize(data->apiData, std::move(createInfo.openGLCreateInfo));
 		data->Draw = OpenGL::Draw;
 		data->PrepareRenderingEarly = OpenGL::PrepareRenderingEarly;
 		data->PrepareRenderingLate = OpenGL::PrepareRenderingLate;
@@ -94,14 +84,19 @@ bool Engine::Renderer::Core::Initialize(API api, Utility::ImgDim dimensions, voi
 		break;
 	}
 
-	data->Initialize(data->apiData);
-
 	return true;
 }
 
 void Engine::Renderer::Core::Terminate()
 {
-	data->Terminate(data->apiData);
+	switch (GetActiveAPI())
+	{
+	case API::OpenGL:
+		OpenGL::Terminate(data->apiData);
+		break;
+	default:
+		break;
+	}
 
 	data = nullptr;
 }
