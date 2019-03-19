@@ -1,3 +1,0 @@
-[submodule "DMath"]
-	path = include/DMath
-	url = git@github.com:Didgy74/DMath.git
