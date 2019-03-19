@@ -4,6 +4,10 @@ namespace Engine
 {
 	class Scene;
 	class SceneObject;
+	namespace Components
+	{
+		class ScriptBase;
+	}
 }
 
 #include "Scene.hpp"
@@ -37,7 +41,7 @@ namespace Engine
 		[[nodiscard]] SceneObject* GetParent() const;
 
 		template<typename T>
-		std::pair<std::reference_wrapper<T>, CompRef<T>> AddComponent();
+		decltype(auto) AddComponent();
 
 		Transform transform;
 		
@@ -50,28 +54,42 @@ namespace Engine
 	};
 
 	template<typename T>
-	std::pair<std::reference_wrapper<T>, CompRef<T>> SceneObject::AddComponent()
+	decltype(auto) SceneObject::AddComponent()
 	{
+		Scene& scene = GetScene();
+
 		if constexpr (Components::IsSingleton<T>() == false)
 		{
-			auto iterator = components.find(typeid(T));
-			if (iterator == components.end())
+			if constexpr (std::is_base_of<Components::ScriptBase, T>())
 			{
-				// No vector for this component type found, make one
-				auto iteratorOpt = components.insert({typeid(T), {}});
-				assert(iteratorOpt.second);
-				iterator = iteratorOpt.first;
+				std::reference_wrapper<T> test = scene.AddComponent<T>(*this);
+				return test.get();
+			}
+			else
+			{
+				using ReturnType = std::pair<std::reference_wrapper<T>, CompRef<T>>;
+
+				auto iterator = components.find(typeid(T));
+				if (iterator == components.end())
+				{
+					// No vector for this component type found, make one
+					auto iteratorOpt = components.insert({ typeid(T), {} });
+					assert(iteratorOpt.second);
+					iterator = iteratorOpt.first;
+				}
+
+				auto& vector = iterator->second;
+
+				if constexpr (std::is_base_of<Components::ComponentBase, T>())
+				{
+					auto guidRefPair = scene.AddComponent<T>(*this);
+					vector.emplace_back(guidRefPair.first);
+
+					return ReturnType{ guidRefPair.second, CompRef<T>(scene, guidRefPair.first) };
+				}
 			}
 
-			auto& vector = iterator->second;
-
-			if constexpr (std::is_base_of<Components::ComponentBase, T>())
-			{
-				auto guidRefPair = GetScene().AddComponent<T>(*this);
-				vector.emplace_back(guidRefPair.first);
-
-				return { guidRefPair.second, CompRef<T>(GetScene(), guidRefPair.first) };
-			}
+			
 		}
 	}
 }

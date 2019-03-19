@@ -18,7 +18,61 @@
 
 #include "Math/LinearTransform3D.hpp"
 
+#include "Components/ScriptBase.hpp"
+
 #include <iostream>
+
+class ScriptTest : public Engine::Components::ScriptBase
+{
+	using ParentType = Engine::Components::ScriptBase;
+
+public:
+	explicit ScriptTest(Engine::SceneObject& owningObject) :
+		ParentType(owningObject)
+	{
+
+	}
+
+protected:
+	
+
+	void Start() override
+	{
+		ParentType::Start();
+	}
+
+	void Tick() override
+	{
+		ParentType::Tick();
+		std::cout << "We ticked!" << std::endl;
+	}
+};
+
+class ScriptTest2 : public Engine::Components::ScriptBase
+{
+	using ParentType = Engine::Components::ScriptBase;
+
+public:
+	explicit ScriptTest2(Engine::SceneObject& owningObject) :
+			ParentType(owningObject)
+	{
+
+	}
+
+protected:
+
+
+	void Start() override
+	{
+		ParentType::Start();
+	}
+
+	void Tick() override
+	{
+		ParentType::Tick();
+		std::cout << "We ticked222222!" << std::endl;
+	}
+};
 
 std::vector<std::unique_ptr<Engine::Scene>> Engine::Core::scenes;
 
@@ -42,6 +96,7 @@ void Engine::Core::Run()
 
 
 
+
 	auto& sceneObject1 = scene1.NewSceneObject();
 	auto& sprite1 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
 	sprite1.SetMesh(Asset::Mesh::Helmet);
@@ -55,12 +110,19 @@ void Engine::Core::Run()
 
 	camera.position.z = 5.f;
 
+	auto& obj3 = scene1.NewSceneObject();
+	ScriptTest& scriptTest = obj3.AddComponent<ScriptTest>();
+	ScriptTest2& scriptTest2 = obj3.AddComponent<ScriptTest2>();
+
+
 	Renderer::RenderGraph graph;
 	Renderer::RenderGraphTransform graphTransform;
 
 
+	scene1.ScriptStart();
 	while (Application::Core::UpdateEvents(), Application::IsRunning())
 	{
+
 		// Handles origin movement for camera
 		const float speed = 2.5f;
 		auto cross = Math::Vector3D::Cross(camera.forward, camera.up);
@@ -78,7 +140,8 @@ void Engine::Core::Run()
 			camera.position += Math::Vector3D::Down() * speed * scene1.GetTimeData().GetDeltaTime();
 		camera.LookAt({ 0, 0, 0 });
 
-		//std::cout << scene1.GetTimeData().GetFPS() << std::endl;
+
+		scene1.ScriptTick();
 
 
 		RenderSystem::BuildRenderGraph(scene1, graph, graphTransform);
