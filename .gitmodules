@@ -1,3 +1,6 @@
 [submodule "external/DMath"]
 	path = external/DMath
 	url = git@github.com:Didgy74/DMath.git
+[submodule "external/fx-gltf"]
+	path = external/fx-gltf
+	url = https://github.com/jessey-git/fx-gltf.git
