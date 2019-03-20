@@ -1,3 +1,3 @@
 [submodule "DMath"]
-	path = DMath
+	path = external/DMath
 	url = git@github.com:Didgy74/DMath.git
