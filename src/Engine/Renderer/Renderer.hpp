@@ -7,8 +7,8 @@
 #include "../Utility/ImgDim.hpp"
 #include "../Utility/Color.hpp"
 
-#include "Math/Vector/Vector.hpp"
-#include "Math/UnitQuaternion.hpp"
+#include "DMath/Vector/Vector.hpp"
+#include "DMath/UnitQuaternion.hpp"
 
 #include <memory>
 #include <vector>

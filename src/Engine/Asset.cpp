@@ -6,7 +6,7 @@
 #include <map>
 #include <type_traits>
 
-#include "fx-gltf/gltf.h"
+#include "fx/gltf.h"
 
 //#pragma warning( push, 0 )
 #define STB_IMAGE_IMPLEMENTATION

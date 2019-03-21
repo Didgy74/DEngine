@@ -1,6 +1,6 @@
 #include "BoxCollider2D.hpp"
 
-#include "Math/LinearTransform2D.hpp"
+#include "DMath/LinearTransform2D.hpp"
 #include "../SceneObject.hpp"
 
 #include <cassert>

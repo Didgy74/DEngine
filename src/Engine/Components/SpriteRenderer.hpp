@@ -4,8 +4,8 @@
 
 #include "../Asset.hpp"
 
-#include "Math/Vector/Vector.hpp"
-#include "Math/Matrix/Matrix.hpp"
+#include "DMath/Vector/Vector.hpp"
+#include "DMath/Matrix/Matrix.hpp"
 
 #include "../Enum.hpp"
 

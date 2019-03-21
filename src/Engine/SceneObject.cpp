@@ -4,7 +4,7 @@
 
 #include "Scene.hpp"
 
-#include "Math/LinearTransform2D.hpp"
+#include "DMath/LinearTransform2D.hpp"
 
 Engine::SceneObject::SceneObject(Scene& owningScene, size_t indexInScene) : 
 	transform(*this),

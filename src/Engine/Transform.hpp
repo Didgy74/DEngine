@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Math/Vector/Vector.hpp"
-#include "Math/Matrix/Matrix.hpp"
-#include "Math/UnitQuaternion.hpp"
+#include "DMath/Vector/Vector.hpp"
+#include "DMath/Matrix/Matrix.hpp"
+#include "DMath/UnitQuaternion.hpp"
 
 #include "Enum.hpp"
 

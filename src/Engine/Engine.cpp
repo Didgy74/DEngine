@@ -16,7 +16,7 @@
 
 #include "Systems/RenderSystem.hpp"
 
-#include "Math/LinearTransform3D.hpp"
+#include "DMath/LinearTransform3D.hpp"
 
 #include "Components/ScriptBase.hpp"
 

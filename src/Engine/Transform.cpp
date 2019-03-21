@@ -1,7 +1,7 @@
 #include "Transform.hpp"
 
-#include "Math/LinearTransform3D.hpp"
-#include "Math/LinearTransform2D.hpp"
+#include "DMath/LinearTransform3D.hpp"
+#include "DMath/LinearTransform2D.hpp"
 
 #include "Scene.hpp"
 #include "SceneObject.hpp"

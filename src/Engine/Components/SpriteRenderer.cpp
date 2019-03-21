@@ -6,7 +6,7 @@
 #include "../Scene.hpp"
 #include "../SceneObject.hpp"
 
-#include "Math/LinearTransform2D.hpp"
+#include "DMath/LinearTransform2D.hpp"
 
 namespace Engine
 {

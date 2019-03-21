@@ -6,9 +6,9 @@
 
 #include "../Enum.hpp"
 
-#include "Math/Vector/Vector.hpp"
-#include "Math/UnitQuaternion.hpp"
-#include "Math/Matrix/Matrix.hpp"
+#include "DMath/Vector/Vector.hpp"
+#include "DMath/UnitQuaternion.hpp"
+#include "DMath/Matrix/Matrix.hpp"
 
 namespace Engine
 {

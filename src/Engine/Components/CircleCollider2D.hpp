@@ -3,7 +3,7 @@
 #include "Components.hpp"
 #include "../Enum.hpp"
 
-#include "Math/Vector/Vector.hpp"
+#include "DMath/Vector/Vector.hpp"
 
 namespace Engine
 {

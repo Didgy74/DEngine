@@ -6,7 +6,7 @@
 
 #include "../Renderer/Renderer.hpp"
 
-#include "Math/LinearTransform3D.hpp"
+#include "DMath/LinearTransform3D.hpp"
 
 #include "../Scene.hpp"
 #include "../SceneObject.hpp"

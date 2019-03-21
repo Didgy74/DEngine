@@ -7,6 +7,10 @@ file(GLOB_RECURSE SOURCE_FILES "src/*.cpp")
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PRIVATE include)
 
+add_subdirectory(external)
+target_link_libraries(${PROJECT_NAME} external::external)
+
+
 # Add custom command to copy Data directory to build directory
 # Remove Data directory in build directory if present
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD

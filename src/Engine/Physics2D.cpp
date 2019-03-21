@@ -7,7 +7,7 @@
 #include "Components/RigidBody2D.hpp"
 #include "Time/Time.hpp"
 
-#include "Math/LinearTransform2D.hpp"
+#include "DMath/LinearTransform2D.hpp"
 
 #include <vector>
 #include <memory>
