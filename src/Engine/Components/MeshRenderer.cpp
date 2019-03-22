@@ -51,7 +51,7 @@ namespace Engine
 			if (space == Space::Local)
 				return localModel;
 			else
-				Multiply(GetSceneObject().transform.GetModel_Reduced(Space::World), localModel);
+				return Multiply(GetSceneObject().transform.GetModel_Reduced(Space::World), localModel);
 		}
 
 		Math::Matrix4x4 MeshRenderer::GetModel(Space space) const

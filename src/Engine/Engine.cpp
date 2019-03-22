@@ -70,7 +70,6 @@ void Engine::Core::Run()
 
 
 
-
 	auto& sceneObject1 = scene1.NewSceneObject();
 	auto& sprite1 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
 	sprite1.SetMesh(Asset::Mesh::Helmet);
@@ -111,6 +110,9 @@ void Engine::Core::Run()
 		if (Input::Raw::GetValue(Input::Raw::Button::LeftCtrl))
 			camera.position += Math::Vector3D::Down() * speed * scene1.GetTimeData().GetDeltaTime();
 		camera.LookAt({ 0, 0, 0 });
+
+		if (Input::Raw::GetValue(Input::Raw::Button::K))
+			mesh2.positionOffset.y += 1.f * scene1.GetTimeData().GetDeltaTime();
 
 		if (Input::Raw::GetEventType(Input::Raw::Button::C) == Input::EventType::Pressed)
 		{
