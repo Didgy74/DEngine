@@ -33,6 +33,7 @@ namespace Engine
 
 			struct Data;
 			struct CameraDataUBO;
+			struct LightDataUBO;
 
 			void UpdateVBODatabase(Data& data, const std::vector<MeshID>& loadQueue);
 			std::optional<VBO> VBOFromPath(const std::string& path);
@@ -52,6 +53,12 @@ namespace Engine
 struct Engine::Renderer::OpenGL::CameraDataUBO
 {
 	Math::Matrix<4, 4, float> viewProjection;
+};
+
+struct Engine::Renderer::OpenGL::LightDataUBO
+{
+	uint32_t pointLightCount;
+	std::array<Math::Vector4D, 10> pointLights;
 };
 
 struct Engine::Renderer::OpenGL::VertexBufferObject
@@ -302,6 +309,7 @@ void Engine::Renderer::OpenGL::PrepareRenderingEarly(const std::vector<SpriteID>
 
 void Engine::Renderer::OpenGL::PrepareRenderingLate()
 {
+	// Update lights positions
 }
 
 void Engine::Renderer::OpenGL::Draw()

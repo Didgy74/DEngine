@@ -6,6 +6,7 @@
 #include "Renderer/Renderer.hpp"
 #include "Components/SpriteRenderer.hpp"
 #include "Components/MeshRenderer.hpp"
+#include "Components/PointLight.hpp"
 #include "Time/Time.hpp"
 #include "Input/InputRaw.hpp"
 #include "Scene.hpp"
@@ -34,8 +35,6 @@ public:
 	}
 
 protected:
-	
-
 	void SceneStart() override
 	{
 		ParentType::SceneStart();
@@ -69,7 +68,6 @@ void Engine::Core::Run()
 	Renderer::GetViewport(0).SetSceneRef(&scene1);
 
 
-
 	auto& sceneObject1 = scene1.NewSceneObject();
 	auto& sprite1 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
 	sprite1.SetMesh(Asset::Mesh::Helmet);
@@ -80,11 +78,11 @@ void Engine::Core::Run()
 
 	auto& objCamera = scene1.NewSceneObject();
 	auto& camera = objCamera.AddComponent<Components::Camera>().first.get();
-
-	camera.position.z = 5.f;
+	camera.positionOffset.z = 5.f;
 
 	auto& obj3 = scene1.NewSceneObject();
-	//ScriptTest& scriptTest = obj3.AddComponent<ScriptTest>();
+	obj3.transform.localPosition = { 5.f, 5.f, 10.f };
+	Components::PointLight& light1 = obj3.AddComponent<Components::PointLight>().first.get();
 
 
 	Renderer::RenderGraph graph;
@@ -98,21 +96,18 @@ void Engine::Core::Run()
 		const float speed = 2.5f;
 		auto cross = Math::Vector3D::Cross(camera.forward, camera.up);
 		if (Input::Raw::GetValue(Input::Raw::Button::A))
-			camera.position -= cross * speed * scene1.GetTimeData().GetDeltaTime();
+			camera.positionOffset -= cross * speed * scene1.GetTimeData().GetDeltaTime();
 		if (Input::Raw::GetValue(Input::Raw::Button::D))
-			camera.position += cross * speed * scene1.GetTimeData().GetDeltaTime();
+			camera.positionOffset += cross * speed * scene1.GetTimeData().GetDeltaTime();
 		if (Input::Raw::GetValue(Input::Raw::Button::W))
-			camera.position += camera.forward *  speed * scene1.GetTimeData().GetDeltaTime();
+			camera.positionOffset += camera.forward *  speed * scene1.GetTimeData().GetDeltaTime();
 		if (Input::Raw::GetValue(Input::Raw::Button::S))
-			camera.position -= camera.forward * speed * scene1.GetTimeData().GetDeltaTime();
+			camera.positionOffset -= camera.forward * speed * scene1.GetTimeData().GetDeltaTime();
 		if (Input::Raw::GetValue(Input::Raw::Button::Space))
-			camera.position += Math::Vector3D::Up() * speed * scene1.GetTimeData().GetDeltaTime();
+			camera.positionOffset += Math::Vector3D::Up() * speed * scene1.GetTimeData().GetDeltaTime();
 		if (Input::Raw::GetValue(Input::Raw::Button::LeftCtrl))
-			camera.position += Math::Vector3D::Down() * speed * scene1.GetTimeData().GetDeltaTime();
+			camera.positionOffset += Math::Vector3D::Down() * speed * scene1.GetTimeData().GetDeltaTime();
 		camera.LookAt({ 0, 0, 0 });
-
-		if (Input::Raw::GetValue(Input::Raw::Button::K))
-			mesh2.positionOffset.y += 1.f * scene1.GetTimeData().GetDeltaTime();
 
 		if (Input::Raw::GetEventType(Input::Raw::Button::C) == Input::EventType::Pressed)
 		{
@@ -123,17 +118,19 @@ void Engine::Core::Run()
 		scene1.ScriptTick();
 
 
-		RenderSystem::BuildRenderGraph(scene1, graph, graphTransform);
+		RenderSystem::BuildRenderGraph(scene1, graph);
+		Renderer::Core::PrepareRenderingEarly(graph);
 
+
+		RenderSystem::BuildRenderGraphTransform(scene1, graphTransform);
+		Renderer::Core::PrepareRenderingLate(graphTransform);
 
 
 		Renderer::Core::SetCameraInfo(camera.GetCameraInfo());
 
-		Renderer::Core::PrepareRenderingEarly(graph);
-
-		Renderer::Core::PrepareRenderingLate(graphTransform);
 
 		Renderer::Core::Draw();
+
 
 		Time::Core::TickEnd(scene1.GetTimeData());
 	}

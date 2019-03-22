@@ -61,7 +61,13 @@ size_t Engine::Renderer::GetViewportCount() { return Core::data->viewports.size(
 
 Engine::Renderer::Viewport& Engine::Renderer::GetViewport(size_t index) { return *Core::data->viewports[index]; }
 
-Engine::Renderer::API Engine::Renderer::GetActiveAPI() { return Core::data->activeAPI; }
+Engine::Renderer::API Engine::Renderer::GetActiveAPI()
+{
+	if (Core::data)
+		return Core::data->activeAPI;
+	else
+		return API::None;
+}
 
 std::any& Engine::Renderer::Core::GetAPIData() { return data->apiData; }
 
@@ -187,6 +193,9 @@ bool Engine::Renderer::IsCompatible(const RenderGraph &renderGraph, const Render
 	if (renderGraph.meshes.size() != transforms.meshes.size())
 		return false;
 
+	if (renderGraph.pointLights.size() != transforms.pointLights.size())
+		return false;
+
 	return true;
 }
 
@@ -240,22 +249,39 @@ void Engine::Renderer::Core::UpdateAssetReferences(Data& data, const RenderGraph
 
 Math::Matrix4x4 Engine::Renderer::CameraInfo::GetModel(float aspectRatio) const
 {
+	using namespace Math::LinTran3D;
 	if (projectMode == ProjectMode::Perspective)
 	{
 		switch (GetActiveAPI())
 		{
 			case API::OpenGL:
-				return Math::LinTran3D::Perspective<float>(Math::API3D::OpenGL, fovY, aspectRatio, zNear, zFar) *  transform;
+				return Perspective<float>(Math::API3D::OpenGL, fovY, aspectRatio, zNear, zFar) * transform;
 			case API::Vulkan:
-				return Math::LinTran3D::Perspective<float>(Math::API3D::Vulkan, fovY, aspectRatio, zNear, zFar) * transform;
+				return Perspective<float>(Math::API3D::Vulkan, fovY, aspectRatio, zNear, zFar) * transform;
 			default:
 				assert(false);
 				return {};
 		}
 	}
-	else // Orthogonal
+	else if (projectMode == ProjectMode::Orthographic)
 	{
-		assert(false);
-		return {};
+		const float& right = orthoWidth / 2;
+		const float& left = -right;
+		const float& top = orthoWidth / aspectRatio / 2;
+		const float& bottom = -top;
+		switch (GetActiveAPI())
+		{
+			case API::OpenGL:
+				return Orthographic<float>(Math::API3D::OpenGL, left, right, bottom, top, zNear, zFar);
+			case API::Vulkan:
+				return Orthographic<float>(Math::API3D::Vulkan, left, right, bottom, top, zNear, zFar);
+			default:
+				assert(false);
+				return {};
+		}
 	}
+
+	// Function should NOT reach here.
+	assert(false);
+	return {};
 }

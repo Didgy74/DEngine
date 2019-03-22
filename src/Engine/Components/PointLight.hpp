@@ -23,6 +23,7 @@ namespace Engine
 			Math::Vector3D positionOffset;
 
 			[[nodiscard]] Math::Matrix<4, 3> GetModel_Reduced(Space space) const;
+			[[nodiscard]] Math::Matrix4x4 GetModel(Space space) const;
 		};
 	}
 }

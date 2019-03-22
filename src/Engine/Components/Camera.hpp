@@ -30,7 +30,7 @@ namespace Engine
 			explicit Camera(SceneObject& owningObject);
 			~Camera();
 
-			Math::Vector3D position;
+			Math::Vector3D positionOffset;
 			Math::Vector3D forward;
 			Math::Vector3D up;
 
@@ -38,7 +38,7 @@ namespace Engine
 			float orthographicWidth;
 			float zNear;
 			float zFar;
-			ProjectionMode activeProjectionMode;
+			ProjectionMode projectionMode;
 
 			void LookAt(const Math::Vector3D& newTarget);
 

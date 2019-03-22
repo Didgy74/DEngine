@@ -10,13 +10,13 @@ namespace Engine
 	{
 		Camera::Camera(SceneObject& owningObject) :
 			ParentType(owningObject),
-			position(),
+			positionOffset(),
 			fov(defaultFovY),
 			forward(Math::Vector3D::Back()),
 			up(Math::Vector3D::Up()),
 			zNear(defaultZNear),
 			zFar(defaultZFar),
-			activeProjectionMode(ProjectionMode::Perspective),
+			projectionMode(ProjectionMode::Perspective),
 			orthographicWidth(defaultOrtographicWidth)
 		{
 		}
@@ -27,7 +27,7 @@ namespace Engine
 
 		void Camera::LookAt(const Math::Vector3D& newTarget)
 		{
-			forward = (newTarget - position).GetNormalized();
+			forward = (newTarget - positionOffset).GetNormalized();
 		}
 
 		Renderer::CameraInfo Camera::GetCameraInfo() const
@@ -39,10 +39,12 @@ namespace Engine
 			cameraInfo.zNear = zNear;
 			cameraInfo.zFar = zFar;
 
-			if (activeProjectionMode == ProjectionMode::Perspective)
+			if (projectionMode == ProjectionMode::Perspective)
 				cameraInfo.projectMode = Renderer::CameraInfo::ProjectMode::Perspective;
+			else if (projectionMode == ProjectionMode::Orthgraphic)
+				cameraInfo.projectMode = Renderer::CameraInfo::ProjectMode::Orthographic;
 
-			cameraInfo.transform = Math::LinTran3D::LookAtRH(position, position + forward, up);
+			cameraInfo.transform = Math::LinTran3D::LookAt_RH(positionOffset, positionOffset + forward, up);
 
 			return cameraInfo;
 		}

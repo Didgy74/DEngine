@@ -29,5 +29,11 @@ namespace Engine
 			else
 				return Multiply(GetSceneObject().transform.GetModel_Reduced(Space::World), localModel);
 		}
+
+		Math::Matrix4x4 PointLight::GetModel(Space space) const
+		{
+			using namespace Math::LinTran3D;
+			return AsMat4(GetModel_Reduced(space));
+		}
 	}
 }

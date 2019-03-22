@@ -56,7 +56,8 @@ namespace Engine
 
 		Math::Matrix4x4 MeshRenderer::GetModel(Space space) const
 		{
-			return Math::LinTran3D::AsMat4(GetModel_Reduced(space));
+			const auto& model = GetModel_Reduced(space);
+			return Math::LinTran3D::AsMat4(model);
 		}
 	}
 }
