@@ -109,20 +109,22 @@ void Engine::Renderer::Core::Terminate()
 
 void Engine::Renderer::Core::PrepareRenderingEarly(RenderGraph& renderGraphInput)
 {
-    auto& renderGraph = data->renderGraph;
+	Data& data = *Core::data;
 
-	UpdateAssetReferences(*data, renderGraph, &renderGraphInput);
+    auto& renderGraph = data.renderGraph;
+
+	UpdateAssetReferences(data, renderGraph, &renderGraphInput);
 
 	std::swap(renderGraph, renderGraphInput);
 
-	if (!data->loadSpriteQueue.empty() || !data->loadMeshQueue.empty())
+	if (!data.loadSpriteQueue.empty() || !data.loadMeshQueue.empty())
 		std::cout << "Loading sprite/mesh resource(s)..." << std::endl;
-	data->PrepareRenderingEarly(data->loadSpriteQueue, data->loadMeshQueue);
+	data.PrepareRenderingEarly(data.loadSpriteQueue, data.loadMeshQueue);
 
-	data->loadSpriteQueue.clear();
-	data->unloadSpriteQueue.clear();
-	data->loadMeshQueue.clear();
-	data->unloadMeshQueue.clear();
+	data.loadSpriteQueue.clear();
+	data.unloadSpriteQueue.clear();
+	data.loadMeshQueue.clear();
+	data.unloadMeshQueue.clear();
 }
 
 void Engine::Renderer::Core::PrepareRenderingLate(RenderGraphTransform &input)
@@ -133,6 +135,8 @@ void Engine::Renderer::Core::PrepareRenderingLate(RenderGraphTransform &input)
 	assert(IsCompatible(renderGraph, input));
 
 	std::swap(renderGraphTransform, input);
+
+	data->PrepareRenderingLate();
 }
 
 void Engine::Renderer::Core::Draw()

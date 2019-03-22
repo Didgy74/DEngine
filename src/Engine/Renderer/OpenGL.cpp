@@ -44,8 +44,11 @@ namespace Engine
 			void Draw_SpritePass(const Data& data, const std::vector<SpriteID>& sprites, const std::vector<Math::Matrix4x4>& transforms);
 			void Draw_MeshPass(const Data& data, const std::vector<MeshID>& meshes, const std::vector<Math::Matrix4x4>& transforms);
 
+			void CreateStandardUBOs(Data& data);
 			void LoadSpriteShader(Data& data);
 			void LoadMeshShader(Data& data);
+
+			inline void PrintGLError(const char* string = "");
 		}
 	}
 }
@@ -58,7 +61,8 @@ struct Engine::Renderer::OpenGL::CameraDataUBO
 struct Engine::Renderer::OpenGL::LightDataUBO
 {
 	uint32_t pointLightCount;
-	std::array<Math::Vector4D, 10> pointLights;
+	std::array<uint32_t, 3> padding;
+	std::array<Math::Vector4D, 10> pointLightPos;
 };
 
 struct Engine::Renderer::OpenGL::VertexBufferObject
@@ -96,6 +100,7 @@ struct Engine::Renderer::OpenGL::Data
 	std::unordered_map<SpriteID, IBO> iboDatabase;
 
 	GLuint cameraDataUBO;
+	GLuint lightDataUBO;
 	GLuint samplerObject;
 
 	GLuint spriteProgram;
@@ -104,8 +109,6 @@ struct Engine::Renderer::OpenGL::Data
 
 	GLuint meshProgram;
 	GLint meshModelUniform;
-
-	
 };
 
 Engine::Renderer::OpenGL::Data& Engine::Renderer::OpenGL::GetData() { return std::any_cast<Data&>(Core::GetAPIData()); }
@@ -232,7 +235,44 @@ void Engine::Renderer::OpenGL::LoadMeshShader(Engine::Renderer::OpenGL::Data &da
 	// Grab uniforms
 	data.meshModelUniform = glGetUniformLocation(data.meshProgram, "model");
 
-	glUniformBlockBinding(data.meshProgram, 0, 0);
+	auto test = glGetUniformBlockIndex(data.meshProgram, "LightData");
+	glUniformBlockBinding(data.meshProgram, 1, 1);
+}
+
+inline void Engine::Renderer::OpenGL::PrintGLError(const char* string)
+{
+	if constexpr (enableDebug)
+	{
+		auto errorEnum = glGetError();
+		if (errorEnum != 0)
+		{
+			auto errorString = glewGetErrorString(errorEnum);
+			std::cout << string << errorString << std::endl;
+		}
+	}
+}
+
+void Engine::Renderer::OpenGL::CreateStandardUBOs(Data& data)
+{
+	std::array<GLuint, 2> buffers;
+	glGenBuffers(2, buffers.data());
+
+	PrintGLError("Making buffers for standard UBOs: ");
+
+	data.cameraDataUBO = buffers[0];
+	data.lightDataUBO = buffers[1];
+
+	// Make camera ubo
+	glBindBuffer(GL_UNIFORM_BUFFER, data.cameraDataUBO);
+	glNamedBufferData(data.cameraDataUBO, sizeof(CameraDataUBO), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, data.cameraDataUBO, 0, sizeof(CameraDataUBO));
+	PrintGLError("Making Camera UBO: ");
+
+	// Make light ubo
+	glBindBuffer(GL_UNIFORM_BUFFER, data.lightDataUBO);
+	glNamedBufferData(data.lightDataUBO, sizeof(LightDataUBO), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferRange(GL_UNIFORM_BUFFER, 1, data.lightDataUBO, 0, sizeof(LightDataUBO));
+	PrintGLError("Making LightData UBO: ");
 }
 
 void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& createInfo)
@@ -245,11 +285,7 @@ void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& create
 
 	data.glSwapBuffers = std::move(createInfo.glSwapBuffers);
 
-	// Make camera ubo
-	glGenBuffers(1, &data.cameraDataUBO);
-	glBindBuffer(GL_UNIFORM_BUFFER, data.cameraDataUBO);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraDataUBO), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, data.cameraDataUBO, 0, sizeof(CameraDataUBO));
+	CreateStandardUBOs(data);
 
 	// Gen sampler
 	glGenSamplers(1, &data.samplerObject);
@@ -265,22 +301,16 @@ void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& create
 	else
 		assert(false);
 
-
-
 	glEnable(GL_DEPTH_TEST);
 
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
+
 	//LoadSpriteShader(data);
 	LoadMeshShader(data);
 
-	if constexpr (enableDebug)
-	{
-		auto errorEnum = glGetError();
-		if (errorEnum != 0)
-			std::cout << glewGetErrorString(errorEnum) << std::endl;
-	}
+	PrintGLError("End of GL init: ");
 }
 
 void Engine::Renderer::OpenGL::Terminate(std::any& apiData)
@@ -303,43 +333,56 @@ void Engine::Renderer::OpenGL::Terminate(std::any& apiData)
 
 void Engine::Renderer::OpenGL::PrepareRenderingEarly(const std::vector<SpriteID>& spriteLoadQueue, const std::vector<MeshID>& meshLoadQueue)
 {
-	UpdateIBODatabase(GetData(), spriteLoadQueue);
-	UpdateVBODatabase(GetData(), meshLoadQueue);
+	Data& data = GetData();
+
+	UpdateIBODatabase(data, spriteLoadQueue);
+	UpdateVBODatabase(data, meshLoadQueue);
+
+	// Update light count
+	const auto& renderGraph = Core::GetRenderGraph();
+	uint32_t pointLightCount = renderGraph.pointLights.size();
+	glNamedBufferSubData(data.lightDataUBO, 0, sizeof(uint32_t), &pointLightCount);
 }
 
 void Engine::Renderer::OpenGL::PrepareRenderingLate()
 {
+	Data& data = GetData();
+
+	const auto& renderGraphTransform = Core::GetRenderGraphTransform();
+
 	// Update lights positions
+	const size_t elements = Math::Min(10, renderGraphTransform.pointLights.size());
+	std::array<Math::Vector4D, 10> posData;
+	for (size_t i = 0; i < elements; i++)
+		posData[i] = renderGraphTransform.pointLights[i].AsVec4();
+	size_t byteLength = sizeof(Math::Vector4D) * elements;
+
+	glNamedBufferSubData(data.lightDataUBO, sizeof(uint32_t) * 4, byteLength, posData.data());
+
+	auto& viewport = Renderer::GetViewport(0);
+
+	auto& cameraInfo = Renderer::Core::GetCameraInfo();
+	auto viewMatrix = cameraInfo.GetModel(viewport.GetDimensions().GetAspectRatio());
+	glNamedBufferSubData(data.cameraDataUBO, 0, sizeof(CameraDataUBO::viewProjection), viewMatrix.data.data());
 }
 
 void Engine::Renderer::OpenGL::Draw()
 {
 	Data& data = GetData();
 
-	glClearColor(1.f, 0.f, 0.f, 1.f);
+	glClearColor(0.25f, 0.f, 0.f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	auto& viewport = Renderer::GetViewport(0);
-
-
-	auto& cameraInfo = Renderer::Core::GetCameraInfo();
-	auto viewMatrix = cameraInfo.GetModel(viewport.GetDimensions().GetAspectRatio());
-	glNamedBufferSubData(data.cameraDataUBO, 0, sizeof(CameraDataUBO::viewProjection), viewMatrix.data.data());
 
 
 	const auto& renderGraph = Core::GetRenderGraph();
 	const auto& renderGraphTransform = Core::GetRenderGraphTransform();
 
-
 	Draw_SpritePass(data, renderGraph.sprites, renderGraphTransform.sprites);
 	Draw_MeshPass(data, renderGraph.meshes, renderGraphTransform.meshes);
 
-	if constexpr (enableDebug)
-	{
-		auto errorEnum = glGetError();
-		if (errorEnum != 0)
-			std::cout << glewGetErrorString(errorEnum) << std::endl;
-	}
+	PrintGLError("End of GL tick: ");
+
+	auto& viewport = Renderer::GetViewport(0);
 
 	data.glSwapBuffers(viewport.GetSurfaceHandle());
 }

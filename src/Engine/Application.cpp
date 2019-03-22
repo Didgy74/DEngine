@@ -53,8 +53,8 @@ namespace Engine
 				data = std::make_unique<Data>();
 				data->isRunning = true;
 
-				glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-				glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+				glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+				glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 				GLFWwindow* window = glfwCreateWindow(defaultWindowSize.width, defaultWindowSize.height, "My Title", NULL, NULL);
 				if (!window)
 				{
@@ -132,6 +132,15 @@ Engine::Input::Raw::Button Engine::Application::Core::APIKeyToButton(int32_t api
 
 	case GLFW_KEY_LEFT_CONTROL:
 		return Button::LeftCtrl;
+
+	case GLFW_KEY_UP:
+		return Button::Up;
+	case GLFW_KEY_DOWN:
+		return Button::Down;
+	case GLFW_KEY_LEFT:
+		return Button::Left;
+	case GLFW_KEY_RIGHT:
+		return Button::Right;
 
 	case GLFW_KEY_A:
 		return Button::A;

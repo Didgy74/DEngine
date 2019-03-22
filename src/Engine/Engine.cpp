@@ -69,8 +69,8 @@ void Engine::Core::Run()
 
 
 	auto& sceneObject1 = scene1.NewSceneObject();
-	auto& sprite1 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
-	sprite1.SetMesh(Asset::Mesh::Helmet);
+	auto& mesh1 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
+	mesh1.SetMesh(Asset::Mesh::Helmet);
 
 	auto& mesh2 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
 	mesh2.SetMesh(Asset::Mesh::Cube);
@@ -80,9 +80,19 @@ void Engine::Core::Run()
 	auto& camera = objCamera.AddComponent<Components::Camera>().first.get();
 	camera.positionOffset.z = 5.f;
 
-	auto& obj3 = scene1.NewSceneObject();
-	obj3.transform.localPosition = { 5.f, 5.f, 10.f };
-	Components::PointLight& light1 = obj3.AddComponent<Components::PointLight>().first.get();
+	auto& lightObj = scene1.NewSceneObject();
+	lightObj.transform.localPosition = { 2.5f, 2.5f, 2.5f };
+	Components::PointLight& light1 = lightObj.AddComponent<Components::PointLight>().first.get();
+	auto& mesh3 = lightObj.AddComponent<Components::MeshRenderer>().first.get();
+	mesh3.SetMesh(Asset::Mesh::Cube);
+	mesh3.scale = { 0.1f, 0.1f, 0.1f };
+
+	auto& obj4 = scene1.NewSceneObject();
+	obj4.transform.localPosition = { 0.f, -7.5f, -10.f };
+	Components::PointLight& light3 = obj4.AddComponent<Components::PointLight>().first.get();
+	auto& mesh4 = obj4.AddComponent<Components::MeshRenderer>().first.get();
+	mesh4.SetMesh(Asset::Mesh::Cube);
+	mesh4.scale = { 0.1f, 0.1f, 0.1f };
 
 
 	Renderer::RenderGraph graph;
@@ -108,6 +118,15 @@ void Engine::Core::Run()
 		if (Input::Raw::GetValue(Input::Raw::Button::LeftCtrl))
 			camera.positionOffset += Math::Vector3D::Down() * speed * scene1.GetTimeData().GetDeltaTime();
 		camera.LookAt({ 0, 0, 0 });
+
+		if (Input::Raw::GetValue(Input::Raw::Button::Up))
+			lightObj.transform.localPosition.z += speed * scene1.GetTimeData().GetDeltaTime();
+		if (Input::Raw::GetValue(Input::Raw::Button::Down))
+			lightObj.transform.localPosition.z -= speed * scene1.GetTimeData().GetDeltaTime();
+		if (Input::Raw::GetValue(Input::Raw::Button::Left))
+			lightObj.transform.localPosition.x -= speed * scene1.GetTimeData().GetDeltaTime();
+		if (Input::Raw::GetValue(Input::Raw::Button::Right))
+			lightObj.transform.localPosition.x += speed * scene1.GetTimeData().GetDeltaTime();
 
 		if (Input::Raw::GetEventType(Input::Raw::Button::C) == Input::EventType::Pressed)
 		{

@@ -1,5 +1,11 @@
 #version 420 core
 
+layout(std140, binding = 1) uniform LightData
+{
+	uint pointLightCount;
+	vec4 pointLightPos[10];
+} lightData;
+
 in FragData
 {
 	vec3 wsPosition;
@@ -7,11 +13,13 @@ in FragData
 	vec2 uv;
 } fragData;
 
-vec3 lightPos = vec3(4.0, 5.0, 6.0);
-
 void main()
 {
-	vec3 pointToLight = normalize(lightPos - fragData.wsPosition);
-	float test = max(dot(pointToLight, fragData.wsNormal), 0);
+	float test = 0.0;
+	for (int i = 0; i < lightData.pointLightCount; i++)
+	{
+		vec3 pointToLight = normalize(lightData.pointLightPos[i].xyz - fragData.wsPosition);
+		test += max(dot(pointToLight, fragData.wsNormal), 0);
+	}
 	gl_FragColor = vec4(test, test, test, test);
 }
