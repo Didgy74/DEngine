@@ -19,6 +19,12 @@ namespace Engine
 	{
 		namespace OpenGL
 		{
+#ifdef NDEBUG
+			constexpr bool enableDebug = false;
+#else
+			constexpr bool enableDebug = true;
+#endif
+
 			struct VertexBufferObject;
 			using VBO = VertexBufferObject;
 
@@ -26,6 +32,7 @@ namespace Engine
 			using IBO = ImageBufferObject;
 
 			struct Data;
+			struct CameraDataUBO;
 
 			void UpdateVBODatabase(Data& data, const std::vector<MeshID>& loadQueue);
 			std::optional<VBO> VBOFromPath(const std::string& path);
@@ -41,6 +48,11 @@ namespace Engine
 		}
 	}
 }
+
+struct Engine::Renderer::OpenGL::CameraDataUBO
+{
+	Math::Matrix<4, 4, float> viewProjection;
+};
 
 struct Engine::Renderer::OpenGL::VertexBufferObject
 {
@@ -76,16 +88,17 @@ struct Engine::Renderer::OpenGL::Data
 
 	std::unordered_map<SpriteID, IBO> iboDatabase;
 
+	GLuint cameraDataUBO;
+	GLuint samplerObject;
+
 	GLuint spriteProgram;
 	GLint spriteModelUniform;
-	GLint spriteViewUniform;
 	GLint spriteSamplerUniform;
 
 	GLuint meshProgram;
 	GLint meshModelUniform;
-	GLint meshViewUniform;
 
-	GLuint samplerObject;
+	
 };
 
 Engine::Renderer::OpenGL::Data& Engine::Renderer::OpenGL::GetData() { return std::any_cast<Data&>(Core::GetAPIData()); }
@@ -173,10 +186,6 @@ void Engine::Renderer::OpenGL::LoadSpriteShader(Data& data)
 	for (unsigned int i = 0; i < 2; i++)
 		glAttachShader(data.spriteProgram, shaders[i]);
 
-	glBindAttribLocation(data.spriteProgram, 0, "position");
-	glBindAttribLocation(data.spriteProgram, 1, "texCoord");
-	glBindAttribLocation(data.spriteProgram, 2, "normal");
-
 	glLinkProgram(data.spriteProgram);
 	CheckShaderError(data.spriteProgram, GL_LINK_STATUS, true, "Error linking shader program");
 
@@ -188,7 +197,6 @@ void Engine::Renderer::OpenGL::LoadSpriteShader(Data& data)
 
 	// Grab uniforms
 	data.spriteModelUniform = glGetUniformLocation(data.spriteProgram, "model");
-	data.spriteViewUniform = glGetUniformLocation(data.spriteProgram, "viewProjection");
 
 	data.spriteSamplerUniform = glGetUniformLocation(data.spriteProgram, "sampler");
 }
@@ -205,10 +213,6 @@ void Engine::Renderer::OpenGL::LoadMeshShader(Engine::Renderer::OpenGL::Data &da
 	for (unsigned int i = 0; i < 2; i++)
 		glAttachShader(data.meshProgram, shader[i]);
 
-	glBindAttribLocation(data.meshProgram, 0, "position");
-	glBindAttribLocation(data.meshProgram, 1, "texCoord");
-	glBindAttribLocation(data.meshProgram, 2, "normal");
-
 	glLinkProgram(data.meshProgram);
 	CheckShaderError(data.meshProgram, GL_LINK_STATUS, true, "Error linking shader program");
 
@@ -220,7 +224,8 @@ void Engine::Renderer::OpenGL::LoadMeshShader(Engine::Renderer::OpenGL::Data &da
 
 	// Grab uniforms
 	data.meshModelUniform = glGetUniformLocation(data.meshProgram, "model");
-	data.meshViewUniform = glGetUniformLocation(data.meshProgram, "viewProjection");
+
+	glUniformBlockBinding(data.meshProgram, 0, 0);
 }
 
 void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& createInfo)
@@ -228,13 +233,16 @@ void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& create
 	auto glInitResult = glewInit();
 	assert(glInitResult == 0);
 
-
 	apiData = std::make_any<Data>();
 	Data& data = std::any_cast<Data&>(apiData);
 
 	data.glSwapBuffers = std::move(createInfo.glSwapBuffers);
 
-
+	// Make camera ubo
+	glGenBuffers(1, &data.cameraDataUBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, data.cameraDataUBO);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraDataUBO), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, data.cameraDataUBO, 0, sizeof(CameraDataUBO));
 
 	// Gen sampler
 	glGenSamplers(1, &data.samplerObject);
@@ -250,6 +258,8 @@ void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& create
 	else
 		assert(false);
 
+
+
 	glEnable(GL_DEPTH_TEST);
 
 	glEnable(GL_CULL_FACE);
@@ -257,6 +267,13 @@ void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& create
 
 	//LoadSpriteShader(data);
 	LoadMeshShader(data);
+
+	if constexpr (enableDebug)
+	{
+		auto errorEnum = glGetError();
+		if (errorEnum != 0)
+			std::cout << glewGetErrorString(errorEnum) << std::endl;
+	}
 }
 
 void Engine::Renderer::OpenGL::Terminate(std::any& apiData)
@@ -271,6 +288,7 @@ void Engine::Renderer::OpenGL::Terminate(std::any& apiData)
 		iboItem.second.DeallocateDeviceBuffers();
 
 	glDeleteProgram(data.spriteProgram);
+	glDeleteProgram(data.meshProgram);
 
 	//delete static_cast<Data*>(apiData);
 	//apiData = nullptr;
@@ -295,12 +313,25 @@ void Engine::Renderer::OpenGL::Draw()
 
 	auto& viewport = Renderer::GetViewport(0);
 
+
+	auto& cameraInfo = Renderer::Core::GetCameraInfo();
+	auto viewMatrix = cameraInfo.GetModel(viewport.GetDimensions().GetAspectRatio());
+	glNamedBufferSubData(data.cameraDataUBO, 0, sizeof(CameraDataUBO::viewProjection), viewMatrix.data.data());
+
+
 	const auto& renderGraph = Core::GetRenderGraph();
 	const auto& renderGraphTransform = Core::GetRenderGraphTransform();
 
 
 	Draw_SpritePass(data, renderGraph.sprites, renderGraphTransform.sprites);
 	Draw_MeshPass(data, renderGraph.meshes, renderGraphTransform.meshes);
+
+	if constexpr (enableDebug)
+	{
+		auto errorEnum = glGetError();
+		if (errorEnum != 0)
+			std::cout << glewGetErrorString(errorEnum) << std::endl;
+	}
 
 	data.glSwapBuffers(viewport.GetSurfaceHandle());
 }
@@ -315,9 +346,6 @@ void Engine::Renderer::OpenGL::Draw_SpritePass(const Data& data,
 	if (!sprites.empty())
 	{
 		glUseProgram(data.spriteProgram);
-
-		auto viewMat = Core::GetCameraInfo().GetModel(viewport.GetDimensions().GetAspectRatio());
-		glProgramUniformMatrix4fv(data.spriteProgram, data.spriteViewUniform, 1, GL_FALSE, viewMat.data.data());
 
 		glProgramUniform1ui(data.spriteProgram, data.spriteSamplerUniform, 0);
 		glBindSampler(0, data.samplerObject);
@@ -347,9 +375,6 @@ void Engine::Renderer::OpenGL::Draw_MeshPass(const Engine::Renderer::OpenGL::Dat
 	if (!meshes.empty())
 	{
 		glUseProgram(data.meshProgram);
-
-		auto viewMat = Core::GetCameraInfo().GetModel(viewport.GetDimensions().GetAspectRatio());
-		glProgramUniformMatrix4fv(data.meshProgram, data.meshViewUniform, 1, GL_FALSE, viewMat.data.data());
 
 		for (size_t i = 0; i < meshes.size(); i++)
 		{

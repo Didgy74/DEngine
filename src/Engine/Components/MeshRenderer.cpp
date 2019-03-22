@@ -18,7 +18,7 @@ namespace Engine
 		MeshRenderer::MeshRenderer(SceneObject& owningSceneObject) :
 			ParentType(owningSceneObject),
 			mesh(Asset::Mesh::None),
-			position{ 0, 0, 0 },
+			positionOffset{ 0, 0, 0 },
 			scale{ 1, 1, 1 },
 			rotation()
 		{
@@ -42,16 +42,21 @@ namespace Engine
 			mesh = newMesh;
 		}
 
-		Math::Matrix4x4 MeshRenderer::GetModel(Space space) const
+		Math::Matrix<4, 3> MeshRenderer::GetModel_Reduced(Space space) const
 		{
 			using namespace Math::LinTran3D;
-			auto localModel = Multiply(Scale_Reduced(scale), Rotate_Reduced(rotation));
-			AddTranslation(localModel, position);
+			Math::Matrix<4, 3> localModel = Multiply(Scale_Reduced(scale), Rotate_Reduced(rotation));
+			AddTranslation(localModel, positionOffset);
 
 			if (space == Space::Local)
-				return AsMat4(localModel);
+				return localModel;
 			else
-				return AsMat4(Multiply(GetSceneObject().transform.GetModel_Reduced(Space::World), localModel));
+				Multiply(GetSceneObject().transform.GetModel_Reduced(Space::World), localModel);
+		}
+
+		Math::Matrix4x4 MeshRenderer::GetModel(Space space) const
+		{
+			return Math::LinTran3D::AsMat4(GetModel_Reduced(space));
 		}
 	}
 }

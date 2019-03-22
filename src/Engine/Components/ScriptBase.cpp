@@ -15,7 +15,7 @@ namespace Engine
 
 		}
 
-		void ScriptBase::Start() {}
+		void ScriptBase::SceneStart() {}
 
 		void ScriptBase::Tick() {}
 

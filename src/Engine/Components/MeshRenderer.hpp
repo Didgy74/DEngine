@@ -26,9 +26,10 @@ namespace Engine
 			std::underlying_type_t<Asset::Mesh> GetMeshID() const;
 			void SetMesh(Asset::Mesh newMesh);
 
+			[[nodiscard]] Math::Matrix<4, 3> GetModel_Reduced(Space space) const;
 			Math::Matrix4x4 GetModel(Space space) const;
 
-			Math::Vector3D position;
+			Math::Vector3D positionOffset;
 			Math::UnitQuaternion<> rotation;
 			Math::Vector3D scale;
 

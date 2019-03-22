@@ -72,7 +72,7 @@ namespace Engine
 
 
 		std::vector<Components::ScriptBase*> scriptComponents;
-		void ScriptStart();
+		void Scripts_SceneStart();
 		void ScriptTick();
 
 		Time::SceneData &GetTimeData();

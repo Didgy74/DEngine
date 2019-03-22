@@ -245,9 +245,9 @@ Math::Matrix4x4 Engine::Renderer::CameraInfo::GetModel(float aspectRatio) const
 		switch (GetActiveAPI())
 		{
 			case API::OpenGL:
-				return Math::LinTran3D::PerspectiveRH_NO(fovY, aspectRatio, zNear, zFar) *  transform;
+				return Math::LinTran3D::Perspective<float>(Math::API3D::OpenGL, fovY, aspectRatio, zNear, zFar) *  transform;
 			case API::Vulkan:
-				return Math::LinTran3D::PerspectiveRH_ZO(fovY, aspectRatio, zNear, zFar) * transform;
+				return Math::LinTran3D::Perspective<float>(Math::API3D::Vulkan, fovY, aspectRatio, zNear, zFar) * transform;
 			default:
 				assert(false);
 				return {};

@@ -42,15 +42,16 @@ namespace Engine
 
 	void Scene::Clear()
 	{
+		sceneObjects.clear();
 		components.clear();
 	}
 
-	void Scene::ScriptStart()
+	void Scene::Scripts_SceneStart()
 	{
 		for (auto& ptr : scriptComponents)
 		{
 			auto& ref = *ptr;
-			ref.Start();
+			ref.SceneStart();
 		}
 	}
 

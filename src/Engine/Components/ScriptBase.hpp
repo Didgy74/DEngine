@@ -25,7 +25,7 @@ namespace Engine
 			const SceneObject& GetSceneObject() const;
 
 		protected:
-			virtual void Start() = 0;
+			virtual void SceneStart() = 0;
 			
 			virtual void Tick() = 0;
 

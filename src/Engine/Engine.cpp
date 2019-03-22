@@ -36,41 +36,15 @@ public:
 protected:
 	
 
-	void Start() override
+	void SceneStart() override
 	{
-		ParentType::Start();
+		ParentType::SceneStart();
 	}
 
 	void Tick() override
 	{
 		ParentType::Tick();
 		std::cout << "We ticked!" << std::endl;
-	}
-};
-
-class ScriptTest2 : public Engine::Components::ScriptBase
-{
-	using ParentType = Engine::Components::ScriptBase;
-
-public:
-	explicit ScriptTest2(Engine::SceneObject& owningObject) :
-			ParentType(owningObject)
-	{
-
-	}
-
-protected:
-
-
-	void Start() override
-	{
-		ParentType::Start();
-	}
-
-	void Tick() override
-	{
-		ParentType::Tick();
-		std::cout << "We ticked222222!" << std::endl;
 	}
 };
 
@@ -103,7 +77,7 @@ void Engine::Core::Run()
 
 	auto& mesh2 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
 	mesh2.SetMesh(Asset::Mesh::Cube);
-	mesh2.position.x = 2.5f;
+	mesh2.positionOffset.x = 2.5f;
 
 	auto& objCamera = scene1.NewSceneObject();
 	auto& camera = objCamera.AddComponent<Components::Camera>().first.get();
@@ -111,18 +85,16 @@ void Engine::Core::Run()
 	camera.position.z = 5.f;
 
 	auto& obj3 = scene1.NewSceneObject();
-	ScriptTest& scriptTest = obj3.AddComponent<ScriptTest>();
-	ScriptTest2& scriptTest2 = obj3.AddComponent<ScriptTest2>();
+	//ScriptTest& scriptTest = obj3.AddComponent<ScriptTest>();
 
 
 	Renderer::RenderGraph graph;
 	Renderer::RenderGraphTransform graphTransform;
 
 
-	scene1.ScriptStart();
+	scene1.Scripts_SceneStart();
 	while (Application::Core::UpdateEvents(), Application::IsRunning())
 	{
-
 		// Handles origin movement for camera
 		const float speed = 2.5f;
 		auto cross = Math::Vector3D::Cross(camera.forward, camera.up);
@@ -139,6 +111,11 @@ void Engine::Core::Run()
 		if (Input::Raw::GetValue(Input::Raw::Button::LeftCtrl))
 			camera.position += Math::Vector3D::Down() * speed * scene1.GetTimeData().GetDeltaTime();
 		camera.LookAt({ 0, 0, 0 });
+
+		if (Input::Raw::GetEventType(Input::Raw::Button::C) == Input::EventType::Pressed)
+		{
+			scene1.Clear();
+		}
 
 
 		scene1.ScriptTick();
