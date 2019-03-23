@@ -68,13 +68,19 @@ void Engine::Core::Run()
 	Renderer::GetViewport(0).SetSceneRef(&scene1);
 
 
+
+
 	auto& sceneObject1 = scene1.NewSceneObject();
 	auto& mesh1 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
 	mesh1.SetMesh(Asset::Mesh::Helmet);
 
+	auto& meshTest = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
+	meshTest.SetMesh(Asset::Mesh::Helmet);
+	meshTest.positionOffset.x = -3.f;
+
 	auto& mesh2 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
 	mesh2.SetMesh(Asset::Mesh::Cube);
-	mesh2.positionOffset.x = 2.5f;
+	mesh2.positionOffset.x = 2.f;
 
 	auto& objCamera = scene1.NewSceneObject();
 	auto& camera = objCamera.AddComponent<Components::Camera>().first.get();
@@ -117,12 +123,12 @@ void Engine::Core::Run()
 			camera.positionOffset += Math::Vector3D::Up() * speed * scene1.GetTimeData().GetDeltaTime();
 		if (Input::Raw::GetValue(Input::Raw::Button::LeftCtrl))
 			camera.positionOffset += Math::Vector3D::Down() * speed * scene1.GetTimeData().GetDeltaTime();
-		camera.LookAt({ 0, 0, 0 });
+		camera.LookAt({ -1.f, 0, 0 });
 
 		if (Input::Raw::GetValue(Input::Raw::Button::Up))
-			lightObj.transform.localPosition.z += speed * scene1.GetTimeData().GetDeltaTime();
-		if (Input::Raw::GetValue(Input::Raw::Button::Down))
 			lightObj.transform.localPosition.z -= speed * scene1.GetTimeData().GetDeltaTime();
+		if (Input::Raw::GetValue(Input::Raw::Button::Down))
+			lightObj.transform.localPosition.z += speed * scene1.GetTimeData().GetDeltaTime();
 		if (Input::Raw::GetValue(Input::Raw::Button::Left))
 			lightObj.transform.localPosition.x -= speed * scene1.GetTimeData().GetDeltaTime();
 		if (Input::Raw::GetValue(Input::Raw::Button::Right))
@@ -140,12 +146,9 @@ void Engine::Core::Run()
 		RenderSystem::BuildRenderGraph(scene1, graph);
 		Renderer::Core::PrepareRenderingEarly(graph);
 
-
+		Renderer::Core::SetCameraInfo(camera.GetRendererCameraInfo());
 		RenderSystem::BuildRenderGraphTransform(scene1, graphTransform);
 		Renderer::Core::PrepareRenderingLate(graphTransform);
-
-
-		Renderer::Core::SetCameraInfo(camera.GetCameraInfo());
 
 
 		Renderer::Core::Draw();

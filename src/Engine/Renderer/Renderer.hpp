@@ -93,14 +93,15 @@ namespace Engine
 
 	struct Renderer::CameraInfo
 	{
-		enum class ProjectMode
+		enum class ProjectionMode
 		{
 			Perspective,
 			Orthographic
 		};
 
 		Math::Matrix4x4 transform;
-		ProjectMode projectMode;
+		Math::Vector3D worldSpacePos;
+		ProjectionMode projectMode;
 		float fovY;
 		float zNear;
 		float zFar;

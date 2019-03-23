@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Components.hpp"
+#include "../Enum.hpp"
 
 #include "DMath/Vector/Vector.hpp"
 
@@ -42,7 +43,8 @@ namespace Engine
 
 			void LookAt(const Math::Vector3D& newTarget);
 
-			Renderer::CameraInfo GetCameraInfo() const;
+			[[nodiscard]] Math::Matrix<4, 3, float> GetModel_Reduced(Space space) const;
+			Renderer::CameraInfo GetRendererCameraInfo() const;
 		};
 	}
 }

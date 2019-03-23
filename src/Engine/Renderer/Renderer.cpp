@@ -254,7 +254,7 @@ void Engine::Renderer::Core::UpdateAssetReferences(Data& data, const RenderGraph
 Math::Matrix4x4 Engine::Renderer::CameraInfo::GetModel(float aspectRatio) const
 {
 	using namespace Math::LinTran3D;
-	if (projectMode == ProjectMode::Perspective)
+	if (projectMode == ProjectionMode::Perspective)
 	{
 		switch (GetActiveAPI())
 		{
@@ -267,7 +267,7 @@ Math::Matrix4x4 Engine::Renderer::CameraInfo::GetModel(float aspectRatio) const
 				return {};
 		}
 	}
-	else if (projectMode == ProjectMode::Orthographic)
+	else if (projectMode == ProjectionMode::Orthographic)
 	{
 		const float& right = orthoWidth / 2;
 		const float& left = -right;

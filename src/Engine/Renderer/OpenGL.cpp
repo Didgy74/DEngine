@@ -55,13 +55,14 @@ namespace Engine
 
 struct Engine::Renderer::OpenGL::CameraDataUBO
 {
+	Math::Vector4D wsPosition;
 	Math::Matrix<4, 4, float> viewProjection;
 };
 
 struct Engine::Renderer::OpenGL::LightDataUBO
 {
 	uint32_t pointLightCount;
-	std::array<uint32_t, 3> padding;
+	std::array<uint32_t, 3> padding1;
 	std::array<Math::Vector4D, 10> pointLightPos;
 };
 
@@ -235,7 +236,6 @@ void Engine::Renderer::OpenGL::LoadMeshShader(Engine::Renderer::OpenGL::Data &da
 	// Grab uniforms
 	data.meshModelUniform = glGetUniformLocation(data.meshProgram, "model");
 
-	auto test = glGetUniformBlockIndex(data.meshProgram, "LightData");
 	glUniformBlockBinding(data.meshProgram, 1, 1);
 }
 
@@ -340,10 +340,12 @@ void Engine::Renderer::OpenGL::PrepareRenderingEarly(const std::vector<SpriteID>
 
 	// Update light count
 	const auto& renderGraph = Core::GetRenderGraph();
-	uint32_t pointLightCount = renderGraph.pointLights.size();
-	glNamedBufferSubData(data.lightDataUBO, 0, sizeof(uint32_t), &pointLightCount);
+	auto pointLightCount = static_cast<uint32_t>(renderGraph.pointLights.size());
+	constexpr GLintptr pointLightCountDataOffset = offsetof(LightDataUBO, LightDataUBO::pointLightCount);
+	glNamedBufferSubData(data.lightDataUBO, pointLightCountDataOffset, sizeof(pointLightCount), &pointLightCount);
 }
 
+bool testing = false;
 void Engine::Renderer::OpenGL::PrepareRenderingLate()
 {
 	Data& data = GetData();
@@ -356,14 +358,21 @@ void Engine::Renderer::OpenGL::PrepareRenderingLate()
 	for (size_t i = 0; i < elements; i++)
 		posData[i] = renderGraphTransform.pointLights[i].AsVec4();
 	size_t byteLength = sizeof(Math::Vector4D) * elements;
-
-	glNamedBufferSubData(data.lightDataUBO, sizeof(uint32_t) * 4, byteLength, posData.data());
+	constexpr GLintptr pointLightPosDataOffset = offsetof(LightDataUBO, LightDataUBO::pointLightPos);
+	glNamedBufferSubData(data.lightDataUBO, pointLightPosDataOffset, byteLength, posData.data());
 
 	auto& viewport = Renderer::GetViewport(0);
 
+	// Update camera UBO
 	auto& cameraInfo = Renderer::Core::GetCameraInfo();
+	const Math::Vector4D& cameraWSPosition = cameraInfo.worldSpacePos.AsVec4();
+	constexpr GLintptr cameraWSPositionDataOffset = offsetof(CameraDataUBO, CameraDataUBO::wsPosition);
+	glBindBuffer(GL_UNIFORM_BUFFER, data.cameraDataUBO);
+	glBufferSubData(GL_UNIFORM_BUFFER, cameraWSPositionDataOffset, sizeof(cameraWSPosition), cameraWSPosition.Data());
+
 	auto viewMatrix = cameraInfo.GetModel(viewport.GetDimensions().GetAspectRatio());
-	glNamedBufferSubData(data.cameraDataUBO, 0, sizeof(CameraDataUBO::viewProjection), viewMatrix.data.data());
+	constexpr GLintptr cameraViewProjectionDataOffset = offsetof(CameraDataUBO, CameraDataUBO::viewProjection);
+	glBufferSubData(GL_UNIFORM_BUFFER, cameraViewProjectionDataOffset, sizeof(viewMatrix), viewMatrix.Data());
 }
 
 void Engine::Renderer::OpenGL::Draw()

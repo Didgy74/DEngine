@@ -1,11 +1,12 @@
 #version 420 core
 
-layout(location = 0) in vec3 position;
-layout(location = 1) in vec2 texCoord;
-layout(location = 2) in vec3 normal;
+layout(location = 0) in vec3 vtxPosition;
+layout(location = 1) in vec2 vtxUV;
+layout(location = 2) in vec3 vtxNormal;
 
 layout(std140, binding = 0) uniform CameraData
 {
+	vec4 wsPosition;
 	mat4 viewProjection;
 } cameraData;
 
@@ -20,9 +21,9 @@ out FragData
 
 void main()
 {
-	gl_Position = cameraData.viewProjection * model * vec4(position, 1.0);
+	gl_Position = cameraData.viewProjection * model * vec4(vtxPosition, 1.0);
 	
-	fragData.wsPosition = vec4(model * vec4(position, 1.0)).xyz;
-	fragData.wsNormal = vec4(model * vec4(normal, 0.0)).xyz;
-	fragData.uv = texCoord;
+	fragData.wsPosition = vec3(model * vec4(vtxPosition, 1.0));
+	fragData.wsNormal = mat3(transpose(inverse(model))) * vtxNormal;
+	fragData.uv = vtxUV;
 }
