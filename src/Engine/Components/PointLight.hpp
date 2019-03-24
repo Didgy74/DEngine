@@ -6,6 +6,7 @@
 #include "DMath/Vector/Vector.hpp"
 #include "DMath/Matrix/Matrix.hpp"
 
+#include "../Utility/Color.hpp"
 
 namespace Engine
 {
@@ -20,6 +21,7 @@ namespace Engine
 			~PointLight();
 
 			float intensity;
+			Math::Vector3D color;
 			Math::Vector3D positionOffset;
 
 			[[nodiscard]] Math::Matrix<4, 3> GetModel_Reduced(Space space) const;

@@ -2,13 +2,15 @@
 
 layout(std140, binding = 0) uniform CameraData
 {
-	vec4 wsPosition;
+	vec3 wsPosition;
 	mat4 viewProjection;
 } cameraData;
 
 layout(std140, binding = 1) uniform LightData
 {
+	vec4 ambientLight;
 	uint pointLightCount;
+	vec4 pointLightIntensity[10];
 	vec4 pointLightPos[10];
 } lightData;
 
@@ -23,26 +25,25 @@ layout(location = 0) out vec4 frag_color;
 
 void main()
 {
-	vec3 pointToCamera = cameraData.wsPosition.xyz - fragData.wsPosition;
+	vec3 pointToCamera = cameraData.wsPosition - fragData.wsPosition;
 	vec3 pointToCameraDir = normalize(pointToCamera);
 
-	float test = 0.0;
+	vec3 diffuse;
+	vec3 specular;
 	for (int i = 0; i < lightData.pointLightCount; i++)
 	{
 		vec3 pointToLight = lightData.pointLightPos[i].xyz - fragData.wsPosition;
 		vec3 pointToLightDir = normalize(pointToLight);
 		
-		float diff = max(0, dot(pointToLightDir, fragData.wsNormal));
-		test += diff;
+		diffuse += max(0, dot(pointToLightDir, fragData.wsNormal)) * vec3(lightData.pointLightIntensity[i]);
 		
 		vec3 lightToPointDir = -pointToLightDir;
 		
 		vec3 reflectDir = reflect(lightToPointDir, fragData.wsNormal);
 		
-		float spec = pow(max(dot(pointToCameraDir, reflectDir), 0.0), 50);
-		
-		test += spec;
-		
+		const float coefficient = 50;
+		specular += pow(max(dot(pointToCameraDir, reflectDir), 0.0), coefficient) * vec3(1);
 	}
-	frag_color = vec4(test);
+	
+	frag_color = vec4(vec3(lightData.ambientLight) + diffuse + specular, 1.0);
 }

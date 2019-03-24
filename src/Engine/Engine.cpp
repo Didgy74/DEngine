@@ -56,11 +56,14 @@ void Engine::Core::Run()
 	Input::Core::Initialize();
 	Physics2D::Core::Initialize();
 
+
 	Renderer::CreateInfo rendererCreateInfo;
 	rendererCreateInfo.preferredAPI = Renderer::API::OpenGL;
 	rendererCreateInfo.surfaceDimensions = Application::GetWindowSize();
 	rendererCreateInfo.surfaceHandle = Application::Core::GetMainWindowHandle();
+
 	rendererCreateInfo.openGLCreateInfo.glSwapBuffers = Application::Core::GL_SwapWindow;
+
 	Renderer::Core::Initialize(std::move(rendererCreateInfo));
 
 	// Create scene and make viewport 0 point to scene 0.
@@ -89,6 +92,7 @@ void Engine::Core::Run()
 	auto& lightObj = scene1.NewSceneObject();
 	lightObj.transform.localPosition = { 2.5f, 2.5f, 2.5f };
 	Components::PointLight& light1 = lightObj.AddComponent<Components::PointLight>().first.get();
+	light1.color = { 1.f, 0.5f, 0.f };
 	auto& mesh3 = lightObj.AddComponent<Components::MeshRenderer>().first.get();
 	mesh3.SetMesh(Asset::Mesh::Cube);
 	mesh3.scale = { 0.1f, 0.1f, 0.1f };

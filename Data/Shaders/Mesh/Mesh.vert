@@ -6,7 +6,7 @@ layout(location = 2) in vec3 vtxNormal;
 
 layout(std140, binding = 0) uniform CameraData
 {
-	vec4 wsPosition;
+	vec3 wsPosition;
 	mat4 viewProjection;
 } cameraData;
 

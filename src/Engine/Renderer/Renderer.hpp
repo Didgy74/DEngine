@@ -5,10 +5,9 @@
 #include "OpenGLCreateInfo.hpp"
 
 #include "../Utility/ImgDim.hpp"
-#include "../Utility/Color.hpp"
 
 #include "DMath/Vector/Vector.hpp"
-#include "DMath/UnitQuaternion.hpp"
+#include "DMath/Matrix/Matrix.hpp"
 
 #include <memory>
 #include <vector>
@@ -59,19 +58,17 @@ namespace Engine
 		API preferredAPI = API::None;
 		Utility::ImgDim surfaceDimensions{};
 		void* surfaceHandle = nullptr;
+		std::function<void(std::string_view)> errorMessageCallback;
 		OpenGL::CreateInfo openGLCreateInfo{};
-	};
-
-	struct Renderer::PointLight
-	{
-		float intensity;
 	};
 
 	struct Renderer::RenderGraph
 	{
 		std::vector<SpriteID> sprites;
 		std::vector<MeshID> meshes;
-		std::vector<PointLight> pointLights;
+		
+		Math::Vector3D ambientLight;
+		std::vector<Math::Vector<3, float>> pointLights;
 	};
 
 	struct Renderer::RenderGraphTransform

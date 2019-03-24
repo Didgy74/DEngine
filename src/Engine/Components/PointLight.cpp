@@ -11,7 +11,8 @@ namespace Engine
 		PointLight::PointLight(SceneObject& owningObject) :
 			ParentType(owningObject),
 			positionOffset(),
-			intensity(1)
+			intensity(1),
+			color{1.f, 1.f, 1.f}
 		{
 		}
 

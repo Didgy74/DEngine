@@ -55,14 +55,17 @@ namespace Engine
 
 struct Engine::Renderer::OpenGL::CameraDataUBO
 {
-	Math::Vector4D wsPosition;
+	Math::Vector3D wsPosition;
+	float padding1;
 	Math::Matrix<4, 4, float> viewProjection;
 };
 
 struct Engine::Renderer::OpenGL::LightDataUBO
 {
+	Math::Vector4D ambientLight;
 	uint32_t pointLightCount;
 	std::array<uint32_t, 3> padding1;
+	std::array<Math::Vector4D, 10> pointLightIntensity;
 	std::array<Math::Vector4D, 10> pointLightPos;
 };
 
@@ -306,6 +309,9 @@ void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& create
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
 
 	//LoadSpriteShader(data);
 	LoadMeshShader(data);
@@ -338,11 +344,25 @@ void Engine::Renderer::OpenGL::PrepareRenderingEarly(const std::vector<SpriteID>
 	UpdateIBODatabase(data, spriteLoadQueue);
 	UpdateVBODatabase(data, meshLoadQueue);
 
-	// Update light count
 	const auto& renderGraph = Core::GetRenderGraph();
+
+	// Update ambient light
+	constexpr GLintptr ambientLightOffset = offsetof(LightDataUBO, LightDataUBO::ambientLight);
+	glNamedBufferSubData(data.lightDataUBO, ambientLightOffset, sizeof(renderGraph.ambientLight), renderGraph.ambientLight.Data());
+
+	// Update light count
 	auto pointLightCount = static_cast<uint32_t>(renderGraph.pointLights.size());
 	constexpr GLintptr pointLightCountDataOffset = offsetof(LightDataUBO, LightDataUBO::pointLightCount);
 	glNamedBufferSubData(data.lightDataUBO, pointLightCountDataOffset, sizeof(pointLightCount), &pointLightCount);
+
+	// Update intensities
+	const size_t elements = Math::Min(10, renderGraph.pointLights.size());
+	std::array<Math::Vector4D, 10> intensityData;
+	for (size_t i = 0; i < elements; i++)
+		intensityData[i] = renderGraph.pointLights[i].AsVec4();
+	size_t byteLength = sizeof(Math::Vector4D) * elements;
+	constexpr GLintptr pointLightIntensityOffset = offsetof(LightDataUBO, LightDataUBO::pointLightIntensity);
+	glNamedBufferSubData(data.lightDataUBO, pointLightIntensityOffset, byteLength, intensityData.data());
 }
 
 bool testing = false;
@@ -365,7 +385,7 @@ void Engine::Renderer::OpenGL::PrepareRenderingLate()
 
 	// Update camera UBO
 	auto& cameraInfo = Renderer::Core::GetCameraInfo();
-	const Math::Vector4D& cameraWSPosition = cameraInfo.worldSpacePos.AsVec4();
+	const Math::Vector3D& cameraWSPosition = cameraInfo.worldSpacePos;
 	constexpr GLintptr cameraWSPositionDataOffset = offsetof(CameraDataUBO, CameraDataUBO::wsPosition);
 	glBindBuffer(GL_UNIFORM_BUFFER, data.cameraDataUBO);
 	glBufferSubData(GL_UNIFORM_BUFFER, cameraWSPositionDataOffset, sizeof(cameraWSPosition), cameraWSPosition.Data());

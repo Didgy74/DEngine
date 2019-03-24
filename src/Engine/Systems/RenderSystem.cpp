@@ -42,7 +42,12 @@ namespace Engine
 			const auto& pointLightComponents = *pointLightComponentsPtr;
 			graph.pointLights.resize(pointLightComponents.size());
 			for (size_t i = 0; i < pointLightComponents.size(); i++)
-				graph.pointLights[i] = Renderer::PointLight{ pointLightComponents[i].intensity };
+			{
+				Math::Vector3D color = pointLightComponents[i].color;
+				for (auto& element : color)
+					element = Math::Clamp(element, 0.f, 1.f) * pointLightComponents[i].intensity;
+				graph.pointLights[i] = color;
+			}
 		}
 	}
 

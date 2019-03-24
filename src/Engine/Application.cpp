@@ -23,8 +23,6 @@ namespace Engine
 				Application::API3D activeAPI;
 
 				void* windowHandle = nullptr;
-
-				
 			};
 
 			static std::unique_ptr<Data> data;
