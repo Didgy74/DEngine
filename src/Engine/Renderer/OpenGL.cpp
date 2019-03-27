@@ -1,4 +1,5 @@
 #include "Renderer.hpp"
+#include "RendererData.hpp"
 #include "OpenGL.hpp"
 
 #include "../Asset.hpp"
@@ -9,7 +10,6 @@
 #include <memory>
 #include <unordered_map>
 #include <fstream>
-#include <iostream>
 #include <array>
 #include <optional>
 
@@ -39,7 +39,7 @@ namespace Engine
 			std::optional<VBO> VBOFromPath(const std::string& path);
 			void UpdateIBODatabase(Data& data, const std::vector<SpriteID>& loadQueue);
 
-			Data& GetData();
+			Data& GetAPIData();
 
 			void Draw_SpritePass(const Data& data, const std::vector<SpriteID>& sprites, const std::vector<Math::Matrix4x4>& transforms);
 			void Draw_MeshPass(const Data& data, const std::vector<MeshID>& meshes, const std::vector<Math::Matrix4x4>& transforms);
@@ -48,7 +48,7 @@ namespace Engine
 			void LoadSpriteShader(Data& data);
 			void LoadMeshShader(Data& data);
 
-			inline void PrintGLError(const char* string = "");
+			void GLDebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam);
 		}
 	}
 }
@@ -115,7 +115,7 @@ struct Engine::Renderer::OpenGL::Data
 	GLint meshModelUniform;
 };
 
-Engine::Renderer::OpenGL::Data& Engine::Renderer::OpenGL::GetData() { return std::any_cast<Data&>(Core::GetAPIData()); }
+Engine::Renderer::OpenGL::Data& Engine::Renderer::OpenGL::GetAPIData() { return std::any_cast<Data&>(Core::GetAPIData()); }
 
 static std::string LoadShader(const std::string& fileName)
 {
@@ -135,7 +135,9 @@ static std::string LoadShader(const std::string& fileName)
 	}
 	else
 	{
-		std::cerr << "Unable to load shader: " << fileName << std::endl;
+		if (Engine::Renderer::Core::GetData().debugData.errorMessageCallback)
+			Engine::Renderer::Core::GetData().debugData.errorMessageCallback("Unable to load shader : " + fileName);
+
 	}
 
 	return output;
@@ -158,7 +160,8 @@ static void CheckShaderError(GLuint shader, GLuint flag, bool isProgram, const s
 		else
 			glGetShaderInfoLog(shader, sizeof(error), NULL, error);
 
-		std::cerr << errorMessage << ": '" << error << "'" << std::endl;
+		if (Engine::Renderer::Core::GetData().debugData.errorMessageCallback)
+			Engine::Renderer::Core::GetData().debugData.errorMessageCallback(errorMessage + ": '" + error);
 	}
 }
 
@@ -167,7 +170,10 @@ static GLuint CreateShader(const std::string& text, GLuint type)
 	GLuint shader = glCreateShader(type);
 
 	if (shader == 0)
-		std::cerr << "Error compiling shader type " << type << std::endl;
+	{
+		if (Engine::Renderer::Core::GetData().debugData.errorMessageCallback)
+			Engine::Renderer::Core::GetData().debugData.errorMessageCallback("Error compiling shader type " + type);
+	}
 
 	const GLchar* p[1];
 	p[0] = text.c_str();
@@ -242,25 +248,10 @@ void Engine::Renderer::OpenGL::LoadMeshShader(Engine::Renderer::OpenGL::Data &da
 	glUniformBlockBinding(data.meshProgram, 1, 1);
 }
 
-inline void Engine::Renderer::OpenGL::PrintGLError(const char* string)
-{
-	if constexpr (enableDebug)
-	{
-		auto errorEnum = glGetError();
-		if (errorEnum != 0)
-		{
-			auto errorString = glewGetErrorString(errorEnum);
-			std::cout << string << errorString << std::endl;
-		}
-	}
-}
-
 void Engine::Renderer::OpenGL::CreateStandardUBOs(Data& data)
 {
 	std::array<GLuint, 2> buffers;
 	glGenBuffers(2, buffers.data());
-
-	PrintGLError("Making buffers for standard UBOs: ");
 
 	data.cameraDataUBO = buffers[0];
 	data.lightDataUBO = buffers[1];
@@ -269,13 +260,16 @@ void Engine::Renderer::OpenGL::CreateStandardUBOs(Data& data)
 	glBindBuffer(GL_UNIFORM_BUFFER, data.cameraDataUBO);
 	glNamedBufferData(data.cameraDataUBO, sizeof(CameraDataUBO), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_UNIFORM_BUFFER, 0, data.cameraDataUBO, 0, sizeof(CameraDataUBO));
-	PrintGLError("Making Camera UBO: ");
 
 	// Make light ubo
 	glBindBuffer(GL_UNIFORM_BUFFER, data.lightDataUBO);
 	glNamedBufferData(data.lightDataUBO, sizeof(LightDataUBO), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_UNIFORM_BUFFER, 1, data.lightDataUBO, 0, sizeof(LightDataUBO));
-	PrintGLError("Making LightData UBO: ");
+}
+
+void Engine::Renderer::OpenGL::GLDebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
+{
+	Core::GetData().debugData.errorMessageCallback(message);
 }
 
 void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& createInfo)
@@ -287,6 +281,23 @@ void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& create
 	Data& data = std::any_cast<Data&>(apiData);
 
 	data.glSwapBuffers = std::move(createInfo.glSwapBuffers);
+
+	// Initialize debug stuff
+	if (Core::GetData().debugData.errorMessageCallback)
+	{
+		GLint flags;
+		glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+		if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
+		{
+			glEnable(GL_DEBUG_OUTPUT);
+			glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+			glDebugMessageCallback(&GLDebugOutputCallback, nullptr);
+			glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+		}
+		else
+			Core::GetData().debugData.errorMessageCallback("Error. Couldn't make GL Debug Output");
+	}
+	
 
 	CreateStandardUBOs(data);
 
@@ -315,8 +326,6 @@ void Engine::Renderer::OpenGL::Initialize(std::any& apiData, CreateInfo&& create
 
 	//LoadSpriteShader(data);
 	LoadMeshShader(data);
-
-	PrintGLError("End of GL init: ");
 }
 
 void Engine::Renderer::OpenGL::Terminate(std::any& apiData)
@@ -339,7 +348,7 @@ void Engine::Renderer::OpenGL::Terminate(std::any& apiData)
 
 void Engine::Renderer::OpenGL::PrepareRenderingEarly(const std::vector<SpriteID>& spriteLoadQueue, const std::vector<MeshID>& meshLoadQueue)
 {
-	Data& data = GetData();
+	Data& data = GetAPIData();
 
 	UpdateIBODatabase(data, spriteLoadQueue);
 	UpdateVBODatabase(data, meshLoadQueue);
@@ -365,10 +374,9 @@ void Engine::Renderer::OpenGL::PrepareRenderingEarly(const std::vector<SpriteID>
 	glNamedBufferSubData(data.lightDataUBO, pointLightIntensityOffset, byteLength, intensityData.data());
 }
 
-bool testing = false;
 void Engine::Renderer::OpenGL::PrepareRenderingLate()
 {
-	Data& data = GetData();
+	Data& data = GetAPIData();
 
 	const auto& renderGraphTransform = Core::GetRenderGraphTransform();
 
@@ -397,7 +405,7 @@ void Engine::Renderer::OpenGL::PrepareRenderingLate()
 
 void Engine::Renderer::OpenGL::Draw()
 {
-	Data& data = GetData();
+	Data& data = GetAPIData();
 
 	glClearColor(0.25f, 0.f, 0.f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -408,8 +416,6 @@ void Engine::Renderer::OpenGL::Draw()
 
 	Draw_SpritePass(data, renderGraph.sprites, renderGraphTransform.sprites);
 	Draw_MeshPass(data, renderGraph.meshes, renderGraphTransform.meshes);
-
-	PrintGLError("End of GL tick: ");
 
 	auto& viewport = Renderer::GetViewport(0);
 

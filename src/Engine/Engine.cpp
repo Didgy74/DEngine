@@ -47,6 +47,11 @@ protected:
 	}
 };
 
+void rendererDebugCallback(std::string_view message)
+{
+	std::cout << "Renderer log: " << message << std::endl;
+}
+
 std::vector<std::unique_ptr<Engine::Scene>> Engine::Core::scenes;
 
 void Engine::Core::Run()
@@ -56,15 +61,15 @@ void Engine::Core::Run()
 	Input::Core::Initialize();
 	Physics2D::Core::Initialize();
 
-
+	// Initialize renderer
 	Renderer::CreateInfo rendererCreateInfo;
 	rendererCreateInfo.preferredAPI = Renderer::API::OpenGL;
 	rendererCreateInfo.surfaceDimensions = Application::GetWindowSize();
 	rendererCreateInfo.surfaceHandle = Application::Core::GetMainWindowHandle();
-
+	rendererCreateInfo.debugCreateInfo.errorMessageCallback = rendererDebugCallback;
 	rendererCreateInfo.openGLCreateInfo.glSwapBuffers = Application::Core::GL_SwapWindow;
-
 	Renderer::Core::Initialize(std::move(rendererCreateInfo));
+
 
 	// Create scene and make viewport 0 point to scene 0.
 	Scene& scene1 = Engine::NewScene();

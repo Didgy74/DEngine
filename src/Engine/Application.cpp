@@ -52,7 +52,8 @@ namespace Engine
 				data->isRunning = true;
 
 				glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-				glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+				glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+				glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 				GLFWwindow* window = glfwCreateWindow(defaultWindowSize.width, defaultWindowSize.height, "My Title", NULL, NULL);
 				if (!window)
 				{

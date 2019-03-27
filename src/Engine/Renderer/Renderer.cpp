@@ -1,15 +1,11 @@
 #include "Renderer.hpp"
-#include "OpenGL.hpp"
+#include "RendererData.hpp"
 
-#include "../Scene.hpp"
-#include "../Components/SpriteRenderer.hpp"
-#include "../Components/MeshRenderer.hpp"
-#include "../Components/Camera.hpp"
+#include "OpenGL.hpp"
 
 #include "DMath/LinearTransform3D.hpp"
 
 #include <functional>
-#include <iostream>
 
 namespace Engine
 {
@@ -17,38 +13,16 @@ namespace Engine
 	{
 		namespace Core
 		{
-			struct Data
-			{
-			    RenderGraph renderGraph;
-			    RenderGraphTransform renderGraphTransform;
-			    CameraInfo cameraInfo;
-
-			    size_t sceneIDCounter = 0;
-
-				API activeAPI = API::None;
-
-				std::unordered_map<MeshID, size_t> meshReferences;
-				std::unordered_map<SpriteID, size_t> spriteReferences;
-
-				std::vector<MeshID> loadMeshQueue;
-				std::vector<MeshID> unloadMeshQueue;
-				std::vector<SpriteID> loadSpriteQueue;
-				std::vector<SpriteID> unloadSpriteQueue;
-
-				std::vector<std::unique_ptr<Viewport>> viewports;
-
-				std::function<void(void)> Draw;
-				std::function<void(const std::vector<SpriteID>&, const std::vector<MeshID>&)> PrepareRenderingEarly;
-				std::function<void(void)> PrepareRenderingLate;
-
-				std::any apiData = nullptr;
-			};
-
 			static std::unique_ptr<Data> data;
 
 			void UpdateAssetReferences(Data& data, const RenderGraph& oldRG, const RenderGraph* newRG);
 		}
 	}
+}
+
+const Engine::Renderer::Core::Data& Engine::Renderer::Core::GetData()
+{
+	return *data;
 }
 
 Engine::Renderer::Viewport& Engine::Renderer::NewViewport(Utility::ImgDim dimensions, void* surfaceHandle)
@@ -73,18 +47,22 @@ std::any& Engine::Renderer::Core::GetAPIData() { return data->apiData; }
 
 bool Engine::Renderer::Core::Initialize(CreateInfo&& createInfo)
 {
-	data = std::make_unique<Data>();
-	data->activeAPI = createInfo.preferredAPI;
+	Core::data = std::make_unique<Data>();
+	Data& data = *Core::data;
+
+	data.activeAPI = createInfo.preferredAPI;
+
+	data.debugData = std::move(createInfo.debugCreateInfo);
 
 	NewViewport(createInfo.surfaceDimensions, createInfo.surfaceHandle);
 
-	switch (data->activeAPI)
+	switch (data.activeAPI)
 	{
 	case API::OpenGL:
-		OpenGL::Initialize(data->apiData, std::move(createInfo.openGLCreateInfo));
-		data->Draw = OpenGL::Draw;
-		data->PrepareRenderingEarly = OpenGL::PrepareRenderingEarly;
-		data->PrepareRenderingLate = OpenGL::PrepareRenderingLate;
+		OpenGL::Initialize(data.apiData, std::move(createInfo.openGLCreateInfo));
+		data.Draw = OpenGL::Draw;
+		data.PrepareRenderingEarly = OpenGL::PrepareRenderingEarly;
+		data.PrepareRenderingLate = OpenGL::PrepareRenderingLate;
 		break;
 	default:
 		break;
@@ -118,7 +96,7 @@ void Engine::Renderer::Core::PrepareRenderingEarly(RenderGraph& renderGraphInput
 	std::swap(renderGraph, renderGraphInput);
 
 	if (!data.loadSpriteQueue.empty() || !data.loadMeshQueue.empty())
-		std::cout << "Loading sprite/mesh resource(s)..." << std::endl;
+		data.debugData.errorMessageCallback("Loading sprite/mesh resource(s)...");
 	data.PrepareRenderingEarly(data.loadSpriteQueue, data.loadMeshQueue);
 
 	data.loadSpriteQueue.clear();

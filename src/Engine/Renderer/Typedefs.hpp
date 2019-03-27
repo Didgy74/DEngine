@@ -15,6 +15,7 @@ namespace Engine
 
 		enum class MeshID : Core::AssetIntegerType {};
 
+		struct DebugCreateInfo;
 		struct CreateInfo;
 		enum class API;
 		class Viewport;

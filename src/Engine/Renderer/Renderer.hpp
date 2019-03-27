@@ -37,8 +37,6 @@ namespace Engine
 			void Draw();
 			void Terminate();
 
-			std::any& GetAPIData();
-
 			const RenderGraph& GetRenderGraph();
 			const RenderGraphTransform& GetRenderGraphTransform();
 			const CameraInfo& GetCameraInfo();
@@ -53,13 +51,20 @@ namespace Engine
 		Vulkan
 	};
 
+	struct Renderer::DebugCreateInfo
+	{
+		std::function<void(std::string_view)> errorMessageCallback;
+	};
+
 	struct Renderer::CreateInfo
 	{
 		API preferredAPI = API::None;
-		Utility::ImgDim surfaceDimensions{};
+		Utility::ImgDim surfaceDimensions;
 		void* surfaceHandle = nullptr;
-		std::function<void(std::string_view)> errorMessageCallback;
-		OpenGL::CreateInfo openGLCreateInfo{};
+
+		DebugCreateInfo debugCreateInfo;
+
+		OpenGL::CreateInfo openGLCreateInfo;
 	};
 
 	struct Renderer::RenderGraph
