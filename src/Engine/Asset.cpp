@@ -150,6 +150,11 @@ Asset::TextureDocument Asset::LoadTextureDocument(Sprite texture)
 	return TextureDocument(std::move(createInfo));
 }
 
+Engine::Renderer::MeshDocument Asset::LoadMesh(size_t i)
+{
+	return Engine::Renderer::MeshDocument();
+}
+
 static Asset::MeshDocument::IndexType ToIndexType(fx::gltf::Accessor::ComponentType componentType)
 {
 	switch (componentType)

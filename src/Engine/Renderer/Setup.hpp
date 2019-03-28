@@ -12,6 +12,8 @@ namespace Engine
 		{
 			using SceneType = Engine::Scene;
 
+			constexpr bool enableDebugging = true;
+
 			constexpr std::string_view assetPath = "Data/DRenderer";
 		}
 	}

@@ -19,8 +19,6 @@ namespace Engine
 				RenderGraphTransform renderGraphTransform;
 				CameraInfo cameraInfo;
 
-				size_t sceneIDCounter = 0;
-
 				API activeAPI = API::None;
 
 				std::unordered_map<MeshID, size_t> meshReferences;
@@ -37,7 +35,9 @@ namespace Engine
 				std::function<void(const std::vector<SpriteID>&, const std::vector<MeshID>&)> PrepareRenderingEarly;
 				std::function<void(void)> PrepareRenderingLate;
 
+				AssetLoadCreateInfo assetLoadData;
 				DebugCreateInfo debugData;
+
 
 				std::any apiData = nullptr;
 			};

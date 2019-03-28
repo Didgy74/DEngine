@@ -8,6 +8,8 @@
 #include <vector>
 #include <array>
 
+#include "Renderer/MeshDocument.hpp"
+
 namespace Asset
 {
 	constexpr std::string_view textureFolderPath = "Data/Textures/";
@@ -29,6 +31,8 @@ namespace Asset
 	MeshDocument LoadMeshDocument(Mesh mesh);
 	MeshDocument LoadMeshDocument(const std::string& path);
 	TextureDocument LoadTextureDocument(Sprite texture);
+
+	Engine::Renderer::MeshDocument LoadMesh(size_t i);
 }
 
 class Asset::MeshDocument
@@ -80,7 +84,6 @@ public:
 	const uint8_t* GetDataPtr(Attribute type) const;
 	Data GetData(Attribute type) const;
 
-private:
 	std::vector<uint8_t> byteArray;
 	std::array<Data, static_cast<size_t>(Attribute::COUNT)> data;
 	IndexType indexType;

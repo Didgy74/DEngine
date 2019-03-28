@@ -11,7 +11,7 @@ namespace Engine
 	{
 		namespace OpenGL
 		{
-			void Initialize(std::any& apiData, CreateInfo&& createInfo);
+			void Initialize(std::any& apiData, const InitInfo& createInfo);
 			void Terminate(std::any& apiData);
 			void PrepareRenderingEarly(const std::vector<SpriteID>& spriteLoadQueue, const std::vector<MeshID>& meshLoadQueue);
 			void PrepareRenderingLate();

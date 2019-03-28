@@ -23,6 +23,8 @@
 
 #include <iostream>
 
+std::vector<std::unique_ptr<Engine::Scene>> Engine::Core::scenes;
+
 class ScriptTest : public Engine::Components::ScriptBase
 {
 	using ParentType = Engine::Components::ScriptBase;
@@ -52,7 +54,28 @@ void rendererDebugCallback(std::string_view message)
 	std::cout << "Renderer log: " << message << std::endl;
 }
 
-std::vector<std::unique_ptr<Engine::Scene>> Engine::Core::scenes;
+namespace Engine
+{
+	void InitializeRenderer()
+	{
+		// Initialize renderer
+		Renderer::InitInfo rendererInitInfo;
+
+		rendererInitInfo.preferredAPI = Renderer::API::OpenGL;
+
+		// Debug info
+		rendererInitInfo.debugInitInfo.useDebugging = true;
+		rendererInitInfo.debugInitInfo.errorMessageCallback = rendererDebugCallback;
+
+		rendererInitInfo.surfaceDimensions = Application::GetWindowSize();
+		rendererInitInfo.surfaceHandle = Application::Core::GetMainWindowHandle();
+
+		rendererInitInfo.assetLoadCreateInfo.meshLoader = &Asset::LoadMesh;
+
+		rendererInitInfo.openGLInitInfo.glSwapBuffers = &Application::Core::GL_SwapWindow;
+		Renderer::Core::Initialize(rendererInitInfo);
+	}
+}
 
 void Engine::Core::Run()
 {
@@ -61,14 +84,7 @@ void Engine::Core::Run()
 	Input::Core::Initialize();
 	Physics2D::Core::Initialize();
 
-	// Initialize renderer
-	Renderer::CreateInfo rendererCreateInfo;
-	rendererCreateInfo.preferredAPI = Renderer::API::OpenGL;
-	rendererCreateInfo.surfaceDimensions = Application::GetWindowSize();
-	rendererCreateInfo.surfaceHandle = Application::Core::GetMainWindowHandle();
-	rendererCreateInfo.debugCreateInfo.errorMessageCallback = rendererDebugCallback;
-	rendererCreateInfo.openGLCreateInfo.glSwapBuffers = Application::Core::GL_SwapWindow;
-	Renderer::Core::Initialize(std::move(rendererCreateInfo));
+	InitializeRenderer();
 
 
 	// Create scene and make viewport 0 point to scene 0.

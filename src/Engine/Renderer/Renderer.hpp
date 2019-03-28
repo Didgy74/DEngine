@@ -20,7 +20,7 @@ namespace Engine
 	namespace Renderer
 	{
 		using SceneType = Setup::SceneType;
-
+		
 		Viewport& NewViewport(Utility::ImgDim dimensions, void* surfaceHandle);
 		size_t GetViewportCount();
 		Viewport& GetViewport(size_t index);
@@ -29,9 +29,12 @@ namespace Engine
 
 		bool IsCompatible(const RenderGraph& renderGraph, const RenderGraphTransform& transforms);
 
+		// This call is thread-safe if ErrorMessageCallback supplied to InitInfo is.
+		void LogDebugMessage(std::string_view message);
+
 		namespace Core
 		{
-			bool Initialize(CreateInfo&& createInfo);
+			bool Initialize(const InitInfo& createInfo);
 			void PrepareRenderingEarly(RenderGraph& renderGraphInput);
 			void PrepareRenderingLate(RenderGraphTransform& sceneData);
 			void Draw();
@@ -53,18 +56,26 @@ namespace Engine
 
 	struct Renderer::DebugCreateInfo
 	{
-		std::function<void(std::string_view)> errorMessageCallback;
+		bool useDebugging = false;
+		ErrorMessageCallbackPFN errorMessageCallback = nullptr;
 	};
 
-	struct Renderer::CreateInfo
+	struct Renderer::AssetLoadCreateInfo
+	{
+		using MeshLoaderPFN = MeshDocument(*)(size_t);
+		MeshLoaderPFN meshLoader = nullptr;
+	};
+
+	struct Renderer::InitInfo
 	{
 		API preferredAPI = API::None;
 		Utility::ImgDim surfaceDimensions;
 		void* surfaceHandle = nullptr;
 
-		DebugCreateInfo debugCreateInfo;
+		AssetLoadCreateInfo assetLoadCreateInfo;
+		DebugCreateInfo debugInitInfo;
 
-		OpenGL::CreateInfo openGLCreateInfo;
+		OpenGL::InitInfo openGLInitInfo;
 	};
 
 	struct Renderer::RenderGraph
@@ -81,16 +92,6 @@ namespace Engine
 		std::vector<Math::Matrix<4, 4, float>> sprites;
 		std::vector<Math::Matrix<4, 4, float>> meshes;
 		std::vector<Math::Vector<3, float>> pointLights;
-	};
-
-	class Renderer::SceneData
-	{
-	public:
-	    SceneData();
-
-        size_t GetSceneID() const;
-	private:
-		size_t sceneID;
 	};
 
 	struct Renderer::CameraInfo
