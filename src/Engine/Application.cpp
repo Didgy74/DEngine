@@ -5,6 +5,7 @@
 #include "GLFW/glfw3.h"
 
 #include <memory>
+#include <iostream>
 
 namespace Engine
 {
@@ -34,6 +35,11 @@ namespace Engine
 	}
 }
 
+void error_callback(int error, const char* description)
+{
+	std::cerr << "GLFW Error: " << description << std::endl;;
+}
+
 namespace Engine
 {
 	namespace Application
@@ -50,6 +56,8 @@ namespace Engine
 
 				data = std::make_unique<Data>();
 				data->isRunning = true;
+
+				glfwSetErrorCallback(error_callback);
 
 				glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 				glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
