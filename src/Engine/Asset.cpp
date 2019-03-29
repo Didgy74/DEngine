@@ -5,6 +5,7 @@
 #include <cassert>
 #include <map>
 #include <type_traits>
+#include <iostream>
 
 #include "fx/gltf.h"
 
@@ -15,8 +16,8 @@
 
 struct AssetInfo
 {
-	std::string name;
-	std::string relativePath;
+	std::string_view name;
+	std::string_view relativePath;
 };
 
 static const std::map<Asset::Sprite, AssetInfo> textureInfos
@@ -27,12 +28,12 @@ static const std::map<Asset::Sprite, AssetInfo> textureInfos
 	{ Asset::Sprite::Circle, {"Circle", "circle.png"} },
 };
 
-static const std::map<Asset::Mesh, AssetInfo> meshInfos
+static const std::map<size_t, AssetInfo> meshInfos
 {
-	{ Asset::Mesh::None, {"None", ""} },
-	{ Asset::Mesh::Cube, {"Cube", "Cube/Cube.gltf"} },
-	{ Asset::Mesh::SpritePlane, {"SpritePlane", "SpritePlane/SpritePlane.gltf"} },
-	{ Asset::Mesh::Helmet, {"Helmet", "Helmet/Helmet.gltf"} },
+	{ size_t(Asset::Mesh::None), {"None", ""} },
+	{ size_t(Asset::Mesh::Cube), {"Cube", "Cube/Cube.gltf"} },
+	{ size_t(Asset::Mesh::SpritePlane), {"SpritePlane", "SpritePlane/SpritePlane.gltf"} },
+	{ size_t(Asset::Mesh::Helmet), {"Helmet", "Helmet/Helmet.gltf"} },
 };
 
 bool Asset::CheckValid(Sprite sprite)
@@ -41,118 +42,112 @@ bool Asset::CheckValid(Sprite sprite)
 	return (0 <= static_cast<Type>(sprite) && static_cast<Type>(sprite) < static_cast<Type>(Sprite::COUNT)) || sprite == Sprite::None;
 }
 
-std::string Asset::GetPath(Sprite texture)
+std::string Asset::GetMeshPath(size_t i)
 {
-	assert(CheckValid(texture));
-	auto iterator = textureInfos.find(texture);
-	assert(iterator != textureInfos.end());
-	return static_cast<std::string>(textureFolderPath) + iterator->second.relativePath;
+	auto iterator = meshInfos.find(i);
+	if (iterator == meshInfos.end())
+		return {};
+	else
+		return std::string(meshFolderPath) + std::string(iterator->second.relativePath);
 }
 
-std::string Asset::GetName(Sprite texture)
+std::optional<Asset::MeshDocument> Asset::LoadMeshDocument(std::string_view path)
 {
-	assert(CheckValid(texture));
-	auto iterator = textureInfos.find(texture);
-	assert(iterator != textureInfos.end());
-	return iterator->second.name;
-}
+	try
+	{
+		const auto gltfDocument = fx::gltf::LoadFromText(std::string(path));
 
-bool Asset::CheckValid(Mesh mesh)
-{
-	using Type = std::underlying_type_t<Mesh>;
-	return (0 <= static_cast<Type>(mesh) && static_cast<Type>(mesh) < static_cast<Type>(Mesh::COUNT)) || mesh == Mesh::None;
-}
+		auto& primitive = gltfDocument.meshes[0].primitives[0];
 
-std::string Asset::GetPath(Mesh mesh)
-{
-	assert(CheckValid(mesh));
-	auto iterator = meshInfos.find(mesh);
-	assert(iterator != meshInfos.end());
-	return static_cast<std::string>(meshFolderPath) + iterator->second.relativePath;
-}
+		auto posAccIterator = primitive.attributes.find("POSITION");
+		if (posAccIterator == primitive.attributes.end())
+		{
+			std::cerr << "Error. Found no position attribute for mesh." << std::endl;
+			return {};
+		}
+		auto& posAcc = gltfDocument.accessors[posAccIterator->second];
+		bool validAccessor = posAcc.type == fx::gltf::Accessor::Type::Vec3 && posAcc.componentType == fx::gltf::Accessor::ComponentType::Float;
+		if (!validAccessor)
+		{
+			std::cerr << "Error. Position attribute of mesh is in wrong format." << std::endl;
+			return {};
+		}
+		auto& posBufferView = gltfDocument.bufferViews[posAcc.bufferView];
+		const auto posByteOffset = posAcc.byteOffset + posBufferView.byteOffset;
+		
 
-std::string Asset::GetName(Mesh mesh)
-{
-	assert(CheckValid(mesh));
-	auto iterator = meshInfos.find(mesh);
-	assert(iterator != meshInfos.end());
-	return iterator->second.name;
-}
+		auto& uvAccessor = gltfDocument.accessors[primitive.attributes.find("TEXCOORD_0")->second];
+		assert(uvAccessor.type == fx::gltf::Accessor::Type::Vec2 && uvAccessor.componentType == fx::gltf::Accessor::ComponentType::Float);
+		auto& uvBufferView = gltfDocument.bufferViews[uvAccessor.bufferView];
 
-Asset::MeshDocument Asset::LoadMeshDocument(Mesh mesh)
-{
-	const auto& path = GetPath(mesh);
-	return LoadMeshDocument(path);
-}
+		
 
-Asset::MeshDocument Asset::LoadMeshDocument(const std::string &path)
-{
-	MeshDocument::CreateInfo createInfo{};
+		auto& normalAccessor = gltfDocument.accessors[primitive.attributes.find("NORMAL")->second];
+		assert(normalAccessor.type == fx::gltf::Accessor::Type::Vec3 && normalAccessor.componentType == fx::gltf::Accessor::ComponentType::Float);
+		auto& normalBufferView = gltfDocument.bufferViews[normalAccessor.bufferView];
+		
 
-	const auto gltfDocument = fx::gltf::LoadFromText(path);
-	auto& primitive = gltfDocument.meshes[0].primitives[0];
+		assert(posAcc.count == uvAccessor.count && posAcc.count == normalAccessor.count);
 
-	auto& posAccessor = gltfDocument.accessors[primitive.attributes.find("POSITION")->second];
-	assert(posAccessor.type == fx::gltf::Accessor::Type::Vec3 && posAccessor.componentType == fx::gltf::Accessor::ComponentType::Float);
-	auto& posBufferView = gltfDocument.bufferViews[posAccessor.bufferView];
-	createInfo.posData.byteOffset = posBufferView.byteOffset + posAccessor.byteOffset;
-	createInfo.posData.byteLength = posAccessor.count * (sizeof(float) * 3);
+		auto& indexAccessor = gltfDocument.accessors[primitive.indices];
+		assert(indexAccessor.type == fx::gltf::Accessor::Type::Scalar);
+		assert(indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedShort
+			|| indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedInt);
+		auto& indexBufferView = gltfDocument.bufferViews[indexAccessor.bufferView];
 
-	auto& uvAccessor = gltfDocument.accessors[primitive.attributes.find("TEXCOORD_0")->second];
-	assert(uvAccessor.type == fx::gltf::Accessor::Type::Vec2 && uvAccessor.componentType == fx::gltf::Accessor::ComponentType::Float);
-	auto& uvBufferView = gltfDocument.bufferViews[uvAccessor.bufferView];
-	createInfo.uvData.byteOffset = uvBufferView.byteOffset + uvAccessor.byteOffset;
-	createInfo.uvData.byteLength = uvAccessor.count * (sizeof(float) * 2);
+		
+		MeshDocument::CreateInfo createInfo{};
+		createInfo.byteArray = std::move(gltfDocument.buffers[posBufferView.buffer].data);
+		createInfo.vertexCount = posAcc.count;
+		createInfo.posByteOffset = posByteOffset;
+		createInfo.uvByteOffset = uvBufferView.byteOffset + uvAccessor.byteOffset;
+		createInfo.normalByteOffset = normalBufferView.byteOffset + normalAccessor.byteOffset;
+		createInfo.indexByteOffset = indexBufferView.byteOffset + indexAccessor.byteOffset;
+		createInfo.indexCount = indexAccessor.count;
+		createInfo.indexType = indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedShort ? MeshDocument::IndexType::UInt16 : MeshDocument::IndexType::UInt32;
 
-	auto& normalAccessor = gltfDocument.accessors[primitive.attributes.find("NORMAL")->second];
-	assert(normalAccessor.type == fx::gltf::Accessor::Type::Vec3 && normalAccessor.componentType == fx::gltf::Accessor::ComponentType::Float);
-	auto& normalBufferView = gltfDocument.bufferViews[normalAccessor.bufferView];
-	createInfo.normalData.byteOffset = normalBufferView.byteOffset + normalAccessor.byteOffset;
-	createInfo.normalData.byteLength = normalAccessor.count * (sizeof(float) * 3);
-
-	assert(posAccessor.count == uvAccessor.count);
-
-	auto& indexAccessor = gltfDocument.accessors[primitive.indices];
-	assert(indexAccessor.type == fx::gltf::Accessor::Type::Scalar);
-	assert(indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedShort
-		   || indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedInt);
-	auto& indexBufferView = gltfDocument.bufferViews[indexAccessor.bufferView];
-	createInfo.indexData.byteOffset = indexBufferView.byteOffset + indexAccessor.byteOffset;
-	createInfo.indexData.byteLength = indexBufferView.byteLength;
-	createInfo.indexType = indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedShort ? MeshDocument::IndexType::Uint16 : MeshDocument::IndexType::Uint32;
-
-	createInfo.byteArray = std::move(gltfDocument.buffers[posBufferView.buffer].data);
-
-	return MeshDocument(std::move(createInfo));
+		return { MeshDocument(std::move(createInfo)) };
+	}
+	catch (std::exception e)
+	{
+		std::cerr << "Asset System Error: Could not load file. Message: " << e.what() << std::endl;
+		return {};
+	}
 }
 
 Asset::TextureDocument Asset::LoadTextureDocument(Sprite texture)
 {
 	TextureDocument::CreateInfo createInfo{};
 
-	// Grab pixels as char array from image.
-	int32_t x = 0;
-	int32_t y = 0;
-	int32_t channelCount = 0;
-	constexpr int32_t desiredChannelCount = 4;
-	auto pixels = stbi_load(Asset::GetPath(texture).c_str(), &x, &y, &channelCount, desiredChannelCount);
-	assert(pixels);
-	// Weird STBI API stuff
-	if constexpr (desiredChannelCount != 0)
-		channelCount = desiredChannelCount;
-
-	createInfo.byteArray = pixels;
-	createInfo.channelCount = static_cast<uint8_t>(channelCount);
-
-	using ValueType = decltype(createInfo.dimensions)::ValueType;
-	createInfo.dimensions = { static_cast<ValueType>(x), static_cast<ValueType>(y) };
-
 	return TextureDocument(std::move(createInfo));
 }
 
-Engine::Renderer::MeshDocument Asset::LoadMesh(size_t i)
+std::optional<Engine::Renderer::MeshDocument> Asset::LoadMesh(size_t i)
 {
-	return Engine::Renderer::MeshDocument();
+	auto path = GetMeshPath(i);
+	if (path == "")
+		return {};
+
+	auto assetMeshDocOpt = LoadMeshDocument(path);
+	if (assetMeshDocOpt.has_value() == false)
+		return {};
+
+	auto oldInfo = MeshDocument::ToCreateInfo(std::move(assetMeshDocOpt.value()));
+
+	using namespace Engine;
+	Renderer::MeshDocument::CreateInfo newInfo;
+	newInfo.byteArray = std::move(oldInfo.byteArray);
+	newInfo.vertexCount = std::move(oldInfo.vertexCount);
+	newInfo.indexCount = std::move(oldInfo.indexCount);
+	newInfo.indexType = oldInfo.indexType == MeshDocument::IndexType::UInt16 ? Renderer::MeshDocument::IndexType::UInt16 : Renderer::MeshDocument::IndexType::UInt32;
+
+	newInfo.posByteOffset = std::move(oldInfo.posByteOffset);
+	newInfo.uvByteOffset = std::move(oldInfo.uvByteOffset);
+	newInfo.normalByteOffset = std::move(oldInfo.normalByteOffset);
+	newInfo.tangentByteOffset = std::move(oldInfo.tangentByteOffset);
+	newInfo.indexByteOffset = std::move(oldInfo.indexByteOffset);
+
+	return Renderer::MeshDocument(std::move(newInfo));
 }
 
 static Asset::MeshDocument::IndexType ToIndexType(fx::gltf::Accessor::ComponentType componentType)
@@ -160,56 +155,61 @@ static Asset::MeshDocument::IndexType ToIndexType(fx::gltf::Accessor::ComponentT
 	switch (componentType)
 	{
 	case fx::gltf::Accessor::ComponentType::UnsignedShort:
-		return Asset::MeshDocument::IndexType::Uint16;
+		return Asset::MeshDocument::IndexType::UInt16;
 	case fx::gltf::Accessor::ComponentType::UnsignedInt:
-		return Asset::MeshDocument::IndexType::Uint32;
+		return Asset::MeshDocument::IndexType::UInt32;
 	default:
 		return static_cast<Asset::MeshDocument::IndexType>(-1);
 	}
 }
 
-Asset::MeshDocument::MeshDocument(CreateInfo&& info) :
-	byteArray(std::move(info.byteArray))
+Asset::MeshDocument::CreateInfo Asset::MeshDocument::ToCreateInfo(MeshDocument&& input)
 {
-	data[static_cast<size_t>(Attribute::Position)] = info.posData;
-	data[static_cast<size_t>(Attribute::TexCoord)] = info.uvData;
-	data[static_cast<size_t>(Attribute::Normal)] = info.normalData;
-	data[static_cast<size_t>(Attribute::Index)] = info.indexData;
-	indexType = info.indexType;
+	CreateInfo returnValue;
+
+	returnValue.byteArray = std::move(input.byteArray);
+	returnValue.vertexCount = std::move(input.vertexCount);
+	returnValue.indexType = std::move(input.indexType);
+	returnValue.indexCount = std::move(input.indexCount);
+
+	returnValue.posByteOffset = std::move(input.GetByteOffset(Attribute::Position));
+	returnValue.uvByteOffset = std::move(input.GetByteOffset(Attribute::TexCoord));
+	returnValue.normalByteOffset = std::move(input.GetByteOffset(Attribute::Normal));
+	returnValue.tangentByteOffset = std::move(input.GetByteOffset(Attribute::Tangent));
+	returnValue.indexByteOffset = std::move(input.GetByteOffset(Attribute::Index));
+
+	return returnValue;
+}
+
+Asset::MeshDocument::MeshDocument(CreateInfo&& info) :
+	byteArray(std::move(info.byteArray)),
+	indexType(info.indexType),
+	vertexCount(info.vertexCount),
+	indexCount(info.indexCount)
+{
+	GetByteOffset(Attribute::Position) = info.posByteOffset;
+	GetByteOffset(Attribute::TexCoord) = info.uvByteOffset;
+	GetByteOffset(Attribute::Normal) = info.normalByteOffset;
+	GetByteOffset(Attribute::Tangent) = info.normalByteOffset;
+	GetByteOffset(Attribute::Index) = info.indexByteOffset;
 }
 
 const std::vector<uint8_t>& Asset::MeshDocument::GetByteArray() const { return byteArray; }
 
-size_t Asset::MeshDocument::GetTotalByteLength() const
-{
-	size_t totalLength = 0;
-	for (const auto& item : data)
-		totalLength += item.byteLength;
-	return totalLength;
-}
-
 Asset::MeshDocument::IndexType Asset::MeshDocument::GetIndexType() const { return indexType; }
-
-uint32_t Asset::MeshDocument::GetIndexCount() const
-{
-	return static_cast<uint32_t>(data[static_cast<size_t>(Attribute::Index)].byteLength / IndexTypeToByteSize(indexType));
-}
-
-uint32_t Asset::MeshDocument::GetVertexCount() const
-{
-	return static_cast<uint32_t>(data[static_cast<size_t>(Attribute::Position)].byteLength / sizeof(PositionType));
-}
 
 const uint8_t* Asset::MeshDocument::GetDataPtr(Attribute type) const
 {
-	return byteArray.data() + data[static_cast<size_t>(type)].byteOffset;
+	return byteArray.data() + byteOffsets.at(size_t(type));
 }
 
-Asset::MeshDocument::Data Asset::MeshDocument::GetData(Attribute type) const { return data[static_cast<size_t>(type)]; }
+size_t& Asset::MeshDocument::GetByteOffset(Attribute type) { return byteOffsets.at(size_t(type)); }
 
-uint8_t Asset::MeshDocument::IndexTypeToByteSize(IndexType indexType)
+const size_t& Asset::MeshDocument::GetByteOffset(Attribute type) const { return byteOffsets.at(size_t(type)); }
+
+uint8_t Asset::MeshDocument::ToByteSize(IndexType indexType)
 {
-	return indexType == IndexType::Uint16 ? uint8_t(2) : uint8_t(4);
+	return indexType == IndexType::UInt16 ? uint8_t(2) : uint8_t(4);
 }
 
 Asset::TextureDocument::TextureDocument(CreateInfo&& right) :

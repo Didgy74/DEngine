@@ -37,8 +37,6 @@ namespace Engine
 			if (GetMesh() == newMesh)
 				return;
 
-			assert(Asset::CheckValid(newMesh));
-
 			mesh = newMesh;
 		}
 
