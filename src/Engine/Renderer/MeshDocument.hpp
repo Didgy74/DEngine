@@ -160,6 +160,8 @@ namespace Engine
 			returnValue.normalByteOffset = std::move(input.GetByteOffset(Attribute::Normal));
 			returnValue.tangentByteOffset = std::move(input.GetByteOffset(Attribute::Tangent));
 			returnValue.indexByteOffset = std::move(input.GetByteOffset(Attribute::Index));
+
+			return returnValue;
 		}
 	}
 }
