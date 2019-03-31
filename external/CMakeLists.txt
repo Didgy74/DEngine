@@ -3,7 +3,6 @@ set(LIB_NAME external)
 add_library(${LIB_NAME} INTERFACE)
 add_library(${LIB_NAME}::${LIB_NAME} ALIAS ${LIB_NAME})
 
-message(STATUS "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(
     ${LIB_NAME}
     INTERFACE
