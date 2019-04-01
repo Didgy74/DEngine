@@ -24,10 +24,12 @@ if (WIN32)
 
     set(GLFW3_BINARY "${GLFW3_BINDIR}/${GLFW3_BINNAME}")
 
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD        # Adds a post-build event to MyTest
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different  # which executes "cmake - E copy_if_different..."
-            ${GLFW3_BINARY}      # <--this is in-file
-            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${GLFW3_BINNAME}) # <--this is out-file path
+    add_custom_command(
+		TARGET ${PROJECT_NAME} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${GLFW3_BINARY}"
+		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/${GLFW3_BINNAME}"
+		)
 
 endif()
 

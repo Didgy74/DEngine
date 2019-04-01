@@ -13,16 +13,19 @@ target_link_libraries(${PROJECT_NAME} external::external)
 
 # Add custom command to copy Data directory to build directory
 # Remove Data directory in build directory if present
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-		   COMMAND ${CMAKE_COMMAND} -E remove_directory
-		   ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Data
-		   )
+add_custom_command(
+	TARGET ${PROJECT_NAME} POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E remove_directory
+	$<TARGET_FILE_DIR:${PROJECT_NAME}>/Data
+	)
+
 # Copy directory from source folder to build folder
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-		   COMMAND ${CMAKE_COMMAND} -E copy_directory
-                   ${PROJECT_SOURCE_DIR}/Data
-		   ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Data
-		   )
+add_custom_command(
+	TARGET ${PROJECT_NAME} POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${PROJECT_SOURCE_DIR}/Data
+	$<TARGET_FILE_DIR:${PROJECT_NAME}>/Data
+	)
 
 # GLEW
 find_package(GLEW 2.0 QUIET)

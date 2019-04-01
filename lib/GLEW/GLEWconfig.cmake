@@ -24,10 +24,12 @@ if (WIN32)
 
     set(GLEW_BINARY "${GLEW_BINDIR}/${GLEW_BINNAME}")
 
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD        # Adds a post-build event to MyTest
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different  # which executes "cmake - E copy_if_different..."
-            ${GLEW_BINARY}      # <--this is in-file
-            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${GLEW_BINNAME}) # <--this is out-file path
+    add_custom_command(
+		TARGET ${PROJECT_NAME} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${GLEW_BINARY}"
+		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/${GLEW_BINNAME}"
+		)
 
 endif()
 

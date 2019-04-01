@@ -1,12 +1,12 @@
-[submodule "external/DMath"]
+[submodule "DMath"]
 	path = external/DMath
 	url = https://github.com/Didgy74/DMath.git
-	shallow = true
-[submodule "external/fx-gltf"]
+	branch = master
+[submodule "fx-gltf"]
 	path = external/fx-gltf
 	url = https://github.com/jessey-git/fx-gltf.git
-	shallow = true
-[submodule "external/nlohmann-json"]
+	branch = master
+[submodule "nlohmann-json"]
 	path = external/nlohmann-json
 	url = https://github.com/nlohmann/json.git
-	shallow = true
+	branch = master
