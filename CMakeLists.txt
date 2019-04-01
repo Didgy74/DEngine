@@ -3,7 +3,6 @@ project(DEngine)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules/")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 file(GLOB_RECURSE SOURCE_FILES "src/*.cpp")
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
@@ -24,6 +23,7 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
                    ${PROJECT_SOURCE_DIR}/Data
 		   ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Data
 		   )
+
 # GLEW
 find_package(GLEW 2.0 QUIET)
 if (GLEW_FOUND)
