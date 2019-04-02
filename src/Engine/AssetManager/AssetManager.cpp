@@ -14,12 +14,12 @@ struct AssetManagerInfo
 	std::string_view relativePath;
 };
 
-static const std::map<Engine::AssetManager::Sprite, AssetManagerInfo> textureInfos
+static const std::map<size_t, AssetManagerInfo> textureInfos
 {
-	{ Engine::AssetManager::Sprite::None, {"None" , ""} },
-	{ Engine::AssetManager::Sprite::Default, {"Default", "defaultTexture.png"} },
-	{ Engine::AssetManager::Sprite::Test, {"Test", "test.png"} },
-	{ Engine::AssetManager::Sprite::Circle, {"Circle", "circle.png"} },
+	{ size_t(Engine::AssetManager::Sprite::None), {"None" , ""} },
+	{ size_t(Engine::AssetManager::Sprite::Default), {"Default", "defaultTexture.png"} },
+	{ size_t(Engine::AssetManager::Sprite::Test), {"Test", "test.png"} },
+	{ size_t(Engine::AssetManager::Sprite::Circle), {"Circle", "circle.png"} },
 };
 
 static const std::map<size_t, AssetManagerInfo> meshInfos
@@ -43,7 +43,16 @@ namespace Engine
 				return std::string(meshFolderPath) + std::string(iterator->second.relativePath);
 		}
 
-		std::optional<Renderer::MeshDocument> AssetManager::LoadMesh(size_t i)
+		std::string GetTexturePath(size_t i)
+		{
+			auto iterator = textureInfos.find(i);
+			if (iterator == textureInfos.end())
+				return {};
+			else
+				return std::string(textureFolderPath) + std::string(iterator->second.relativePath);
+		}
+
+		std::optional<Renderer::MeshDocument> LoadMesh(size_t i)
 		{
 			auto path = GetMeshPath(i);
 			if (path == "")
@@ -68,6 +77,11 @@ namespace Engine
 			newInfo.indexByteOffset = std::move(oldInfo.indexByteOffset);
 
 			return { Renderer::MeshDocument(std::move(newInfo)) };
+		}
+
+		std::optional<Renderer::TextureDocument> LoadTexture(size_t i)
+		{
+			return {};
 		}
 	}
 	

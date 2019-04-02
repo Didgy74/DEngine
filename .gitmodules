@@ -10,7 +10,3 @@
 	path = external/nlohmann-json
 	url = https://github.com/nlohmann/json.git
 	branch = origin/master
-[submodule "ktxlib"]
-	path = external/ktxlib
-	url = https://github.com/KhronosGroup/KTX-Software.git
-	branch = origin/master

@@ -9,6 +9,7 @@
 #include <optional>
 
 #include "../Renderer/MeshDocument.hpp"
+#include "../Renderer/TextureDocument.hpp"
 
 namespace Engine
 {
@@ -18,8 +19,10 @@ namespace Engine
 		constexpr std::string_view meshFolderPath = "Data/Meshes/";
 
 		std::string GetMeshPath(size_t i);
+		std::string GetTexturePath(size_t i);
 
 		std::optional<Renderer::MeshDocument> LoadMesh(size_t i);
+		std::optional<Renderer::TextureDocument> LoadTexture(size_t i);
 	}
 
 	namespace AssMan = AssetManager;

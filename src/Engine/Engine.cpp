@@ -69,6 +69,7 @@ namespace Engine
 		rendererInitInfo.surfaceHandle = Application::Core::GetMainWindowHandle();
 
 		rendererInitInfo.assetLoadCreateInfo.meshLoader = &AssMan::LoadMesh;
+		rendererInitInfo.assetLoadCreateInfo.textureLoader = &AssMan::LoadTexture;
 
 		rendererInitInfo.openGLInitInfo.glSwapBuffers = &Application::Core::GL_SwapWindow;
 		Renderer::Core::Initialize(rendererInitInfo);

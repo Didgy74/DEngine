@@ -3,6 +3,7 @@
 #include <array>
 #include <vector>
 #include <optional>
+#include <string>
 
 namespace Engine
 {

@@ -16,7 +16,7 @@ namespace Engine
 		private:
 			Format format;
 			std::array<uint32_t, 2> dimensions;
-			std::array<uint8_t> byteArray;
+			std::vector<uint8_t> byteArray;
 		};
 
 		enum class TextureDocument::Format

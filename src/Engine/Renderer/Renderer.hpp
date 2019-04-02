@@ -71,7 +71,7 @@ namespace Engine
 	struct Renderer::InitInfo
 	{
 		API preferredAPI = API::None;
-		Utility::ImgDim surfaceDimensions;
+		Utility::ImgDim surfaceDimensions{};
 		void* surfaceHandle = nullptr;
 
 		AssetLoadCreateInfo assetLoadCreateInfo;
