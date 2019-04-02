@@ -9,11 +9,6 @@
 
 #include "fx/gltf.h"
 
-//#pragma warning( push, 0 )
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image/stb_image.h"
-//#pragma warning( pop )
-
 struct AssetInfo
 {
 	std::string_view name;
