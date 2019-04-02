@@ -17,8 +17,6 @@
 
 #include "Systems/RenderSystem.hpp"
 
-#include "DMath/LinearTransform3D.hpp"
-
 #include "Components/ScriptBase.hpp"
 
 #include <iostream>
@@ -70,7 +68,7 @@ namespace Engine
 		rendererInitInfo.surfaceDimensions = Application::GetWindowSize();
 		rendererInitInfo.surfaceHandle = Application::Core::GetMainWindowHandle();
 
-		rendererInitInfo.assetLoadCreateInfo.meshLoader = &Asset::LoadMesh;
+		rendererInitInfo.assetLoadCreateInfo.meshLoader = &AssMan::LoadMesh;
 
 		rendererInitInfo.openGLInitInfo.glSwapBuffers = &Application::Core::GL_SwapWindow;
 		Renderer::Core::Initialize(rendererInitInfo);
@@ -79,6 +77,7 @@ namespace Engine
 
 void Engine::Core::Run()
 {
+
 	Application::Core::Initialize(Application::API3D::OpenGL);
 	Time::Core::Initialize();
 	Input::Core::Initialize();
@@ -96,14 +95,14 @@ void Engine::Core::Run()
 
 	auto& sceneObject1 = scene1.NewSceneObject();
 	auto& mesh1 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
-	mesh1.SetMesh(Asset::Mesh::Helmet);
+	mesh1.SetMesh(AssMan::Mesh::Helmet);
 
 	auto& meshTest = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
-	meshTest.SetMesh(Asset::Mesh::Helmet);
+	meshTest.SetMesh(AssMan::Mesh::Helmet);
 	meshTest.positionOffset.x = -3.f;
 
 	auto& mesh2 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
-	mesh2.SetMesh(Asset::Mesh::Cube);
+	mesh2.SetMesh(AssMan::Mesh::Cube);
 	mesh2.positionOffset.x = 2.f;
 
 	auto& objCamera = scene1.NewSceneObject();
@@ -115,14 +114,14 @@ void Engine::Core::Run()
 	Components::PointLight& light1 = lightObj.AddComponent<Components::PointLight>().first.get();
 	light1.color = { 1.f, 0.5f, 0.f };
 	auto& mesh3 = lightObj.AddComponent<Components::MeshRenderer>().first.get();
-	mesh3.SetMesh(Asset::Mesh::Cube);
+	mesh3.SetMesh(AssMan::Mesh::Cube);
 	mesh3.scale = { 0.1f, 0.1f, 0.1f };
 
 	auto& obj4 = scene1.NewSceneObject();
 	obj4.transform.localPosition = { 0.f, -7.5f, -10.f };
 	Components::PointLight& light3 = obj4.AddComponent<Components::PointLight>().first.get();
 	auto& mesh4 = obj4.AddComponent<Components::MeshRenderer>().first.get();
-	mesh4.SetMesh(Asset::Mesh::Cube);
+	mesh4.SetMesh(AssMan::Mesh::Cube);
 	mesh4.scale = { 0.1f, 0.1f, 0.1f };
 
 

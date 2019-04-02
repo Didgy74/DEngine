@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <array>
 
+#include <cassert>
+
 namespace Engine
 {
 	namespace Renderer

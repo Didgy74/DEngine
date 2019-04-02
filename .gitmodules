@@ -1,16 +1,16 @@
 [submodule "DMath"]
 	path = external/DMath
 	url = https://github.com/Didgy74/DMath.git
-	branch = master
+	branch = origin/master
 [submodule "fx-gltf"]
 	path = external/fx-gltf
 	url = https://github.com/jessey-git/fx-gltf.git
-	branch = master
+	branch = origin/master
 [submodule "nlohmann-json"]
 	path = external/nlohmann-json
 	url = https://github.com/nlohmann/json.git
-	branch = master
+	branch = origin/master
 [submodule "ktxlib"]
 	path = external/ktxlib
 	url = https://github.com/KhronosGroup/KTX-Software.git
-	branch = master
+	branch = origin/master

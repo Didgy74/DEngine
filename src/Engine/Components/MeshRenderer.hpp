@@ -2,7 +2,7 @@
 
 #include "Components.hpp"
 
-#include "../Asset.hpp"
+#include "../AssetManager/AssetManager.hpp"
 
 #include "../Enum.hpp"
 
@@ -22,9 +22,9 @@ namespace Engine
 			explicit MeshRenderer(SceneObject& owningObject);
 			~MeshRenderer();
 
-			[[nodiscard]] Asset::Mesh GetMesh() const;
-			std::underlying_type_t<Asset::Mesh> GetMeshID() const;
-			void SetMesh(Asset::Mesh newMesh);
+			[[nodiscard]] AssMan::Mesh GetMesh() const;
+			std::underlying_type_t<AssMan::Mesh> GetMeshID() const;
+			void SetMesh(AssMan::Mesh newMesh);
 
 			[[nodiscard]] Math::Matrix<4, 3> GetModel_Reduced(Space space) const;
 			Math::Matrix4x4 GetModel(Space space) const;
@@ -34,7 +34,7 @@ namespace Engine
 			Math::Vector3D scale;
 
 		private:
-			Asset::Mesh mesh;
+			AssMan::Mesh mesh;
 		};
 	}
 }

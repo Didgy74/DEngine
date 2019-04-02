@@ -64,6 +64,8 @@ namespace Engine
 	{
 		using MeshLoaderPFN = std::optional<MeshDocument>(*)(size_t);
 		MeshLoaderPFN meshLoader = nullptr;
+		using TextureLoaderPFN = std::optional<TextureDocument>(*)(size_t);
+		TextureLoaderPFN textureLoader = nullptr;
 	};
 
 	struct Renderer::InitInfo

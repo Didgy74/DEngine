@@ -14,7 +14,7 @@ namespace Engine
 	{
 		SpriteRenderer::SpriteRenderer(SceneObject& owningObject) :
 			ParentType(owningObject),
-			sprite(Asset::Sprite::None),
+			sprite(AssMan::Sprite::None),
 			positionOffset{ 0, 0 },
 			rotation(0),
 			scale{ 1, 1 }
@@ -25,17 +25,15 @@ namespace Engine
 		{
 		}
 
-		void SpriteRenderer::SetSprite(Asset::Sprite newSprite)
+		void SpriteRenderer::SetSprite(AssMan::Sprite newSprite)
 		{
 			if (GetSprite() == newSprite)
 				return;
 
-			assert(Asset::CheckValid(newSprite));
-
 			sprite = newSprite;
 		}
 
-		Asset::Sprite SpriteRenderer::GetSprite() const { return sprite; }
+		AssMan::Sprite SpriteRenderer::GetSprite() const { return sprite; }
 
 		Math::Matrix<3, 2> SpriteRenderer::GetModel2D_Reduced(Space space) const
 		{

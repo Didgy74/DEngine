@@ -23,6 +23,7 @@ namespace Engine
 		struct InitInfo;
 
 		class MeshDocument;
+		class TextureDocument;
 
 
 		enum class API;
