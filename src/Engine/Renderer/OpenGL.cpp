@@ -1,6 +1,7 @@
 #include "Renderer.hpp"
 #include "RendererData.hpp"
 #include "MeshDocument.hpp"
+#include "TextureDocument.hpp"
 #include "OpenGL.hpp"
 
 #include "GL/glew.h"
@@ -18,12 +19,6 @@ namespace Engine
 	{
 		namespace OpenGL
 		{
-#ifdef NDEBUG
-			constexpr bool enableDebug = false;
-#else
-			constexpr bool enableDebug = true;
-#endif
-
 			struct VertexBufferObject;
 			using VBO = VertexBufferObject;
 
@@ -35,8 +30,9 @@ namespace Engine
 			struct LightDataUBO;
 
 			void UpdateVBODatabase(Data& data, const std::vector<MeshID>& loadQueue);
-			std::optional<VBO> VBOFromPath(size_t id);
 			void UpdateIBODatabase(Data& data, const std::vector<SpriteID>& loadQueue);
+			std::optional<VBO> GetVBOFromID(size_t id);
+			std::optional<IBO> GetIBOFromID(size_t id);
 
 			Data& GetAPIData();
 
@@ -48,6 +44,10 @@ namespace Engine
 			void LoadMeshShader(Data& data);
 
 			void GLDebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam);
+
+			GLint ToGLType(MeshDocument::IndexType indexType);
+			GLint ToGLFormat(TextureDocument::Format format);
+			GLint ToGLType(TextureDocument::Type type);
 		}
 	}
 
@@ -111,6 +111,9 @@ namespace Engine
 
 		GLuint meshProgram;
 		GLint meshModelUniform;
+
+		IBO testIBO;
+		GLint meshTextureUniform;
 	};
 
 	Renderer::OpenGL::Data& Renderer::OpenGL::GetAPIData() { return std::any_cast<Data&>(Core::GetAPIData()); }
@@ -236,6 +239,8 @@ namespace Engine
 
 		// Grab uniforms
 		data.meshModelUniform = glGetUniformLocation(data.meshProgram, "model");
+		data.meshTextureUniform = glGetUniformLocation(data.meshProgram, "texture");
+
 
 		glUniformBlockBinding(data.meshProgram, 1, 1);
 	}
@@ -292,7 +297,6 @@ namespace Engine
 					LogDebugMessage("Error. Couldn't make GL Debug Output");
 			}
 		}
-		
 
 		CreateStandardUBOs(data);
 
@@ -302,15 +306,7 @@ namespace Engine
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		// Load sprite VBO
-		/*
-		auto quadVBOOpt = VBOFromPath(static_cast<std::string>(Renderer::Setup::assetPath) + "/Meshes/SpritePlane/SpritePlane.gltf");
-		if (quadVBOOpt.has_value())
-			data.quadVBO = quadVBOOpt.value();
-		else
-			assert(false);
-			*/
+		glBindSampler(0, data.samplerObject);
 
 		glEnable(GL_DEPTH_TEST);
 
@@ -319,6 +315,7 @@ namespace Engine
 
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+		data.testIBO = GetIBOFromID(2).value();
 
 
 		//LoadSpriteShader(data);
@@ -449,7 +446,7 @@ namespace Engine
 		}
 	}
 
-	void Renderer::OpenGL::Draw_MeshPass(const Engine::Renderer::OpenGL::Data &data,
+	void Renderer::OpenGL::Draw_MeshPass(const Data &data,
 										 const std::vector<Engine::Renderer::MeshID> &meshes,
 									     const std::vector<Math::Matrix4x4> &transforms)
 	{
@@ -458,6 +455,12 @@ namespace Engine
 		if (!meshes.empty())
 		{
 			glUseProgram(data.meshProgram);
+
+			glUniform1ui(data.meshTextureUniform, 0);
+
+			glActiveTexture(GL_TEXTURE0);
+
+			glBindTexture(GL_TEXTURE_2D, data.testIBO.texture);
 
 			for (size_t i = 0; i < meshes.size(); i++)
 			{
@@ -475,7 +478,7 @@ namespace Engine
 	{
 		for (const auto& id : loadQueue)
 		{
-			auto vboOpt = VBOFromPath(static_cast<size_t>(id));
+			auto vboOpt = GetVBOFromID(static_cast<size_t>(id));
 			assert(vboOpt.has_value());
 
 			data.vboDatabase.insert({ id, vboOpt.value() });
@@ -487,17 +490,31 @@ namespace Engine
 		glActiveTexture(GL_TEXTURE0);
 		for (const auto& id : loadQueue)
 		{
-			/*auto texDocument = Asset::LoadTextureDocument(static_cast<Asset::Sprite>(id));
+			auto iboOpt = GetIBOFromID(static_cast<size_t>(id));
+			assert(iboOpt.has_value());
 
-			IBO ibo;
-
-			glGenTextures(1, &ibo.texture);
-			glBindTexture(GL_TEXTURE_2D, ibo.texture);
-
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texDocument.GetDimensions().width, texDocument.GetDimensions().height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texDocument.GetData());
-
-			data.iboDatabase.insert({ id, ibo });*/
+			data.iboDatabase.insert({ id, iboOpt.value() });
 		}
+	}
+
+	std::optional<Renderer::OpenGL::IBO> Renderer::OpenGL::GetIBOFromID(size_t id)
+	{
+		auto texDocumentOpt = Core::GetData().assetLoadData.textureLoader(id);
+		assert(texDocumentOpt.has_value());
+
+		auto& texDocument = texDocumentOpt.value();
+
+		IBO ibo;
+
+		glGenTextures(1, &ibo.texture);
+		glBindTexture(GL_TEXTURE_2D, ibo.texture);
+
+		GLint internalFormat = ToGLFormat(texDocument.GetBaseInternalFormat());
+		GLint type = ToGLType(texDocument.GetType());
+		const uint8_t* data = texDocument.GetData();
+		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, texDocument.GetDimensions()[0], texDocument.GetDimensions()[1], 0, internalFormat, type, data);
+
+		return ibo;
 	}
 
 	void Renderer::OpenGL::VBO::DeallocateDeviceBuffers()
@@ -511,7 +528,7 @@ namespace Engine
 		glDeleteTextures(1, &texture);
 	}
 
-	std::optional<Renderer::OpenGL::VBO> Renderer::OpenGL::VBOFromPath(size_t id)
+	std::optional<Renderer::OpenGL::VBO> Renderer::OpenGL::GetVBOFromID(size_t id)
 	{
 		const auto meshDocumentOpt = Core::GetData().assetLoadData.meshLoader(id);
 
@@ -521,7 +538,7 @@ namespace Engine
 
 		VBO vbo;
 
-		vbo.indexType = meshDocument.GetIndexType() == MeshDocument::IndexType::UInt16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+		vbo.indexType = ToGLType(meshDocument.GetIndexType());
 		vbo.numIndices = meshDocument.GetIndexCount();
 
 		glGenVertexArrays(1, &vbo.vertexArrayObject);
@@ -548,5 +565,43 @@ namespace Engine
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshDocument.GetByteLength(MeshDocument::Attribute::Index), meshDocument.GetDataPtr(MeshDocument::Attribute::Index), GL_STATIC_DRAW);
 
 		return vbo;
+	}
+
+	GLint Renderer::OpenGL::ToGLType(MeshDocument::IndexType indexType)
+	{
+		using IndexType = MeshDocument::IndexType;
+		switch (indexType)
+		{
+		case IndexType::UInt16:
+			return GL_UNSIGNED_SHORT;
+		case IndexType::UInt32:
+			return GL_UNSIGNED_INT;
+		default:
+			return 0;
+		}
+	}
+
+	GLint Renderer::OpenGL::ToGLFormat(TextureDocument::Format format)
+	{
+		using Format = TextureDocument::Format;
+		switch (format)
+		{
+		case Format::RGBA:
+			return GL_RGBA;
+		default:
+			return 0;
+		}
+	}
+
+	GLint Renderer::OpenGL::ToGLType(TextureDocument::Type type)
+	{
+		using Type = TextureDocument::Type;
+		switch (type)
+		{
+		case Type::UnsignedByte:
+			return GL_UNSIGNED_BYTE;
+		default:
+			return 0;
+		}
 	}
 }

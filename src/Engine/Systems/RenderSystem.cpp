@@ -20,7 +20,7 @@ namespace Engine
 			const auto& spriteComponents = *spriteComponentsPtr;
 			graph.sprites.resize(spriteComponents.size());
 			for (size_t i = 0; i < spriteComponents.size(); i++)
-				graph.sprites[i] = static_cast<Renderer::SpriteID>(spriteComponents[i].GetSprite());
+				graph.sprites[i] = Renderer::SpriteID(spriteComponents[i].GetSprite());
 		}
 
 		auto meshComponentsPtr = scene.GetAllComponents<Components::MeshRenderer>();
@@ -31,7 +31,7 @@ namespace Engine
 			const auto& meshComponents = *meshComponentsPtr;
 			graph.meshes.resize(meshComponents.size());
 			for (size_t i = 0; i < meshComponents.size(); i++)
-				graph.meshes[i] = static_cast<Renderer::MeshID>(meshComponents[i].GetMesh());
+				graph.meshes[i] = Renderer::MeshID(meshComponents[i].GetMesh());
 		}
 
 		auto pointLightComponentsPtr = scene.GetAllComponents<Components::PointLight>();

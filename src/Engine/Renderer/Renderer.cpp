@@ -373,3 +373,6 @@ namespace Engine
 		return {};
 	}
 }
+
+#include "MeshDocument.inl"
+#include "TextureDocument.inl"

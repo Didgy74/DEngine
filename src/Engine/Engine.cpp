@@ -1,7 +1,5 @@
 #include "Engine.hpp"
 
-#include "Physics2D.hpp"
-
 #include "Application.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Components/SpriteRenderer.hpp"
@@ -13,39 +11,14 @@
 #include "SceneObject.hpp"
 
 #include "Components/Camera.hpp"
-#include "Components/RigidBody2D.hpp"
 
 #include "Systems/RenderSystem.hpp"
 
-#include "Components/ScriptBase.hpp"
+#include "AssManRendererConnect.hpp"
 
 #include <iostream>
 
 std::vector<std::unique_ptr<Engine::Scene>> Engine::Core::scenes;
-
-class ScriptTest : public Engine::Components::ScriptBase
-{
-	using ParentType = Engine::Components::ScriptBase;
-
-public:
-	explicit ScriptTest(Engine::SceneObject& owningObject) :
-		ParentType(owningObject)
-	{
-
-	}
-
-protected:
-	void SceneStart() override
-	{
-		ParentType::SceneStart();
-	}
-
-	void Tick() override
-	{
-		ParentType::Tick();
-		std::cout << "We ticked!" << std::endl;
-	}
-};
 
 void rendererDebugCallback(std::string_view message)
 {
@@ -68,8 +41,8 @@ namespace Engine
 		rendererInitInfo.surfaceDimensions = Application::GetWindowSize();
 		rendererInitInfo.surfaceHandle = Application::Core::GetMainWindowHandle();
 
-		rendererInitInfo.assetLoadCreateInfo.meshLoader = &AssMan::LoadMesh;
-		rendererInitInfo.assetLoadCreateInfo.textureLoader = &AssMan::LoadTexture;
+		rendererInitInfo.assetLoadCreateInfo.meshLoader = &LoadMesh;
+		rendererInitInfo.assetLoadCreateInfo.textureLoader = &LoadTexture;
 
 		rendererInitInfo.openGLInitInfo.glSwapBuffers = &Application::Core::GL_SwapWindow;
 		Renderer::Core::Initialize(rendererInitInfo);
@@ -78,7 +51,6 @@ namespace Engine
 
 void Engine::Core::Run()
 {
-
 	Application::Core::Initialize(Application::API3D::OpenGL);
 	Time::Core::Initialize();
 	Input::Core::Initialize();

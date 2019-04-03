@@ -46,9 +46,9 @@ namespace Engine
 				uint32_t indexCount;
 			};
 
-			MeshDocument(CreateInfo&& info);
-			MeshDocument(MeshDocument&&) = default;
-			MeshDocument(const MeshDocument&) = default;
+			explicit MeshDocument(CreateInfo&& info);
+			explicit MeshDocument(MeshDocument&&) = default;
+			MeshDocument(const MeshDocument&) = delete;
 
 			const std::vector<uint8_t>& GetByteArray() const;
 			const size_t& GetByteOffset(Attribute attr) const;

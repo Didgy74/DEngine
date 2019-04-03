@@ -18,7 +18,7 @@ static const std::map<size_t, AssetManagerInfo> textureInfos
 {
 	{ size_t(Engine::AssetManager::Sprite::None), {"None" , ""} },
 	{ size_t(Engine::AssetManager::Sprite::Default), {"Default", "defaultTexture.png"} },
-	{ size_t(Engine::AssetManager::Sprite::Test), {"Test", "test.png"} },
+	{ size_t(Engine::AssetManager::Sprite::Test), {"Test", "test.ktx"} },
 	{ size_t(Engine::AssetManager::Sprite::Circle), {"Circle", "circle.png"} },
 };
 
@@ -51,40 +51,7 @@ namespace Engine
 			else
 				return std::string(textureFolderPath) + std::string(iterator->second.relativePath);
 		}
-
-		std::optional<Renderer::MeshDocument> LoadMesh(size_t i)
-		{
-			auto path = GetMeshPath(i);
-			if (path == "")
-				return {};
-
-			auto AssetManagerMeshDocOpt = LoadMeshDocument(path);
-			if (AssetManagerMeshDocOpt.has_value() == false)
-				return {};
-
-			auto oldInfo = MeshDocument::ToCreateInfo(std::move(AssetManagerMeshDocOpt.value()));
-
-			Renderer::MeshDocument::CreateInfo newInfo;
-			newInfo.byteArray = std::move(oldInfo.byteArray);
-			newInfo.vertexCount = std::move(oldInfo.vertexCount);
-			newInfo.indexCount = std::move(oldInfo.indexCount);
-			newInfo.indexType = oldInfo.indexType == MeshDocument::IndexType::UInt16 ? Renderer::MeshDocument::IndexType::UInt16 : Renderer::MeshDocument::IndexType::UInt32;
-
-			newInfo.posByteOffset = std::move(oldInfo.posByteOffset);
-			newInfo.uvByteOffset = std::move(oldInfo.uvByteOffset);
-			newInfo.normalByteOffset = std::move(oldInfo.normalByteOffset);
-			newInfo.tangentByteOffset = std::move(oldInfo.tangentByteOffset);
-			newInfo.indexByteOffset = std::move(oldInfo.indexByteOffset);
-
-			return { Renderer::MeshDocument(std::move(newInfo)) };
-		}
-
-		std::optional<Renderer::TextureDocument> LoadTexture(size_t i)
-		{
-			return {};
-		}
 	}
-	
 }
 
 #include "MeshDocument.inl"

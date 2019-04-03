@@ -1,12 +1,10 @@
 //#include "SDL2/SDL.h"
 
-//#include "Engine/Engine.hpp"
-
-#include "Engine/AssetManager/TextureDocument.hpp"
+#include "Engine/Engine.hpp"
 
 int main(int argc, char* argv[])
 {
-	auto test = Engine::AssMan::LoadTextureDocument("Data/Textures/test.ktx");
+	Engine::Core::Run();
 
     return 0;
 }

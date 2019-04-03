@@ -23,6 +23,8 @@ in FragData
 
 layout(location = 0) out vec4 frag_color;
 
+uniform sampler2D myTexture;
+
 void main()
 {
 	vec3 pointToCamera = cameraData.wsPosition - fragData.wsPosition;
@@ -45,5 +47,7 @@ void main()
 		specular += pow(max(dot(pointToCameraDir, reflectDir), 0.0), coefficient) * vec3(1);
 	}
 	
-	frag_color = vec4(vec3(lightData.ambientLight) + diffuse + specular, 1.0);
+	vec3 resultColor = lightData.ambientLight.xyz + diffuse + specular;
+	resultColor = resultColor * texture(myTexture, fragData.uv).xyz;
+	frag_color = vec4(resultColor, 1.0);
 }

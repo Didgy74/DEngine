@@ -59,7 +59,7 @@ namespace Engine
 
 				assert(posAcc.count == uvAccessor.count && posAcc.count == normalAccessor.count);
 
-				auto & indexAccessor = gltfDocument.accessors[primitive.indices];
+				auto& indexAccessor = gltfDocument.accessors[primitive.indices];
 				assert(indexAccessor.type == fx::gltf::Accessor::Type::Scalar);
 				assert(indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedShort
 					|| indexAccessor.componentType == fx::gltf::Accessor::ComponentType::UnsignedInt);
@@ -76,7 +76,7 @@ namespace Engine
 				createInfo.indexCount = indexAccessor.count;
 				createInfo.indexType = ToIndexType(indexAccessor.componentType);
 
-				return { MeshDocument(std::move(createInfo)) };
+				return std::optional<MeshDocument>{ MeshDocument(std::move(createInfo)) };
 			}
 			catch (std::exception e)
 			{
@@ -85,7 +85,80 @@ namespace Engine
 			}
 		}
 
-		MeshDocument::CreateInfo AssetManager::MeshDocument::ToCreateInfo(MeshDocument&& input)
+		MeshDocument::MeshDocument(CreateInfo&& createInfo) :
+			byteArray(std::move(createInfo.byteArray)),
+			indexType(std::move(createInfo.indexType)),
+			indexCount(std::move(createInfo.indexCount)),
+			vertexCount(std::move(createInfo.vertexCount))
+		{
+			GetByteOffset(Attribute::Position) = std::move(createInfo.posByteOffset);
+			GetByteOffset(Attribute::TexCoord) = std::move(createInfo.uvByteOffset);
+			GetByteOffset(Attribute::Normal) = std::move(createInfo.normalByteOffset);
+			GetByteOffset(Attribute::Tangent) = std::move(createInfo.tangentByteOffset);
+			GetByteOffset(Attribute::Index) = std::move(createInfo.indexByteOffset);
+		}
+
+		size_t MeshDocument::GetByteLength(Attribute attr) const
+		{
+			switch (attr)
+			{
+			case Attribute::Position:
+				return GetVertexCount() * sizeof(PositionType);
+			case Attribute::TexCoord:
+				return GetVertexCount() * sizeof(UVType);
+			case Attribute::Normal:
+				return GetVertexCount() * sizeof(NormalType);
+			case Attribute::Tangent:
+				return GetVertexCount() * sizeof(TangentType);
+			case Attribute::Index:
+				return GetIndexCount()* ToByteSize(GetIndexType());
+			default:
+				assert(false);
+				return 0;
+			}
+		}
+
+		const size_t& MeshDocument::GetByteOffset(Attribute attr) const
+		{
+			return byteOffsets.at(size_t(attr));
+		}
+
+		size_t& MeshDocument::GetByteOffset(Attribute attr)
+		{
+			return byteOffsets.at(static_cast<size_t>(attr));
+		}
+
+		const uint8_t* MeshDocument::GetDataPtr(Attribute attr) const
+		{
+			return byteArray.data() + GetByteOffset(attr);
+		}
+
+		uint32_t MeshDocument::GetVertexCount() const
+		{
+			return vertexCount;
+		}
+
+		MeshDocument::IndexType MeshDocument::GetIndexType() const
+		{
+			return indexType;
+		}
+
+		uint32_t MeshDocument::GetIndexCount() const
+		{
+			return indexCount;
+		}
+
+		size_t MeshDocument::GetTotalSizeRequired() const
+		{
+			return byteArray.size();
+		}
+
+		uint8_t MeshDocument::ToByteSize(IndexType type)
+		{
+			return type == IndexType::UInt16 ? uint8_t(2) : uint8_t(4);
+		}
+
+		MeshDocument::CreateInfo MeshDocument::ToCreateInfo(MeshDocument&& input)
 		{
 			CreateInfo returnValue;
 
@@ -101,37 +174,6 @@ namespace Engine
 			returnValue.indexByteOffset = std::move(input.GetByteOffset(Attribute::Index));
 
 			return returnValue;
-		}
-
-		AssetManager::MeshDocument::MeshDocument(CreateInfo && info) :
-			byteArray(std::move(info.byteArray)),
-			indexType(info.indexType),
-			vertexCount(info.vertexCount),
-			indexCount(info.indexCount)
-		{
-			GetByteOffset(Attribute::Position) = info.posByteOffset;
-			GetByteOffset(Attribute::TexCoord) = info.uvByteOffset;
-			GetByteOffset(Attribute::Normal) = info.normalByteOffset;
-			GetByteOffset(Attribute::Tangent) = info.normalByteOffset;
-			GetByteOffset(Attribute::Index) = info.indexByteOffset;
-		}
-
-		const std::vector<uint8_t>& AssetManager::MeshDocument::GetByteArray() const { return byteArray; }
-
-		AssetManager::MeshDocument::IndexType AssetManager::MeshDocument::GetIndexType() const { return indexType; }
-
-		const uint8_t* AssetManager::MeshDocument::GetDataPtr(Attribute type) const
-		{
-			return byteArray.data() + byteOffsets.at(size_t(type));
-		}
-
-		size_t& AssetManager::MeshDocument::GetByteOffset(Attribute type) { return byteOffsets.at(size_t(type)); }
-
-		const size_t& AssetManager::MeshDocument::GetByteOffset(Attribute type) const { return byteOffsets.at(size_t(type)); }
-
-		uint8_t AssetManager::MeshDocument::ToByteSize(IndexType indexType)
-		{
-			return indexType == IndexType::UInt16 ? uint8_t(2) : uint8_t(4);
 		}
 	}
 }
