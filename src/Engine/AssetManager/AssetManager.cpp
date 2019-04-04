@@ -16,10 +16,7 @@ struct AssetManagerInfo
 
 static const std::map<size_t, AssetManagerInfo> textureInfos
 {
-	{ size_t(Engine::AssetManager::Sprite::None), {"None" , ""} },
-	{ size_t(Engine::AssetManager::Sprite::Default), {"Default", "defaultTexture.png"} },
-	{ size_t(Engine::AssetManager::Sprite::Test), {"Test", "test.ktx"} },
-	{ size_t(Engine::AssetManager::Sprite::Circle), {"Circle", "circle.png"} },
+	{ size_t(Engine::AssetManager::Sprite::Test), {"Test", "test2.ktx"} },
 };
 
 static const std::map<size_t, AssetManagerInfo> meshInfos

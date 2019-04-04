@@ -47,16 +47,16 @@ namespace Engine
 
 		newInfo.byteArray = std::move(oldInfo.byteArray);
 
+		newInfo.isCompressed = oldInfo.isCompressed;
 		newInfo.baseInternalFormat = Renderer::TextureDocument::Format(oldInfo.baseInternalFormat);
+		newInfo.internalFormat = Renderer::TextureDocument::Format(oldInfo.internalFormat);
 
 		newInfo.type = Renderer::TextureDocument::Type(oldInfo.type);
 
 		newInfo.numDimensions = oldInfo.numDimensions;
-
 		newInfo.dimensions = oldInfo.dimensions;
 
 		newInfo.numLayers = oldInfo.numLayers;
-
 		newInfo.numLevels = oldInfo.numLevels;
 
 		return std::optional<Renderer::TextureDocument>{ Renderer::TextureDocument(std::move(newInfo)) };

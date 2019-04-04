@@ -85,7 +85,7 @@ void Engine::Core::Run()
 	auto& lightObj = scene1.NewSceneObject();
 	lightObj.transform.localPosition = { 2.5f, 2.5f, 2.5f };
 	Components::PointLight& light1 = lightObj.AddComponent<Components::PointLight>().first.get();
-	light1.color = { 1.f, 0.5f, 0.f };
+	light1.color = { 1.f, 1.f, 1.f };
 	auto& mesh3 = lightObj.AddComponent<Components::MeshRenderer>().first.get();
 	mesh3.SetMesh(AssMan::Mesh::Cube);
 	mesh3.scale = { 0.1f, 0.1f, 0.1f };

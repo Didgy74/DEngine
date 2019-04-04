@@ -17,11 +17,13 @@ namespace Engine
 		TextureDocument::TextureDocument(CreateInfo&& info) :
 			byteArray(std::move(info.byteArray)),
 			baseInternalFormat(info.baseInternalFormat),
+			internalFormat(info.internalFormat),
 			type(info.type),
 			numDimensions(info.numDimensions),
 			dimensions(info.dimensions),
 			numLayers(info.numLayers),
-			numLevels(info.numLevels)
+			numLevels(info.numLevels),
+			isCompressed(info.isCompressed)
 		{
 
 		}
@@ -31,9 +33,9 @@ namespace Engine
 			
 		}
 
-		const std::array<uint32_t, 3>& TextureDocument::GetDimensions() const
+		const std::vector<uint8_t>& TextureDocument::GetByteArray() const
 		{
-			return dimensions;
+			return byteArray;
 		}
 
 		const uint8_t* TextureDocument::GetData() const
@@ -41,9 +43,29 @@ namespace Engine
 			return byteArray.data();
 		}
 
+		size_t TextureDocument::GetByteLength() const
+		{
+			return byteArray.size();
+		}
+
+		const std::array<uint32_t, 3>& TextureDocument::GetDimensions() const
+		{
+			return dimensions;
+		}
+
+		bool TextureDocument::IsCompressed() const
+		{
+			return isCompressed;
+		}
+
 		TextureDocument::Format TextureDocument::GetBaseInternalFormat() const
 		{
 			return baseInternalFormat;
+		}
+
+		TextureDocument::Format TextureDocument::GetInternalFormat() const
+		{
+			return internalFormat;
 		}
 
 		TextureDocument::Type TextureDocument::GetType() const
@@ -56,7 +78,9 @@ namespace Engine
 			CreateInfo info{};
 
 			info.byteArray = std::move(texDoc.byteArray);
+			info.isCompressed = texDoc.isCompressed;
 			info.baseInternalFormat = texDoc.baseInternalFormat;
+			info.internalFormat = texDoc.internalFormat;
 			info.type = texDoc.type;
 			info.numDimensions = texDoc.numDimensions;
 			info.dimensions = texDoc.dimensions;
@@ -88,8 +112,10 @@ namespace Engine
 			createInfo.numLayers = texture->numLayers;
 			createInfo.numLevels = texture->numLevels;
 
+			createInfo.isCompressed = texture->isCompressed;
 			createInfo.type = ConvertGLType(texture->glType);
 			createInfo.baseInternalFormat = ConvertGLFormat(texture->glBaseInternalformat);
+			createInfo.internalFormat = ConvertGLFormat(texture->glInternalformat);
 
 			ktxTexture_Destroy(texture);
 
@@ -121,10 +147,10 @@ namespace Engine
 		{
 			using Format = TextureDocument::Format;
 
+			// Uncompressed
 			constexpr auto GL_RGB = 0x1907;
 			constexpr auto GL_RGBA = 0x1908;
 			constexpr auto GL_RGBA8 = 0x8058;
-
 			switch (glFormat)
 			{
 			case GL_RGB:
@@ -133,9 +159,43 @@ namespace Engine
 				return Format::RGBA;
 			case GL_RGBA8:
 				return Format::R8G8B8A8;
-			default:
-				return Format::Invalid;
+			};
+
+			// DXT
+			constexpr auto GL_COMPRESSED_RGB_S3TC_DXT1_ANGLE = 0x83F0;
+			constexpr auto GL_COMPRESSED_RGBA_S3TC_DXT1_ANGLE = 0x83F1;
+			constexpr auto GL_COMPRESSED_RGBA_S3TC_DXT3_ANGLE = 0x83F2;
+			constexpr auto GL_COMPRESSED_RGBA_S3TC_DXT5_ANGLE = 0x83F3;
+			switch (glFormat)
+			{
+			case GL_COMPRESSED_RGB_S3TC_DXT1_ANGLE:
+				return Format::Compressed_RGB_S3TC_DXT1_ANGLE;
+			case GL_COMPRESSED_RGBA_S3TC_DXT1_ANGLE:
+				return Format::Compressed_RGBA_S3TC_DXT1_ANGLE;
+			case GL_COMPRESSED_RGBA_S3TC_DXT3_ANGLE:
+				return Format::Compressed_RGBA_S3TC_DXT3_ANGLE;
+			case GL_COMPRESSED_RGBA_S3TC_DXT5_ANGLE:
+				return Format::Compressed_RGBA_S3TC_DXT5_ANGLE;
 			}
+
+			// BPTC
+			constexpr auto GL_COMPRESSED_RGBA_BPTC_UNORM = 0x8E8C;
+			constexpr auto GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM = 0x8E8D;
+			constexpr auto GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT = 0x8E8E;
+			constexpr auto GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT = 0x8E8F;
+			switch (glFormat)
+			{
+			case GL_COMPRESSED_RGBA_BPTC_UNORM:
+				return Format::Compressed_RGBA_BPTC_UNORM;
+			case GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM:
+				return Format::Compressed_SRGB_ALPHA_BPTC_UNORM;
+			case GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT:
+				return Format::Compressed_RGB_BPTC_SIGNED_FLOAT;
+			case GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT:
+				return Format::Compressed_RGB_BPTC_UNSIGNED_FLOAT;
+			}
+
+			return Format::Invalid;
 		}
 	}
 }

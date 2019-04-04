@@ -502,17 +502,25 @@ namespace Engine
 		auto texDocumentOpt = Core::GetData().assetLoadData.textureLoader(id);
 		assert(texDocumentOpt.has_value());
 
-		auto& texDocument = texDocumentOpt.value();
+		auto& texDoc = texDocumentOpt.value();
 
 		IBO ibo;
 
 		glGenTextures(1, &ibo.texture);
 		glBindTexture(GL_TEXTURE_2D, ibo.texture);
 
-		GLint internalFormat = ToGLFormat(texDocument.GetBaseInternalFormat());
-		GLint type = ToGLType(texDocument.GetType());
-		const uint8_t* data = texDocument.GetData();
-		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, texDocument.GetDimensions()[0], texDocument.GetDimensions()[1], 0, internalFormat, type, data);
+		GLint internalFormat = ToGLFormat(texDoc.GetInternalFormat());
+		GLint baseInternalFormat = ToGLFormat(texDoc.GetBaseInternalFormat());
+		GLsizei width = texDoc.GetDimensions()[0];
+		GLsizei height = texDoc.GetDimensions()[1];
+		GLint type = ToGLType(texDoc.GetType());
+		GLsizei byteLength = texDoc.GetByteLength();
+		const uint8_t* data = texDoc.GetData();
+
+		if (texDoc.IsCompressed())
+			glCompressedTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, byteLength, data);
+		else
+			glTexImage2D(GL_TEXTURE_2D, 0, baseInternalFormat, width, height, 0, baseInternalFormat, type, data);
 
 		return ibo;
 	}
@@ -584,13 +592,44 @@ namespace Engine
 	GLint Renderer::OpenGL::ToGLFormat(TextureDocument::Format format)
 	{
 		using Format = TextureDocument::Format;
+
+		// Uncompressed
 		switch (format)
 		{
+		case Format::RGB:
+			return GL_RGB;
 		case Format::RGBA:
 			return GL_RGBA;
-		default:
-			return 0;
+		case Format::R8G8B8A8:
+			return GL_RGBA8;
+		};
+
+		// DXT
+		switch (format)
+		{
+		case Format::Compressed_RGB_S3TC_DXT1_ANGLE:
+			return GL_COMPRESSED_RGB_S3TC_DXT1_ANGLE;
+		case Format::Compressed_RGBA_S3TC_DXT1_ANGLE:
+			return GL_COMPRESSED_RGBA_S3TC_DXT1_ANGLE;
+		case Format::Compressed_RGBA_S3TC_DXT3_ANGLE:
+			return GL_COMPRESSED_RGBA_S3TC_DXT3_ANGLE;
+		case Format::Compressed_RGBA_S3TC_DXT5_ANGLE:
+			return GL_COMPRESSED_RGBA_S3TC_DXT5_ANGLE;
 		}
+
+		switch (format)
+		{
+		case Format::Compressed_RGBA_BPTC_UNORM:
+			return GL_COMPRESSED_RGBA_BPTC_UNORM;
+		case Format::Compressed_SRGB_ALPHA_BPTC_UNORM:
+			return GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM;
+		case Format::Compressed_RGB_BPTC_SIGNED_FLOAT:
+			return GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT;
+		case Format::Compressed_RGB_BPTC_UNSIGNED_FLOAT:
+			return GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT;
+		}
+
+		return 0;
 	}
 
 	GLint Renderer::OpenGL::ToGLType(TextureDocument::Type type)
