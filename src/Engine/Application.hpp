@@ -10,7 +10,7 @@ namespace Engine
 {
 	namespace Application
 	{
-		constexpr Utility::ImgDim defaultWindowSize = { 1800, 900 };
+		constexpr Utility::ImgDim defaultWindowSize = { 1900, 1000 };
 		constexpr Utility::ImgDim minimumWindowSize = { 800, 600 };
 		constexpr float narrowestAspectRatio = minimumWindowSize.GetAspectRatio();
 		constexpr std::string_view defaultApplicationName = "VulkanProject1";

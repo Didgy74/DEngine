@@ -1,6 +1,5 @@
 #include "AssetManager.hpp"
 #include "MeshDocument.hpp"
-#include "TextureDocument.hpp"
 
 #include <cassert>
 #include <map>
@@ -16,7 +15,7 @@ struct AssetManagerInfo
 
 static const std::map<size_t, AssetManagerInfo> textureInfos
 {
-	{ size_t(Engine::AssetManager::Sprite::Test), {"Test", "test2.ktx"} },
+	{ size_t(Engine::AssetManager::Sprite::Test), {"Test", "test3.ktx"} },
 };
 
 static const std::map<size_t, AssetManagerInfo> meshInfos
@@ -52,4 +51,3 @@ namespace Engine
 }
 
 #include "MeshDocument.inl"
-#include "TextureDocument.inl"

@@ -2,14 +2,12 @@
 
 #include "Typedefs.hpp"
 #include "MeshDocument.hpp"
-#include "TextureDocument.hpp"
 
 #include <string>
 #include <string_view>
 #include <optional>
 
 #include "../Renderer/MeshDocument.hpp"
-#include "../Renderer/TextureDocument.hpp"
 
 namespace Engine
 {
@@ -22,7 +20,6 @@ namespace Engine
 		std::string GetTexturePath(size_t i);
 
 		std::optional<Renderer::MeshDocument> LoadMesh(size_t i);
-		std::optional<Renderer::TextureDocument> LoadTexture(size_t i);
 	}
 
 	namespace AssMan = AssetManager;

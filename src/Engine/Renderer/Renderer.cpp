@@ -375,4 +375,3 @@ namespace Engine
 }
 
 #include "MeshDocument.inl"
-#include "TextureDocument.inl"

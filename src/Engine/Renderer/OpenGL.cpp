@@ -1,8 +1,10 @@
 #include "Renderer.hpp"
 #include "RendererData.hpp"
 #include "MeshDocument.hpp"
-#include "TextureDocument.hpp"
 #include "OpenGL.hpp"
+
+#define DTEX_IMPLEMENTATION
+#include "DTex/DTex.hpp"
 
 #include "GL/glew.h"
 
@@ -43,11 +45,9 @@ namespace Engine
 			void LoadSpriteShader(Data& data);
 			void LoadMeshShader(Data& data);
 
-			void GLDebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam);
+            void GLAPIENTRY GLDebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam);
 
 			GLint ToGLType(MeshDocument::IndexType indexType);
-			GLint ToGLFormat(TextureDocument::Format format);
-			GLint ToGLType(TextureDocument::Type type);
 		}
 	}
 
@@ -264,12 +264,12 @@ namespace Engine
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, data.lightDataUBO, 0, sizeof(LightDataUBO));
 	}
 
-	void Renderer::OpenGL::GLDebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
+	void GLAPIENTRY Renderer::OpenGL::GLDebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
 	{
 		LogDebugMessage(message);
 	}
 
-	void Renderer::OpenGL::Initialize(std::any& apiData, const InitInfo& createInfo)
+    void Renderer::OpenGL::Initialize(std::any& apiData, const InitInfo& createInfo)
 	{
 		auto glInitResult = glewInit();
 		assert(glInitResult == 0);
@@ -278,6 +278,7 @@ namespace Engine
 		Data& data = std::any_cast<Data&>(apiData);
 
 		data.glSwapBuffers = std::move(createInfo.glSwapBuffers);
+
 
 		// Initialize debug stuff
 		if constexpr (Setup::enableDebugging)
@@ -304,8 +305,9 @@ namespace Engine
 		glGenSamplers(1, &data.samplerObject);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glSamplerParameteri(data.samplerObject, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(data.samplerObject, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(data.samplerObject, GL_TEXTURE_LOD_BIAS, 0);
 		glBindSampler(0, data.samplerObject);
 
 		glEnable(GL_DEPTH_TEST);
@@ -428,7 +430,7 @@ namespace Engine
 			glUseProgram(data.spriteProgram);
 
 			glProgramUniform1ui(data.spriteProgram, data.spriteSamplerUniform, 0);
-			glBindSampler(0, data.samplerObject);
+			glBindSampler(GL_TEXTURE0, data.samplerObject);
 
 			const auto& spriteVBO = data.quadVBO;
 			glBindVertexArray(spriteVBO.vertexArrayObject);
@@ -499,28 +501,39 @@ namespace Engine
 
 	std::optional<Renderer::OpenGL::IBO> Renderer::OpenGL::GetIBOFromID(size_t id)
 	{
-		auto texDocumentOpt = Core::GetData().assetLoadData.textureLoader(id);
-		assert(texDocumentOpt.has_value());
+		//auto texDocumentOpt = Core::GetData().assetLoadData.textureLoader(id);
+		//assert(texDocumentOpt.has_value());
 
-		auto& texDoc = texDocumentOpt.value();
+		auto texDocOpt = DTex::LoadFromFile("Data/Textures/test.ktx");
+		auto& texDoc = texDocOpt.value();
 
 		IBO ibo;
 
 		glGenTextures(1, &ibo.texture);
-		glBindTexture(GL_TEXTURE_2D, ibo.texture);
 
-		GLint internalFormat = ToGLFormat(texDoc.GetInternalFormat());
-		GLint baseInternalFormat = ToGLFormat(texDoc.GetBaseInternalFormat());
-		GLsizei width = texDoc.GetDimensions()[0];
-		GLsizei height = texDoc.GetDimensions()[1];
-		GLint type = ToGLType(texDoc.GetType());
-		GLsizei byteLength = texDoc.GetByteLength();
-		const uint8_t* data = texDoc.GetData();
+		GLenum target = texDoc.GetGLTarget();
 
-		if (texDoc.IsCompressed())
-			glCompressedTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, byteLength, data);
-		else
-			glTexImage2D(GL_TEXTURE_2D, 0, baseInternalFormat, width, height, 0, baseInternalFormat, type, data);
+		glBindTexture(target, ibo.texture);
+
+
+		GLint format = texDoc.GetGLFormat();
+		GLenum type = texDoc.GetGLType();
+
+		for (size_t level = 0; level < texDoc.GetMipLevels(); level++)
+		{
+			GLsizei width = texDoc.GetDimensions(level)[0];
+			GLsizei height = texDoc.GetDimensions(level)[1];
+			auto data = texDoc.GetData(level);
+			GLsizei dataLength = texDoc.GetByteLength(level);
+
+			if (texDoc.IsCompressed())
+				glCompressedTexImage2D(target, level, format, width, height, 0, dataLength, data);
+			else
+				glTexImage2D(target, level, format, width, height, 0, format, type, data);
+		}
+
+		glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+		glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, texDoc.GetMipLevels() - 1);
 
 		return ibo;
 	}
@@ -584,61 +597,6 @@ namespace Engine
 			return GL_UNSIGNED_SHORT;
 		case IndexType::UInt32:
 			return GL_UNSIGNED_INT;
-		default:
-			return 0;
-		}
-	}
-
-	GLint Renderer::OpenGL::ToGLFormat(TextureDocument::Format format)
-	{
-		using Format = TextureDocument::Format;
-
-		// Uncompressed
-		switch (format)
-		{
-		case Format::RGB:
-			return GL_RGB;
-		case Format::RGBA:
-			return GL_RGBA;
-		case Format::R8G8B8A8:
-			return GL_RGBA8;
-		};
-
-		// DXT
-		switch (format)
-		{
-		case Format::Compressed_RGB_S3TC_DXT1_ANGLE:
-			return GL_COMPRESSED_RGB_S3TC_DXT1_ANGLE;
-		case Format::Compressed_RGBA_S3TC_DXT1_ANGLE:
-			return GL_COMPRESSED_RGBA_S3TC_DXT1_ANGLE;
-		case Format::Compressed_RGBA_S3TC_DXT3_ANGLE:
-			return GL_COMPRESSED_RGBA_S3TC_DXT3_ANGLE;
-		case Format::Compressed_RGBA_S3TC_DXT5_ANGLE:
-			return GL_COMPRESSED_RGBA_S3TC_DXT5_ANGLE;
-		}
-
-		switch (format)
-		{
-		case Format::Compressed_RGBA_BPTC_UNORM:
-			return GL_COMPRESSED_RGBA_BPTC_UNORM;
-		case Format::Compressed_SRGB_ALPHA_BPTC_UNORM:
-			return GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM;
-		case Format::Compressed_RGB_BPTC_SIGNED_FLOAT:
-			return GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT;
-		case Format::Compressed_RGB_BPTC_UNSIGNED_FLOAT:
-			return GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT;
-		}
-
-		return 0;
-	}
-
-	GLint Renderer::OpenGL::ToGLType(TextureDocument::Type type)
-	{
-		using Type = TextureDocument::Type;
-		switch (type)
-		{
-		case Type::UnsignedByte:
-			return GL_UNSIGNED_BYTE;
 		default:
 			return 0;
 		}

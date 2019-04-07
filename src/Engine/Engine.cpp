@@ -42,7 +42,7 @@ namespace Engine
 		rendererInitInfo.surfaceHandle = Application::Core::GetMainWindowHandle();
 
 		rendererInitInfo.assetLoadCreateInfo.meshLoader = &LoadMesh;
-		rendererInitInfo.assetLoadCreateInfo.textureLoader = &LoadTexture;
+		//rendererInitInfo.assetLoadCreateInfo.textureLoader = &LoadTexture;
 
 		rendererInitInfo.openGLInitInfo.glSwapBuffers = &Application::Core::GL_SwapWindow;
 		Renderer::Core::Initialize(rendererInitInfo);
@@ -106,7 +106,7 @@ void Engine::Core::Run()
 	while (Application::Core::UpdateEvents(), Application::IsRunning())
 	{
 		// Handles origin movement for camera
-		const float speed = 2.5f;
+		const float speed = 5.f;
 		auto cross = Math::Vector3D::Cross(camera.forward, camera.up);
 		if (Input::Raw::GetValue(Input::Raw::Button::A))
 			camera.positionOffset -= cross * speed * scene1.GetTimeData().GetDeltaTime();

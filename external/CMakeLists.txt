@@ -22,27 +22,10 @@ target_include_directories(
 add_subdirectory(DMath)
 target_link_libraries(${LIB_NAME} INTERFACE DMath::DMath)
 
-# libktx
-set(LIBKTX_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/KTX-Software-master")
-target_include_directories(
-    ${LIB_NAME}
-    INTERFACE
-    $<BUILD_INTERFACE:${LIBKTX_FOLDER}/include>
-    $<INSTALL_INTERFACE:include>
-)
-target_include_directories(
-    ${LIB_NAME}
-    INTERFACE
-    $<BUILD_INTERFACE:${LIBKTX_FOLDER}/other_include>
-    $<INSTALL_INTERFACE:include>
-)
+# DTex
+add_subdirectory(DTex)
+target_link_libraries(${LIB_NAME} INTERFACE DTex::DTex)
 
-set(LIBKTX_LIB_FOLDER "${LIBKTX_FOLDER}/lib")
-set(KTX_SOURCE_FILES 
-	"${LIBKTX_LIB_FOLDER}/texture.c" 
-	"${LIBKTX_LIB_FOLDER}/filestream.c" 
-	"${LIBKTX_LIB_FOLDER}/checkheader.c"
-	"${LIBKTX_LIB_FOLDER}/hashlist.c"
-	"${LIBKTX_LIB_FOLDER}/memstream.c"
-	"${LIBKTX_LIB_FOLDER}/swap.c")
-target_sources(${LIB_NAME} INTERFACE ${KTX_SOURCE_FILES})
+# Vulkan-headers
+add_subdirectory(Vulkan-Headers)
+target_link_libraries(${LIB_NAME} INTERFACE Vulkan::Headers)
