@@ -1,8 +1,7 @@
 #pragma once
 
-#include "DMath/Vector/Vector.hpp"
-
 #include <cstdint>
+#include <array>
 
 namespace Engine
 {
@@ -18,13 +17,13 @@ namespace Engine
 
 			EventType GetEventType(Button input);
 
-			Math::Vector<2, int16_t> GetMouseDelta();
+			std::array<int16_t, 2> GetMouseDelta();
 		}
 
 		namespace Core
 		{
-			void UpdateSingle(bool buttonValue, Input::Raw::Button button);
-			void UpdateMouseInfo(int16_t posX, int16_t posY, int16_t moveX, int16_t moveY);
+			void UpdateKey(bool buttonValue, Input::Raw::Button button);
+			void UpdateMouseInfo(uint16_t posX, uint16_t posY);
 			void Initialize();
 			void Terminate();
 			void ClearValues();

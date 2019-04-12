@@ -1,12 +1,11 @@
-#include "Renderer.hpp"
-#include "RendererData.hpp"
-#include "MeshDocument.hpp"
-#include "OpenGL.hpp"
-
-#define DTEX_IMPLEMENTATION
-#include "DTex/DTex.hpp"
+#include "DRenderer/Renderer.hpp"
+#include "DRenderer/RendererData.hpp"
+#include "DRenderer/MeshDocument.hpp"
+#include "DRenderer/OpenGL.hpp"
 
 #include "GL/glew.h"
+
+#include "DTex/DTex.hpp"
 
 #include <cassert>
 #include <memory>
@@ -34,7 +33,7 @@ namespace Engine
 			void UpdateVBODatabase(Data& data, const std::vector<MeshID>& loadQueue);
 			void UpdateIBODatabase(Data& data, const std::vector<SpriteID>& loadQueue);
 			std::optional<VBO> GetVBOFromID(size_t id);
-			std::optional<IBO> GetIBOFromID(size_t id);
+			std::optional<IBO> GetIBOFromTexDoc(const DTex::TexDoc& input);
 
 			Data& GetAPIData();
 
@@ -317,7 +316,10 @@ namespace Engine
 
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-		data.testIBO = GetIBOFromID(2).value();
+		// Load default texture
+		auto loadResult = DTex::LoadFromFile(std::string{ Setup::assetPath } +"/DRenderer/Textures/02.ktx");
+		assert(loadResult.GetResultInfo() == DTex::ResultInfo::Success && "Couldn't load the default texture for DRenderer.");
+		data.testIBO = GetIBOFromTexDoc(loadResult.GetValue()).value();
 
 
 		//LoadSpriteShader(data);
@@ -356,15 +358,15 @@ namespace Engine
 		glNamedBufferSubData(data.lightDataUBO, ambientLightOffset, sizeof(renderGraph.ambientLight), renderGraph.ambientLight.Data());
 
 		// Update light count
-		auto pointLightCount = static_cast<uint32_t>(renderGraph.pointLights.size());
+		auto pointLightCount = static_cast<uint32_t>(renderGraph.pointLightIntensities.size());
 		constexpr GLintptr pointLightCountDataOffset = offsetof(LightDataUBO, LightDataUBO::pointLightCount);
 		glNamedBufferSubData(data.lightDataUBO, pointLightCountDataOffset, sizeof(pointLightCount), &pointLightCount);
 
 		// Update intensities
-		const size_t elements = Math::Min(10, renderGraph.pointLights.size());
+		const size_t elements = Math::Min(10, renderGraph.pointLightIntensities.size());
 		std::array<Math::Vector4D, 10> intensityData;
 		for (size_t i = 0; i < elements; i++)
-			intensityData[i] = renderGraph.pointLights[i].AsVec4();
+			intensityData[i] = renderGraph.pointLightIntensities[i].AsVec4();
 		size_t byteLength = sizeof(Math::Vector4D) * elements;
 		constexpr GLintptr pointLightIntensityOffset = offsetof(LightDataUBO, LightDataUBO::pointLightIntensity);
 		glNamedBufferSubData(data.lightDataUBO, pointLightIntensityOffset, byteLength, intensityData.data());
@@ -489,51 +491,59 @@ namespace Engine
 
 	void Renderer::OpenGL::UpdateIBODatabase(Data& data, const std::vector<SpriteID>& loadQueue)
 	{
-		glActiveTexture(GL_TEXTURE0);
+		//glActiveTexture(GL_TEXTURE0);
+
 		for (const auto& id : loadQueue)
 		{
-			auto iboOpt = GetIBOFromID(static_cast<size_t>(id));
-			assert(iboOpt.has_value());
+			auto texDocOpt = Core::GetData().assetLoadData.textureLoader(size_t(id));
+			if (!texDocOpt.has_value())
+				continue;
+
+			auto& texDoc = texDocOpt.value();
+
+			auto iboOpt = GetIBOFromTexDoc(texDoc);
+			if (!iboOpt.has_value())
+				continue;
 
 			data.iboDatabase.insert({ id, iboOpt.value() });
 		}
 	}
 
-	std::optional<Renderer::OpenGL::IBO> Renderer::OpenGL::GetIBOFromID(size_t id)
+	std::optional<Renderer::OpenGL::IBO> Renderer::OpenGL::GetIBOFromTexDoc(const DTex::TexDoc& input)
 	{
-		//auto texDocumentOpt = Core::GetData().assetLoadData.textureLoader(id);
-		//assert(texDocumentOpt.has_value());
-
-		auto texDocOpt = DTex::LoadFromFile("Data/Textures/test.ktx");
-		auto& texDoc = texDocOpt.value();
-
 		IBO ibo;
+
+		GLenum target = DTex::ToGLTarget(input.GetTextureType());
+		GLint format = DTex::ToGLFormat(input.GetPixelFormat());
+		GLenum type = DTex::ToGLType(input.GetPixelFormat());
+		if (target == 0 || format == 0)
+		{
+			LogDebugMessage("Error. Texture can not be used in OpenGL.");
+			return {};
+		}
 
 		glGenTextures(1, &ibo.texture);
 
-		GLenum target = texDoc.GetGLTarget();
-
 		glBindTexture(target, ibo.texture);
 
-
-		GLint format = texDoc.GetGLFormat();
-		GLenum type = texDoc.GetGLType();
-
-		for (size_t level = 0; level < texDoc.GetMipLevels(); level++)
+		for (GLint level = 0; level < GLint(input.GetMipLevels()); level++)
 		{
-			GLsizei width = texDoc.GetDimensions(level)[0];
-			GLsizei height = texDoc.GetDimensions(level)[1];
-			auto data = texDoc.GetData(level);
-			GLsizei dataLength = texDoc.GetByteLength(level);
+			GLsizei width = GLsizei(input.GetDimensions(level).width);
+			GLsizei height = GLsizei(input.GetDimensions(level).height);
+			auto data = input.GetData(level);
+			GLsizei dataLength = input.GetDataSize(level);
 
-			if (texDoc.IsCompressed())
+			if (input.IsCompressed())
 				glCompressedTexImage2D(target, level, format, width, height, 0, dataLength, data);
 			else
 				glTexImage2D(target, level, format, width, height, 0, format, type, data);
 		}
 
-		glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
-		glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, texDoc.GetMipLevels() - 1);
+		if (input.GetMipLevels() > 1)
+		{
+			glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+			glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, input.GetMipLevels() - 1);
+		}
 
 		return ibo;
 	}

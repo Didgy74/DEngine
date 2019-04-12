@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Components.hpp"
-#include "../Enum.hpp"
+#include "DEngine/Components/Components.hpp"
+#include "DEngine/Enum.hpp"
 
 #include "DMath/Vector/Vector.hpp"
 
@@ -19,8 +19,8 @@ namespace Engine
 
 			Math::Matrix<3, 2> GetModel2D_Reduced(Space space) const;
 
-			Math::Vector2D positionOffset;
-			float radius;
+			Math::Vector2D positionOffset{};
+			float radius{ 0.5 };
 		};
 	}
 }

@@ -1,10 +1,10 @@
-#include "SpriteRenderer.hpp"
+#include "DEngine/Components/SpriteRenderer.hpp"
 
 #include <array>
 #include <cassert>
 
-#include "../Scene.hpp"
-#include "../SceneObject.hpp"
+#include "DEngine/Scene.hpp"
+#include "DEngine/SceneObject.hpp"
 
 #include "DMath/LinearTransform2D.hpp"
 
@@ -13,11 +13,7 @@ namespace Engine
 	namespace Components
 	{
 		SpriteRenderer::SpriteRenderer(SceneObject& owningObject) :
-			ParentType(owningObject),
-			sprite(AssMan::Sprite::None),
-			positionOffset{ 0, 0 },
-			rotation(0),
-			scale{ 1, 1 }
+			ParentType(owningObject)
 		{
 		}
 
@@ -41,15 +37,15 @@ namespace Engine
 
 			const auto& scaleModel = Scale_Reduced(scale);
 			const auto& rotateModel = Rotate_Reduced(rotation);
-			auto localModel = Multiply(scaleModel, rotateModel);
+			auto localModel = Multiply_Reduced(scaleModel, rotateModel);
 			AddTranslation(localModel, positionOffset);
 
 			if (space == Space::Local)
 				return localModel;
 			else
 			{
-				auto parentModel = GetSceneObject().transform.GetModel2D_Reduced(space);
-				return Multiply(parentModel, localModel);
+				auto parentModel = GetSceneObject().GetModel2D_Reduced(space);
+				return Multiply_Reduced(parentModel, localModel);
 			}
 		}
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Components.hpp"
+#include "DEngine/Components/Components.hpp"
 
 #include "DMath/Vector/Vector.hpp"
 
@@ -19,9 +19,9 @@ namespace Engine
 			explicit RigidBody2D(SceneObject& owningObject);
 			~RigidBody2D();
 
-			Math::Vector2D position;
-			Math::Vector2D velocity;
-			float torque;
+			Math::Vector2D position{};
+			Math::Vector2D velocity{};
+			float torque{};
 
 			float GetMass() const;
 			void SetMass(float newMass);
@@ -29,7 +29,7 @@ namespace Engine
 			void SetInverseMass(float newInverseMass);
 
 		private:
-			float inverseMass;
+			float inverseMass{ 1.f };
 		};
 	}
 

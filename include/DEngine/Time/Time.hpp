@@ -30,15 +30,15 @@ namespace Engine
 			uint16_t GetFPS() const;
 
 		private:
-			size_t tickCount;
-			size_t fixedTickCount;
-            std::chrono::high_resolution_clock::time_point startTime;
-            std::chrono::high_resolution_clock::time_point previousFrameEndTime;
-            float deltaTime;
+			size_t tickCount{};
+			size_t fixedTickCount{};
+			std::chrono::high_resolution_clock::time_point startTime{};
+			std::chrono::high_resolution_clock::time_point previousFrameEndTime{};
+			float deltaTime{};
 
-            std::array<std::chrono::high_resolution_clock::duration, 2> fixedTickInterval;
-            uint8_t fixedTickIntervalBufferIndex;
-            bool fixedTickIntervalChanged;
+			std::array<std::chrono::high_resolution_clock::duration, 2> fixedTickInterval{};
+			uint8_t fixedTickIntervalBufferIndex{};
+			bool fixedTickIntervalChanged{};
 
             friend Time::Core;
 		};

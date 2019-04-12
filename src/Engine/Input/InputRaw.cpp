@@ -1,6 +1,5 @@
 #define INPUT_BUTTON_COUNT
-#include "InputRaw.hpp"
-#include "DMath/Vector/Vector.hpp"
+#include "DEngine/Input/InputRaw.hpp"
 
 #include <array>
 #include <memory>
@@ -13,11 +12,11 @@ namespace Engine
 		{
 			struct Data
 			{
-				std::array<bool, static_cast<size_t>(Input::Raw::Button::COUNT)> buttonValues;
-				std::array<Input::EventType, static_cast<size_t>(Input::Raw::Button::COUNT)> eventTypes;
+				std::array<bool, static_cast<size_t>(Input::Raw::Button::COUNT)> buttonValues{};
+				std::array<Input::EventType, static_cast<size_t>(Input::Raw::Button::COUNT)> eventTypes{};
 
-				Math::Vector<2, int16_t> mousePosition;
-				Math::Vector<2, int16_t> mouseDelta;
+				std::array<uint16_t, 2> mousePosition{};
+				std::array<int16_t, 2> mouseDelta{};
 			};
 
 			static std::unique_ptr<Data> data;
@@ -33,19 +32,19 @@ bool Engine::Input::Raw::GetValue(Button input) { return Core::data->buttonValue
 
 Engine::Input::EventType Engine::Input::Raw::GetEventType(Button input) { return Core::data->eventTypes[static_cast<size_t>(input)]; }
 
-Math::Vector<2, int16_t> Engine::Input::Raw::GetMouseDelta() { return Core::data->mouseDelta; }
+std::array<int16_t, 2> Engine::Input::Raw::GetMouseDelta() { return Core::data->mouseDelta; }
 
-void Engine::Input::Core::UpdateSingle(bool buttonValue, Raw::Button button) 
+void Engine::Input::Core::UpdateKey(bool buttonValue, Raw::Button button) 
 {
-	size_t index = static_cast<size_t>(button);
+	size_t index = size_t(button);
 	data->buttonValues[index] = buttonValue;
 	data->eventTypes[index] = ToEventType(buttonValue);
 }
 
-void Engine::Input::Core::UpdateMouseInfo(int16_t posX, int16_t posY, int16_t moveX, int16_t moveY)
+void Engine::Input::Core::UpdateMouseInfo(uint16_t posX, uint16_t posY)
 {
+	data->mouseDelta = { int16_t(posX) - int16_t(data->mousePosition[0]), int16_t(posY) - int16_t(data->mousePosition[1]) };
 	data->mousePosition = { posX, posY };
-	data->mouseDelta = { moveX, moveY };
 }
 
 void Engine::Input::Core::Initialize()

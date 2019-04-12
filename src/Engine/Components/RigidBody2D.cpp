@@ -1,19 +1,15 @@
-#include "RigidBody2D.hpp"
+#include "DEngine/Components/RigidBody2D.hpp"
 
-#include "../Scene.hpp"
-#include "../SceneObject.hpp"
+#include "DEngine/SceneObject.hpp"
 
 namespace Engine
 {
 	namespace Components
 	{
 		RigidBody2D::RigidBody2D(SceneObject& owningObject) :
-			ParentType(owningObject),
-			velocity(),
-			inverseMass(1.f),
-			torque()
+			ParentType(owningObject)
 		{
-			position = owningObject.transform.GetPosition(Space::World).AsVec2();
+			position = owningObject.GetPosition(Space::World).AsVec2();
 		}
 
 		RigidBody2D::~RigidBody2D()

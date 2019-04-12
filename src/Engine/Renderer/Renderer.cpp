@@ -1,7 +1,7 @@
-#include "Renderer.hpp"
-#include "RendererData.hpp"
+#include "DRenderer/Renderer.hpp"
+#include "DRenderer/RendererData.hpp"
 
-#include "OpenGL.hpp"
+#include "DRenderer/OpenGL.hpp"
 
 #include "DMath/LinearTransform3D.hpp"
 
@@ -45,6 +45,13 @@ namespace Engine
 		if (createInfo.assetLoadCreateInfo.meshLoader == nullptr)
 		{
 			DebugMessage("Error. MeshLoader pointer in initialization cannot be nullptr.");
+			return false;
+		}
+
+		// Asset load stuff
+		if (createInfo.assetLoadCreateInfo.textureLoader == nullptr)
+		{
+			DebugMessage("Error. TextureLoader pointer in initialization cannot be nullptr.");
 			return false;
 		}
 
@@ -270,7 +277,7 @@ namespace Engine
 		if (renderGraph.meshes.size() != transforms.meshes.size())
 			return false;
 
-		if (renderGraph.pointLights.size() != transforms.pointLights.size())
+		if (renderGraph.pointLightIntensities.size() != transforms.pointLights.size())
 			return false;
 
 		return true;

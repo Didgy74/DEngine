@@ -1,5 +1,5 @@
-#include "AssetManager.hpp"
-#include "MeshDocument.hpp"
+#include "DEngine/AssetManager/AssetManager.hpp"
+#include "DEngine/AssetManager/MeshDocument.hpp"
 
 #include <cassert>
 #include <map>

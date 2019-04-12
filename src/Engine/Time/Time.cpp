@@ -1,4 +1,4 @@
-#include "Time.hpp"
+#include "DEngine/Time/Time.hpp"
 
 #include <chrono>
 #include <memory>
@@ -48,11 +48,7 @@ void Engine::Time::Core::TickEnd(SceneData& scene)
 	scene.previousFrameEndTime = now;
 }
 
-Engine::Time::SceneData::SceneData() :
-    tickCount(0),
-    fixedTickInterval(),
-    fixedTickIntervalChanged(false),
-    fixedTickIntervalBufferIndex(0)
+Engine::Time::SceneData::SceneData()
 {
     auto now = std::chrono::high_resolution_clock::now();
 

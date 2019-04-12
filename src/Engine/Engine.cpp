@@ -1,16 +1,18 @@
 #include "Engine.hpp"
 
 #include "Application.hpp"
-#include "Renderer/Renderer.hpp"
-#include "Components/SpriteRenderer.hpp"
-#include "Components/MeshRenderer.hpp"
-#include "Components/PointLight.hpp"
-#include "Time/Time.hpp"
-#include "Input/InputRaw.hpp"
-#include "Scene.hpp"
-#include "SceneObject.hpp"
+#include "DEngine/Time/Time.hpp"
+#include "DEngine/Input/InputRaw.hpp"
+#include "DRenderer/Renderer.hpp"
 
-#include "Components/Camera.hpp"
+#include "DEngine/Scene.hpp"
+#include "DEngine/SceneObject.hpp"
+
+#include "DEngine/Components/Camera.hpp"
+#include "DEngine/Components/FreeLook.hpp"
+#include "DEngine/Components/SpriteRenderer.hpp"
+#include "DEngine/Components/MeshRenderer.hpp"
+#include "DEngine/Components/PointLight.hpp"
 
 #include "Systems/RenderSystem.hpp"
 
@@ -42,7 +44,7 @@ namespace Engine
 		rendererInitInfo.surfaceHandle = Application::Core::GetMainWindowHandle();
 
 		rendererInitInfo.assetLoadCreateInfo.meshLoader = &LoadMesh;
-		//rendererInitInfo.assetLoadCreateInfo.textureLoader = &LoadTexture;
+		rendererInitInfo.assetLoadCreateInfo.textureLoader = &LoadTexture;
 
 		rendererInitInfo.openGLInitInfo.glSwapBuffers = &Application::Core::GL_SwapWindow;
 		Renderer::Core::Initialize(rendererInitInfo);
@@ -54,7 +56,6 @@ void Engine::Core::Run()
 	Application::Core::Initialize(Application::API3D::OpenGL);
 	Time::Core::Initialize();
 	Input::Core::Initialize();
-	Physics2D::Core::Initialize();
 
 	InitializeRenderer();
 
@@ -64,36 +65,37 @@ void Engine::Core::Run()
 	Renderer::GetViewport(0).SetSceneRef(&scene1);
 
 
-
+	auto& objCamera = scene1.NewSceneObject();
+	objCamera.localPosition.z = -5.f;
+	auto& camera = objCamera.AddComponent<Components::Camera>().second.get();
+	objCamera.AddComponent<Components::FreeLook>();
 
 	auto& sceneObject1 = scene1.NewSceneObject();
-	auto& mesh1 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
+	auto& mesh1 = sceneObject1.AddComponent<Components::MeshRenderer>().second.get();
 	mesh1.SetMesh(AssMan::Mesh::Helmet);
 
-	auto& meshTest = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
+	auto& meshTest = sceneObject1.AddComponent<Components::MeshRenderer>().second.get();
 	meshTest.SetMesh(AssMan::Mesh::Helmet);
 	meshTest.positionOffset.x = -3.f;
 
-	auto& mesh2 = sceneObject1.AddComponent<Components::MeshRenderer>().first.get();
+	auto& mesh2 = sceneObject1.AddComponent<Components::MeshRenderer>().second.get();
 	mesh2.SetMesh(AssMan::Mesh::Cube);
 	mesh2.positionOffset.x = 2.f;
 
-	auto& objCamera = scene1.NewSceneObject();
-	auto& camera = objCamera.AddComponent<Components::Camera>().first.get();
-	camera.positionOffset.z = 5.f;
+	
 
 	auto& lightObj = scene1.NewSceneObject();
-	lightObj.transform.localPosition = { 2.5f, 2.5f, 2.5f };
-	Components::PointLight& light1 = lightObj.AddComponent<Components::PointLight>().first.get();
+	lightObj.localPosition = { 2.5f, 2.5f, 2.5f };
+	Components::PointLight& light1 = lightObj.AddComponent<Components::PointLight>().second.get();
 	light1.color = { 1.f, 1.f, 1.f };
-	auto& mesh3 = lightObj.AddComponent<Components::MeshRenderer>().first.get();
+	auto& mesh3 = lightObj.AddComponent<Components::MeshRenderer>().second.get();
 	mesh3.SetMesh(AssMan::Mesh::Cube);
 	mesh3.scale = { 0.1f, 0.1f, 0.1f };
 
 	auto& obj4 = scene1.NewSceneObject();
-	obj4.transform.localPosition = { 0.f, -7.5f, -10.f };
-	Components::PointLight& light3 = obj4.AddComponent<Components::PointLight>().first.get();
-	auto& mesh4 = obj4.AddComponent<Components::MeshRenderer>().first.get();
+	obj4.localPosition = { 0.f, -7.5f, -10.f };
+	Components::PointLight& light3 = obj4.AddComponent<Components::PointLight>().second.get();
+	auto& mesh4 = obj4.AddComponent<Components::MeshRenderer>().second.get();
 	mesh4.SetMesh(AssMan::Mesh::Cube);
 	mesh4.scale = { 0.1f, 0.1f, 0.1f };
 
@@ -105,52 +107,20 @@ void Engine::Core::Run()
 	scene1.Scripts_SceneStart();
 	while (Application::Core::UpdateEvents(), Application::IsRunning())
 	{
-		// Handles origin movement for camera
-		const float speed = 5.f;
-		auto cross = Math::Vector3D::Cross(camera.forward, camera.up);
-		if (Input::Raw::GetValue(Input::Raw::Button::A))
-			camera.positionOffset -= cross * speed * scene1.GetTimeData().GetDeltaTime();
-		if (Input::Raw::GetValue(Input::Raw::Button::D))
-			camera.positionOffset += cross * speed * scene1.GetTimeData().GetDeltaTime();
-		if (Input::Raw::GetValue(Input::Raw::Button::W))
-			camera.positionOffset += camera.forward *  speed * scene1.GetTimeData().GetDeltaTime();
-		if (Input::Raw::GetValue(Input::Raw::Button::S))
-			camera.positionOffset -= camera.forward * speed * scene1.GetTimeData().GetDeltaTime();
-		if (Input::Raw::GetValue(Input::Raw::Button::Space))
-			camera.positionOffset += Math::Vector3D::Up() * speed * scene1.GetTimeData().GetDeltaTime();
-		if (Input::Raw::GetValue(Input::Raw::Button::LeftCtrl))
-			camera.positionOffset += Math::Vector3D::Down() * speed * scene1.GetTimeData().GetDeltaTime();
-		camera.LookAt({ -1.f, 0, 0 });
-
-		if (Input::Raw::GetValue(Input::Raw::Button::Up))
-			lightObj.transform.localPosition.z -= speed * scene1.GetTimeData().GetDeltaTime();
-		if (Input::Raw::GetValue(Input::Raw::Button::Down))
-			lightObj.transform.localPosition.z += speed * scene1.GetTimeData().GetDeltaTime();
-		if (Input::Raw::GetValue(Input::Raw::Button::Left))
-			lightObj.transform.localPosition.x -= speed * scene1.GetTimeData().GetDeltaTime();
-		if (Input::Raw::GetValue(Input::Raw::Button::Right))
-			lightObj.transform.localPosition.x += speed * scene1.GetTimeData().GetDeltaTime();
-
-		if (Input::Raw::GetEventType(Input::Raw::Button::C) == Input::EventType::Pressed)
-		{
-			scene1.Clear();
-		}
-
-
 		scene1.ScriptTick();
 
 
 		RenderSystem::BuildRenderGraph(scene1, graph);
 		Renderer::Core::PrepareRenderingEarly(graph);
 
-		Renderer::Core::SetCameraInfo(camera.GetRendererCameraInfo());
+		Renderer::Core::SetCameraInfo(GetRendererCameraInfo(camera));
 		RenderSystem::BuildRenderGraphTransform(scene1, graphTransform);
 		Renderer::Core::PrepareRenderingLate(graphTransform);
 
 
 		Renderer::Core::Draw();
 
-
+		Input::Core::ClearValues();
 		Time::Core::TickEnd(scene1.GetTimeData());
 	}
 

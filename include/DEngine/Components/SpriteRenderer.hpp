@@ -1,13 +1,13 @@
 #pragma once
 
-#include "Components.hpp"
+#include "DEngine/Components/Components.hpp"
 
-#include "../AssetManager/AssetManager.hpp"
+#include "DEngine/AssetManager/AssetManager.hpp"
 
 #include "DMath/Vector/Vector.hpp"
 #include "DMath/Matrix/Matrix.hpp"
 
-#include "../Enum.hpp"
+#include "DEngine/Enum.hpp"
 
 namespace Engine
 {
@@ -27,12 +27,12 @@ namespace Engine
 			Math::Matrix<3, 2> GetModel2D_Reduced(Space space) const;
 			Math::Matrix4x4 GetModel(Space space) const;
 
-			Math::Vector2D positionOffset;
-			float rotation;
-			Math::Vector2D scale;
+			Math::Vector2D positionOffset{};
+			float rotation{};
+			Math::Vector2D scale{ 1, 1 };
 
 		private:
-			AssMan::Sprite sprite;
+			AssMan::Sprite sprite = AssMan::Sprite::None;
 		};
 	}
 	

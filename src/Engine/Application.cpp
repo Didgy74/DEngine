@@ -1,6 +1,6 @@
 #include "Application.hpp"
 
-#include "Input/InputRaw.hpp"
+#include "DEngine/Input/InputRaw.hpp"
 
 #include "GLFW/glfw3.h"
 
@@ -30,7 +30,9 @@ namespace Engine
 
 			Input::Raw::Button APIKeyToButton(int32_t apiKey);
 
-			void GLFW_KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+			void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+			void MousePosCallback(GLFWwindow* window, double x, double y);
+			void MouseButtonCallback(GLFWwindow* window, int button, int action, int modifierBits);
 		}
 	}
 }
@@ -71,7 +73,9 @@ namespace Engine
 				glfwMakeContextCurrent(window);
 				glfwSwapInterval(1);
 
-				glfwSetKeyCallback(window, GLFW_KeyCallback);
+				glfwSetKeyCallback(window, &KeyCallback);
+				glfwSetCursorPosCallback(window, &MousePosCallback);
+				glfwSetMouseButtonCallback(window, &MouseButtonCallback);
 
 				data->windowHandle = window;
 				data->windowSize = defaultWindowSize;
@@ -120,13 +124,36 @@ void Engine::Application::Core::Terminate()
 	glfwTerminate();
 }
 
-void Engine::Application::Core::GLFW_KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+void Engine::Application::Core::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	Input::Raw::Button button = APIKeyToButton(key);
 	if (action == GLFW_PRESS)
-		Input::Core::UpdateSingle(true, button);
+		Input::Core::UpdateKey(true, button);
 	else if (action == GLFW_RELEASE)
-		Input::Core::UpdateSingle(false, button);
+		Input::Core::UpdateKey(false, button);
+}
+
+void Engine::Application::Core::MousePosCallback(GLFWwindow* window, double x, double y)
+{
+	Input::Core::UpdateMouseInfo(uint16_t(x), uint16_t(y));
+}
+
+void Engine::Application::Core::MouseButtonCallback(GLFWwindow* window, int button, int action, int modifierBits)
+{
+	if (button == GLFW_MOUSE_BUTTON_1)
+	{
+		if (action == GLFW_PRESS)
+			Input::Core::UpdateKey(true, Input::Raw::Button::LeftMouse);
+		else if (action == GLFW_RELEASE)
+			Input::Core::UpdateKey(false, Input::Raw::Button::LeftMouse);
+	}
+	else if (button == GLFW_MOUSE_BUTTON_2)
+	{
+		if (action == GLFW_PRESS)
+			Input::Core::UpdateKey(true, Input::Raw::Button::RightMouse);
+		else if (action == GLFW_RELEASE)
+			Input::Core::UpdateKey(false, Input::Raw::Button::RightMouse);
+	}
 }
 
 Engine::Input::Raw::Button Engine::Application::Core::APIKeyToButton(int32_t apiKey)

@@ -2,9 +2,9 @@
 
 #include "System.hpp"
 
-#include "../Renderer/Typedefs.hpp"
+#include "DRenderer/Typedefs.hpp"
 
-#include "../Scene.hpp"
+#include "DEngine/Scene.hpp"
 
 // Forward declarations
 namespace Engine

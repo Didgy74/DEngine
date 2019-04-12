@@ -1,67 +1,84 @@
-#include "Camera.hpp"
+#include "DEngine/Components/Camera.hpp"
 
-#include "../SceneObject.hpp"
+#include "DEngine/SceneObject.hpp"
 
 #include "DMath/LinearTransform3D.hpp"
 
-#include "../Renderer/Renderer.hpp"
+#include "DRenderer/Renderer.hpp"
+
+#include <assert.h>
+
+#include <iostream>
 
 namespace Engine
 {
 	namespace Components
 	{
 		Camera::Camera(SceneObject& owningObject) :
-			ParentType(owningObject),
-			positionOffset(),
-			fov(defaultFovY),
-			forward(Math::Vector3D::Back()),
-			up(Math::Vector3D::Up()),
-			zNear(defaultZNear),
-			zFar(defaultZFar),
-			projectionMode(ProjectionMode::Perspective),
-			orthographicWidth(defaultOrtographicWidth)
+			ParentType(owningObject)
 		{
+			//rotation = Math::UnitQuaternion<float>(Math::Vector3D{ 0, 1, 0 }, 180.f);
 		}
 
 		Camera::~Camera()
 		{
 		}
 
-		void Camera::LookAt(const Math::Vector3D& newTarget)
+		void Camera::LookAt(const Math::Vector3D& newTarget, Space space)
 		{
-			forward = (newTarget - positionOffset).GetNormalized();
+			
 		}
 
 		Math::Matrix<4, 3, float> Camera::GetModel_Reduced(Space space) const
 		{
 			using namespace Math::LinTran3D;
-			const auto& localModel = Translate_Reduced(positionOffset);
+			auto localModel = Rotate_Reduced(rotation);
+			AddTranslation(localModel, positionOffset);
 			if (space == Space::Local)
 				return localModel;
 			else
-				return Multiply(GetSceneObject().transform.GetModel_Reduced(Space::World), localModel);
+				return Multiply_Reduced(GetSceneObject().GetModel_Reduced(Space::World), localModel);
 		}
 
-		Renderer::CameraInfo Camera::GetRendererCameraInfo() const
+		Math::Matrix<4, 4, float> Camera::GetModel(Space space) const
 		{
-			Renderer::CameraInfo cameraInfo;
+			return Math::LinTran3D::AsMat4(GetModel_Reduced(space));
+		}
 
-			cameraInfo.fovY = fov;
-			cameraInfo.orthoWidth = orthographicWidth;
-			cameraInfo.zNear = zNear;
-			cameraInfo.zFar = zFar;
+		Math::Matrix<4, 4, float> Camera::GetViewModel(Space space) const
+		{
+			using namespace Math::LinTran3D;
 
-			if (projectionMode == ProjectionMode::Perspective)
-				cameraInfo.projectMode = Renderer::CameraInfo::ProjectionMode::Perspective;
-			else if (projectionMode == ProjectionMode::Orthgraphic)
-				cameraInfo.projectMode = Renderer::CameraInfo::ProjectionMode::Orthographic;
+			auto model = Rotate_Reduced(rotation);
+			AddTranslation(model, positionOffset);
+			
+			// Switch invert Z and X axis
+			Math::Matrix<4, 3, float> testReduced{};
+			for (size_t i = 0; i < 3; i++)
+				testReduced.At(i, i) = 1;
+			testReduced.At(2, 2) = -testReduced.At(2, 2);
+			testReduced.At(0, 0) = -testReduced.At(0, 0);
+			model = Multiply_Reduced(testReduced, model);
+	
+			if (space == Space::World)
+				model = Multiply_Reduced(GetSceneObject().GetModel_Reduced(Space::World), model);
 
-			cameraInfo.transform = Math::LinTran3D::LookAt_RH(positionOffset, positionOffset + forward, up);
+			auto modelMat4 = AsMat4(model);
 
-			auto test = GetModel_Reduced(Space::World);
-			cameraInfo.worldSpacePos = Math::LinTran3D::GetTranslation(test);
+			/*
+			Math::Matrix<4, 4, float> test{};
+			for (size_t i = 0; i < 4; i++)
+				test.At(i, i) = 1;
+			test.At(2, 2) = -1;
+			modelMat4 = test * modelMat4;
+			*/
 
-			return cameraInfo;
+
+			auto inverseOpt = modelMat4.GetInverse();
+			assert(inverseOpt.has_value() && "Error. Couldn't find inverse matrix of camera.");
+			auto inverse = inverseOpt.value();
+
+			return inverse;
 		}
 	}
 }

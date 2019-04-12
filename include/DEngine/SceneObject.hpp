@@ -11,15 +11,19 @@ namespace Engine
 }
 
 #include "Scene.hpp"
-#include "Transform.hpp"
 #include "ComponentReference.hpp"
 #include "Components/Components.hpp"
+#include "Enum.hpp"
 
 #include <vector>
 #include <functional>
 #include <unordered_map>
 #include <typeindex>
 #include <type_traits>
+
+#include "DMath/Vector/Vector.hpp"
+#include "DMath/Matrix/Matrix.hpp"
+#include "DMath/UnitQuaternion.hpp"
 
 namespace Engine
 {
@@ -43,11 +47,30 @@ namespace Engine
 		template<typename T>
 		decltype(auto) AddComponent();
 
-		Transform transform;
+		template<typename T>
+		auto GetComponents();
+		template<typename T>
+		auto GetComponents() const;
 		
+		Math::Vector3D localPosition{};
+		Math::UnitQuaternion<> localRotation{};
+		Math::Vector3D localScale{ 1, 1, 1 };
+
+		Math::Vector3D GetPosition(Space space) const;
+
+		Math::Matrix<4, 3> GetModel_Reduced(Space space) const;
+		Math::Matrix<3, 2> GetModel2D_Reduced(Space space) const;
+
+		Math::Matrix2x2 GetRotationModel2D(Space space) const;
+		Math::Matrix<3, 3, float> GetRotationModel(Space space) const;
+
+		Math::Vector<3, float> GetForwardVector(Space space) const;
+		Math::Vector<3, float> GetUpVector(Space space) const;
+		Math::Vector<3, float> GetRightVector(Space space) const;
+
 	private:
 		std::reference_wrapper<Scene> sceneRef;
-		SceneObject* parent;
+		SceneObject* parent = nullptr;
 		std::vector<SceneObject*> children;
 		std::unordered_map<std::type_index, std::vector<size_t>> components;
 		std::unordered_map<std::type_index, size_t> singletonComponents;
@@ -67,7 +90,7 @@ namespace Engine
 			}
 			else
 			{
-				using ReturnType = std::pair<std::reference_wrapper<T>, CompRef<T>>;
+				using ReturnType = std::pair<CompRef<T>, std::reference_wrapper<T>>;
 
 				auto iterator = components.find(typeid(T));
 				if (iterator == components.end())
@@ -85,7 +108,7 @@ namespace Engine
 					auto guidRefPair = scene.AddComponent<T>(*this);
 					vector.emplace_back(guidRefPair.first);
 
-					return ReturnType{ guidRefPair.second, CompRef<T>(scene, guidRefPair.first) };
+					return ReturnType{ CompRef<T>(scene, guidRefPair.first), guidRefPair.second };
 				}
 			}
 

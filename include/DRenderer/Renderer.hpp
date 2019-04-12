@@ -4,10 +4,12 @@
 #include "Typedefs.hpp"
 #include "OpenGLCreateInfo.hpp"
 
-#include "../Utility/ImgDim.hpp"
+#include "Utility/ImgDim.hpp"
 
 #include "DMath/Vector/Vector.hpp"
 #include "DMath/Matrix/Matrix.hpp"
+
+#include "DTex/DTex.hpp"
 
 #include <memory>
 #include <vector>
@@ -64,7 +66,7 @@ namespace Engine
 	{
 		using MeshLoaderPFN = std::optional<MeshDocument>(*)(size_t);
 		MeshLoaderPFN meshLoader = nullptr;
-		using TextureLoaderPFN = std::optional<TextureDocument>(*)(size_t);
+		using TextureLoaderPFN = std::optional<DTex::TexDoc>(*)(size_t);
 		TextureLoaderPFN textureLoader = nullptr;
 	};
 
@@ -85,14 +87,15 @@ namespace Engine
 		std::vector<SpriteID> sprites;
 		std::vector<MeshID> meshes;
 		
+		std::vector<Math::Vector<3, float>> pointLightIntensities;
 		Math::Vector3D ambientLight;
-		std::vector<Math::Vector<3, float>> pointLights;
 	};
 
 	struct Renderer::RenderGraphTransform
 	{
 		std::vector<Math::Matrix<4, 4, float>> sprites;
 		std::vector<Math::Matrix<4, 4, float>> meshes;
+
 		std::vector<Math::Vector<3, float>> pointLights;
 	};
 

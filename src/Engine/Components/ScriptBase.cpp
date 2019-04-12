@@ -1,4 +1,4 @@
-#include "ScriptBase.hpp"
+#include "DEngine/Components/ScriptBase.hpp"
 
 namespace Engine
 {

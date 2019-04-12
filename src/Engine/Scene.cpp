@@ -1,9 +1,9 @@
-#include "Scene.hpp"
+#include "DEngine/Scene.hpp"
 
 #include <algorithm>
 #include <cassert>
 
-#include "SceneObject.hpp"
+#include "DEngine/SceneObject.hpp"
 
 namespace Engine
 {
@@ -26,6 +26,8 @@ namespace Engine
 	}
 
 	size_t Scene::GetIndexInEngine() const { return indexInEngine; }
+
+	const Time::SceneData& Scene::GetTimeData() const { return timeData; }
 
 	Time::SceneData& Scene::GetTimeData() { return timeData; }
 

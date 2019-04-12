@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Components.hpp"
-#include "../Enum.hpp"
+#include "DEngine/Components/Components.hpp"
+#include "DEngine/Enum.hpp"
 
 #include "DMath/Vector/Vector.hpp"
-
-#include "../Renderer/Renderer.hpp"
+#include "DMath/Matrix/Matrix.hpp"
+#include "DMath/UnitQuaternion.hpp"
 
 namespace Engine
 {
@@ -31,20 +31,19 @@ namespace Engine
 			explicit Camera(SceneObject& owningObject);
 			~Camera();
 
-			Math::Vector3D positionOffset;
-			Math::Vector3D forward;
-			Math::Vector3D up;
+			Math::Vector3D positionOffset{};
+			Math::UnitQuaternion<> rotation{};
+			float fov = defaultFovY;
+			float orthographicWidth = defaultOrtographicWidth;
+			float zNear = defaultZNear;
+			float zFar = defaultZFar;
+			ProjectionMode projectionMode = ProjectionMode::Perspective;
 
-			float fov;
-			float orthographicWidth;
-			float zNear;
-			float zFar;
-			ProjectionMode projectionMode;
-
-			void LookAt(const Math::Vector3D& newTarget);
+			void LookAt(const Math::Vector3D& newTarget, Space space);
 
 			[[nodiscard]] Math::Matrix<4, 3, float> GetModel_Reduced(Space space) const;
-			Renderer::CameraInfo GetRendererCameraInfo() const;
+			[[nodiscard]] Math::Matrix<4, 4, float> GetModel(Space space) const;
+			[[nodiscard]] Math::Matrix<4, 4, float> GetViewModel(Space space) const;
 		};
 	}
 }

@@ -14,7 +14,7 @@ namespace Engine
 
 			constexpr bool enableDebugging = true;
 
-			constexpr std::string_view assetPath = "Data/DRenderer";
+			constexpr std::string_view assetPath = "Data";
 		}
 	}
 }

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Components.hpp"
-#include "../Enum.hpp"
+#include "DEngine/Components/Components.hpp"
+#include "DEngine/Enum.hpp"
 
 #include "DMath/Vector/Vector.hpp"
 

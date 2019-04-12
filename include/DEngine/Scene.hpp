@@ -55,6 +55,8 @@ namespace Engine
 
 		[[nodiscard]] size_t GetIndexInEngine() const;
 
+		const Time::SceneData& GetTimeData() const;
+
 		void Clear();
 
 	private:
@@ -75,7 +77,7 @@ namespace Engine
 		void Scripts_SceneStart();
 		void ScriptTick();
 
-		Time::SceneData &GetTimeData();
+		Time::SceneData& GetTimeData();
 
 		void RemoveSceneObject(SceneObject &owningObject);
 

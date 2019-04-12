@@ -1,10 +1,10 @@
 #include "RenderSystem.hpp"
 
-#include "../Renderer/Renderer.hpp"
+#include "DRenderer/Renderer.hpp"
 
-#include "../Components/SpriteRenderer.hpp"
-#include "../Components/MeshRenderer.hpp"
-#include "../Components/PointLight.hpp"
+#include "DEngine/Components/SpriteRenderer.hpp"
+#include "DEngine/Components/MeshRenderer.hpp"
+#include "DEngine/Components/PointLight.hpp"
 
 #include "DMath/LinearTransform3D.hpp"
 
@@ -36,17 +36,17 @@ namespace Engine
 
 		auto pointLightComponentsPtr = scene.GetAllComponents<Components::PointLight>();
 		if (pointLightComponentsPtr == nullptr)
-			graph.pointLights.clear();
+			graph.pointLightIntensities.clear();
 		else
 		{
 			const auto& pointLightComponents = *pointLightComponentsPtr;
-			graph.pointLights.resize(pointLightComponents.size());
+			graph.pointLightIntensities.resize(pointLightComponents.size());
 			for (size_t i = 0; i < pointLightComponents.size(); i++)
 			{
 				Math::Vector3D color = pointLightComponents[i].color;
 				for (auto& element : color)
 					element = Math::Clamp(element, 0.f, 1.f) * pointLightComponents[i].intensity;
-				graph.pointLights[i] = color;
+				graph.pointLightIntensities[i] = color;
 			}
 		}
 	}

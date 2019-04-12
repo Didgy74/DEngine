@@ -1,6 +1,6 @@
-#include "PointLight.hpp"
+#include "DEngine/Components/PointLight.hpp"
 
-#include "../SceneObject.hpp"
+#include "DEngine/SceneObject.hpp"
 
 #include "DMath/LinearTransform3D.hpp"
 
@@ -9,10 +9,7 @@ namespace Engine
 	namespace Components
 	{
 		PointLight::PointLight(SceneObject& owningObject) :
-			ParentType(owningObject),
-			positionOffset(),
-			intensity(1),
-			color{1.f, 1.f, 1.f}
+			ParentType(owningObject)
 		{
 		}
 
@@ -28,7 +25,7 @@ namespace Engine
 			if (space == Space::Local)
 				return localModel;
 			else
-				return Multiply(GetSceneObject().transform.GetModel_Reduced(Space::World), localModel);
+				return Multiply_Reduced(GetSceneObject().GetModel_Reduced(Space::World), localModel);
 		}
 
 		Math::Matrix4x4 PointLight::GetModel(Space space) const

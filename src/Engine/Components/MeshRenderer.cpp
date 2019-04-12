@@ -1,15 +1,15 @@
-#include "MeshRenderer.hpp"
+#include "DEngine/Components/MeshRenderer.hpp"
 
 #include <vector>
 #include <string>
 #include <cassert>
 
-#include "../Renderer/Renderer.hpp"
+#include "DRenderer/Renderer.hpp"
 
 #include "DMath/LinearTransform3D.hpp"
 
-#include "../Scene.hpp"
-#include "../SceneObject.hpp"
+#include "DEngine/Scene.hpp"
+#include "DEngine/SceneObject.hpp"
 
 namespace Engine
 {
@@ -43,13 +43,13 @@ namespace Engine
 		Math::Matrix<4, 3> MeshRenderer::GetModel_Reduced(Space space) const
 		{
 			using namespace Math::LinTran3D;
-			Math::Matrix<4, 3> localModel = Multiply(Scale_Reduced(scale), Rotate_Reduced(rotation));
+			Math::Matrix<4, 3> localModel = Multiply_Reduced(Scale_Reduced(scale), Rotate_Reduced(rotation));
 			AddTranslation(localModel, positionOffset);
 
 			if (space == Space::Local)
 				return localModel;
 			else
-				return Multiply(GetSceneObject().transform.GetModel_Reduced(Space::World), localModel);
+				return Multiply_Reduced(GetSceneObject().GetModel_Reduced(Space::World), localModel);
 		}
 
 		Math::Matrix4x4 MeshRenderer::GetModel(Space space) const

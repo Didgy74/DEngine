@@ -1,11 +1,11 @@
-#include "Physics2D.hpp"
+#include "DEngine/Physics2D.hpp"
 
-#include "Scene.hpp"
-#include "SceneObject.hpp"
-#include "Components/CircleCollider2D.hpp"
-#include "Components/BoxCollider2D.hpp"
-#include "Components/RigidBody2D.hpp"
-#include "Time/Time.hpp"
+#include "DEngine/Scene.hpp"
+#include "DEngine/SceneObject.hpp"
+#include "DEngine/Components/CircleCollider2D.hpp"
+#include "DEngine/Components/BoxCollider2D.hpp"
+#include "DEngine/Components/RigidBody2D.hpp"
+#include "DEngine/Time/Time.hpp"
 
 #include "DMath/LinearTransform2D.hpp"
 

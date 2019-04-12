@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Components.hpp"
+#include "DEngine/Components/Components.hpp"
 
-#include "../AssetManager/AssetManager.hpp"
+#include "DEngine/AssetManager/AssetManager.hpp"
 
-#include "../Enum.hpp"
+#include "DEngine/Enum.hpp"
 
 #include "DMath/Vector/Vector.hpp"
 #include "DMath/UnitQuaternion.hpp"

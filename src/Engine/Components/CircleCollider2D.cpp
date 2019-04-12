@@ -1,18 +1,16 @@
-#include "CircleCollider2D.hpp"
+#include "DEngine/Components/CircleCollider2D.hpp"
 
 #include "DMath/LinearTransform2D.hpp"
 
-#include "../Scene.hpp"
-#include "../SceneObject.hpp"
+#include "DEngine/Scene.hpp"
+#include "DEngine/SceneObject.hpp"
 
 namespace Engine
 {
 	namespace Components
 	{
 		CircleCollider2D::CircleCollider2D(SceneObject& owningObject) :
-			ParentType(owningObject),
-			radius(0.5f),
-			positionOffset{ 0, 0 }
+			ParentType(owningObject)
 		{
 		}
 
@@ -27,8 +25,8 @@ namespace Engine
 				return localModel;
 			else
 			{
-				const auto& worldSpaceModel = GetSceneObject().transform.GetModel2D_Reduced(Space::World);
-				return Math::LinTran2D::Multiply(worldSpaceModel, localModel);
+				const auto& worldSpaceModel = GetSceneObject().GetModel2D_Reduced(Space::World);
+				return Math::LinTran2D::Multiply_Reduced(worldSpaceModel, localModel);
 			}
 		}
 	}

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Components.hpp"
-#include "../Enum.hpp"
+#include "DEngine/Components/Components.hpp"
+#include "DEngine/Enum.hpp"
 
 #include "DMath/Vector/Vector.hpp"
 #include "DMath/Matrix/Matrix.hpp"
@@ -23,9 +23,9 @@ namespace Engine
 			Math::Matrix2x2 GetRotationModel2D(Space space) const;
 			Math::Matrix3x3 GetRotationModel2D_Homo(Space space) const;
 
-			Math::Vector2D position;
-			float rotation;
-			Math::Vector2D size;
+			Math::Vector2D position{};
+			float rotation{};
+			Math::Vector2D size{ 1, 1 };
 		};
 	}
 }

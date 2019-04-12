@@ -1,12 +1,12 @@
 #pragma once
 
-#include "Components.hpp"
-#include "../Enum.hpp"
+#include "DEngine/Components/Components.hpp"
+#include "DEngine/Enum.hpp"
 
 #include "DMath/Vector/Vector.hpp"
 #include "DMath/Matrix/Matrix.hpp"
 
-#include "../Utility/Color.hpp"
+#include "Utility/Color.hpp"
 
 namespace Engine
 {
@@ -20,9 +20,9 @@ namespace Engine
 			explicit PointLight(SceneObject& owningObject);
 			~PointLight();
 
-			float intensity;
-			Math::Vector3D color;
-			Math::Vector3D positionOffset;
+			float intensity{ 1 };
+			Math::Vector3D color{ 1, 1, 1 };
+			Math::Vector3D positionOffset{};
 
 			[[nodiscard]] Math::Matrix<4, 3> GetModel_Reduced(Space space) const;
 			[[nodiscard]] Math::Matrix4x4 GetModel(Space space) const;
