@@ -66,8 +66,12 @@ namespace Engine
 	{
 		using MeshLoaderPFN = std::optional<MeshDocument>(*)(size_t);
 		MeshLoaderPFN meshLoader = nullptr;
+
 		using TextureLoaderPFN = std::optional<DTex::TexDoc>(*)(size_t);
 		TextureLoaderPFN textureLoader = nullptr;
+
+		using AssetLoadEndPFN = void(*)();
+		AssetLoadEndPFN assetLoadEnd = nullptr;
 	};
 
 	struct Renderer::InitInfo
@@ -82,21 +86,32 @@ namespace Engine
 		OpenGL::InitInfo openGLInitInfo;
 	};
 
+	struct Renderer::MeshID
+	{
+		size_t meshID;
+		size_t diffuseID;
+	};
+
+	struct Renderer::SpriteID
+	{
+		size_t spriteID;
+	};
+
 	struct Renderer::RenderGraph
 	{
 		std::vector<SpriteID> sprites;
 		std::vector<MeshID> meshes;
 		
-		std::vector<Math::Vector<3, float>> pointLightIntensities;
-		Math::Vector3D ambientLight;
+		std::vector<std::array<float, 3>> pointLightIntensities;
+		std::array<float, 3> ambientLight{};
 	};
 
 	struct Renderer::RenderGraphTransform
 	{
-		std::vector<Math::Matrix<4, 4, float>> sprites;
-		std::vector<Math::Matrix<4, 4, float>> meshes;
+		std::vector<std::array<float, 16>> sprites;
+		std::vector<std::array<float, 16>> meshes;
 
-		std::vector<Math::Vector<3, float>> pointLights;
+		std::vector<std::array<float, 3>> pointLights;
 	};
 
 	struct Renderer::CameraInfo

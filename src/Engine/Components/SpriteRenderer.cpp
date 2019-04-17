@@ -21,7 +21,7 @@ namespace Engine
 		{
 		}
 
-		void SpriteRenderer::SetSprite(AssMan::Sprite newSprite)
+		void SpriteRenderer::SetSprite(size_t newSprite)
 		{
 			if (GetSprite() == newSprite)
 				return;
@@ -29,7 +29,7 @@ namespace Engine
 			sprite = newSprite;
 		}
 
-		AssMan::Sprite SpriteRenderer::GetSprite() const { return sprite; }
+		size_t SpriteRenderer::GetSprite() const { return sprite; }
 
 		Math::Matrix<3, 2> SpriteRenderer::GetModel2D_Reduced(Space space) const
 		{

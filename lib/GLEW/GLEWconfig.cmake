@@ -1,27 +1,42 @@
-if (WIN32)
+if(WIN32)
 
-    if (MSVC)
+    if(MSVC)
 
-        set(GLEW_INCLUDE_DIRS ${CMAKE_CURRENT_LIST_DIR}/MSVC/include)
-        set(GLEW_LIBDIR ${CMAKE_CURRENT_LIST_DIR}/MSVC/lib)
-
-        set(GLEW_LIBRARIES "${GLEW_LIBDIR}/glew32s.lib;${GLEW_LIBDIR}/glew32.lib")
-
-        set(GLEW_BINDIR ${CMAKE_CURRENT_LIST_DIR}/MSVC/bin)
-        set(GLEW_BINNAME glew32.dll)
-
+        if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
+		
+			set(GLEW_LIBDIR ${CMAKE_CURRENT_LIST_DIR}/MSVC/x86/lib)
+			set(GLEW_BINDIR ${CMAKE_CURRENT_LIST_DIR}/MSVC/x86/bin)
+			
+		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
+		
+			set(GLEW_LIBDIR ${CMAKE_CURRENT_LIST_DIR}/MSVC/x64/lib)
+			set(GLEW_BINDIR ${CMAKE_CURRENT_LIST_DIR}/MSVC/x64/bin)
+			
+		endif()
+        
+		set(GLEW_LIBRARIES "${GLEW_LIBDIR}/glew32s.lib;${GLEW_LIBDIR}/glew32.lib")
+		
     elseif(MINGW)
+		
+		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
+		
+			set(GLEW_LIBDIR ${CMAKE_CURRENT_LIST_DIR}/MinGW/x86/lib)
+			set(GLEW_BINDIR ${CMAKE_CURRENT_LIST_DIR}/MinGW/x86/bin)
+			
+		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
+		
+			set(GLEW_LIBDIR ${CMAKE_CURRENT_LIST_DIR}/MinGW/x64/lib)
+			set(GLEW_BINDIR ${CMAKE_CURRENT_LIST_DIR}/MinGW/x64/bin)
+			
+		endif() 
 
-        set(GLEW_INCLUDE_DIRS ${CMAKE_CURRENT_LIST_DIR}/MinGW/include)
-
-        set(GLEW_LIBDIR ${CMAKE_CURRENT_LIST_DIR}/MinGW/lib)
-        set(GLEW_LIBRARIES "-L${GLEW_LIBDIR} -lglew32 -lglew32mx")
-
-        set(GLEW_BINDIR ${CMAKE_CURRENT_LIST_DIR}/MinGW/bin)
-        set(GLEW_BINNAME glew32.dll)
+		set(GLEW_LIBRARIES "-L${GLEW_LIBDIR} -lglew32 -lglew32mx")
 
     endif()
 
+	set(GLEW_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/include")
+	
+	set(GLEW_BINNAME glew32.dll)
     set(GLEW_BINARY "${GLEW_BINDIR}/${GLEW_BINNAME}")
 
     add_custom_command(

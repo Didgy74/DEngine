@@ -17,8 +17,6 @@ namespace Engine
 	{
 		MeshRenderer::MeshRenderer(SceneObject& owningSceneObject) :
 			ParentType(owningSceneObject),
-			mesh(AssMan::Mesh::None),
-			positionOffset{ 0, 0, 0 },
 			scale{ 1, 1, 1 },
 			rotation()
 		{
@@ -28,11 +26,9 @@ namespace Engine
 		{
 		}
 
-		AssMan::Mesh MeshRenderer::GetMesh() const { return mesh; }
+		size_t MeshRenderer::GetMesh() const { return mesh; }
 
-		std::underlying_type_t<AssMan::Mesh> MeshRenderer::GetMeshID() const { return static_cast<std::underlying_type_t<AssMan::Mesh>>(GetMesh()); }
-
-		void MeshRenderer::SetMesh(AssMan::Mesh newMesh)
+		void MeshRenderer::SetMesh(size_t newMesh)
 		{
 			if (GetMesh() == newMesh)
 				return;

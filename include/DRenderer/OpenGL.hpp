@@ -13,7 +13,7 @@ namespace Engine
 		{
 			void Initialize(std::any& apiData, const InitInfo& createInfo);
 			void Terminate(std::any& apiData);
-			void PrepareRenderingEarly(const std::vector<SpriteID>& spriteLoadQueue, const std::vector<MeshID>& meshLoadQueue);
+			void PrepareRenderingEarly(const std::vector<size_t>& spriteLoadQueue, const std::vector<size_t>& meshLoadQueue);
 			void PrepareRenderingLate();
 			void Draw();
 		}

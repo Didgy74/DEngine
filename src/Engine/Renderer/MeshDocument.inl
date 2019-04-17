@@ -7,7 +7,7 @@ namespace Engine
 	namespace Renderer
 	{
 		MeshDocument::MeshDocument(CreateInfo&& createInfo) :
-			byteArray(std::move(createInfo.byteArray)),
+			byteArrayRef(std::move(createInfo.byteArrayRef)),
 			indexType(std::move(createInfo.indexType)),
 			indexCount(std::move(createInfo.indexCount)),
 			vertexCount(std::move(createInfo.vertexCount))
@@ -49,9 +49,9 @@ namespace Engine
 			return byteOffsets.at(static_cast<size_t>(attr));
 		}
 
-		const uint8_t* MeshDocument::GetDataPtr(Attribute attr) const
+		const std::byte* MeshDocument::GetDataPtr(Attribute attr) const
 		{
-			return byteArray.data() + GetByteOffset(attr);
+			return byteArrayRef + GetByteOffset(attr);
 		}
 
 		uint32_t MeshDocument::GetVertexCount() const
@@ -71,7 +71,7 @@ namespace Engine
 
 		size_t MeshDocument::GetTotalSizeRequired() const
 		{
-			return byteArray.size();
+			return 0;
 		}
 
 		uint8_t MeshDocument::ToByteSize(IndexType type)
@@ -83,7 +83,7 @@ namespace Engine
 		{
 			CreateInfo returnValue;
 
-			returnValue.byteArray = std::move(input.byteArray);
+			returnValue.byteArrayRef = std::move(input.byteArrayRef);
 			returnValue.vertexCount = std::move(input.vertexCount);
 			returnValue.indexType = std::move(input.indexType);
 			returnValue.indexCount = std::move(input.indexCount);

@@ -190,12 +190,12 @@ namespace Engine
 
 		std::swap(renderGraph, renderGraphInput);
 
-		if (!data.loadSpriteQueue.empty() || !data.loadMeshQueue.empty())
+		if (!data.loadTextureQueue.empty() || !data.loadMeshQueue.empty())
 			LogDebugMessage("Loading sprite/mesh resource(s)...");
-		data.PrepareRenderingEarly(data.loadSpriteQueue, data.loadMeshQueue);
+		data.PrepareRenderingEarly(data.loadTextureQueue, data.loadMeshQueue);
 
-		data.loadSpriteQueue.clear();
-		data.unloadSpriteQueue.clear();
+		data.loadTextureQueue.clear();
+		data.unloadTextureQueue.clear();
 		data.loadMeshQueue.clear();
 		data.unloadMeshQueue.clear();
 	}
@@ -301,42 +301,55 @@ namespace Engine
 			// Sprites
 			for (const auto& item : newRG->sprites)
 			{
-				auto& referenceCount = data.spriteReferences[item];
-				referenceCount++;
-				if (referenceCount == 1)
-					data.loadSpriteQueue.emplace_back(item);
+				auto& textureReferenceCount = data.textureReferences[item.spriteID];
+				textureReferenceCount++;
+				if (textureReferenceCount == 1)
+					data.loadTextureQueue.emplace_back(item.spriteID);
 			}
 
 			// Meshes
 			for (const auto& item : newRG->meshes)
 			{
-				auto& referenceCount = data.meshReferences[item];
-				referenceCount++;
-				if (referenceCount == 1)
-					data.loadMeshQueue.emplace_back(item);
+				auto& meshReferenceCount = data.meshReferences[item.meshID];
+				meshReferenceCount++;
+				if (meshReferenceCount == 1)
+					data.loadMeshQueue.emplace_back(item.meshID);
+
+				auto& textureReferenceCount = data.textureReferences[item.diffuseID];
+				textureReferenceCount++;
+				if (textureReferenceCount == 1)
+					data.loadTextureQueue.emplace_back(item.diffuseID);
 			}
 		}
 
 		// Remove existing references
 		for (const auto& item : oldRG.sprites)
 		{
-			auto iterator = data.spriteReferences.find(item);
-			iterator->second--;
-			if (iterator->second <= 0)
+			auto textureRefIterator = data.textureReferences.find(item.spriteID);
+			textureRefIterator->second--;
+			if (textureRefIterator->second <= 0)
 			{
-				data.unloadSpriteQueue.emplace_back(item);
-				data.spriteReferences.erase(iterator);
+				data.unloadTextureQueue.emplace_back(item.spriteID);
+				data.textureReferences.erase(textureRefIterator);
 			}
 		}
 
 		for (const auto& item : oldRG.meshes)
 		{
-			auto iterator = data.meshReferences.find(item);
-			iterator->second--;
-			if (iterator->second <= 0)
+			auto meshRefIterator = data.meshReferences.find(item.meshID);
+			meshRefIterator->second--;
+			if (meshRefIterator->second <= 0)
 			{
-				data.unloadMeshQueue.emplace_back(item);
-				data.meshReferences.erase(iterator);
+				data.unloadMeshQueue.emplace_back(item.meshID);
+				data.meshReferences.erase(meshRefIterator);
+			}
+
+			auto textureRefIterator = data.textureReferences.find(item.diffuseID);
+			textureRefIterator->second--;
+			if (textureRefIterator->second <= 0)
+			{
+				data.unloadTextureQueue.emplace_back(item.diffuseID);
+				data.textureReferences.erase(textureRefIterator);
 			}
 		}
 	}

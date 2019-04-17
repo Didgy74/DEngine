@@ -22,19 +22,18 @@ namespace Engine
 			explicit MeshRenderer(SceneObject& owningObject);
 			~MeshRenderer();
 
-			[[nodiscard]] AssMan::Mesh GetMesh() const;
-			std::underlying_type_t<AssMan::Mesh> GetMeshID() const;
-			void SetMesh(AssMan::Mesh newMesh);
+			[[nodiscard]] size_t GetMesh() const;
+			void SetMesh(size_t newMesh);
 
 			[[nodiscard]] Math::Matrix<4, 3> GetModel_Reduced(Space space) const;
 			Math::Matrix4x4 GetModel(Space space) const;
 
-			Math::Vector3D positionOffset;
-			Math::UnitQuaternion<> rotation;
-			Math::Vector3D scale;
+			Math::Vector<3, float> positionOffset{};
+			Math::UnitQuaternion<float> rotation{};
+			Math::Vector<3, float> scale{};
 
-		private:
-			AssMan::Mesh mesh;
+			size_t mesh{};
+			size_t texture{};
 		};
 	}
 }

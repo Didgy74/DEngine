@@ -21,18 +21,18 @@ namespace Engine
 
 				API activeAPI = API::None;
 
-				std::unordered_map<MeshID, size_t> meshReferences;
-				std::unordered_map<SpriteID, size_t> spriteReferences;
+				std::unordered_map<size_t, size_t> meshReferences;
+				std::unordered_map<size_t, size_t> textureReferences;
 
-				std::vector<MeshID> loadMeshQueue;
-				std::vector<MeshID> unloadMeshQueue;
-				std::vector<SpriteID> loadSpriteQueue;
-				std::vector<SpriteID> unloadSpriteQueue;
+				std::vector<size_t> loadMeshQueue;
+				std::vector<size_t> unloadMeshQueue;
+				std::vector<size_t> loadTextureQueue;
+				std::vector<size_t> unloadTextureQueue;
 
 				std::vector<std::unique_ptr<Viewport>> viewports;
 
 				std::function<void(void)> Draw;
-				std::function<void(const std::vector<SpriteID>&, const std::vector<MeshID>&)> PrepareRenderingEarly;
+				std::function<void(const std::vector<size_t>&, const std::vector<size_t>&)> PrepareRenderingEarly;
 				std::function<void(void)> PrepareRenderingLate;
 
 				AssetLoadCreateInfo assetLoadData;

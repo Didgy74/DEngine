@@ -14,10 +14,6 @@ namespace Engine
 
 		using ErrorMessageCallbackPFN = std::function<void(std::string_view)>;
 
-		enum class SpriteID : Core::AssetIntegerType {};
-
-		enum class MeshID : Core::AssetIntegerType {};
-
 		struct DebugCreateInfo;
 		struct AssetLoadCreateInfo;
 		struct InitInfo;
@@ -26,8 +22,12 @@ namespace Engine
 
 		enum class API;
 		class Viewport;
+
+		struct MeshID;
+		struct SpriteID;
 		struct RenderGraph;
 		struct RenderGraphTransform;
+
 		struct CameraInfo;
 		struct PointLight;
 	}

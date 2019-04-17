@@ -2,8 +2,6 @@
 
 #include "Engine/Engine.hpp"
 
-#include "DTex/DTex.hpp"
-
 int main(int argc, char* argv[])
 {
 	Engine::Core::Run();

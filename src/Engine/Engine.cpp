@@ -18,6 +18,8 @@
 
 #include "AssManRendererConnect.hpp"
 
+#include "LoadGLTFScene.hpp"
+
 #include <iostream>
 
 std::vector<std::unique_ptr<Engine::Scene>> Engine::Core::scenes;
@@ -43,7 +45,8 @@ namespace Engine
 		rendererInitInfo.surfaceDimensions = Application::GetWindowSize();
 		rendererInitInfo.surfaceHandle = Application::Core::GetMainWindowHandle();
 
-		rendererInitInfo.assetLoadCreateInfo.meshLoader = &LoadMesh;
+		rendererInitInfo.assetLoadCreateInfo.meshLoader = &AssMan::GetRendererMeshDoc;
+		rendererInitInfo.assetLoadCreateInfo.assetLoadEnd = &AssMan::Renderer_AssetLoadEndEvent;
 		rendererInitInfo.assetLoadCreateInfo.textureLoader = &LoadTexture;
 
 		rendererInitInfo.openGLInitInfo.glSwapBuffers = &Application::Core::GL_SwapWindow;
@@ -53,10 +56,10 @@ namespace Engine
 
 void Engine::Core::Run()
 {
+	AssetManager::Core::Initialize();
 	Application::Core::Initialize(Application::API3D::OpenGL);
 	Time::Core::Initialize();
 	Input::Core::Initialize();
-
 	InitializeRenderer();
 
 
@@ -64,41 +67,26 @@ void Engine::Core::Run()
 	Scene& scene1 = Engine::NewScene();
 	Renderer::GetViewport(0).SetSceneRef(&scene1);
 
-
 	auto& objCamera = scene1.NewSceneObject();
 	objCamera.localPosition.z = -5.f;
 	auto& camera = objCamera.AddComponent<Components::Camera>().second.get();
+	camera.zFar = 100000.f;
 	objCamera.AddComponent<Components::FreeLook>();
-
-	auto& sceneObject1 = scene1.NewSceneObject();
-	auto& mesh1 = sceneObject1.AddComponent<Components::MeshRenderer>().second.get();
-	mesh1.SetMesh(AssMan::Mesh::Helmet);
-
-	auto& meshTest = sceneObject1.AddComponent<Components::MeshRenderer>().second.get();
-	meshTest.SetMesh(AssMan::Mesh::Helmet);
-	meshTest.positionOffset.x = -3.f;
-
-	auto& mesh2 = sceneObject1.AddComponent<Components::MeshRenderer>().second.get();
-	mesh2.SetMesh(AssMan::Mesh::Cube);
-	mesh2.positionOffset.x = 2.f;
-
-	
 
 	auto& lightObj = scene1.NewSceneObject();
 	lightObj.localPosition = { 2.5f, 2.5f, 2.5f };
 	Components::PointLight& light1 = lightObj.AddComponent<Components::PointLight>().second.get();
 	light1.color = { 1.f, 1.f, 1.f };
-	auto& mesh3 = lightObj.AddComponent<Components::MeshRenderer>().second.get();
-	mesh3.SetMesh(AssMan::Mesh::Cube);
-	mesh3.scale = { 0.1f, 0.1f, 0.1f };
+	light1.intensity = 0.5f;
 
 	auto& obj4 = scene1.NewSceneObject();
 	obj4.localPosition = { 0.f, -7.5f, -10.f };
-	Components::PointLight& light3 = obj4.AddComponent<Components::PointLight>().second.get();
-	auto& mesh4 = obj4.AddComponent<Components::MeshRenderer>().second.get();
-	mesh4.SetMesh(AssMan::Mesh::Cube);
-	mesh4.scale = { 0.1f, 0.1f, 0.1f };
+	//Components::PointLight& light3 = obj4.AddComponent<Components::PointLight>().second.get();
 
+
+	LoadGLTFScene(scene1, "Data/Sponza2/Sponza.gltf");
+
+	const auto& meshCompVector = scene1.GetAllComponents<Components::MeshRenderer>();
 
 	Renderer::RenderGraph graph;
 	Renderer::RenderGraphTransform graphTransform;
@@ -130,6 +118,7 @@ void Engine::Core::Run()
 	Input::Core::Terminate();
 	Renderer::Core::Terminate();
 	Application::Core::Terminate();
+	AssetManager::Core::Terminate();
 }
 
 void Engine::Core::Destroy(SceneObject& sceneObject)

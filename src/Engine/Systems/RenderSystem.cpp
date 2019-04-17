@@ -20,7 +20,9 @@ namespace Engine
 			const auto& spriteComponents = *spriteComponentsPtr;
 			graph.sprites.resize(spriteComponents.size());
 			for (size_t i = 0; i < spriteComponents.size(); i++)
-				graph.sprites[i] = Renderer::SpriteID(spriteComponents[i].GetSprite());
+			{
+				const auto& spriteComponent = spriteComponents[i];
+			}
 		}
 
 		auto meshComponentsPtr = scene.GetAllComponents<Components::MeshRenderer>();
@@ -31,7 +33,15 @@ namespace Engine
 			const auto& meshComponents = *meshComponentsPtr;
 			graph.meshes.resize(meshComponents.size());
 			for (size_t i = 0; i < meshComponents.size(); i++)
-				graph.meshes[i] = Renderer::MeshID(meshComponents[i].GetMesh());
+			{
+				const auto& meshComponent = meshComponents[i];
+
+				Renderer::MeshID meshID;
+				meshID.meshID = meshComponent.mesh;
+				meshID.diffuseID = meshComponent.texture;
+
+				graph.meshes[i] = meshID;
+			}
 		}
 
 		auto pointLightComponentsPtr = scene.GetAllComponents<Components::PointLight>();
@@ -46,7 +56,7 @@ namespace Engine
 				Math::Vector3D color = pointLightComponents[i].color;
 				for (auto& element : color)
 					element = Math::Clamp(element, 0.f, 1.f) * pointLightComponents[i].intensity;
-				graph.pointLightIntensities[i] = color;
+				graph.pointLightIntensities[i] = { color.x, color.y, color.z };
 			}
 		}
 	}
@@ -61,7 +71,7 @@ namespace Engine
 			const auto& spriteComponents = *spriteComponentsPtr;
 			transforms.sprites.resize(spriteComponents.size());
 			for (size_t i = 0; i < spriteComponents.size(); i++)
-				transforms.sprites[i] = spriteComponents[i].GetModel(Space::World);
+				transforms.sprites[i] = spriteComponents[i].GetModel(Space::World).data;
 		}
 
 		auto meshComponentsPtr = scene.GetAllComponents<Components::MeshRenderer>();
@@ -72,7 +82,7 @@ namespace Engine
 			const auto& meshComponents = *meshComponentsPtr;
 			transforms.meshes.resize(meshComponents.size());
 			for (size_t i = 0; i < meshComponents.size(); i++)
-				transforms.meshes[i] = meshComponents[i].GetModel(Space::World);
+				transforms.meshes[i] = meshComponents[i].GetModel(Space::World).data;
 		}
 
 		auto pointLightComponentsPtr = scene.GetAllComponents<Components::PointLight>();
@@ -86,7 +96,7 @@ namespace Engine
 			{
 				const auto& model = pointLightComponents[i].GetModel_Reduced(Space::World);
 				const Math::Vector3D& position = Math::LinTran3D::GetTranslation(model);
-				transforms.pointLights[i] = position;
+				transforms.pointLights[i] = { position.x, position.y, position.z };
 			}
 		}
 	}

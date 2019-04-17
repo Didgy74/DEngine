@@ -30,15 +30,15 @@ namespace Engine
 			struct CameraDataUBO;
 			struct LightDataUBO;
 
-			void UpdateVBODatabase(Data& data, const std::vector<MeshID>& loadQueue);
-			void UpdateIBODatabase(Data& data, const std::vector<SpriteID>& loadQueue);
+			void UpdateVBODatabase(Data& data, const std::vector<size_t>& loadQueue);
+			void UpdateIBODatabase(Data& data, const std::vector<size_t>& loadQueue);
 			std::optional<VBO> GetVBOFromID(size_t id);
 			std::optional<IBO> GetIBOFromTexDoc(const DTex::TexDoc& input);
 
 			Data& GetAPIData();
 
-			void Draw_SpritePass(const Data& data, const std::vector<SpriteID>& sprites, const std::vector<Math::Matrix4x4>& transforms);
-			void Draw_MeshPass(const Data& data, const std::vector<MeshID>& meshes, const std::vector<Math::Matrix4x4>& transforms);
+			void Draw_SpritePass(const Data& data, const std::vector<SpriteID>& sprites, const std::vector<std::array<float, 16>>& transforms);
+			void Draw_MeshPass(const Data& data, const std::vector<MeshID>& meshes, const std::vector<std::array<float, 16>>& transforms);
 
 			void CreateStandardUBOs(Data& data);
 			void LoadSpriteShader(Data& data);
@@ -95,10 +95,10 @@ namespace Engine
 	{
 		std::function<void(void*)> glSwapBuffers;
 
-		std::unordered_map<MeshID, VBO> vboDatabase;
+		std::unordered_map<size_t, VBO> vboDatabase;
 		VBO quadVBO;
 
-		std::unordered_map<SpriteID, IBO> iboDatabase;
+		std::unordered_map<size_t, IBO> iboDatabase;
 
 		GLuint cameraDataUBO;
 		GLuint lightDataUBO;
@@ -304,8 +304,10 @@ namespace Engine
 		glGenSamplers(1, &data.samplerObject);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glSamplerParameteri(data.samplerObject, GL_TEXTURE_WRAP_R, GL_REPEAT);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		//glSamplerParameteri(data.samplerObject, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_LOD_BIAS, 0);
 		glBindSampler(0, data.samplerObject);
 
@@ -317,7 +319,7 @@ namespace Engine
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 		// Load default texture
-		auto loadResult = DTex::LoadFromFile(std::string{ Setup::assetPath } +"/DRenderer/Textures/02.ktx");
+		auto loadResult = DTex::LoadFromFile(std::string{ Setup::assetPath } + "/DRenderer/Textures/02.ktx");
 		assert(loadResult.GetResultInfo() == DTex::ResultInfo::Success && "Couldn't load the default texture for DRenderer.");
 		data.testIBO = GetIBOFromTexDoc(loadResult.GetValue()).value();
 
@@ -344,18 +346,19 @@ namespace Engine
 		//apiData = nullptr;
 	}
 
-	void Renderer::OpenGL::PrepareRenderingEarly(const std::vector<SpriteID>& spriteLoadQueue, const std::vector<MeshID>& meshLoadQueue)
+	void Renderer::OpenGL::PrepareRenderingEarly(const std::vector<size_t>& spriteLoadQueue, const std::vector<size_t>& meshLoadQueue)
 	{
 		Data& data = GetAPIData();
 
 		UpdateIBODatabase(data, spriteLoadQueue);
 		UpdateVBODatabase(data, meshLoadQueue);
+		Core::GetData().assetLoadData.assetLoadEnd();
 
 		const auto& renderGraph = Core::GetRenderGraph();
 
 		// Update ambient light
 		constexpr GLintptr ambientLightOffset = offsetof(LightDataUBO, LightDataUBO::ambientLight);
-		glNamedBufferSubData(data.lightDataUBO, ambientLightOffset, sizeof(renderGraph.ambientLight), renderGraph.ambientLight.Data());
+		glNamedBufferSubData(data.lightDataUBO, ambientLightOffset, sizeof(renderGraph.ambientLight), renderGraph.ambientLight.data());
 
 		// Update light count
 		auto pointLightCount = static_cast<uint32_t>(renderGraph.pointLightIntensities.size());
@@ -364,10 +367,14 @@ namespace Engine
 
 		// Update intensities
 		const size_t elements = Math::Min(10, renderGraph.pointLightIntensities.size());
-		std::array<Math::Vector4D, 10> intensityData;
+		std::array<std::array<float, 4>, 10> intensityData;
 		for (size_t i = 0; i < elements; i++)
-			intensityData[i] = renderGraph.pointLightIntensities[i].AsVec4();
-		size_t byteLength = sizeof(Math::Vector4D) * elements;
+		{
+			for (size_t j = 0; j < 3; j++)
+				intensityData[i][j] = renderGraph.pointLightIntensities[i][j];
+			intensityData[i][3] = 0.f;
+		}
+		size_t byteLength = sizeof(std::array<float, 4>) * elements;
 		constexpr GLintptr pointLightIntensityOffset = offsetof(LightDataUBO, LightDataUBO::pointLightIntensity);
 		glNamedBufferSubData(data.lightDataUBO, pointLightIntensityOffset, byteLength, intensityData.data());
 	}
@@ -380,10 +387,14 @@ namespace Engine
 
 		// Update lights positions
 		const size_t elements = Math::Min(10, renderGraphTransform.pointLights.size());
-		std::array<Math::Vector4D, 10> posData;
+		std::array<std::array<float, 4>, 10> posData;
 		for (size_t i = 0; i < elements; i++)
-			posData[i] = renderGraphTransform.pointLights[i].AsVec4();
-		size_t byteLength = sizeof(Math::Vector4D) * elements;
+		{
+			for (size_t j = 0; j < 3; j++)
+				posData[i][j] = renderGraphTransform.pointLights[i][j];
+			posData[i][3] = 0.f;
+		}
+		size_t byteLength = sizeof(std::array<float, 4>) * elements;
 		constexpr GLintptr pointLightPosDataOffset = offsetof(LightDataUBO, LightDataUBO::pointLightPos);
 		glNamedBufferSubData(data.lightDataUBO, pointLightPosDataOffset, byteLength, posData.data());
 
@@ -422,7 +433,7 @@ namespace Engine
 
 	void Renderer::OpenGL::Draw_SpritePass(const Data& data,
 										   const std::vector<SpriteID>& sprites,
-										   const std::vector<Math::Matrix4x4>& transforms)
+										   const std::vector<std::array<float, 16>>& transforms)
 	{
 		auto& viewport = Renderer::GetViewport(0);
 
@@ -439,10 +450,10 @@ namespace Engine
 
 			for (size_t i = 0; i < sprites.size(); i++)
 			{
-				glProgramUniformMatrix4fv(data.spriteProgram, data.spriteModelUniform, 1, GL_FALSE, transforms[i].data.data());
+				glProgramUniformMatrix4fv(data.spriteProgram, data.spriteModelUniform, 1, GL_FALSE, transforms[i].data());
 
 				glActiveTexture(GL_TEXTURE0);
-				const IBO& ibo = data.iboDatabase.at(sprites[i]);
+				const IBO& ibo = data.iboDatabase.at(sprites[i].spriteID);
 				glBindTexture(GL_TEXTURE_2D, ibo.texture);
 
 				glDrawElements(GL_TRIANGLES, spriteVBO.numIndices, spriteVBO.indexType, nullptr);
@@ -451,8 +462,8 @@ namespace Engine
 	}
 
 	void Renderer::OpenGL::Draw_MeshPass(const Data &data,
-										 const std::vector<Engine::Renderer::MeshID> &meshes,
-									     const std::vector<Math::Matrix4x4> &transforms)
+										 const std::vector<MeshID> &meshes,
+									     const std::vector<std::array<float, 16>> &transforms)
 	{
 		auto& viewport = Renderer::GetViewport(0);
 
@@ -460,50 +471,57 @@ namespace Engine
 		{
 			glUseProgram(data.meshProgram);
 
-			glUniform1ui(data.meshTextureUniform, 0);
-
-			glActiveTexture(GL_TEXTURE0);
-
-			glBindTexture(GL_TEXTURE_2D, data.testIBO.texture);
+			glProgramUniform1ui(data.meshProgram, data.meshTextureUniform, 0);
 
 			for (size_t i = 0; i < meshes.size(); i++)
 			{
-				glProgramUniformMatrix4fv(data.meshProgram, data.meshModelUniform, 1, GL_FALSE, transforms[i].data.data());
+				glProgramUniformMatrix4fv(data.meshProgram, data.meshModelUniform, 1, GL_FALSE, transforms[i].data());
 
-				const VBO& vbo = data.vboDatabase.at(meshes[i]);
+				const VBO& vbo = data.vboDatabase.at(meshes[i].meshID);
 				glBindVertexArray(vbo.vertexArrayObject);
+
+				glActiveTexture(GL_TEXTURE0);
+				auto iboIterator = data.iboDatabase.find(meshes[i].diffuseID);
+				if (iboIterator == data.iboDatabase.end())
+				{
+					std::stringstream stream;
+					stream << "Index: " << i << std::endl;
+					stream << "TextureID: " << meshes[i].diffuseID;
+					LogDebugMessage(stream.str());
+					glBindTexture(GL_TEXTURE_2D, data.testIBO.texture);
+				}
+				else
+					glBindTexture(GL_TEXTURE_2D, iboIterator->second.texture);
 
 				glDrawElements(GL_TRIANGLES, vbo.numIndices, vbo.indexType, nullptr);
 			}
 		}
 	}
 
-	void Renderer::OpenGL::UpdateVBODatabase(Data& data, const std::vector<MeshID>& loadQueue)
+	void Renderer::OpenGL::UpdateVBODatabase(Data& data, const std::vector<size_t>& loadQueue)
 	{
 		for (const auto& id : loadQueue)
 		{
-			auto vboOpt = GetVBOFromID(static_cast<size_t>(id));
+			auto vboOpt = GetVBOFromID(id);
 			assert(vboOpt.has_value());
 
 			data.vboDatabase.insert({ id, vboOpt.value() });
 		}
 	}
 
-	void Renderer::OpenGL::UpdateIBODatabase(Data& data, const std::vector<SpriteID>& loadQueue)
+	void Renderer::OpenGL::UpdateIBODatabase(Data& data, const std::vector<size_t>& loadQueue)
 	{
-		//glActiveTexture(GL_TEXTURE0);
+		glActiveTexture(GL_TEXTURE0);
 
 		for (const auto& id : loadQueue)
 		{
-			auto texDocOpt = Core::GetData().assetLoadData.textureLoader(size_t(id));
-			if (!texDocOpt.has_value())
-				continue;
+			auto texDocOpt = Core::GetData().assetLoadData.textureLoader(id);
+			assert(texDocOpt.has_value() && "Failed to load Texture from texture-loader.");
 
 			auto& texDoc = texDocOpt.value();
 
 			auto iboOpt = GetIBOFromTexDoc(texDoc);
-			if (!iboOpt.has_value())
-				continue;
+			assert(iboOpt.has_value() && "Failed to make IBO from Texture Document.");
 
 			data.iboDatabase.insert({ id, iboOpt.value() });
 		}
@@ -526,6 +544,9 @@ namespace Engine
 
 		glBindTexture(target, ibo.texture);
 
+		glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+		glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, GLint(input.GetMipLevels() - 1));
+
 		for (GLint level = 0; level < GLint(input.GetMipLevels()); level++)
 		{
 			GLsizei width = GLsizei(input.GetDimensions(level).width);
@@ -537,12 +558,6 @@ namespace Engine
 				glCompressedTexImage2D(target, level, format, width, height, 0, dataLength, data);
 			else
 				glTexImage2D(target, level, format, width, height, 0, format, type, data);
-		}
-
-		if (input.GetMipLevels() > 1)
-		{
-			glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
-			glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, input.GetMipLevels() - 1);
 		}
 
 		return ibo;

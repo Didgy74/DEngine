@@ -47,7 +47,7 @@ void main()
 		specular += pow(max(dot(pointToCameraDir, reflectDir), 0.0), coefficient) * vec3(1);
 	}
 	
-	vec3 resultColor = lightData.ambientLight.xyz + diffuse + specular;
-	resultColor = resultColor * texture(myTexture, fragData.uv).xyz;
+	vec3 resultColor =  diffuse;
+	resultColor = resultColor * texture(myTexture, fragData.uv).rgb;
 	frag_color = vec4(resultColor, 1.0);
 }

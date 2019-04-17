@@ -66,7 +66,7 @@ namespace Engine
 			
 
 			// Handles origin movement for camera
-			constexpr float speed = 5.f;
+			constexpr float speed = 15.f;
 
 			if (Input::Raw::GetValue(Input::Raw::Button::A))
 				obj.localPosition += right * speed * deltaTime;

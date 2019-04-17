@@ -21,8 +21,8 @@ namespace Engine
 			explicit SpriteRenderer(SceneObject& owningObject);
 			~SpriteRenderer();
 
-			void SetSprite(AssMan::Sprite newTexture);
-			[[nodiscard]] AssMan::Sprite GetSprite() const;
+			void SetSprite(size_t newTexture);
+			[[nodiscard]] size_t GetSprite() const;
 
 			Math::Matrix<3, 2> GetModel2D_Reduced(Space space) const;
 			Math::Matrix4x4 GetModel(Space space) const;
@@ -32,7 +32,7 @@ namespace Engine
 			Math::Vector2D scale{ 1, 1 };
 
 		private:
-			AssMan::Sprite sprite = AssMan::Sprite::None;
+			size_t sprite{};
 		};
 	}
 	
