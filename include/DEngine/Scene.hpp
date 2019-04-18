@@ -30,9 +30,8 @@ namespace Engine
 	public:
 		explicit Scene(size_t indexInEngine);
 
-		Scene(const Scene &right) = delete;
-
-		Scene(Scene &&right) noexcept = delete;
+		Scene(const Scene&) = delete;
+		Scene(Scene&&) = delete;
 
 		~Scene();
 

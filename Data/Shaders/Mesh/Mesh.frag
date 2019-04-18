@@ -25,8 +25,14 @@ layout(location = 0) out vec4 frag_color;
 
 uniform sampler2D myTexture;
 
+float constant = 1.0;
+float linear = 0.09;
+float quadratic = 0.032;
+
 void main()
 {
+	vec3 color = texture(myTexture, fragData.uv).rgb;
+
 	vec3 pointToCamera = cameraData.wsPosition - fragData.wsPosition;
 	vec3 pointToCameraDir = normalize(pointToCamera);
 
@@ -35,19 +41,24 @@ void main()
 	for (int i = 0; i < lightData.pointLightCount; i++)
 	{
 		vec3 pointToLight = lightData.pointLightPos[i].xyz - fragData.wsPosition;
+		
+		float distance = length(pointToLight);
+		float attenuation = 1.0 / (constant + linear * distance + quadratic * (distance * distance));
+		
 		vec3 pointToLightDir = normalize(pointToLight);
 		
-		diffuse += max(0, dot(pointToLightDir, fragData.wsNormal)) * vec3(lightData.pointLightIntensity[i]);
+		diffuse += max(0, dot(pointToLightDir, fragData.wsNormal)) * attenuation * lightData.pointLightIntensity[i].xyz;
 		
-		vec3 lightToPointDir = -pointToLightDir;
 		
-		vec3 reflectDir = reflect(lightToPointDir, fragData.wsNormal);
+		vec3 lightToPointDir = normalize(-pointToLightDir);
 		
-		const float coefficient = 50;
-		specular += pow(max(dot(pointToCameraDir, reflectDir), 0.0), coefficient) * vec3(1);
+		vec3 reflectDir = normalize(reflect(lightToPointDir, fragData.wsNormal));
+		
+		float coefficient = 100;
+		specular += vec3(pow(max(dot(pointToCameraDir, reflectDir), 0.0), coefficient) * lightData.pointLightIntensity[i] * attenuation);
 	}
 	
-	vec3 resultColor =  diffuse;
-	resultColor = resultColor * texture(myTexture, fragData.uv).rgb;
+	vec3 resultIntensity = diffuse * color + specular;
+	vec3 resultColor = resultIntensity;
 	frag_color = vec4(resultColor, 1.0);
 }

@@ -4,6 +4,8 @@
 
 #include <cassert>
 
+#include <iostream>
+
 namespace Engine
 {
 	Renderer::CameraInfo GetRendererCameraInfo(const Components::Camera& in)
@@ -16,6 +18,8 @@ namespace Engine
 		cameraInfo.zFar = in.zFar;
 
 		cameraInfo.transform = in.GetViewModel(Space::World);
+
+		cameraInfo.worldSpacePos = in.GetPosition(Space::World);
 
 		switch (in.projectionMode)
 		{

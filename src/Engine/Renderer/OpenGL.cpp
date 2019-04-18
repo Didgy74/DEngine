@@ -1,5 +1,5 @@
 #include "DRenderer/Renderer.hpp"
-#include "DRenderer/RendererData.hpp"
+#include "RendererData.hpp"
 #include "DRenderer/MeshDocument.hpp"
 #include "DRenderer/OpenGL.hpp"
 

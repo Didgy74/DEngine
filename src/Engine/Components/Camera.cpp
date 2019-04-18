@@ -65,20 +65,30 @@ namespace Engine
 
 			auto modelMat4 = AsMat4(model);
 
-			/*
-			Math::Matrix<4, 4, float> test{};
-			for (size_t i = 0; i < 4; i++)
-				test.At(i, i) = 1;
-			test.At(2, 2) = -1;
-			modelMat4 = test * modelMat4;
-			*/
-
 
 			auto inverseOpt = modelMat4.GetInverse();
 			assert(inverseOpt.has_value() && "Error. Couldn't find inverse matrix of camera.");
 			auto inverse = inverseOpt.value();
 
 			return inverse;
+		}
+
+		Math::Vector<3, float> Camera::GetPosition(Space space) const
+		{
+			using namespace Math::LinTran3D;
+
+			auto localPos = positionOffset;
+			if (space == Space::Local)
+				return localPos;
+			else if (space == Space::World)
+			{
+				return GetSceneObject().GetPosition(space);
+			}
+			else
+			{
+				assert(false && "Invalid enum value.");
+				return {};
+			}
 		}
 	}
 }

@@ -16,7 +16,7 @@ namespace Engine
 
 		auto& sceneObj = scene.NewSceneObject();
 
-		sceneObj.localScale = { 0.1f, 0.1f, 0.1f };
+		sceneObj.localScale = { gltfDoc.nodes[0].scale[0], gltfDoc.nodes[0].scale[1], gltfDoc.nodes[0].scale[2], };
 
 		for (size_t meshIndex = 0; meshIndex < gltfDoc.meshes.size(); meshIndex++)
 		{

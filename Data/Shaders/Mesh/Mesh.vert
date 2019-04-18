@@ -24,6 +24,7 @@ void main()
 	gl_Position = cameraData.viewProjection * model * vec4(vtxPosition, 1.0);
 	
 	fragData.wsPosition = vec3(model * vec4(vtxPosition, 1.0));
-	fragData.wsNormal = mat3(transpose(inverse(model))) * vtxNormal;
+	fragData.wsNormal = normalize(transpose(inverse(mat3(model))) * vtxNormal);
 	fragData.uv = vtxUV;
 }
+

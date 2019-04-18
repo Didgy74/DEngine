@@ -18,10 +18,10 @@ namespace Engine
 			struct Data
 			{
 				size_t meshIDCounter = 0;
-				std::map<size_t, MeshInfo> meshAssetDatabase;
+				std::unordered_map<size_t, MeshInfo> meshAssetDatabase;
 
 				size_t textureIDCounter = 0;
-				std::map<size_t, TextureInfo> textureAssetDatabase;
+				std::unordered_map<size_t, TextureInfo> textureAssetDatabase;
 
 				std::map<std::string, fx::gltf::Document> openGLTFDocs;
 			};

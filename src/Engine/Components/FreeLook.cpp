@@ -7,8 +7,6 @@
 #include "DEngine/SceneObject.hpp"
 #include "DEngine/Scene.hpp"
 
-#include <iostream>
-
 namespace Engine
 {
 	namespace Components
@@ -61,12 +59,8 @@ namespace Engine
 			Math::Vector3D forward{ mat[2][0], mat[2][1], mat[2][2] };
 			
 
-			
-
-			
-
 			// Handles origin movement for camera
-			constexpr float speed = 15.f;
+			constexpr float speed = 5.f;
 
 			if (Input::Raw::GetValue(Input::Raw::Button::A))
 				obj.localPosition += right * speed * deltaTime;

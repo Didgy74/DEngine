@@ -14,6 +14,8 @@
 #include "DEngine/Components/MeshRenderer.hpp"
 #include "DEngine/Components/PointLight.hpp"
 
+#include "SinusMovement.hpp"
+
 #include "Systems/RenderSystem.hpp"
 
 #include "AssManRendererConnect.hpp"
@@ -70,14 +72,15 @@ void Engine::Core::Run()
 	auto& objCamera = scene1.NewSceneObject();
 	objCamera.localPosition.z = -5.f;
 	auto& camera = objCamera.AddComponent<Components::Camera>().second.get();
-	camera.zFar = 100000.f;
+	camera.zFar = 10000.f;
 	objCamera.AddComponent<Components::FreeLook>();
 
 	auto& lightObj = scene1.NewSceneObject();
-	lightObj.localPosition = { 2.5f, 2.5f, 2.5f };
+	lightObj.localPosition = { 0.f, 1.f, 0.f };
 	Components::PointLight& light1 = lightObj.AddComponent<Components::PointLight>().second.get();
 	light1.color = { 1.f, 1.f, 1.f };
-	light1.intensity = 0.5f;
+	light1.intensity = 2.f;
+	lightObj.AddComponent<Assignment02::SinusMovement>();
 
 	auto& obj4 = scene1.NewSceneObject();
 	obj4.localPosition = { 0.f, -7.5f, -10.f };
@@ -97,14 +100,12 @@ void Engine::Core::Run()
 	{
 		scene1.ScriptTick();
 
-
 		RenderSystem::BuildRenderGraph(scene1, graph);
 		Renderer::Core::PrepareRenderingEarly(graph);
 
 		Renderer::Core::SetCameraInfo(GetRendererCameraInfo(camera));
 		RenderSystem::BuildRenderGraphTransform(scene1, graphTransform);
 		Renderer::Core::PrepareRenderingLate(graphTransform);
-
 
 		Renderer::Core::Draw();
 
