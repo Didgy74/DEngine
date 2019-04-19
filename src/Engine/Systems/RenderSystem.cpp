@@ -12,19 +12,7 @@ namespace Engine
 {
 	void RenderSystem::BuildRenderGraph(const Scene& scene, Renderer::RenderGraph& graph)
 	{
-		auto spriteComponentsPtr = scene.GetAllComponents<Components::SpriteRenderer>();
-		if (spriteComponentsPtr == nullptr)
-			graph.sprites.clear();
-		else
-		{
-			const auto& spriteComponents = *spriteComponentsPtr;
-			graph.sprites.resize(spriteComponents.size());
-			for (size_t i = 0; i < spriteComponents.size(); i++)
-			{
-				const auto& spriteComponent = spriteComponents[i];
-			}
-		}
-
+		// Copies all the MeshID and TextureID data (no positional data) from the components into the RenderGraph
 		auto meshComponentsPtr = scene.GetAllComponents<Components::MeshRenderer>();
 		if (meshComponentsPtr == nullptr)
 			graph.meshes.clear();
@@ -44,6 +32,7 @@ namespace Engine
 			}
 		}
 
+		// Loads all PointLight data (no positional data) onto the RenderGraph struct.
 		auto pointLightComponentsPtr = scene.GetAllComponents<Components::PointLight>();
 		if (pointLightComponentsPtr == nullptr)
 			graph.pointLightIntensities.clear();
@@ -63,17 +52,9 @@ namespace Engine
 
 	void RenderSystem::BuildRenderGraphTransform(const Scene& scene, Renderer::RenderGraphTransform& transforms)
 	{
-		auto spriteComponentsPtr = scene.GetAllComponents<Components::SpriteRenderer>();
-		if (spriteComponentsPtr == nullptr)
-			transforms.sprites.clear();
-		else
-		{
-			const auto& spriteComponents = *spriteComponentsPtr;
-			transforms.sprites.resize(spriteComponents.size());
-			for (size_t i = 0; i < spriteComponents.size(); i++)
-				transforms.sprites[i] = spriteComponents[i].GetModel(Space::World).data;
-		}
-
+		// Copies all the Mesh-components' positional data onto the RenderGraphTransform struct.
+		// This copies a full 4x4 matrix, it's faster because everything has
+		// to be converted to that format to move up the parent SceneObject chain anyways
 		auto meshComponentsPtr = scene.GetAllComponents<Components::MeshRenderer>();
 		if (meshComponentsPtr == nullptr)
 			transforms.meshes.clear();
@@ -85,6 +66,7 @@ namespace Engine
 				transforms.meshes[i] = meshComponents[i].GetModel(Space::World).data;
 		}
 
+		// Loads all the PointLight components' positional data over to the RenderGraphTransform
 		auto pointLightComponentsPtr = scene.GetAllComponents<Components::PointLight>();
 		if (pointLightComponentsPtr == nullptr)
 			transforms.pointLights.clear();
@@ -94,8 +76,7 @@ namespace Engine
 			transforms.pointLights.resize(pointLightComponents.size());
 			for (size_t i = 0; i < pointLightComponents.size(); i++)
 			{
-				const auto& model = pointLightComponents[i].GetModel_Reduced(Space::World);
-				const Math::Vector3D& position = Math::LinTran3D::GetTranslation(model);
+				const auto& position = pointLightComponents[i].GetPosition(Space::World);
 				transforms.pointLights[i] = { position.x, position.y, position.z };
 			}
 		}

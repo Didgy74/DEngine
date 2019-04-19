@@ -15,8 +15,8 @@ namespace Engine
 		struct MeshInfo
 		{
 			std::string path;
-			size_t meshIndex;
-			size_t primitiveIndex;
+			size_t meshIndex = 0;
+			size_t primitiveIndex = 0;
 
 			bool operator==(const MeshInfo& right) const;
 		};

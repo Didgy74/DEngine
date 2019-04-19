@@ -26,6 +26,7 @@ namespace Engine
 
 			[[nodiscard]] Math::Matrix<4, 3> GetModel_Reduced(Space space) const;
 			[[nodiscard]] Math::Matrix4x4 GetModel(Space space) const;
+			[[nodiscard]] Math::Vector<3, float> GetPosition(Space space) const;
 		};
 	}
 }

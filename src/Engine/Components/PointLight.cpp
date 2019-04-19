@@ -33,5 +33,10 @@ namespace Engine
 			using namespace Math::LinTran3D;
 			return AsMat4(GetModel_Reduced(space));
 		}
+
+		Math::Vector<3, float> PointLight::GetPosition(Space space) const
+		{
+			return Math::LinTran3D::GetTranslation(GetModel_Reduced(space));
+		}
 	}
 }

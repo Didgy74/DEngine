@@ -215,11 +215,12 @@ namespace Engine
 		data.spriteSamplerUniform = glGetUniformLocation(data.spriteProgram, "sampler");
 	}
 
-	void Renderer::OpenGL::LoadMeshShader(Engine::Renderer::OpenGL::Data &data)
+	void Renderer::OpenGL::LoadMeshShader(Data &data)
 	{
 		// Create shader
 		data.meshProgram = glCreateProgram();
 
+		// Links the shader files to the shader program.
 		std::array<GLuint, 2> shader{};
 		shader[0] = CreateShader(LoadShader("Data/Shaders/Mesh/Mesh.vert"), GL_VERTEX_SHADER);
 		shader[1] = CreateShader(LoadShader("Data/Shaders/Mesh/Mesh.frag"), GL_FRAGMENT_SHADER);
@@ -239,9 +240,6 @@ namespace Engine
 		// Grab uniforms
 		data.meshModelUniform = glGetUniformLocation(data.meshProgram, "model");
 		data.meshTextureUniform = glGetUniformLocation(data.meshProgram, "texture");
-
-
-		glUniformBlockBinding(data.meshProgram, 1, 1);
 	}
 
 	void Renderer::OpenGL::CreateStandardUBOs(Data& data)
@@ -249,15 +247,14 @@ namespace Engine
 		std::array<GLuint, 2> buffers;
 		glGenBuffers(2, buffers.data());
 
+		// Make camera ubo, bind it to 0
 		data.cameraDataUBO = buffers[0];
-		data.lightDataUBO = buffers[1];
-
-		// Make camera ubo
 		glBindBuffer(GL_UNIFORM_BUFFER, data.cameraDataUBO);
 		glNamedBufferData(data.cameraDataUBO, sizeof(CameraDataUBO), nullptr, GL_DYNAMIC_DRAW);
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, data.cameraDataUBO, 0, sizeof(CameraDataUBO));
 
-		// Make light ubo
+		// Make light ubo, bind it to 1
+		data.lightDataUBO = buffers[1];
 		glBindBuffer(GL_UNIFORM_BUFFER, data.lightDataUBO);
 		glNamedBufferData(data.lightDataUBO, sizeof(LightDataUBO), nullptr, GL_DYNAMIC_DRAW);
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, data.lightDataUBO, 0, sizeof(LightDataUBO));
@@ -270,9 +267,11 @@ namespace Engine
 
     void Renderer::OpenGL::Initialize(std::any& apiData, const InitInfo& createInfo)
 	{
+		// Initializes GLEW
 		auto glInitResult = glewInit();
 		assert(glInitResult == 0);
 
+		// Allocates the memory associated with the OpenGL rendering.
 		apiData = std::make_any<Data>();
 		Data& data = std::any_cast<Data&>(apiData);
 
@@ -298,9 +297,10 @@ namespace Engine
 			}
 		}
 
+		// Creates UBO buffers for camera and lighting data.
 		CreateStandardUBOs(data);
 
-		// Gen sampler
+		// We only use 1 Sampler Object in this project. We generate it here and set its parameters.
 		glGenSamplers(1, &data.samplerObject);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -311,20 +311,21 @@ namespace Engine
 		glSamplerParameteri(data.samplerObject, GL_TEXTURE_LOD_BIAS, 0);
 		glBindSampler(0, data.samplerObject);
 
+		// Basic OpenGL settings.
 		glEnable(GL_DEPTH_TEST);
-
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_BACK);
 
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-		// Load default texture
+		// Load default texture, this texture will ordinarily be used if the renderer can't find the one it's supposed to use.
 		auto loadResult = DTex::LoadFromFile(std::string{ Setup::assetPath } + "/DRenderer/Textures/02.ktx");
 		assert(loadResult.GetResultInfo() == DTex::ResultInfo::Success && "Couldn't load the default texture for DRenderer.");
 		data.testIBO = GetIBOFromTexDoc(loadResult.GetValue()).value();
 
 
 		//LoadSpriteShader(data);
+		// Loads the mesh shader and initializes it.
 		LoadMeshShader(data);
 	}
 
@@ -350,11 +351,17 @@ namespace Engine
 	{
 		Data& data = GetAPIData();
 
+		// Loads any needed texture into the unordered_map of IBOs in Data.
 		UpdateIBODatabase(data, spriteLoadQueue);
+		// Loads any needed meshes into the unordered_map of VBOs in Data.
 		UpdateVBODatabase(data, meshLoadQueue);
+		// Sends signal that the renderer is done loading assets to render this frame.
+		// This helps the AssetManager know when it can discard loaded assets in CPU memory.
 		Core::GetData().assetLoadData.assetLoadEnd();
 
 		const auto& renderGraph = Core::GetRenderGraph();
+
+		// Below we load all light intensities, colors etc. onto our Camera UBO.
 
 		// Update ambient light
 		constexpr GLintptr ambientLightOffset = offsetof(LightDataUBO, LightDataUBO::ambientLight);
@@ -384,6 +391,8 @@ namespace Engine
 		Data& data = GetAPIData();
 
 		const auto& renderGraphTransform = Core::GetRenderGraphTransform();
+
+		// Below we load all non-drawcall positional data onto OpenGL. This includes light- and camera positional data.
 
 		// Update lights positions
 		const size_t elements = Math::Min(10, renderGraphTransform.pointLights.size());
@@ -423,11 +432,13 @@ namespace Engine
 		const auto& renderGraph = Core::GetRenderGraph();
 		const auto& renderGraphTransform = Core::GetRenderGraphTransform();
 
-		Draw_SpritePass(data, renderGraph.sprites, renderGraphTransform.sprites);
+		//Draw_SpritePass(data, renderGraph.sprites, renderGraphTransform.sprites);
+		// Here our Mesh rendering-pass begins and ends.
 		Draw_MeshPass(data, renderGraph.meshes, renderGraphTransform.meshes);
 
 		auto& viewport = Renderer::GetViewport(0);
 
+		// At the end of the drawing process, we grab the surface handle we drew on and swap the GL Buffers.
 		data.glSwapBuffers(viewport.GetSurfaceHandle());
 	}
 
@@ -473,13 +484,18 @@ namespace Engine
 
 			glProgramUniform1ui(data.meshProgram, data.meshTextureUniform, 0);
 
+			// Iterates over all Mesh-components to be drawn
 			for (size_t i = 0; i < meshes.size(); i++)
 			{
+				// Updates the model matrix
 				glProgramUniformMatrix4fv(data.meshProgram, data.meshModelUniform, 1, GL_FALSE, transforms[i].data());
 
+				// Find the correct vertex array object and binds it.
 				const VBO& vbo = data.vboDatabase.at(meshes[i].meshID);
 				glBindVertexArray(vbo.vertexArrayObject);
 
+				// Finds the correct texture object and binds it. If we couldn't find it,
+				// then we bind the default texture for the renderer. And log an error output.
 				glActiveTexture(GL_TEXTURE0);
 				auto iboIterator = data.iboDatabase.find(meshes[i].diffuseID);
 				if (iboIterator == data.iboDatabase.end())
@@ -493,6 +509,7 @@ namespace Engine
 				else
 					glBindTexture(GL_TEXTURE_2D, iboIterator->second.texture);
 
+				// We draw elements using information we got from our VBO
 				glDrawElements(GL_TRIANGLES, vbo.numIndices, vbo.indexType, nullptr);
 			}
 		}
@@ -531,9 +548,11 @@ namespace Engine
 	{
 		IBO ibo;
 
+		// Grabs the OpenGL data from the DTex::TexDoc structure.
 		GLenum target = DTex::ToGLTarget(input.GetTextureType());
 		GLint format = DTex::ToGLFormat(input.GetPixelFormat());
 		GLenum type = DTex::ToGLType(input.GetPixelFormat());
+
 		if (target == 0 || format == 0)
 		{
 			LogDebugMessage("Error. Texture can not be used in OpenGL.");
@@ -544,9 +563,11 @@ namespace Engine
 
 		glBindTexture(target, ibo.texture);
 
+		// Sets mipmapping parameters.
 		glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
 		glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, GLint(input.GetMipLevels() - 1));
 
+		// Iterates over mipmap-levels and loads all image data onto OpenGL.
 		for (GLint level = 0; level < GLint(input.GetMipLevels()); level++)
 		{
 			GLsizei width = GLsizei(input.GetDimensions(level).width);
@@ -584,6 +605,8 @@ namespace Engine
 
 		VBO vbo;
 
+		// Here we load the metadata from our Renderer::MeshDocument struct
+
 		vbo.indexType = ToGLType(meshDocument.GetIndexType());
 		vbo.numIndices = meshDocument.GetIndexCount();
 
@@ -591,6 +614,8 @@ namespace Engine
 		glBindVertexArray(vbo.vertexArrayObject);
 
 		glGenBuffers(GLint(vbo.attributeBuffers.size()), vbo.attributeBuffers.data());
+
+		// Below we move all the mesh-data onto the GPU on a per-attribute basis.
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[size_t(VBO::Attribute::Position)]);
 		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetByteLength(MeshDocument::Attribute::Position), meshDocument.GetDataPtr(MeshDocument::Attribute::Position), GL_STATIC_DRAW);

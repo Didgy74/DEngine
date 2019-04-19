@@ -25,7 +25,7 @@ namespace Engine
 			static constexpr float defaultFovY = 50.f;
 			static constexpr float defaultOrtographicWidth = 10.f;
 			static constexpr float defaultZNear = 0.1f;
-			static constexpr float defaultZFar = 100.f;
+			static constexpr float defaultZFar = 10000.f;
 			static constexpr ProjectionMode defaultProjectionMode = ProjectionMode::Perspective;
 
 			explicit Camera(SceneObject& owningObject);

@@ -5,7 +5,7 @@
 
 namespace Engine
 {
-	class Scene;
+	class SceneObject;
 
-	bool LoadGLTFScene(Scene& scene, std::filesystem::path path);
+	bool LoadGLTFScene(SceneObject& scene, std::filesystem::path path);
 }

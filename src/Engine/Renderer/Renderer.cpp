@@ -125,6 +125,9 @@ namespace Engine
 
 	bool Renderer::Core::Initialize(const InitInfo& createInfo)
 	{
+		// Checks if the supplies InitInfo struct provides all the necessary info.
+		// This only happens if debugging is enabled.
+		// This doesn't happen at all when compiling in release mode.
 		if constexpr (Setup::enableDebugging)
 		{
 			if (createInfo.debugInitInfo.useDebugging)
@@ -149,15 +152,17 @@ namespace Engine
 
 		data.assetLoadData = createInfo.assetLoadCreateInfo;
 
+		// Creates a new viewport
 		NewViewport(createInfo.surfaceDimensions, createInfo.surfaceHandle);
 
+		// Initializes correct function pointers based on the preferred 3D API
 		switch (data.activeAPI)
 		{
 		case API::OpenGL:
 			OpenGL::Initialize(data.apiData, createInfo.openGLInitInfo);
-			data.Draw = OpenGL::Draw;
-			data.PrepareRenderingEarly = OpenGL::PrepareRenderingEarly;
-			data.PrepareRenderingLate = OpenGL::PrepareRenderingLate;
+			data.Draw = &OpenGL::Draw;
+			data.PrepareRenderingEarly = &OpenGL::PrepareRenderingEarly;
+			data.PrepareRenderingLate = &OpenGL::PrepareRenderingLate;
 			break;
 		default:
 			break;
@@ -186,14 +191,21 @@ namespace Engine
 
 		auto& renderGraph = data.renderGraph;
 
+		// Moves through the RenderGraph and tracks what assets are referenced
+		// to know which assets need to be loaded and which can be unloaded.
+		// Assets to be loaded/unloaded are stored in the data.load* queues.
 		UpdateAssetReferences(data, renderGraph, &renderGraphInput);
 
+		// Swaps the resources of the user's rendergraph and the one the renderer owns.
+		// This allows you to reuse allocated memory.
 		std::swap(renderGraph, renderGraphInput);
 
+		// Logs a message whenever textures or mesh assets need to be loaded.
 		if (!data.loadTextureQueue.empty() || !data.loadMeshQueue.empty())
 			LogDebugMessage("Loading sprite/mesh resource(s)...");
 		data.PrepareRenderingEarly(data.loadTextureQueue, data.loadMeshQueue);
 
+		// Clears all the load-asset queues.
 		data.loadTextureQueue.clear();
 		data.unloadTextureQueue.clear();
 		data.loadMeshQueue.clear();

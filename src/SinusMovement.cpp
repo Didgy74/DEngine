@@ -30,8 +30,6 @@ namespace Assignment02
 
 		float time = scene.GetTimeData().GetTimeSinceSceneStart();
 
-		float timeMultiplier = 25.f;
-		float moveMagnitudeMultipler = 7.5f;
-		GetSceneObject().localPosition.x = startPos.x + Math::Sin(time * timeMultiplier) * moveMagnitudeMultipler;
+		GetSceneObject().localPosition.x = startPos.x + Math::Sin(time * timeMultiplier) * movementMultiplier;
 	}
 }

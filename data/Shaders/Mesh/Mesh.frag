@@ -36,14 +36,17 @@ void main()
 	vec3 pointToCamera = cameraData.wsPosition - fragData.wsPosition;
 	vec3 pointToCameraDir = normalize(pointToCamera);
 
+	vec3 ambient;
 	vec3 diffuse;
 	vec3 specular;
 	for (int i = 0; i < lightData.pointLightCount; i++)
 	{
 		vec3 pointToLight = lightData.pointLightPos[i].xyz - fragData.wsPosition;
-		
 		float distance = length(pointToLight);
 		float attenuation = 1.0 / (constant + linear * distance + quadratic * (distance * distance));
+	
+		ambient += attenuation * lightData.pointLightIntensity[i].xyz * 0.1f;
+		
 		
 		vec3 pointToLightDir = normalize(pointToLight);
 		
@@ -58,7 +61,7 @@ void main()
 		specular += vec3(pow(max(dot(pointToCameraDir, reflectDir), 0.0), coefficient) * lightData.pointLightIntensity[i] * attenuation);
 	}
 	
-	vec3 resultIntensity = diffuse * color + specular;
+	vec3 resultIntensity = (ambient + diffuse)  * color + specular;
 	vec3 resultColor = resultIntensity;
 	frag_color = vec4(resultColor, 1.0);
 }

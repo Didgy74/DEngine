@@ -81,9 +81,7 @@ namespace Engine
 			if (space == Space::Local)
 				return localPos;
 			else if (space == Space::World)
-			{
-				return GetSceneObject().GetPosition(space);
-			}
+				return Multiply_Reduced(GetSceneObject().GetModel_Reduced(space), localPos);
 			else
 			{
 				assert(false && "Invalid enum value.");

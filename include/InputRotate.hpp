@@ -6,16 +6,12 @@
 
 namespace Assignment02
 {
-	class SinusMovement : public Engine::Components::ScriptBase
+	class InputRotate : public Engine::Components::ScriptBase
 	{
 	public:
 		using ParentType = ScriptBase;
 
-		explicit SinusMovement(Engine::SceneObject& owningObject);
-
-		Math::Vector3D startPos{};
-		float movementMultiplier = 7.5f;
-		float timeMultiplier = 25.f;
+		explicit InputRotate(Engine::SceneObject& owningObject);
 
 	protected:
 		void SceneStart() override;

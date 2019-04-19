@@ -43,6 +43,7 @@ namespace Engine
 		[[nodiscard]] Scene& GetScene();
 
 		[[nodiscard]] SceneObject* GetParent() const;
+		void SetParent(SceneObject* newParent);
 
 		template<typename T>
 		decltype(auto) AddComponent();
@@ -71,7 +72,7 @@ namespace Engine
 	private:
 		std::reference_wrapper<Scene> sceneRef;
 		SceneObject* parent = nullptr;
-		std::vector<SceneObject*> children;
+		std::vector<std::reference_wrapper<SceneObject>> children;
 		std::unordered_map<std::type_index, std::vector<size_t>> components;
 		std::unordered_map<std::type_index, size_t> singletonComponents;
 	};
