@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <optional>
+#include <filesystem>
 
 #include "DRenderer/MeshDocument.hpp"
 
@@ -23,7 +24,7 @@ namespace Engine
 
 		struct TextureInfo
 		{
-			std::string path;
+			std::filesystem::path path;
 
 			bool operator==(const TextureInfo& right) const;
 		};

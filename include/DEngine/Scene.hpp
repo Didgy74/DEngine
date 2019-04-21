@@ -49,6 +49,8 @@ namespace Engine
 		template<typename T>
 		T* GetComponent(const CompRef<T>& ref);
 		template<typename T>
+		std::vector<T>* GetAllComponents();
+		template<typename T>
 		const std::vector<T>* GetAllComponents() const;
 
 
@@ -153,6 +155,18 @@ T* Engine::Scene::GetComponent(const CompRef<T> &ref)
 	auto index = std::distance(table.id.begin(), idIterator);
 
 	return &table.data[index];
+}
+
+template<typename T>
+std::vector<T>* Engine::Scene::GetAllComponents()
+{
+	auto iterator = components.find(typeid(T));
+	if (iterator == components.end())
+		return nullptr;
+
+	using ContainerType = Table<T>;
+	auto& table = std::any_cast<ContainerType&>(iterator->second);
+	return &table.data;
 }
 
 template<typename T>

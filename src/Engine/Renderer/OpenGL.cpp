@@ -6,6 +6,7 @@
 #include "GL/glew.h"
 
 #include "DTex/DTex.hpp"
+#include "DTex/GLFormats.hpp"
 
 #include <cassert>
 #include <memory>
@@ -563,10 +564,6 @@ namespace Engine
 
 		glBindTexture(target, ibo.texture);
 
-		// Sets mipmapping parameters.
-		glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
-		glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, GLint(input.GetMipLevels() - 1));
-
 		// Iterates over mipmap-levels and loads all image data onto OpenGL.
 		for (GLint level = 0; level < GLint(input.GetMipLevels()); level++)
 		{
@@ -580,6 +577,15 @@ namespace Engine
 			else
 				glTexImage2D(target, level, format, width, height, 0, format, type, data);
 		}
+
+		// Sets mipmapping parameters.
+		if (input.GetMipLevels() > 1)
+		{
+			glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+			glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, GLint(input.GetMipLevels() - 1));
+		}
+		else
+			glGenerateTextureMipmap(ibo.texture);
 
 		return ibo;
 	}
