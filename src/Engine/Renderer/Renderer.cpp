@@ -1,7 +1,7 @@
 #include "DRenderer/Renderer.hpp"
 #include "RendererData.hpp"
 
-#include "DRenderer/OpenGL.hpp"
+#include "OpenGL.hpp"
 
 #include "DMath/LinearTransform3D.hpp"
 

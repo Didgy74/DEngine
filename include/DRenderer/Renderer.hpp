@@ -3,6 +3,7 @@
 #include "Setup.hpp"
 #include "Typedefs.hpp"
 #include "OpenGLCreateInfo.hpp"
+#include "VulkanInitInfo.hpp"
 
 #include "Utility/ImgDim.hpp"
 
@@ -84,6 +85,7 @@ namespace Engine
 		DebugCreateInfo debugInitInfo;
 
 		OpenGL::InitInfo openGLInitInfo;
+		DRenderer::Vulkan::InitInfo vulkanInitInfo;
 	};
 
 	struct Renderer::MeshID

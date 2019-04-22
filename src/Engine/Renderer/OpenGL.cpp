@@ -1,7 +1,7 @@
 #include "DRenderer/Renderer.hpp"
 #include "RendererData.hpp"
 #include "DRenderer/MeshDocument.hpp"
-#include "DRenderer/OpenGL.hpp"
+#include "OpenGL.hpp"
 
 #include "GL/glew.h"
 
@@ -14,6 +14,7 @@
 #include <fstream>
 #include <array>
 #include <optional>
+#include <iostream>
 
 namespace Engine
 {
@@ -575,7 +576,13 @@ namespace Engine
 			if (input.IsCompressed())
 				glCompressedTexImage2D(target, level, format, width, height, 0, dataLength, data);
 			else
-				glTexImage2D(target, level, format, width, height, 0, format, type, data);
+			{
+				if (format == GL_RGBA)
+					glTexImage2D(target, level, GL_COMPRESSED_RGBA, width, height, 0, format, type, data);
+				else if (format == GL_RGB)
+					glTexImage2D(target, level, GL_COMPRESSED_RGB, width, height, 0, format, type, data);
+			}
+				
 		}
 
 		// Sets mipmapping parameters.
