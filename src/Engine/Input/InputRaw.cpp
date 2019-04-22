@@ -43,7 +43,8 @@ void Engine::Input::Core::UpdateKey(bool buttonValue, Raw::Button button)
 
 void Engine::Input::Core::UpdateMouseInfo(uint16_t posX, uint16_t posY)
 {
-	data->mouseDelta = { int16_t(posX) - int16_t(data->mousePosition[0]), int16_t(posY) - int16_t(data->mousePosition[1]) };
+	data->mouseDelta[0] = int16_t(posX) - int16_t(data->mousePosition[0]);
+	data->mouseDelta[1] = int16_t(posY) - int16_t(data->mousePosition[1]);
 	data->mousePosition = { posX, posY };
 }
 

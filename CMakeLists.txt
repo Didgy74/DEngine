@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 project(DEngine)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -9,6 +9,10 @@ endif()
 file(GLOB_RECURSE SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.inl")
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+	target_link_libraries(${PROJECT_NAME} stdc++fs)
+endif()
+
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 add_subdirectory(external)
@@ -16,11 +20,11 @@ target_link_libraries(${PROJECT_NAME} external::external)
 
 # Add custom command to copy Data directory to build directory
 # Remove Data directory in build directory if present
-add_custom_command(
-	TARGET ${PROJECT_NAME} POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E remove_directory
-	$<TARGET_FILE_DIR:${PROJECT_NAME}>/data
-	)
+#add_custom_command(
+#	TARGET ${PROJECT_NAME} POST_BUILD
+#	COMMAND ${CMAKE_COMMAND} -E remove_directory
+#	$<TARGET_FILE_DIR:${PROJECT_NAME}>/data
+#	)
 
 # Copy directory from source folder to build folder
 add_custom_command(

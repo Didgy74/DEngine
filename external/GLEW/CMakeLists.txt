@@ -5,7 +5,7 @@ add_library(${LIB_NAME}::${LIB_NAME} ALIAS ${LIB_NAME})
 
 find_package(GLEW 2.0 QUIET)
 if (GLEW_FOUND)
-	target_link_libraries(${PROJECT_NAME} INTERFACE GLEW::GLEW)
+	target_link_libraries(${LIB_NAME} INTERFACE ${GLEW_LIBRARIES})
 else()
 	if(UNIX)
 

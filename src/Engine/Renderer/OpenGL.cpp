@@ -196,8 +196,8 @@ namespace Engine
 		data.spriteProgram = glCreateProgram();
 
 		std::array<GLuint, 2> shaders{};
-		shaders[0] = CreateShader(LoadShader("Data/Shaders/Sprite/sprite.vert"), GL_VERTEX_SHADER);
-		shaders[1] = CreateShader(LoadShader("Data/Shaders/Sprite/sprite.frag"), GL_FRAGMENT_SHADER);
+		shaders[0] = CreateShader(LoadShader("data/Shaders/Sprite/sprite.vert"), GL_VERTEX_SHADER);
+		shaders[1] = CreateShader(LoadShader("data/Shaders/Sprite/sprite.frag"), GL_FRAGMENT_SHADER);
 
 		for (unsigned int i = 0; i < 2; i++)
 			glAttachShader(data.spriteProgram, shaders[i]);
@@ -224,8 +224,8 @@ namespace Engine
 
 		// Links the shader files to the shader program.
 		std::array<GLuint, 2> shader{};
-		shader[0] = CreateShader(LoadShader("Data/Shaders/Mesh/Mesh.vert"), GL_VERTEX_SHADER);
-		shader[1] = CreateShader(LoadShader("Data/Shaders/Mesh/Mesh.frag"), GL_FRAGMENT_SHADER);
+		shader[0] = CreateShader(LoadShader("data/Shaders/Mesh/Mesh.vert"), GL_VERTEX_SHADER);
+		shader[1] = CreateShader(LoadShader("data/Shaders/Mesh/Mesh.frag"), GL_FRAGMENT_SHADER);
 
 		for (unsigned int i = 0; i < 2; i++)
 			glAttachShader(data.meshProgram, shader[i]);
@@ -321,9 +321,9 @@ namespace Engine
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 		// Load default texture, this texture will ordinarily be used if the renderer can't find the one it's supposed to use.
-		auto loadResult = DTex::LoadFromFile(std::string{ Setup::assetPath } + "/DRenderer/Textures/02.ktx");
-		assert(loadResult.GetResultInfo() == DTex::ResultInfo::Success && "Couldn't load the default texture for DRenderer.");
-		data.testIBO = GetIBOFromTexDoc(loadResult.GetValue()).value();
+		//auto loadResult = DTex::LoadFromFile(std::string{ Setup::assetPath } + "/DRenderer/Textures/02.ktx");
+		//assert(loadResult.GetResultInfo() == DTex::ResultInfo::Success && "Couldn't load the default texture for DRenderer.");
+		//data.testIBO = GetIBOFromTexDoc(loadResult.GetValue()).value();
 
 
 		//LoadSpriteShader(data);

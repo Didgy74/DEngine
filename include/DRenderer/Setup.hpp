@@ -14,7 +14,7 @@ namespace Engine
 
 			constexpr bool enableDebugging = true;
 
-			constexpr std::string_view assetPath = "Data";
+			constexpr std::string_view assetPath = "data";
 		}
 	}
 }

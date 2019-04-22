@@ -197,9 +197,4 @@ namespace Engine
 			return {};
 		}
 	}
-
-	void Engine::Destroy(SceneObject & sceneObject)
-	{
-		Core::Destroy(sceneObject);
-	}
 }
