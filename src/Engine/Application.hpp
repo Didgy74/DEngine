@@ -44,9 +44,7 @@ namespace Engine
 
 			void GL_SwapWindow(void* windowHandle);
 
-			void(*Vk_Test(void))();
-			void(*Vk_EnumerateExtensions(void))();
-
+			void(*Vk_Test())();
 		}
 	};
 }

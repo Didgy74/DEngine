@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DRenderer/VulkanInitInfo.hpp"
+#include "RendererData.hpp"
 
 #include <vector>
 #include <any>
@@ -10,7 +11,7 @@ namespace DRenderer
 {
 	namespace Vulkan
 	{
-		void Initialize(std::any& apiData, InitInfo& createInfo);
+		void Initialize(Core::APIDataPointer& apiData, InitInfo& createInfo);
 		void Terminate(std::any& apiData);
 		void PrepareRenderingEarly(const std::vector<size_t>& spriteLoadQueue, const std::vector<size_t>& meshLoadQueue);
 		void PrepareRenderingLate();

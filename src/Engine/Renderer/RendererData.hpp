@@ -2,10 +2,20 @@
 
 #include "DRenderer/Renderer.hpp"
 
-#include <vector>
-#include <functional>
-#include <any>
 #include <unordered_map>
+#include <vector>
+
+namespace DRenderer
+{
+	namespace Core
+	{
+		struct APIDataPointer
+		{
+			void* data = nullptr;
+			void(*deleterPfn)(void*&) = nullptr;
+		};
+	}
+}
 
 namespace Engine
 {
@@ -35,16 +45,15 @@ namespace Engine
 				std::function<void(const std::vector<size_t>&, const std::vector<size_t>&)> PrepareRenderingEarly;
 				std::function<void(void)> PrepareRenderingLate;
 
-				AssetLoadCreateInfo assetLoadData;
-				DebugCreateInfo debugData;
+				AssetLoadCreateInfo assetLoadData{};
+				DebugCreateInfo debugData{};
 
-
-				std::any apiData = nullptr;
+				DRenderer::Core::APIDataPointer apiData{};
 			};
 
 			const Data& GetData();
 
-			std::any& GetAPIData();
+			void* GetAPIData();
 		}
 	}
 }

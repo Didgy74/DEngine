@@ -32,6 +32,8 @@ namespace Engine
 			struct CameraDataUBO;
 			struct LightDataUBO;
 
+			void DataDeleter(void*& ptr);
+
 			void UpdateVBODatabase(Data& data, const std::vector<size_t>& loadQueue);
 			void UpdateIBODatabase(Data& data, const std::vector<size_t>& loadQueue);
 			std::optional<VBO> GetVBOFromID(size_t id);
@@ -95,6 +97,12 @@ namespace Engine
 
 	struct Renderer::OpenGL::Data
 	{
+		Data() = default;
+		Data(const Data&) = delete;
+		Data(Data&&) = delete;
+		Data& operator=(const Data&) = delete;
+		Data& operator=(Data&&) = delete;
+
 		std::function<void(void*)> glSwapBuffers;
 
 		std::unordered_map<size_t, VBO> vboDatabase;
@@ -117,7 +125,14 @@ namespace Engine
 		GLint meshTextureUniform;
 	};
 
-	Renderer::OpenGL::Data& Renderer::OpenGL::GetAPIData() { return std::any_cast<Data&>(Core::GetAPIData()); }
+	void Renderer::OpenGL::DataDeleter(void*& ptr)
+	{
+		Data* data = static_cast<Data*>(ptr);
+		ptr = nullptr;
+		delete data;
+	}
+
+	Renderer::OpenGL::Data& Renderer::OpenGL::GetAPIData() { return *static_cast<Data*>(Core::GetAPIData()); }
 
 	static std::string LoadShader(const std::string& fileName)
 	{
@@ -267,15 +282,16 @@ namespace Engine
 		LogDebugMessage(message);
 	}
 
-    void Renderer::OpenGL::Initialize(std::any& apiData, const InitInfo& createInfo)
+    void Renderer::OpenGL::Initialize(DRenderer::Core::APIDataPointer& apiData, const InitInfo& createInfo)
 	{
 		// Initializes GLEW
 		auto glInitResult = glewInit();
 		assert(glInitResult == 0);
 
 		// Allocates the memory associated with the OpenGL rendering.
-		apiData = std::make_any<Data>();
-		Data& data = std::any_cast<Data&>(apiData);
+		apiData.data = new Data();
+		apiData.deleterPfn = &DataDeleter;
+		Data& data = *static_cast<Data*>(apiData.data);;
 
 		data.glSwapBuffers = std::move(createInfo.glSwapBuffers);
 
@@ -331,9 +347,9 @@ namespace Engine
 		LoadMeshShader(data);
 	}
 
-	void Renderer::OpenGL::Terminate(std::any& apiData)
+	void Renderer::OpenGL::Terminate(void*& apiData)
 	{
-		Data& data = std::any_cast<Data&>(apiData);
+		Data& data = *static_cast<Data*>(apiData);
 
 		data.quadVBO.DeallocateDeviceBuffers();
 		for (auto& vboItem : data.vboDatabase)

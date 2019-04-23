@@ -44,3 +44,6 @@ target_link_libraries(${LIB_NAME} INTERFACE GLFW3::GLFW3)
 find_package(OpenGL 4.3 REQUIRED)
 target_link_libraries(${LIB_NAME} INTERFACE OpenGL::GL)
 
+# Volk
+add_subdirectory(Volk)
+target_link_libraries(${LIB_NAME} INTERFACE Volk::Volk)

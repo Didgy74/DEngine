@@ -60,7 +60,7 @@ namespace Engine
 		// This one goes to GLFW3's swap buffer function.
 		rendererInitInfo.openGLInitInfo.glSwapBuffers = &Application::Core::GL_SwapWindow;
 
-		rendererInitInfo.vulkanInitInfo.test = &Application::Core::Vk_EnumerateExtensions;
+		rendererInitInfo.vulkanInitInfo.test = &Application::Core::Vk_Test;
 
 		Renderer::Core::Initialize(rendererInitInfo);
 	}
@@ -102,7 +102,7 @@ void Engine::Core::Run()
 	lightObj.localScale = { 0.1f, 0.1f, 0.1f };
 	Components::PointLight& light1 = lightObj.AddComponent<Components::PointLight>().second.get();
 	light1.color = { 1.f, 0.5f, 0.5f };
-	light1.intensity = 0.5f;
+	light1.intensity = 2.;
 	auto& sinus1 = lightObj.AddComponent<Assignment02::SinusMovement>();
 	auto& mesh1 = lightObj.AddComponent<Components::MeshRenderer>().second.get();
 	mesh1.mesh = cubeMesh;
@@ -121,7 +121,7 @@ void Engine::Core::Run()
 	sinus2.movementMultiplier = -sinus2.movementMultiplier;
 	Components::PointLight& light2 = lightObj2.AddComponent<Components::PointLight>().second.get();
 	light2.color = { 0.5f, 1.f, 0.5f };
-	light2.intensity = 0.5f;
+	light2.intensity = 2.f;
 
 
 	// Light object 3
@@ -135,12 +135,12 @@ void Engine::Core::Run()
 	sinus3.timeMultiplier = 15.f;
 	Components::PointLight& light3 = lightObj3.AddComponent<Components::PointLight>().second.get();
 	light3.color = { 0.5f, 0.5f, 1.f };
-	light3.intensity = 0.5f;
+	light3.intensity = 2.f;
 
 	// Load the GLTF scene, with a reference to the SceneObject we want to add it to
 	auto& rootObj = scene1.NewSceneObject();
 	rootObj.AddComponent<Assignment02::InputRotate>();
-	LoadGLTFScene(rootObj, "data/Sponza2/Sponza.gltf");
+	LoadGLTFScene(rootObj, "data/Sponza/Sponza.gltf");
 
 	lightObj.SetParent(&rootObj);
 	lightObj2.SetParent(&rootObj);

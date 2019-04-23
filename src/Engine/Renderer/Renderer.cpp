@@ -7,6 +7,10 @@
 #include "DMath/LinearTransform3D.hpp"
 
 #include <functional>
+#include <vector>
+#include <functional>
+#include <any>
+#include <unordered_map>
 
 namespace Engine
 {
@@ -123,7 +127,7 @@ namespace Engine
 			return API::None;
 	}
 
-	std::any& Renderer::Core::GetAPIData() { return data->apiData; }
+	void* Renderer::Core::GetAPIData() { return data->apiData.data; }
 
 	bool Renderer::Core::Initialize(InitInfo createInfo)
 	{
@@ -181,7 +185,7 @@ namespace Engine
 		switch (GetActiveAPI())
 		{
 		case API::OpenGL:
-			OpenGL::Terminate(data->apiData);
+			OpenGL::Terminate(data->apiData.data);
 			break;
 		default:
 			break;

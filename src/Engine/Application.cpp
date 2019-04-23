@@ -110,15 +110,9 @@ void Engine::Application::Core::GL_SwapWindow(void* window)
 	glfwSwapBuffers(static_cast<GLFWwindow*>(window));
 }
 
-
-void(*Engine::Application::Core::Vk_Test(void))()
+void(*Engine::Application::Core::Vk_Test())()
 {
-	return glfwGetInstanceProcAddress(NULL, "vkCreateInstance");
-}
-
-void(*Engine::Application::Core::Vk_EnumerateExtensions(void))()
-{
-	return glfwGetInstanceProcAddress(NULL, "vkEnumerateInstanceExtensionProperties");
+	return (void(*)())&glfwGetInstanceProcAddress;
 }
 
 void Engine::Application::Core::UpdateEvents()

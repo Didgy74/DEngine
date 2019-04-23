@@ -1,6 +1,8 @@
 #pragma once
 
 #include "DRenderer/Typedefs.hpp"
+#include "RendererData.hpp"
+
 #include <vector>
 #include <any>
 #include <functional>
@@ -11,8 +13,8 @@ namespace Engine
 	{
 		namespace OpenGL
 		{
-			void Initialize(std::any& apiData, const InitInfo& createInfo);
-			void Terminate(std::any& apiData);
+			void Initialize(DRenderer::Core::APIDataPointer& apiData, const InitInfo& createInfo);
+			void Terminate(void*& apiData);
 			void PrepareRenderingEarly(const std::vector<size_t>& spriteLoadQueue, const std::vector<size_t>& meshLoadQueue);
 			void PrepareRenderingLate();
 			void Draw();
