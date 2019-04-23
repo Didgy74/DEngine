@@ -37,7 +37,7 @@ namespace Engine
 
 		namespace Core
 		{
-			bool Initialize(const InitInfo& createInfo);
+			bool Initialize(InitInfo createInfo);
 			void PrepareRenderingEarly(RenderGraph& renderGraphInput);
 			void PrepareRenderingLate(RenderGraphTransform& sceneData);
 			void Draw();

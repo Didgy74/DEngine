@@ -2,6 +2,7 @@
 
 #include "DEngine/Input/InputRaw.hpp"
 
+#define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 
 #include <memory>
@@ -107,6 +108,17 @@ void* Engine::Application::Core::GetMainWindowHandle() { return data->windowHand
 void Engine::Application::Core::GL_SwapWindow(void* window)
 {
 	glfwSwapBuffers(static_cast<GLFWwindow*>(window));
+}
+
+
+void(*Engine::Application::Core::Vk_Test(void))()
+{
+	return glfwGetInstanceProcAddress(NULL, "vkCreateInstance");
+}
+
+void(*Engine::Application::Core::Vk_EnumerateExtensions(void))()
+{
+	return glfwGetInstanceProcAddress(NULL, "vkEnumerateInstanceExtensionProperties");
 }
 
 void Engine::Application::Core::UpdateEvents()

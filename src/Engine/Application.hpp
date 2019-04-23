@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <functional>
 
 #include "Utility/ImgDim.hpp"
 
@@ -34,13 +35,18 @@ namespace Engine
 
 		namespace Core
 		{
-			void* GetMainWindowHandle();
-			void GL_SwapWindow(void* windowHandle);
-
 			void UpdateEvents();
 
 			void Initialize(API3D api);
 			void Terminate();
+
+			void* GetMainWindowHandle();
+
+			void GL_SwapWindow(void* windowHandle);
+
+			void(*Vk_Test(void))();
+			void(*Vk_EnumerateExtensions(void))();
+
 		}
 	};
 }

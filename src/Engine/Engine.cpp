@@ -39,7 +39,7 @@ namespace Engine
 		// Initialize renderer
 		Renderer::InitInfo rendererInitInfo;
 
-		rendererInitInfo.preferredAPI = Renderer::API::OpenGL;
+		rendererInitInfo.preferredAPI = Renderer::API::Vulkan;
 
 		// Debug info
 		// Whether we want to enable debugging in the rendering system
@@ -59,6 +59,9 @@ namespace Engine
 		// Function pointer to the Application systems GL_SwapBuffer function.
 		// This one goes to GLFW3's swap buffer function.
 		rendererInitInfo.openGLInitInfo.glSwapBuffers = &Application::Core::GL_SwapWindow;
+
+		rendererInitInfo.vulkanInitInfo.test = &Application::Core::Vk_EnumerateExtensions;
+
 		Renderer::Core::Initialize(rendererInitInfo);
 	}
 }
@@ -137,7 +140,7 @@ void Engine::Core::Run()
 	// Load the GLTF scene, with a reference to the SceneObject we want to add it to
 	auto& rootObj = scene1.NewSceneObject();
 	rootObj.AddComponent<Assignment02::InputRotate>();
-	LoadGLTFScene(rootObj, "data/Sponza/Sponza.gltf");
+	LoadGLTFScene(rootObj, "data/Sponza2/Sponza.gltf");
 
 	lightObj.SetParent(&rootObj);
 	lightObj2.SetParent(&rootObj);

@@ -2,6 +2,7 @@
 #include "RendererData.hpp"
 
 #include "OpenGL.hpp"
+#include "Vulkan.hpp"
 
 #include "DMath/LinearTransform3D.hpp"
 
@@ -69,10 +70,11 @@ namespace Engine
 		switch (createInfo.preferredAPI)
 		{
 		case API::OpenGL:
-			if (IsValid(createInfo.openGLInitInfo, createInfo.debugInitInfo.errorMessageCallback) == true)
-				break;
-			else
+			if (IsValid(createInfo.openGLInitInfo, createInfo.debugInitInfo.errorMessageCallback) == false)
 				return false;
+			break;
+		case API::Vulkan:
+			break;
 		default:
 			DebugMessage("Error. InitInfo::preferredAPI can't be set to 'API::None'");
 			return false;
@@ -123,7 +125,7 @@ namespace Engine
 
 	std::any& Renderer::Core::GetAPIData() { return data->apiData; }
 
-	bool Renderer::Core::Initialize(const InitInfo& createInfo)
+	bool Renderer::Core::Initialize(InitInfo createInfo)
 	{
 		// Checks if the supplies InitInfo struct provides all the necessary info.
 		// This only happens if debugging is enabled.
@@ -163,6 +165,9 @@ namespace Engine
 			data.Draw = &OpenGL::Draw;
 			data.PrepareRenderingEarly = &OpenGL::PrepareRenderingEarly;
 			data.PrepareRenderingLate = &OpenGL::PrepareRenderingLate;
+			break;
+		case API::Vulkan:
+			DRenderer::Vulkan::Initialize(data.apiData, createInfo.vulkanInitInfo);
 			break;
 		default:
 			break;
