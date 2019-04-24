@@ -5,55 +5,46 @@
 #include <unordered_map>
 #include <vector>
 
-namespace DRenderer
+namespace DRenderer::Core
 {
-	namespace Core
+	struct APIDataPointer
 	{
-		struct APIDataPointer
-		{
-			void* data = nullptr;
-			void(*deleterPfn)(void*&) = nullptr;
-		};
-	}
-}
+		void* data = nullptr;
+		void(*deleterPfn)(void*&) = nullptr;
+	};
 
-namespace Engine
-{
-	namespace Renderer
+	struct Data
 	{
-		namespace Core
-		{
-			struct Data
-			{
-				RenderGraph renderGraph;
-				RenderGraphTransform renderGraphTransform;
-				CameraInfo cameraInfo;
+		Engine::Renderer::RenderGraph renderGraph;
+		Engine::Renderer::RenderGraphTransform renderGraphTransform;
+		Engine::Renderer::CameraInfo cameraInfo;
 
-				API activeAPI = API::None;
+		Engine::Renderer::API activeAPI = Engine::Renderer::API::None;
 
-				std::unordered_map<size_t, size_t> meshReferences;
-				std::unordered_map<size_t, size_t> textureReferences;
+		std::unordered_map<size_t, size_t> meshReferences;
+		std::unordered_map<size_t, size_t> textureReferences;
 
-				std::vector<size_t> loadMeshQueue;
-				std::vector<size_t> unloadMeshQueue;
-				std::vector<size_t> loadTextureQueue;
-				std::vector<size_t> unloadTextureQueue;
+		std::vector<size_t> loadMeshQueue;
+		std::vector<size_t> unloadMeshQueue;
+		std::vector<size_t> loadTextureQueue;
+		std::vector<size_t> unloadTextureQueue;
 
-				std::vector<std::unique_ptr<Viewport>> viewports;
+		std::vector<std::unique_ptr<Engine::Renderer::Viewport>> viewports;
 
-				std::function<void(void)> Draw;
-				std::function<void(const std::vector<size_t>&, const std::vector<size_t>&)> PrepareRenderingEarly;
-				std::function<void(void)> PrepareRenderingLate;
+		std::function<void(void)> Draw;
+		std::function<void(const std::vector<size_t>&, const std::vector<size_t>&)> PrepareRenderingEarly;
+		std::function<void(void)> PrepareRenderingLate;
 
-				AssetLoadCreateInfo assetLoadData{};
-				DebugCreateInfo debugData{};
+		Engine::Renderer::AssetLoadCreateInfo assetLoadData{};
+		Engine::Renderer::DebugCreateInfo debugData{};
 
-				DRenderer::Core::APIDataPointer apiData{};
-			};
+		APIDataPointer apiData{};
+	};
 
-			const Data& GetData();
+	const Data& GetData();
 
-			void* GetAPIData();
-		}
-	}
+	void* GetAPIData();
+
+	// This call is thread-safe if ErrorMessageCallback supplied to InitInfo is.
+	void LogDebugMessage(std::string_view message);
 }

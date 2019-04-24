@@ -44,7 +44,9 @@ namespace Engine
 
 			void GL_SwapWindow(void* windowHandle);
 
-			void(*Vk_Test())();
+			void(*Vk_GetInstanceProcAddress())();
+			std::vector<std::string_view> Vk_GetRequiredInstanceExtensions();
+			bool Vk_CreateSurface(void* instance, void* window, void* surface);
 		}
 	};
 }

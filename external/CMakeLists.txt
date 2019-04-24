@@ -45,5 +45,5 @@ find_package(OpenGL 4.3 REQUIRED)
 target_link_libraries(${LIB_NAME} INTERFACE OpenGL::GL)
 
 # Volk
-add_subdirectory(Volk)
-target_link_libraries(${LIB_NAME} INTERFACE Volk::Volk)
+add_subdirectory(volk-cpp)
+target_link_libraries(${LIB_NAME} INTERFACE volk-cpp::volk-cpp)

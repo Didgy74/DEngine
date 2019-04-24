@@ -8,34 +8,28 @@
 #include <memory>
 #include <iostream>
 
-namespace Engine
+namespace Engine::Application::Core
 {
-	namespace Application
+	struct Data
 	{
-		namespace Core
-		{
-			struct Data
-			{
-				bool isRunning = false;
-				bool isMinimized = false;
-				Utility::ImgDim windowSize;
-				uint16_t refreshRate;
-				std::string applicationAbsolutePath;
-				std::string applicationName;
-				Application::API3D activeAPI;
+		bool isRunning = false;
+		bool isMinimized = false;
+		Utility::ImgDim windowSize;
+		uint16_t refreshRate;
+		std::string applicationAbsolutePath;
+		std::string applicationName;
+		Application::API3D activeAPI;
 
-				void* windowHandle = nullptr;
-			};
+		void* windowHandle = nullptr;
+	};
 
-			static std::unique_ptr<Data> data;
+	static std::unique_ptr<Data> data;
 
-			Input::Raw::Button APIKeyToButton(int32_t apiKey);
+	Input::Raw::Button APIKeyToButton(int32_t apiKey);
 
-			void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-			void MousePosCallback(GLFWwindow* window, double x, double y);
-			void MouseButtonCallback(GLFWwindow* window, int button, int action, int modifierBits);
-		}
-	}
+	void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+	void MousePosCallback(GLFWwindow* window, double x, double y);
+	void MouseButtonCallback(GLFWwindow* window, int button, int action, int modifierBits);
 }
 
 void error_callback(int error, const char* description)
@@ -43,45 +37,39 @@ void error_callback(int error, const char* description)
 	std::cerr << "GLFW Error: " << description << std::endl;;
 }
 
-namespace Engine
+namespace Engine::Application::Core
 {
-	namespace Application
+	void Initialize(API3D api)
 	{
-		namespace Core
+		if (!glfwInit())
 		{
-			void Initialize(API3D api)
-			{
-				if (!glfwInit())
-				{
-					// Initialization failed
-					assert(false);
-				}
-
-				data = std::make_unique<Data>();
-				data->isRunning = true;
-
-				glfwSetErrorCallback(error_callback);
-
-				glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-				glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-				glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
-				GLFWwindow* window = glfwCreateWindow(defaultWindowSize.width, defaultWindowSize.height, "My Title", NULL, NULL);
-				if (!window)
-				{
-					// Window or OpenGL context creation failed
-					assert(false);
-				}
-				glfwMakeContextCurrent(window);
-				glfwSwapInterval(1);
-
-				glfwSetKeyCallback(window, &KeyCallback);
-				glfwSetCursorPosCallback(window, &MousePosCallback);
-				glfwSetMouseButtonCallback(window, &MouseButtonCallback);
-
-				data->windowHandle = window;
-				data->windowSize = defaultWindowSize;
-			}
+			// Initialization failed
+			assert(false);
 		}
+
+		data = std::make_unique<Data>();
+		data->isRunning = true;
+
+		glfwSetErrorCallback(error_callback);
+
+		//glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+		//glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+		//glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+		GLFWwindow* window = glfwCreateWindow(defaultWindowSize.width, defaultWindowSize.height, "My Title", NULL, NULL);
+		if (!window)
+		{
+			// Window or OpenGL context creation failed
+			assert(false);
+		}
+		//glfwMakeContextCurrent(window);
+		//glfwSwapInterval(1);
+
+		glfwSetKeyCallback(window, &KeyCallback);
+		glfwSetCursorPosCallback(window, &MousePosCallback);
+		glfwSetMouseButtonCallback(window, &MouseButtonCallback);
+
+		data->windowHandle = window;
+		data->windowSize = defaultWindowSize;
 	}
 }
 
@@ -110,9 +98,34 @@ void Engine::Application::Core::GL_SwapWindow(void* window)
 	glfwSwapBuffers(static_cast<GLFWwindow*>(window));
 }
 
-void(*Engine::Application::Core::Vk_Test())()
+void(*Engine::Application::Core::Vk_GetInstanceProcAddress())()
 {
 	return (void(*)())&glfwGetInstanceProcAddress;
+}
+
+std::vector<std::string_view> Engine::Application::Core::Vk_GetRequiredInstanceExtensions()
+{
+	uint32_t extensionListLength = 0;
+	const char** requiredExtensionList = glfwGetRequiredInstanceExtensions(&extensionListLength);
+	if (extensionListLength == 0)
+		return {};
+
+	std::vector<std::string_view> returnArr;
+	returnArr.reserve(extensionListLength);
+	for (size_t i = 0; i < extensionListLength; i++)
+		returnArr.push_back(requiredExtensionList[i]);
+	return returnArr;
+}
+
+bool Engine::Application::Core::Vk_CreateSurface(void* instance, void* window, void* surface)
+{
+	VkInstance instanceBleh = *static_cast<VkInstance*>(instance);
+	auto test = glfwCreateWindowSurface(instanceBleh, (GLFWwindow*)window, nullptr, (VkSurfaceKHR*)surface);
+	if (test != VkResult::VK_SUCCESS)
+	{
+		return false;
+	}
+	return true;
 }
 
 void Engine::Application::Core::UpdateEvents()

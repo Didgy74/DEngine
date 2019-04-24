@@ -132,7 +132,7 @@ namespace Engine
 		delete data;
 	}
 
-	Renderer::OpenGL::Data& Renderer::OpenGL::GetAPIData() { return *static_cast<Data*>(Core::GetAPIData()); }
+	Renderer::OpenGL::Data& Renderer::OpenGL::GetAPIData() { return *static_cast<Data*>(DRenderer::Core::GetAPIData()); }
 
 	static std::string LoadShader(const std::string& fileName)
 	{
@@ -152,7 +152,7 @@ namespace Engine
 		}
 		else
 		{
-			Renderer::LogDebugMessage("Unable to load shader : " + fileName);
+			DRenderer::Core::LogDebugMessage("Unable to load shader : " + fileName);
 		}
 
 		return output;
@@ -175,7 +175,7 @@ namespace Engine
 			else
 				glGetShaderInfoLog(shader, sizeof(error), NULL, error);
 
-			Renderer::LogDebugMessage(errorMessage + ": '" + error);
+			DRenderer::Core::LogDebugMessage(errorMessage + ": '" + error);
 		}
 	}
 
@@ -184,7 +184,7 @@ namespace Engine
 		GLuint shader = glCreateShader(type);
 
 		if (shader == 0)
-			Renderer::LogDebugMessage("Error compiling shader type " + type);
+			DRenderer::Core::LogDebugMessage("Error compiling shader type " + type);
 
 		const GLchar* p[1];
 		p[0] = text.c_str();
@@ -279,7 +279,7 @@ namespace Engine
 
 	void GLAPIENTRY Renderer::OpenGL::GLDebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
 	{
-		LogDebugMessage(message);
+		DRenderer::Core::LogDebugMessage(message);
 	}
 
     void Renderer::OpenGL::Initialize(DRenderer::Core::APIDataPointer& apiData, const InitInfo& createInfo)
@@ -299,7 +299,7 @@ namespace Engine
 		// Initialize debug stuff
 		if constexpr (Setup::enableDebugging)
 		{
-			if (Core::GetData().debugData.useDebugging)
+			if (DRenderer::Core::GetData().debugData.useDebugging)
 			{
 				GLint flags;
 				glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
@@ -311,7 +311,7 @@ namespace Engine
 					glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
 				}
 				else
-					LogDebugMessage("Error. Couldn't make GL Debug Output");
+					DRenderer::Core::LogDebugMessage("Error. Couldn't make GL Debug Output");
 			}
 		}
 
@@ -375,7 +375,7 @@ namespace Engine
 		UpdateVBODatabase(data, meshLoadQueue);
 		// Sends signal that the renderer is done loading assets to render this frame.
 		// This helps the AssetManager know when it can discard loaded assets in CPU memory.
-		Core::GetData().assetLoadData.assetLoadEnd();
+		DRenderer::Core::GetData().assetLoadData.assetLoadEnd();
 
 		const auto& renderGraph = Core::GetRenderGraph();
 
@@ -521,7 +521,7 @@ namespace Engine
 					std::stringstream stream;
 					stream << "Index: " << i << std::endl;
 					stream << "TextureID: " << meshes[i].diffuseID;
-					LogDebugMessage(stream.str());
+					DRenderer::Core::LogDebugMessage(stream.str());
 					glBindTexture(GL_TEXTURE_2D, data.testIBO.texture);
 				}
 				else
@@ -550,7 +550,7 @@ namespace Engine
 
 		for (const auto& id : loadQueue)
 		{
-			auto texDocOpt = Core::GetData().assetLoadData.textureLoader(id);
+			auto texDocOpt = DRenderer::Core::GetData().assetLoadData.textureLoader(id);
 			assert(texDocOpt.has_value() && "Failed to load Texture from texture-loader.");
 
 			auto& texDoc = texDocOpt.value();
@@ -573,7 +573,7 @@ namespace Engine
 
 		if (target == 0 || format == 0)
 		{
-			LogDebugMessage("Error. Texture can not be used in OpenGL.");
+			DRenderer::Core::LogDebugMessage("Error. Texture can not be used in OpenGL.");
 			return {};
 		}
 
@@ -626,7 +626,7 @@ namespace Engine
 
 	std::optional<Renderer::OpenGL::VBO> Renderer::OpenGL::GetVBOFromID(size_t id)
 	{
-		const auto meshDocumentOpt = Core::GetData().assetLoadData.meshLoader(id);
+		const auto meshDocumentOpt = DRenderer::Core::GetData().assetLoadData.meshLoader(id);
 
 		assert(meshDocumentOpt.has_value());
 

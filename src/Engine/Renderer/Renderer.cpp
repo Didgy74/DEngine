@@ -1,5 +1,6 @@
 #include "DRenderer/Renderer.hpp"
 #include "RendererData.hpp"
+#include "DRenderer/DebugConfig.hpp"
 
 #include "OpenGL.hpp"
 #include "Vulkan.hpp"
@@ -12,21 +13,18 @@
 #include <any>
 #include <unordered_map>
 
-namespace Engine
+namespace DRenderer::Core
 {
-	namespace Renderer
-	{
-		namespace Core
-		{
-			static std::unique_ptr<Data> data;
+	static std::unique_ptr<Data> data;
 
-			void UpdateAssetReferences(Data& data, const RenderGraph& oldRG, const RenderGraph* newRG);
+	void UpdateAssetReferences(Data& data, const Engine::Renderer::RenderGraph& oldRG, const Engine::Renderer::RenderGraph* newRG);
 
-			bool IsValid(const InitInfo& createInfo, ErrorMessageCallbackPFN callback);
-		}
-	}
+	bool IsValid(const Engine::Renderer::InitInfo& createInfo, Engine::Renderer::ErrorMessageCallbackPFN callback);
+}
 
-	bool Renderer::Core::IsValid(const InitInfo& createInfo, ErrorMessageCallbackPFN callback)
+namespace DRenderer::Core
+{
+	bool IsValid(const Engine::Renderer::InitInfo& createInfo, Engine::Renderer::ErrorMessageCallbackPFN callback)
 	{
 		const auto& DebugMessage = [callback](const char* message)
 		{
@@ -63,7 +61,7 @@ namespace Engine
 		// Debug stuff
 		if (createInfo.debugInitInfo.useDebugging == true)
 		{
-			const DebugCreateInfo& debugInfo = createInfo.debugInitInfo;
+			const Engine::Renderer::DebugCreateInfo& debugInfo = createInfo.debugInitInfo;
 			if (debugInfo.errorMessageCallback == nullptr)
 			{
 				DebugMessage("Error. DebugCreateInfo::errorMessageCallback cannot be nullptr when DebugCreateInfo::enableDebug is true.");
@@ -73,11 +71,11 @@ namespace Engine
 
 		switch (createInfo.preferredAPI)
 		{
-		case API::OpenGL:
+		case Engine::Renderer::API::OpenGL:
 			if (IsValid(createInfo.openGLInitInfo, createInfo.debugInitInfo.errorMessageCallback) == false)
 				return false;
 			break;
-		case API::Vulkan:
+		case Engine::Renderer::API::Vulkan:
 			break;
 		default:
 			DebugMessage("Error. InitInfo::preferredAPI can't be set to 'API::None'");
@@ -87,6 +85,87 @@ namespace Engine
 		return true;
 	}
 
+	const Data& GetData()
+	{
+		return *data;
+	}
+
+	void* GetAPIData() { return data->apiData.data; }
+
+	void LogDebugMessage(std::string_view message)
+	{
+		if constexpr (DRenderer::debugConfig == true)
+		{
+			const Data& data = *Core::data;
+			if (data.debugData.useDebugging)
+				data.debugData.errorMessageCallback(message);
+		}
+	}
+
+	void UpdateAssetReferences(Data& data, const Engine::Renderer::RenderGraph& oldRG, const Engine::Renderer::RenderGraph* newRG)
+	{
+		// Add new references
+		if (newRG)
+		{
+			// Sprites
+			for (const auto& item : newRG->sprites)
+			{
+				auto& textureReferenceCount = data.textureReferences[item.spriteID];
+				textureReferenceCount++;
+				if (textureReferenceCount == 1)
+					data.loadTextureQueue.emplace_back(item.spriteID);
+			}
+
+			// Meshes
+			for (const auto& item : newRG->meshes)
+			{
+				auto& meshReferenceCount = data.meshReferences[item.meshID];
+				meshReferenceCount++;
+				if (meshReferenceCount == 1)
+					data.loadMeshQueue.emplace_back(item.meshID);
+
+				auto & textureReferenceCount = data.textureReferences[item.diffuseID];
+				textureReferenceCount++;
+				if (textureReferenceCount == 1)
+					data.loadTextureQueue.emplace_back(item.diffuseID);
+			}
+		}
+
+		// Remove existing references
+		for (const auto& item : oldRG.sprites)
+		{
+			auto textureRefIterator = data.textureReferences.find(item.spriteID);
+			textureRefIterator->second--;
+			if (textureRefIterator->second <= 0)
+			{
+				data.unloadTextureQueue.emplace_back(item.spriteID);
+				data.textureReferences.erase(textureRefIterator);
+			}
+		}
+
+		for (const auto& item : oldRG.meshes)
+		{
+			auto meshRefIterator = data.meshReferences.find(item.meshID);
+			meshRefIterator->second--;
+			if (meshRefIterator->second <= 0)
+			{
+				data.unloadMeshQueue.emplace_back(item.meshID);
+				data.meshReferences.erase(meshRefIterator);
+			}
+
+			auto textureRefIterator = data.textureReferences.find(item.diffuseID);
+			textureRefIterator->second--;
+			if (textureRefIterator->second <= 0)
+			{
+				data.unloadTextureQueue.emplace_back(item.diffuseID);
+				data.textureReferences.erase(textureRefIterator);
+			}
+		}
+	}
+}
+
+namespace Engine
+{
 	bool Renderer::OpenGL::IsValid(const InitInfo& initInfo, ErrorMessageCallbackPFN callback)
 	{
 		const auto& DebugMessage = [callback](const char* message)
@@ -104,30 +183,25 @@ namespace Engine
 		return true;
 	}
 
-	const Renderer::Core::Data& Engine::Renderer::Core::GetData()
-	{
-		return *data;
-	}
-
 	Renderer::Viewport& Engine::Renderer::NewViewport(Utility::ImgDim dimensions, void* surfaceHandle)
 	{
-		Core::data->viewports.emplace_back(std::make_unique<Viewport>(dimensions, surfaceHandle));
-		return *Core::data->viewports.back();
+		DRenderer::Core::data->viewports.emplace_back(std::make_unique<Viewport>(dimensions, surfaceHandle));
+		return *DRenderer::Core::data->viewports.back();
 	}
 
-	size_t Renderer::GetViewportCount() { return Core::data->viewports.size(); }
+	size_t Renderer::GetViewportCount() { return DRenderer::Core::data->viewports.size(); }
 
-	Renderer::Viewport& Renderer::GetViewport(size_t index) { return *Core::data->viewports[index]; }
+	Renderer::Viewport& Renderer::GetViewport(size_t index) { return *DRenderer::Core::data->viewports[index]; }
 
 	Renderer::API Renderer::GetActiveAPI()
 	{
-		if (Core::data)
-			return Core::data->activeAPI;
+		if (DRenderer::Core::data)
+			return DRenderer::Core::data->activeAPI;
 		else
 			return API::None;
 	}
 
-	void* Renderer::Core::GetAPIData() { return data->apiData.data; }
+
 
 	bool Renderer::Core::Initialize(InitInfo createInfo)
 	{
@@ -138,15 +212,15 @@ namespace Engine
 		{
 			if (createInfo.debugInitInfo.useDebugging)
 			{
-				bool valid = IsValid(createInfo, createInfo.debugInitInfo.errorMessageCallback);
+				bool valid = DRenderer::Core::IsValid(createInfo, createInfo.debugInitInfo.errorMessageCallback);
 				if (!valid)
-					LogDebugMessage("Error. InitInfo is not valid.");
+					DRenderer::Core::LogDebugMessage("Error. InitInfo is not valid.");
 				assert(valid);
 			}
 		}
 
-		Core::data = std::make_unique<Data>();
-		Data& data = *Core::data;
+		DRenderer::Core::data = std::make_unique<DRenderer::Core::Data>();
+		DRenderer::Core::Data& data = *DRenderer::Core::data;
 
 		// Debug info
 		if constexpr (Setup::enableDebugging)
@@ -185,25 +259,25 @@ namespace Engine
 		switch (GetActiveAPI())
 		{
 		case API::OpenGL:
-			OpenGL::Terminate(data->apiData.data);
+			OpenGL::Terminate(DRenderer::Core::data->apiData.data);
 			break;
 		default:
 			break;
 		}
 
-		data = nullptr;
+		DRenderer::Core::data = nullptr;
 	}
 
 	void Renderer::Core::PrepareRenderingEarly(RenderGraph& renderGraphInput)
 	{
-		Data& data = *Core::data;
+		DRenderer::Core::Data& data = *DRenderer::Core::data;
 
 		auto& renderGraph = data.renderGraph;
 
 		// Moves through the RenderGraph and tracks what assets are referenced
 		// to know which assets need to be loaded and which can be unloaded.
 		// Assets to be loaded/unloaded are stored in the data.load* queues.
-		UpdateAssetReferences(data, renderGraph, &renderGraphInput);
+		DRenderer::Core::UpdateAssetReferences(data, renderGraph, &renderGraphInput);
 
 		// Swaps the resources of the user's rendergraph and the one the renderer owns.
 		// This allows you to reuse allocated memory.
@@ -211,7 +285,7 @@ namespace Engine
 
 		// Logs a message whenever textures or mesh assets need to be loaded.
 		if (!data.loadTextureQueue.empty() || !data.loadMeshQueue.empty())
-			LogDebugMessage("Loading sprite/mesh resource(s)...");
+			DRenderer::Core::LogDebugMessage("Loading sprite/mesh resource(s)...");
 		data.PrepareRenderingEarly(data.loadTextureQueue, data.loadMeshQueue);
 
 		// Clears all the load-asset queues.
@@ -223,7 +297,7 @@ namespace Engine
 
 	void Renderer::Core::PrepareRenderingLate(RenderGraphTransform &input)
 	{
-		Data& data = *Core::data;
+		DRenderer::Core::Data& data = *DRenderer::Core::data;
 
 		const auto& renderGraph = data.renderGraph;
 		auto& renderGraphTransform = data.renderGraphTransform;
@@ -235,7 +309,7 @@ namespace Engine
 				bool compatible = IsCompatible(renderGraph, input);
 				if (!compatible)
 				{
-					LogDebugMessage("Error. Newly submitted RenderGraphTransform is not compatible with previously submitted RenderGraph.");
+					DRenderer::Core::LogDebugMessage("Error. Newly submitted RenderGraphTransform is not compatible with previously submitted RenderGraph.");
 					assert(false);
 				}
 			}
@@ -248,27 +322,27 @@ namespace Engine
 
 	void Renderer::Core::Draw()
 	{
-		data->Draw();
+		DRenderer::Core::data->Draw();
 	}
 
 	const Renderer::RenderGraph &Renderer::Core::GetRenderGraph()
 	{
-		return data->renderGraph;
+		return DRenderer::Core::data->renderGraph;
 	}
 
 	const Renderer::RenderGraphTransform &Renderer::Core::GetRenderGraphTransform()
 	{
-		return data->renderGraphTransform;
+		return DRenderer::Core::data->renderGraphTransform;
 	}
 
 	const Renderer::CameraInfo &Renderer::Core::GetCameraInfo()
 	{
-		return data->cameraInfo;
+		return DRenderer::Core::data->cameraInfo;
 	}
 
 	void Renderer::Core::SetCameraInfo(const CameraInfo &input)
 	{
-		data->cameraInfo = input;
+		DRenderer::Core::data->cameraInfo = input;
 	}
 
 	Renderer::Viewport::Viewport(Utility::ImgDim dimensions, void* surfaceHandle) :
@@ -302,77 +376,6 @@ namespace Engine
 			return false;
 
 		return true;
-	}
-
-	void Renderer::LogDebugMessage(std::string_view message)
-	{
-		if constexpr (Setup::enableDebugging)
-		{
-			const Core::Data& data = *Core::data;
-			if (data.debugData.useDebugging)
-				data.debugData.errorMessageCallback(message);
-		}
-	}
-
-	void Renderer::Core::UpdateAssetReferences(Data& data, const RenderGraph& oldRG, const RenderGraph* newRG)
-	{
-		// Add new references
-		if (newRG)
-		{
-			// Sprites
-			for (const auto& item : newRG->sprites)
-			{
-				auto& textureReferenceCount = data.textureReferences[item.spriteID];
-				textureReferenceCount++;
-				if (textureReferenceCount == 1)
-					data.loadTextureQueue.emplace_back(item.spriteID);
-			}
-
-			// Meshes
-			for (const auto& item : newRG->meshes)
-			{
-				auto& meshReferenceCount = data.meshReferences[item.meshID];
-				meshReferenceCount++;
-				if (meshReferenceCount == 1)
-					data.loadMeshQueue.emplace_back(item.meshID);
-
-				auto& textureReferenceCount = data.textureReferences[item.diffuseID];
-				textureReferenceCount++;
-				if (textureReferenceCount == 1)
-					data.loadTextureQueue.emplace_back(item.diffuseID);
-			}
-		}
-
-		// Remove existing references
-		for (const auto& item : oldRG.sprites)
-		{
-			auto textureRefIterator = data.textureReferences.find(item.spriteID);
-			textureRefIterator->second--;
-			if (textureRefIterator->second <= 0)
-			{
-				data.unloadTextureQueue.emplace_back(item.spriteID);
-				data.textureReferences.erase(textureRefIterator);
-			}
-		}
-
-		for (const auto& item : oldRG.meshes)
-		{
-			auto meshRefIterator = data.meshReferences.find(item.meshID);
-			meshRefIterator->second--;
-			if (meshRefIterator->second <= 0)
-			{
-				data.unloadMeshQueue.emplace_back(item.meshID);
-				data.meshReferences.erase(meshRefIterator);
-			}
-
-			auto textureRefIterator = data.textureReferences.find(item.diffuseID);
-			textureRefIterator->second--;
-			if (textureRefIterator->second <= 0)
-			{
-				data.unloadTextureQueue.emplace_back(item.diffuseID);
-				data.textureReferences.erase(textureRefIterator);
-			}
-		}
 	}
 
 	Math::Matrix4x4 Renderer::CameraInfo::GetModel(float aspectRatio) const

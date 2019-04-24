@@ -1,5 +1,5 @@
 /* This file is part of volk library; see volk.h for version/license details */
-#include "Volk/volk.h"
+#include "volk/volk.h"
 
 #ifdef _WIN32
 #	include <windows.h>
@@ -33,7 +33,8 @@ VkResult volkInitialize(void)
 	if (!module)
 		return VK_ERROR_INITIALIZATION_FAILED;
 
-	vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)GetProcAddress(module, "vkGetInstanceProcAddr");
+	// note: function pointer is cast through void function pointer to silence cast-function-type warning on gcc8
+	vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)(void(*)(void))GetProcAddress(module, "vkGetInstanceProcAddr");
 #elif defined(__APPLE__)
 	void* module = dlopen("libvulkan.dylib", RTLD_NOW | RTLD_LOCAL);
 	if (!module)

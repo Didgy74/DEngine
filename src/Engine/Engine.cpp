@@ -60,7 +60,9 @@ namespace Engine
 		// This one goes to GLFW3's swap buffer function.
 		rendererInitInfo.openGLInitInfo.glSwapBuffers = &Application::Core::GL_SwapWindow;
 
-		rendererInitInfo.vulkanInitInfo.test = &Application::Core::Vk_Test;
+		rendererInitInfo.vulkanInitInfo.getInstanceProcAddr = &Application::Core::Vk_GetInstanceProcAddress;
+		rendererInitInfo.vulkanInitInfo.getRequiredInstanceExtensions = &Application::Core::Vk_GetRequiredInstanceExtensions;
+		rendererInitInfo.vulkanInitInfo.test = &Application::Core::Vk_CreateSurface;
 
 		Renderer::Core::Initialize(rendererInitInfo);
 	}

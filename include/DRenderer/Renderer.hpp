@@ -32,9 +32,6 @@ namespace Engine
 
 		bool IsCompatible(const RenderGraph& renderGraph, const RenderGraphTransform& transforms);
 
-		// This call is thread-safe if ErrorMessageCallback supplied to InitInfo is.
-		void LogDebugMessage(std::string_view message);
-
 		namespace Core
 		{
 			bool Initialize(InitInfo createInfo);

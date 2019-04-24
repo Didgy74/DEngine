@@ -1,4 +1,4 @@
-project(volk)
+project(volk-cpp)
 cmake_minimum_required(VERSION 3.0)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -15,4 +15,4 @@ target_include_directories(
     $<INSTALL_INTERFACE:include>
 )
 
-target_sources(${LIB_NAME} INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/volk.c")
+target_sources(${LIB_NAME} INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/volk.cpp")

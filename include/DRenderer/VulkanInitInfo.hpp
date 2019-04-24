@@ -1,6 +1,8 @@
 #pragma once
 
 #include <functional>
+#include <vector>
+#include <string_view>
 
 namespace DRenderer
 {
@@ -8,7 +10,9 @@ namespace DRenderer
 	{
 		struct InitInfo
 		{
-			std::function<void(*())(void)> test = nullptr;
+			std::function<void(*())()> getInstanceProcAddr = nullptr;
+			std::function<std::vector<std::string_view>()> getRequiredInstanceExtensions = nullptr;
+			std::function<bool(void* instance, void* windowHandle, void* surfaceHandle)> test = nullptr;
 		};
 	}
 }
