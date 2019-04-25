@@ -1893,59 +1893,92 @@ VKAPI_ATTR VkResult VKAPI_CALL vkResetFences(
 
 VKAPI_ATTR VkResult VKAPI_CALL vkGetFenceStatus(
 	VkDevice                                    device,
-	VkFence                                     fence);
+	VkFence                                     fence)
+{
+	return Volk::funcPtrs->vkGetFenceStatus(device, fence);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkWaitForFences(
 	VkDevice                                    device,
 	uint32_t                                    fenceCount,
 	const VkFence* pFences,
 	VkBool32                                    waitAll,
-	uint64_t                                    timeout);
+	uint64_t                                    timeout)
+{
+	return Volk::funcPtrs->vkWaitForFences(device, fenceCount, pFences, waitAll, timeout);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateSemaphore(
 	VkDevice                                    device,
 	const VkSemaphoreCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkSemaphore* pSemaphore);
+	VkSemaphore* pSemaphore)
+{
+	return Volk::funcPtrs->vkCreateSemaphore(device, pCreateInfo, pAllocator, pSemaphore);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroySemaphore(
 	VkDevice                                    device,
 	VkSemaphore                                 semaphore,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroySemaphore(device, semaphore, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateEvent(
 	VkDevice                                    device,
 	const VkEventCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkEvent* pEvent);
+	VkEvent* pEvent)
+{
+	return Volk::funcPtrs->vkCreateEvent(device, pCreateInfo, pAllocator, pEvent);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyEvent(
 	VkDevice                                    device,
 	VkEvent                                     event,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyEvent(device, event, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkGetEventStatus(
 	VkDevice                                    device,
-	VkEvent                                     event);
+	VkEvent                                     event)
+{
+	return Volk::funcPtrs->vkGetEventStatus(device, event);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkSetEvent(
 	VkDevice                                    device,
-	VkEvent                                     event);
+	VkEvent                                     event)
+{
+	return Volk::funcPtrs->vkSetEvent(device, event);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkResetEvent(
 	VkDevice                                    device,
-	VkEvent                                     event);
+	VkEvent                                     event)
+{
+	return Volk::funcPtrs->vkResetEvent(device, event);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateQueryPool(
 	VkDevice                                    device,
 	const VkQueryPoolCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkQueryPool* pQueryPool);
+	VkQueryPool* pQueryPool)
+{
+	return Volk::funcPtrs->vkCreateQueryPool(device, pCreateInfo, pAllocator, pQueryPool);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyQueryPool(
 	VkDevice                                    device,
 	VkQueryPool                                 queryPool,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyQueryPool(device, queryPool, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkGetQueryPoolResults(
 	VkDevice                                    device,
@@ -1955,91 +1988,139 @@ VKAPI_ATTR VkResult VKAPI_CALL vkGetQueryPoolResults(
 	size_t                                      dataSize,
 	void* pData,
 	VkDeviceSize                                stride,
-	VkQueryResultFlags                          flags);
+	VkQueryResultFlags                          flags)
+{
+	return Volk::funcPtrs->vkGetQueryPoolResults(device, queryPool, firstQuery, queryCount, dataSize, pData, stride, flags);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateBuffer(
 	VkDevice                                    device,
 	const VkBufferCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkBuffer* pBuffer);
+	VkBuffer* pBuffer)
+{
+	return Volk::funcPtrs->vkCreateBuffer(device, pCreateInfo, pAllocator, pBuffer);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyBuffer(
 	VkDevice                                    device,
 	VkBuffer                                    buffer,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyBuffer(device, buffer, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateBufferView(
 	VkDevice                                    device,
 	const VkBufferViewCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkBufferView* pView);
+	VkBufferView* pView)
+{
+	return Volk::funcPtrs->vkCreateBufferView(device, pCreateInfo, pAllocator, pView);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyBufferView(
 	VkDevice                                    device,
 	VkBufferView                                bufferView,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyBufferView(device, bufferView, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateImage(
 	VkDevice                                    device,
 	const VkImageCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkImage* pImage);
+	VkImage* pImage)
+{
+	return Volk::funcPtrs->vkCreateImage(device, pCreateInfo, pAllocator, pImage);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyImage(
 	VkDevice                                    device,
 	VkImage                                     image,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyImage(device, image, pAllocator);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkGetImageSubresourceLayout(
 	VkDevice                                    device,
 	VkImage                                     image,
 	const VkImageSubresource* pSubresource,
-	VkSubresourceLayout* pLayout);
+	VkSubresourceLayout* pLayout)
+{
+	return Volk::funcPtrs->vkGetImageSubresourceLayout(device, image, pSubresource, pLayout);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateImageView(
 	VkDevice                                    device,
 	const VkImageViewCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkImageView* pView);
+	VkImageView* pView)
+{
+	return Volk::funcPtrs->vkCreateImageView(device, pCreateInfo, pAllocator, pView);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyImageView(
 	VkDevice                                    device,
 	VkImageView                                 imageView,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyImageView(device, imageView, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateShaderModule(
 	VkDevice                                    device,
 	const VkShaderModuleCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkShaderModule* pShaderModule);
+	VkShaderModule* pShaderModule)
+{
+	return Volk::funcPtrs->vkCreateShaderModule(device, pCreateInfo, pAllocator, pShaderModule);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyShaderModule(
 	VkDevice                                    device,
 	VkShaderModule                              shaderModule,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyShaderModule(device, shaderModule, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreatePipelineCache(
 	VkDevice                                    device,
 	const VkPipelineCacheCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkPipelineCache* pPipelineCache);
+	VkPipelineCache* pPipelineCache)
+{
+	return Volk::funcPtrs->vkCreatePipelineCache(device, pCreateInfo, pAllocator, pPipelineCache);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyPipelineCache(
 	VkDevice                                    device,
 	VkPipelineCache                             pipelineCache,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyPipelineCache(device, pipelineCache, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkGetPipelineCacheData(
 	VkDevice                                    device,
 	VkPipelineCache                             pipelineCache,
 	size_t* pDataSize,
-	void* pData);
+	void* pData)
+{
+	return Volk::funcPtrs->vkGetPipelineCacheData(device, pipelineCache, pDataSize, pData);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkMergePipelineCaches(
 	VkDevice                                    device,
 	VkPipelineCache                             dstCache,
 	uint32_t                                    srcCacheCount,
-	const VkPipelineCache* pSrcCaches);
+	const VkPipelineCache* pSrcCaches)
+{
+	return Volk::funcPtrs->vkMergePipelineCaches(device, dstCache, srcCacheCount, pSrcCaches);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateGraphicsPipelines(
 	VkDevice                                    device,
@@ -2047,7 +2128,10 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateGraphicsPipelines(
 	uint32_t                                    createInfoCount,
 	const VkGraphicsPipelineCreateInfo* pCreateInfos,
 	const VkAllocationCallbacks* pAllocator,
-	VkPipeline* pPipelines);
+	VkPipeline* pPipelines)
+{
+	return Volk::funcPtrs->vkCreateGraphicsPipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateComputePipelines(
 	VkDevice                                    device,
@@ -2055,107 +2139,163 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateComputePipelines(
 	uint32_t                                    createInfoCount,
 	const VkComputePipelineCreateInfo* pCreateInfos,
 	const VkAllocationCallbacks* pAllocator,
-	VkPipeline* pPipelines);
+	VkPipeline* pPipelines)
+{
+	return Volk::funcPtrs->vkCreateComputePipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyPipeline(
 	VkDevice                                    device,
 	VkPipeline                                  pipeline,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyPipeline(device, pipeline, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreatePipelineLayout(
 	VkDevice                                    device,
 	const VkPipelineLayoutCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkPipelineLayout* pPipelineLayout);
+	VkPipelineLayout* pPipelineLayout)
+{
+	return Volk::funcPtrs->vkCreatePipelineLayout(device, pCreateInfo, pAllocator, pPipelineLayout);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyPipelineLayout(
 	VkDevice                                    device,
 	VkPipelineLayout                            pipelineLayout,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyPipelineLayout(device, pipelineLayout, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateSampler(
 	VkDevice                                    device,
 	const VkSamplerCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkSampler* pSampler);
+	VkSampler* pSampler)
+{
+	return Volk::funcPtrs->vkCreateSampler(device, pCreateInfo, pAllocator, pSampler);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroySampler(
 	VkDevice                                    device,
 	VkSampler                                   sampler,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroySampler(device, sampler, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateDescriptorSetLayout(
 	VkDevice                                    device,
 	const VkDescriptorSetLayoutCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkDescriptorSetLayout* pSetLayout);
+	VkDescriptorSetLayout* pSetLayout)
+{
+	return Volk::funcPtrs->vkCreateDescriptorSetLayout(device, pCreateInfo, pAllocator, pSetLayout);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyDescriptorSetLayout(
 	VkDevice                                    device,
 	VkDescriptorSetLayout                       descriptorSetLayout,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyDescriptorSetLayout(device, descriptorSetLayout, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateDescriptorPool(
 	VkDevice                                    device,
 	const VkDescriptorPoolCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkDescriptorPool* pDescriptorPool);
+	VkDescriptorPool* pDescriptorPool)
+{
+	return Volk::funcPtrs->vkCreateDescriptorPool(device, pCreateInfo, pAllocator, pDescriptorPool);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyDescriptorPool(
 	VkDevice                                    device,
 	VkDescriptorPool                            descriptorPool,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyDescriptorPool(device, descriptorPool, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkResetDescriptorPool(
 	VkDevice                                    device,
 	VkDescriptorPool                            descriptorPool,
-	VkDescriptorPoolResetFlags                  flags);
+	VkDescriptorPoolResetFlags                  flags)
+{
+	return Volk::funcPtrs->vkResetDescriptorPool(device, descriptorPool, flags);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkAllocateDescriptorSets(
 	VkDevice                                    device,
 	const VkDescriptorSetAllocateInfo* pAllocateInfo,
-	VkDescriptorSet* pDescriptorSets);
+	VkDescriptorSet* pDescriptorSets)
+{
+	return Volk::funcPtrs->vkAllocateDescriptorSets(device, pAllocateInfo, pDescriptorSets);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkFreeDescriptorSets(
 	VkDevice                                    device,
 	VkDescriptorPool                            descriptorPool,
 	uint32_t                                    descriptorSetCount,
-	const VkDescriptorSet* pDescriptorSets);
+	const VkDescriptorSet* pDescriptorSets)
+{
+	return Volk::funcPtrs->vkFreeDescriptorSets(device, descriptorPool, descriptorSetCount, pDescriptorSets);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkUpdateDescriptorSets(
 	VkDevice                                    device,
 	uint32_t                                    descriptorWriteCount,
 	const VkWriteDescriptorSet* pDescriptorWrites,
 	uint32_t                                    descriptorCopyCount,
-	const VkCopyDescriptorSet* pDescriptorCopies);
+	const VkCopyDescriptorSet* pDescriptorCopies)
+{
+	return Volk::funcPtrs->vkUpdateDescriptorSets(device, descriptorWriteCount, pDescriptorWrites, descriptorCopyCount, pDescriptorCopies);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateFramebuffer(
 	VkDevice                                    device,
 	const VkFramebufferCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkFramebuffer* pFramebuffer);
+	VkFramebuffer* pFramebuffer)
+{
+	return Volk::funcPtrs->vkCreateFramebuffer(device, pCreateInfo, pAllocator, pFramebuffer);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyFramebuffer(
 	VkDevice                                    device,
 	VkFramebuffer                               framebuffer,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyFramebuffer(device, framebuffer, pAllocator);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateRenderPass(
 	VkDevice                                    device,
 	const VkRenderPassCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkRenderPass* pRenderPass);
+	VkRenderPass* pRenderPass)
+{
+	return Volk::funcPtrs->vkCreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyRenderPass(
 	VkDevice                                    device,
 	VkRenderPass                                renderPass,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyRenderPass(device, renderPass, pAllocator);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkGetRenderAreaGranularity(
 	VkDevice                                    device,
 	VkRenderPass                                renderPass,
-	VkExtent2D* pGranularity);
-
+	VkExtent2D* pGranularity)
+{
+	return Volk::funcPtrs->vkGetRenderAreaGranularity(device, renderPass, pGranularity);
+}
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateCommandPool(
 	VkDevice                                    device,
@@ -2265,6 +2405,62 @@ VKAPI_ATTR VkResult VKAPI_CALL vkGetPhysicalDeviceSurfacePresentModesKHR(
 	return Volk::funcPtrs->vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, pPresentModeCount, pPresentModes);
 }
 #endif /* defined(VK_KHR_surface) */
+
+#if defined(VK_KHR_swapchain)
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateSwapchainKHR(
+	VkDevice                                    device,
+	const VkSwapchainCreateInfoKHR* pCreateInfo,
+	const VkAllocationCallbacks* pAllocator,
+	VkSwapchainKHR* pSwapchain)
+{
+	return Volk::funcPtrs->vkCreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkDestroySwapchainKHR(
+	VkDevice                                    device,
+	VkSwapchainKHR                              swapchain,
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroySwapchainKHR(device, swapchain, pAllocator);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL vkGetSwapchainImagesKHR(
+	VkDevice                                    device,
+	VkSwapchainKHR                              swapchain,
+	uint32_t* pSwapchainImageCount,
+	VkImage* pSwapchainImages)
+{
+	return Volk::funcPtrs->vkGetSwapchainImagesKHR(device, swapchain, pSwapchainImageCount, pSwapchainImages);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL vkAcquireNextImageKHR(
+	VkDevice                                    device,
+	VkSwapchainKHR                              swapchain,
+	uint64_t                                    timeout,
+	VkSemaphore                                 semaphore,
+	VkFence                                     fence,
+	uint32_t* pImageIndex)
+{
+	return Volk::funcPtrs->vkAcquireNextImageKHR(device, swapchain, timeout, semaphore, fence, pImageIndex);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL vkQueuePresentKHR(
+	VkQueue                                     queue,
+	const VkPresentInfoKHR* pPresentInfo)
+{
+	return Volk::funcPtrs->vkQueuePresentKHR(queue, pPresentInfo);
+}
+#endif /* defined(VK_KHR_swapchain) */
+
+#if (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
+VKAPI_ATTR VkResult VKAPI_CALL vkAcquireNextImage2KHR(
+	VkDevice                                    device,
+	const VkAcquireNextImageInfoKHR* pAcquireInfo,
+	uint32_t* pImageIndex)
+{
+	return Volk::funcPtrs->vkAcquireNextImage2KHR(device, pAcquireInfo, pImageIndex);
+}
+#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 
 #if defined(VK_VERSION_1_1)
 VKAPI_ATTR VkResult VKAPI_CALL vkEnumerateInstanceVersion(
@@ -2507,6 +2703,8 @@ VKAPI_ATTR void VKAPI_CALL vkSubmitDebugUtilsMessageEXT(
 }
 #endif /* defined(VK_EXT_debug_utils) */
 
+
+
 #ifdef __GNUC__
 #	pragma GCC visibility push(hidden)
 #endif
@@ -2727,13 +2925,6 @@ PFN_vkDestroySamplerYcbcrConversionKHR vkDestroySamplerYcbcrConversionKHR;
 #if defined(VK_KHR_shared_presentable_image)
 PFN_vkGetSwapchainStatusKHR vkGetSwapchainStatusKHR;
 #endif /* defined(VK_KHR_shared_presentable_image) */
-#if defined(VK_KHR_swapchain)
-PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR;
-PFN_vkCreateSwapchainKHR vkCreateSwapchainKHR;
-PFN_vkDestroySwapchainKHR vkDestroySwapchainKHR;
-PFN_vkGetSwapchainImagesKHR vkGetSwapchainImagesKHR;
-PFN_vkQueuePresentKHR vkQueuePresentKHR;
-#endif /* defined(VK_KHR_swapchain) */
 #if defined(VK_KHR_wayland_surface)
 PFN_vkCreateWaylandSurfaceKHR vkCreateWaylandSurfaceKHR;
 PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR vkGetPhysicalDeviceWaylandPresentationSupportKHR;
@@ -2827,9 +3018,6 @@ PFN_vkGetDeviceGroupPresentCapabilitiesKHR vkGetDeviceGroupPresentCapabilitiesKH
 PFN_vkGetDeviceGroupSurfacePresentModesKHR vkGetDeviceGroupSurfacePresentModesKHR;
 PFN_vkGetPhysicalDevicePresentRectanglesKHR vkGetPhysicalDevicePresentRectanglesKHR;
 #endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
-#if (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
-PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
-#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 /* VOLK_GENERATE_PROTOTYPES_C */
 
 #ifdef __GNUC__

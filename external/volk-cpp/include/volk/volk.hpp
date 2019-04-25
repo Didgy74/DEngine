@@ -1256,6 +1256,50 @@ VKAPI_ATTR void VKAPI_CALL vkCmdExecuteCommands(
 	VkCommandBuffer                             commandBuffer,
 	uint32_t                                    commandBufferCount,
 	const VkCommandBuffer* pCommandBuffers);
+#endif /* defined(VK_VERSION_1_0) */
+
+#if defined(VK_KHR_swapchain)
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateSwapchainKHR(
+	VkDevice                                    device,
+	const VkSwapchainCreateInfoKHR* pCreateInfo,
+	const VkAllocationCallbacks* pAllocator,
+	VkSwapchainKHR* pSwapchain);
+
+VKAPI_ATTR void VKAPI_CALL vkDestroySwapchainKHR(
+	VkDevice                                    device,
+	VkSwapchainKHR                              swapchain,
+	const VkAllocationCallbacks* pAllocator);
+
+VKAPI_ATTR VkResult VKAPI_CALL vkGetSwapchainImagesKHR(
+	VkDevice                                    device,
+	VkSwapchainKHR                              swapchain,
+	uint32_t* pSwapchainImageCount,
+	VkImage* pSwapchainImages);
+
+VKAPI_ATTR VkResult VKAPI_CALL vkAcquireNextImageKHR(
+	VkDevice                                    device,
+	VkSwapchainKHR                              swapchain,
+	uint64_t                                    timeout,
+	VkSemaphore                                 semaphore,
+	VkFence                                     fence,
+	uint32_t* pImageIndex);
+
+VKAPI_ATTR VkResult VKAPI_CALL vkQueuePresentKHR(
+	VkQueue                                     queue,
+	const VkPresentInfoKHR* pPresentInfo);
+#endif /* defined(VK_KHR_swapchain) */
+
+#if (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
+extern PFN_vkGetDeviceGroupPresentCapabilitiesKHR vkGetDeviceGroupPresentCapabilitiesKHR;
+extern PFN_vkGetDeviceGroupSurfacePresentModesKHR vkGetDeviceGroupSurfacePresentModesKHR;
+extern PFN_vkGetPhysicalDevicePresentRectanglesKHR vkGetPhysicalDevicePresentRectanglesKHR;
+#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
+#if (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
+VKAPI_ATTR VkResult VKAPI_CALL vkAcquireNextImage2KHR(
+	VkDevice                                    device,
+	const VkAcquireNextImageInfoKHR* pAcquireInfo,
+	uint32_t* pImageIndex);
+#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 
 #if defined(VK_AMD_buffer_marker)
 VKAPI_ATTR void VKAPI_CALL vkCmdWriteBufferMarkerAMD(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage, VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker);
@@ -1279,8 +1323,6 @@ VKAPI_ATTR VkResult VKAPI_CALL vkBindImageMemory2KHR(
 	uint32_t                                    bindInfoCount,
 	const VkBindImageMemoryInfo* pBindInfos);
 #endif /* defined(VK_KHR_bind_memory2) */
-
-#endif /* defined(VK_VERSION_1_0) */
 
 #if defined(VK_VERSION_1_1)
 VKAPI_ATTR VkResult VKAPI_CALL vkEnumerateInstanceVersion(
@@ -1723,13 +1765,6 @@ extern PFN_vkDestroySamplerYcbcrConversionKHR vkDestroySamplerYcbcrConversionKHR
 #if defined(VK_KHR_shared_presentable_image)
 extern PFN_vkGetSwapchainStatusKHR vkGetSwapchainStatusKHR;
 #endif /* defined(VK_KHR_shared_presentable_image) */
-#if defined(VK_KHR_swapchain)
-extern PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR;
-extern PFN_vkCreateSwapchainKHR vkCreateSwapchainKHR;
-extern PFN_vkDestroySwapchainKHR vkDestroySwapchainKHR;
-extern PFN_vkGetSwapchainImagesKHR vkGetSwapchainImagesKHR;
-extern PFN_vkQueuePresentKHR vkQueuePresentKHR;
-#endif /* defined(VK_KHR_swapchain) */
 #if defined(VK_KHR_wayland_surface)
 extern PFN_vkCreateWaylandSurfaceKHR vkCreateWaylandSurfaceKHR;
 extern PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR vkGetPhysicalDeviceWaylandPresentationSupportKHR;
@@ -1818,14 +1853,6 @@ extern PFN_vkGetDeviceGroupSurfacePresentModes2EXT vkGetDeviceGroupSurfacePresen
 #if (defined(VK_KHR_descriptor_update_template) && defined(VK_KHR_push_descriptor)) || (defined(VK_KHR_push_descriptor) && defined(VK_VERSION_1_1))
 extern PFN_vkCmdPushDescriptorSetWithTemplateKHR vkCmdPushDescriptorSetWithTemplateKHR;
 #endif /* (defined(VK_KHR_descriptor_update_template) && defined(VK_KHR_push_descriptor)) || (defined(VK_KHR_push_descriptor) && defined(VK_VERSION_1_1)) */
-#if (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
-extern PFN_vkGetDeviceGroupPresentCapabilitiesKHR vkGetDeviceGroupPresentCapabilitiesKHR;
-extern PFN_vkGetDeviceGroupSurfacePresentModesKHR vkGetDeviceGroupSurfacePresentModesKHR;
-extern PFN_vkGetPhysicalDevicePresentRectanglesKHR vkGetPhysicalDevicePresentRectanglesKHR;
-#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
-#if (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
-extern PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
-#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 /* VOLK_GENERATE_PROTOTYPES_H */
 
 #endif

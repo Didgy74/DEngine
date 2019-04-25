@@ -20,7 +20,7 @@ namespace DRenderer::Vulkan
 
 	constexpr std::array requiredDeviceExtensions
 	{
-		"VK_KHR_swapchain",
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 	};
 
 	constexpr std::array requiredDeviceLayers
@@ -31,6 +31,9 @@ namespace DRenderer::Vulkan
 	struct APIData;
 	void APIDataDeleter(void*& ptr);
 	APIData& GetAPIData();
+
+	struct SwapchainSettings;
+	SwapchainSettings GetSwapchainSettings(vk::PhysicalDevice device, vk::SurfaceKHR surface);
 
 	VKAPI_ATTR VkBool32 VKAPI_CALL Callback(
 		vk::DebugUtilsMessageTypeFlagBitsEXT messageSeverity,
@@ -59,15 +62,41 @@ struct DRenderer::Vulkan::APIData
 
 	vk::SurfaceKHR surface = nullptr;
 
-	vk::PhysicalDevice physicalDevice = nullptr;
-	bool hostMemoryIsDeviceLocal = false;
+	struct PhysDevice
+	{
+		vk::PhysicalDevice handle = nullptr;
+
+		vk::PhysicalDeviceProperties properties{};
+		vk::PhysicalDeviceMemoryProperties memProperties{};
+		uint32_t deviceLocalMemory = std::numeric_limits<uint32_t>::max();
+		uint32_t hostVisibleMemory = std::numeric_limits<uint32_t>::max();
+		bool hostMemoryIsDeviceLocal = false;
+	};
+	PhysDevice physDevice{};
 
 	vk::Device device = nullptr;
 
 	vk::Queue graphicsQueue = nullptr;
 	vk::Queue presentQueue = nullptr;
 	vk::Queue transferQueue = nullptr;
+	vk::Queue transferImageQueue = nullptr;
 	vk::Queue computeQueue = nullptr;
+
+	struct RenderTarget
+	{
+		vk::DeviceMemory memory = nullptr;
+		vk::Image image = nullptr;
+		vk::ImageView imageView = nullptr;
+		vk::Framebuffer framebuffer = nullptr;
+	};
+	RenderTarget renderTarget{};
+
+	vk::SwapchainKHR swapchain = nullptr;
+	uint8_t swapchainLength = 0;
+	uint8_t resourceSetCount = 0;
+	std::vector<vk::Image> swapchainImages;
+
+	vk::RenderPass renderPass = nullptr;
 };
 
 void DRenderer::Vulkan::APIDataDeleter(void*& ptr)
@@ -82,22 +111,55 @@ DRenderer::Vulkan::APIData& DRenderer::Vulkan::GetAPIData()
 	return *static_cast<APIData*>(Core::GetAPIData());
 }
 
-namespace DRenderer::Vulkan
+struct DRenderer::Vulkan::SwapchainSettings
 {
-	bool Init_LoadAPIVersion(APIData::Version& version);
-	bool Init_LoadInstanceExtensionProperties(std::vector<vk::ExtensionProperties>& vecRef);
-	bool Init_LoadInstanceLayerProperties(std::vector<vk::LayerProperties>& vecRef);
-	bool Init_CreateInstance(vk::Instance& target, 
-							 const std::vector<vk::ExtensionProperties>& extensions, 
-							 const std::vector<vk::LayerProperties>& layers,
-							 vk::ApplicationInfo appInfo,
-							 const std::vector<std::string_view>& extensions2);
-	bool Init_CreateDebugMessenger(vk::Instance instance, vk::DebugUtilsMessengerEXT& messengerRef);
-	bool Init_CreateSurface(vk::Instance instance, void* hwnd, vk::SurfaceKHR& targetSurface);
+	vk::SurfaceCapabilitiesKHR capabilities{};
+	vk::PresentModeKHR presentMode{};
+	vk::SurfaceFormatKHR surfaceFormat{};
+};
+
+DRenderer::Vulkan::SwapchainSettings DRenderer::Vulkan::GetSwapchainSettings(vk::PhysicalDevice device, vk::SurfaceKHR surface)
+{
+	// Query surface capabilities
+	auto capabilities = device.getSurfaceCapabilitiesKHR(surface);
+
+	auto presentModes = device.getSurfacePresentModesKHR(surface);
+	vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
+
+	auto formats = device.getSurfaceFormatsKHR(surface);
+	vk::SurfaceFormatKHR surfaceFormat = { vk::Format::eR8G8B8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear };
+
+	SwapchainSettings settings{};
+	settings.capabilities = capabilities;
+	settings.presentMode = presentMode;
+	settings.surfaceFormat = surfaceFormat;
+
+	return settings;
 }
 
-bool DRenderer::Vulkan::Init_LoadAPIVersion(APIData::Version& version)
+namespace DRenderer::Vulkan
 {
+	APIData::Version Init_LoadAPIVersion();
+	std::vector<vk::ExtensionProperties> Init_LoadInstanceExtensionProperties();
+	std::vector<vk::LayerProperties> Init_LoadInstanceLayerProperties();
+	vk::Instance Init_CreateInstance(const std::vector<vk::ExtensionProperties>& extensions, 
+									 const std::vector<vk::LayerProperties>& layers,
+									 vk::ApplicationInfo appInfo,
+									 const std::vector<std::string_view>& extensions2);
+	vk::DebugUtilsMessengerEXT Init_CreateDebugMessenger(vk::Instance instance);
+	vk::SurfaceKHR Init_CreateSurface(vk::Instance instance, void* hwnd);
+	vk::SwapchainKHR Init_CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings);
+	std::vector<vk::ImageView> Init_CreateSwapchainImageViews(vk::Device device, const std::vector<vk::Image>& imageArr, vk::Format format);
+	// Note! This does NOT create the associated framebuffer
+	APIData::RenderTarget Init_CreateRenderTarget(vk::Device device, vk::Extent2D extents);
+	vk::RenderPass Init_CreateMainRenderPass(vk::Device device, vk::SampleCountFlagBits sampleCount);
+	vk::Framebuffer Init_CreateRenderTargetFramebuffer(vk::Device device, vk::Extent2D extents, vk::ImageView imgView, vk::RenderPass renderPass);
+}
+
+DRenderer::Vulkan::APIData::Version DRenderer::Vulkan::Init_LoadAPIVersion()
+{
+	APIData::Version version;
+
 	// Query the highest API version available.
 	uint32_t apiVersion = 0;
 	auto enumerateVersionResult = vk::enumerateInstanceVersion(&apiVersion);
@@ -106,10 +168,10 @@ bool DRenderer::Vulkan::Init_LoadAPIVersion(APIData::Version& version)
 	version.minor = VK_VERSION_MINOR(apiVersion);
 	version.patch = VK_VERSION_PATCH(apiVersion);
 
-	return true;
+	return version;
 }
 
-bool DRenderer::Vulkan::Init_LoadInstanceExtensionProperties(std::vector<vk::ExtensionProperties>& vecRef)
+std::vector<vk::ExtensionProperties> DRenderer::Vulkan::Init_LoadInstanceExtensionProperties()
 {
 	auto availableExtensions = vk::enumerateInstanceExtensionProperties();
 
@@ -134,15 +196,13 @@ bool DRenderer::Vulkan::Init_LoadInstanceExtensionProperties(std::vector<vk::Ext
 		}
 		// If there's a required extension that doesn't exist, return failure.
 		if (foundExtension == false)
-			return false;
+			return {};
 	}
 
-	vecRef = std::move(activeExts);
-
-	return true;
+	return std::move(activeExts);
 }
 
-bool DRenderer::Vulkan::Init_LoadInstanceLayerProperties(std::vector<vk::LayerProperties>& vecRef)
+std::vector<vk::LayerProperties> DRenderer::Vulkan::Init_LoadInstanceLayerProperties()
 {
 	// Load all the available validation layers, load all the ones we require into vecRef.
 	if constexpr (debugConfig)
@@ -170,20 +230,19 @@ bool DRenderer::Vulkan::Init_LoadInstanceLayerProperties(std::vector<vk::LayerPr
 			}
 			// If we couldn't find the required validation layer, return failure.
 			if (foundLayer == false)
-				return false;
+				return {};
 		}
 
-		vecRef = std::move(activeLayers);
+		return std::move(activeLayers);
 	}
 
-	return true;
+	return {};
 }
 
-bool DRenderer::Vulkan::Init_CreateInstance(vk::Instance& target,
-											const std::vector<vk::ExtensionProperties>& extensions,
-											const std::vector<vk::LayerProperties>& layers,
-											vk::ApplicationInfo appInfo,
-											const std::vector<std::string_view>& extensions2)
+vk::Instance DRenderer::Vulkan::Init_CreateInstance(const std::vector<vk::ExtensionProperties>& extensions,
+													const std::vector<vk::LayerProperties>& layers,
+													vk::ApplicationInfo appInfo,
+													const std::vector<std::string_view>& extensions2)
 {
 	vk::InstanceCreateInfo createInfo{};
 
@@ -227,11 +286,9 @@ bool DRenderer::Vulkan::Init_CreateInstance(vk::Instance& target,
 
 	auto result = vk::createInstance(createInfo);
 	if (!result)
-		return false;
+		return {};
 
-	target = result;
-
-	return true;
+	return result;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL DRenderer::Vulkan::Callback(
@@ -245,38 +302,193 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DRenderer::Vulkan::Callback(
 	return true;
 }
 
-bool DRenderer::Vulkan::Init_CreateDebugMessenger(vk::Instance instance, vk::DebugUtilsMessengerEXT& messengerRef)
+vk::DebugUtilsMessengerEXT DRenderer::Vulkan::Init_CreateDebugMessenger(vk::Instance instance)
 {
-	if constexpr (debugConfig == true)
-	{
-		vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
-		createInfo.messageSeverity =
-			vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
-			vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
-		createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
-		createInfo.pfnUserCallback = (PFN_vkDebugUtilsMessengerCallbackEXT)&Callback;
+	vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
+	createInfo.messageSeverity =
+		vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
+		vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+		vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
+		vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
+	createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
+	createInfo.pfnUserCallback = (PFN_vkDebugUtilsMessengerCallbackEXT)&Callback;
 
-		vk::DebugUtilsMessengerEXT temp = instance.createDebugUtilsMessengerEXT(createInfo);
-		if (temp)
-			messengerRef = temp;
-		else
-			return false;
-	}
-
-	return true;
+	vk::DebugUtilsMessengerEXT temp = instance.createDebugUtilsMessengerEXT(createInfo);
+	assert(temp);
+	return temp;
 }
 
-bool DRenderer::Vulkan::Init_CreateSurface(vk::Instance instance, void* hwnd, vk::SurfaceKHR& targetSurface)
+vk::SurfaceKHR DRenderer::Vulkan::Init_CreateSurface(vk::Instance instance, void* hwnd)
 {
 	vk::SurfaceKHR tempSurfaceHandle;
 	bool surfaceCreationTest = GetAPIData().initInfo.test(&instance, hwnd, &tempSurfaceHandle);
-	assert(surfaceCreationTest == true);
-	targetSurface = tempSurfaceHandle;
-	return true;
+	assert(surfaceCreationTest);
+	return tempSurfaceHandle;
+}
+
+vk::SwapchainKHR DRenderer::Vulkan::Init_CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings)
+{
+	vk::SwapchainCreateInfoKHR swapchainCreateInfo{};
+
+	swapchainCreateInfo.imageArrayLayers = 1;
+	swapchainCreateInfo.imageExtent = settings.capabilities.currentExtent;
+	swapchainCreateInfo.imageFormat = settings.surfaceFormat.format;
+	swapchainCreateInfo.imageColorSpace = settings.surfaceFormat.colorSpace;
+	swapchainCreateInfo.imageSharingMode = vk::SharingMode::eExclusive;
+	swapchainCreateInfo.presentMode = settings.presentMode;
+	swapchainCreateInfo.surface = surface;
+	swapchainCreateInfo.preTransform = settings.capabilities.currentTransform;
+	swapchainCreateInfo.clipped = 1;
+	swapchainCreateInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+	swapchainCreateInfo.imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
+	swapchainCreateInfo.minImageCount = 3;
+	if (settings.capabilities.maxImageCount < swapchainCreateInfo.minImageCount)
+		swapchainCreateInfo.minImageCount = settings.capabilities.maxImageCount;
+
+	auto swapchainResult = device.createSwapchainKHR(swapchainCreateInfo);
+	assert(swapchainResult);
+
+	return swapchainResult;
+}
+
+std::vector<vk::ImageView> DRenderer::Vulkan::Init_CreateSwapchainImageViews(vk::Device device, const std::vector<vk::Image>& imageArr, vk::Format format)
+{
+	std::vector<vk::ImageView> imageViews(imageArr.size());
+	for (size_t i = 0; i < imageViews.size(); i++)
+	{
+		vk::ImageViewCreateInfo createInfo{};
+
+		createInfo.image = imageArr[i];
+
+		createInfo.viewType = vk::ImageViewType::e2D;
+
+		vk::ComponentMapping compMapping{};
+		compMapping.r = vk::ComponentSwizzle::eIdentity;
+		compMapping.g = vk::ComponentSwizzle::eIdentity;
+		compMapping.b = vk::ComponentSwizzle::eIdentity;
+		compMapping.a = vk::ComponentSwizzle::eIdentity;
+		createInfo.components = compMapping;
+
+		createInfo.format = format;
+
+		vk::ImageSubresourceRange subresourceRange;
+		subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+		subresourceRange.layerCount = 1;
+		subresourceRange.levelCount = 1;
+		createInfo.subresourceRange = subresourceRange;
+
+		vk::ImageView temp = device.createImageView(createInfo);
+		assert(temp);
+		imageViews[i] = temp;
+	}
+	return std::move(imageViews);
+}
+
+// Note! This does NOT create the associated framebuffer.
+DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init_CreateRenderTarget(vk::Device device, vk::Extent2D extents)
+{
+	// Setup image for render target
+	vk::ImageCreateInfo imgCreateInfo{};
+	imgCreateInfo.format = vk::Format::eR8G8B8A8Unorm;
+	imgCreateInfo.imageType = vk::ImageType::e2D;
+	imgCreateInfo.initialLayout = vk::ImageLayout::eUndefined;
+	imgCreateInfo.mipLevels = 1;
+	imgCreateInfo.arrayLayers = 1;
+	imgCreateInfo.samples = vk::SampleCountFlagBits::e1;
+	imgCreateInfo.sharingMode = vk::SharingMode::eExclusive;
+	imgCreateInfo.tiling = vk::ImageTiling::eOptimal;
+	imgCreateInfo.usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc;
+	imgCreateInfo.extent = { extents.width, extents.height, 1 };
+
+	vk::Image img = device.createImage(imgCreateInfo);
+	assert(img);
+
+	vk::MemoryRequirements memReqs = device.getImageMemoryRequirements(img);
+
+	vk::MemoryAllocateInfo allocInfo;
+	allocInfo.allocationSize = memReqs.size;
+
+	allocInfo.memoryTypeIndex = GetAPIData().physDevice.deviceLocalMemory;
+
+	vk::DeviceMemory mem = device.allocateMemory(allocInfo);
+	assert(mem);
+
+	device.bindImageMemory(img, mem, 0);
+
+	vk::ImageViewCreateInfo imgViewCreateInfo{};
+	imgViewCreateInfo.image = img;
+	imgViewCreateInfo.format = imgCreateInfo.format;
+	imgViewCreateInfo.viewType = vk::ImageViewType::e2D;
+	imgViewCreateInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+	imgViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	imgViewCreateInfo.subresourceRange.layerCount = 1;
+	imgViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	imgViewCreateInfo.subresourceRange.levelCount = 1;
+
+	vk::ImageView imgView = device.createImageView(imgViewCreateInfo);
+	assert(imgView);
+
+	APIData::RenderTarget renderTarget{};
+	renderTarget.memory = mem;
+	renderTarget.image = img;
+	renderTarget.imageView = imgView;
+
+	return renderTarget;
+}
+
+vk::RenderPass DRenderer::Vulkan::Init_CreateMainRenderPass(vk::Device device, vk::SampleCountFlagBits sampleCount)
+{
+	// Set up render pass
+	vk::RenderPassCreateInfo createInfo{};
+
+	vk::AttachmentDescription colorAttachment{};
+	colorAttachment.initialLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	colorAttachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	colorAttachment.format = vk::Format::eR8G8B8A8Unorm;
+	colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+	colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
+	colorAttachment.samples = sampleCount;
+	colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+	colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+
+	createInfo.attachmentCount = 1;
+	createInfo.pAttachments = &colorAttachment;
+
+
+	vk::AttachmentReference colorAttachmentRef{};
+	colorAttachmentRef.attachment = 0;
+	colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
+	vk::SubpassDescription sbDesc{};
+	sbDesc.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+	sbDesc.colorAttachmentCount = 1;
+	sbDesc.pColorAttachments = &colorAttachmentRef;
+
+	createInfo.subpassCount = 1;
+	createInfo.pSubpasses = &sbDesc;
+
+	auto renderPass = device.createRenderPass(createInfo);
+	assert(renderPass);
+	return renderPass;
+}
+
+vk::Framebuffer DRenderer::Vulkan::Init_CreateRenderTargetFramebuffer(vk::Device device, vk::Extent2D extents, vk::ImageView imgView, vk::RenderPass renderPass)
+{
+	vk::FramebufferCreateInfo fbCreateInfo{};
+	fbCreateInfo.renderPass = renderPass;
+	fbCreateInfo.width = extents.width;
+	fbCreateInfo.height = extents.height;
+	fbCreateInfo.layers = 1;
+	fbCreateInfo.attachmentCount = 1;
+	fbCreateInfo.pAttachments = &imgView;
+
+	vk::Framebuffer fb = device.createFramebuffer(fbCreateInfo);
+	assert(fb);
+	return fb;
 }
 
 void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& initInfo)
 {
+	// Load the first function pointers.
 	Volk::InitializeCustom((PFN_vkGetInstanceProcAddr)initInfo.getInstanceProcAddr());
 
 	apiData.data = new APIData();
@@ -285,56 +497,71 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	data.initInfo = initInfo;
 
 	// Start initialization
-	Init_LoadAPIVersion(data.apiVersion);
-	Init_LoadInstanceExtensionProperties(data.instanceExtensionProperties);
-	Init_LoadInstanceLayerProperties(data.instanceLayerProperties);
+	data.apiVersion = Init_LoadAPIVersion();
+	data.instanceExtensionProperties = Init_LoadInstanceExtensionProperties();
+	data.instanceLayerProperties = Init_LoadInstanceLayerProperties();
 	
+	// Create our instance
 	vk::ApplicationInfo appInfo{};
 	appInfo.apiVersion = VK_MAKE_VERSION(data.apiVersion.major, data.apiVersion.minor, data.apiVersion.patch);
 	appInfo.pApplicationName = "DEngine";
 	appInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
 	appInfo.pEngineName = "DEngine";
 	appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
-	auto wsiRequiredExtensions = initInfo.getRequiredInstanceExtensions();
-	Init_CreateInstance(data.instance, data.instanceExtensionProperties, data.instanceLayerProperties, appInfo, wsiRequiredExtensions);
+	auto wsiRequiredExtensions = data.initInfo.getRequiredInstanceExtensions();
+	data.instance = Init_CreateInstance(data.instanceExtensionProperties, data.instanceLayerProperties, appInfo, wsiRequiredExtensions);
 
+	// Load function pointers for our instance.
 	Volk::LoadInstance(data.instance);
 
-	Init_CreateDebugMessenger(data.instance, data.debugMessenger);
+	// Enable debugging only if we are in debug config, and the user requested debugging.
+	if constexpr (DRenderer::debugConfig == true)
+	{
+		if (DRenderer::Core::GetData().debugData.useDebugging == true)
+			data.debugMessenger = Init_CreateDebugMessenger(data.instance);
+	}
+
+	// Create our surface we will render onto
 	void* hwnd = Engine::Renderer::GetViewport(0).GetSurfaceHandle();
-	Init_CreateSurface(data.instance, hwnd, data.surface);
+	data.surface = Init_CreateSurface(data.instance, hwnd);
 
-
-	
-
-
-
-
-
+	// Find physical device
+	// TODO: Make code that is not hardcoded.
 	auto devices = data.instance.enumeratePhysicalDevices();
 	assert(devices.size() > 0);
-	data.physicalDevice = devices[0];
-	auto queues = data.physicalDevice.getQueueFamilyProperties();
-	bool presentSupport = data.physicalDevice.getSurfaceSupportKHR(2, data.surface);
+	data.physDevice.handle = devices[0];
+
+	// We've picked a physical device. Grab some information from it.
+
+	data.physDevice.properties = data.physDevice.handle.getProperties();
+	data.physDevice.memProperties = data.physDevice.handle.getMemoryProperties();
+	data.physDevice.deviceLocalMemory = 0;
+	data.physDevice.hostVisibleMemory = 1;
+	data.physDevice.hostMemoryIsDeviceLocal = false;
+
+	SwapchainSettings swapchainSettings = GetSwapchainSettings(data.physDevice.handle, data.surface);
 
 
-	size_t graphicsFamily = 0;
-	size_t graphicsQueue = 0;
 
-	size_t transferFamily = 2;
-	size_t transferQueue = 0;
+	// Create logical device
+	auto queues = data.physDevice.handle.getQueueFamilyProperties();
+	bool presentSupport = data.physDevice.handle.getSurfaceSupportKHR(2, data.surface);
 
-	size_t computeFamily = 1;
-	size_t computeQueue = 0;
-
-	size_t presentFamily = 2;
-	size_t presentQueue = 1;
-
+	uint32_t graphicsFamily = 0;
+	uint32_t graphicsQueue = 0;
+	uint32_t presentFamily = 2;
+	uint32_t presentQueue = 1;
+	uint32_t computeFamily = 1;
+	uint32_t computeQueue = 0;
+	uint32_t transferFamily = 2;
+	uint32_t transferQueue = 0;
+	uint32_t transferImageFamily = 1;
+	uint32_t transferImageQueue = 1;
 
 	vk::DeviceCreateInfo createInfo{};
 
 	// Feature configuration
-	auto physDeviceFeatures = data.physicalDevice.getFeatures();
+	auto physDeviceFeatures = data.physDevice.handle.getFeatures();
 
 	vk::PhysicalDeviceFeatures features{};
 	if (physDeviceFeatures.robustBufferAccess == 1)
@@ -354,7 +581,7 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 
 	vk::DeviceQueueCreateInfo secondQueueCreateInfo;
 	secondQueueCreateInfo.pQueuePriorities = priority;
-	secondQueueCreateInfo.queueCount = 1;
+	secondQueueCreateInfo.queueCount = 2;
 	secondQueueCreateInfo.queueFamilyIndex = 1;
 	queueCreateInfos.push_back(secondQueueCreateInfo);
 
@@ -367,34 +594,43 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	createInfo.queueCreateInfoCount = uint32_t(queueCreateInfos.size());
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-
-	auto deviceExtensionsAvailable = data.physicalDevice.enumerateDeviceExtensionProperties();
-	// Check if all required device extensions are available
+	auto deviceExtensionsAvailable = data.physDevice.handle.enumerateDeviceExtensionProperties();
+	// TODO: Check if all required device extensions are available
 	createInfo.ppEnabledExtensionNames = Vulkan::requiredDeviceExtensions.data();
 	createInfo.enabledExtensionCount = uint32_t(Vulkan::requiredDeviceExtensions.size());
 
-	auto deviceLayersAvailable = data.physicalDevice.enumerateDeviceLayerProperties();
-	createInfo.enabledLayerCount = uint32_t(Vulkan::requiredDeviceLayers.size());
-	createInfo.ppEnabledLayerNames = Vulkan::requiredDeviceLayers.data();
+	auto deviceLayersAvailable = data.physDevice.handle.enumerateDeviceLayerProperties();
+	//createInfo.enabledLayerCount = uint32_t(Vulkan::requiredDeviceLayers.size());
+	//createInfo.ppEnabledLayerNames = Vulkan::requiredDeviceLayers.data();
 
-	auto result = data.physicalDevice.createDevice(createInfo);
+	auto result = data.physDevice.handle.createDevice(createInfo);
 	if (!result)
 		std::abort();
 	data.device = result;
 
-	data.graphicsQueue = data.device.getQueue(0, 0);
-	data.presentQueue = data.device.getQueue(2, 1);
-	data.transferQueue = data.device.getQueue(2, 0);
-	data.computeQueue = data.device.getQueue(1, 0);
+	// Load function pointers for our device.
+	Volk::LoadDevice(data.device);
+
+	vk::Extent2D renderImgExtents = { swapchainSettings.capabilities.currentExtent.width, swapchainSettings.capabilities.currentExtent.height };
+	data.renderTarget = Init_CreateRenderTarget(data.device, renderImgExtents);
+
+	// Set up main renderpass
+	data.renderPass = Init_CreateMainRenderPass(data.device, vk::SampleCountFlagBits::e1);
+
+	data.renderTarget.framebuffer = Init_CreateRenderTargetFramebuffer(data.device, renderImgExtents, data.renderTarget.imageView, data.renderPass);
+
+	// Set up swapchain
+	data.swapchain = Init_CreateSwapchain(data.device, data.surface, swapchainSettings);
+	data.swapchainImages = data.device.getSwapchainImagesKHR(data.swapchain);
+	data.swapchainLength = uint8_t(data.swapchainImages.size());
+	data.resourceSetCount = data.swapchainLength - 1;
 
 
 
 
-	// Query surface capabilities
-	auto capabilities = data.physicalDevice.getSurfaceCapabilitiesKHR(data.surface);
-	auto presentModes = data.physicalDevice.getSurfacePresentModesKHR(data.surface);
-	auto formats = data.physicalDevice.getSurfaceFormatsKHR(data.surface);
-
-
-
+	data.graphicsQueue = data.device.getQueue(graphicsFamily, graphicsQueue);
+	data.presentQueue = data.device.getQueue(presentFamily, presentQueue);
+	data.transferQueue = data.device.getQueue(transferFamily, transferQueue);
+	data.computeQueue = data.device.getQueue(computeFamily, computeQueue);
+	data.transferImageQueue = data.device.getQueue(transferImageFamily, transferImageQueue);
 }
