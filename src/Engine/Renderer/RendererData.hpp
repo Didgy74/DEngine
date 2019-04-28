@@ -7,10 +7,24 @@
 
 namespace DRenderer::Core
 {
+#if (defined(DRENDERER_DEVELOPMENT) && !defined(NDEBUG))
+	constexpr uint8_t debugLevel = 2;
+#elif !defined(NDEBUG)
+	constexpr uint8_t debugLevel = 1;
+#else
+	constexpr uint8_t debugLevel = 0;
+#endif
+
 	struct APIDataPointer
 	{
 		void* data = nullptr;
 		void(*deleterPfn)(void*&) = nullptr;
+	};
+
+	struct PrepareRenderingEarlyParams
+	{
+		const std::vector<size_t>* meshLoadQueue = nullptr;
+		const std::vector<size_t>* textureLoadQueue = nullptr;
 	};
 
 	struct Data
@@ -32,7 +46,7 @@ namespace DRenderer::Core
 		std::vector<std::unique_ptr<Engine::Renderer::Viewport>> viewports;
 
 		std::function<void(void)> Draw;
-		std::function<void(const std::vector<size_t>&, const std::vector<size_t>&)> PrepareRenderingEarly;
+		std::function<void(const PrepareRenderingEarlyParams&)> PrepareRenderingEarly;
 		std::function<void(void)> PrepareRenderingLate;
 
 		Engine::Renderer::AssetLoadCreateInfo assetLoadData{};
@@ -45,6 +59,6 @@ namespace DRenderer::Core
 
 	void* GetAPIData();
 
-	// This call is thread-safe if ErrorMessageCallback supplied to InitInfo is.
+	// This call is thread-safe if the ErrorMessageCallback supplied to InitInfo is.
 	void LogDebugMessage(std::string_view message);
 }

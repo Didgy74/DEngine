@@ -76,11 +76,9 @@ struct DRenderer::Vulkan::APIData
 
 	vk::Device device = nullptr;
 
+	vk::Extent2D surfaceExtents{};
+
 	vk::Queue graphicsQueue = nullptr;
-	vk::Queue presentQueue = nullptr;
-	vk::Queue transferQueue = nullptr;
-	vk::Queue transferImageQueue = nullptr;
-	vk::Queue computeQueue = nullptr;
 
 	struct RenderTarget
 	{
@@ -93,10 +91,30 @@ struct DRenderer::Vulkan::APIData
 
 	vk::SwapchainKHR swapchain = nullptr;
 	uint8_t swapchainLength = 0;
+	uint8_t currentSwapchainImage = 0;
+	// Resource set means in-flight image
 	uint8_t resourceSetCount = 0;
+	// Resource set means in-flight image
+	uint8_t currentResourceSet = 0;
+	// Has swapchain length
 	std::vector<vk::Image> swapchainImages;
+	// Has swapchain length
+	std::vector<vk::ImageView> swapchainImageViews;
+	// Has swapchain length
+	std::vector<vk::Fence> imageAvailableForPresentation;
+	size_t test = 0;
 
 	vk::RenderPass renderPass = nullptr;
+
+	vk::CommandPool renderCmdPool = nullptr;
+	// Has the length of Swapchain-length
+	std::vector<vk::CommandBuffer> renderCmdBuffer;
+	// Has swapchain length
+	std::vector<vk::Fence> renderCmdBufferAvailable;
+
+	vk::CommandPool presentCmdPool = nullptr;
+	// Has swapchain length
+	std::vector<vk::CommandBuffer> presentCmdBuffer;
 };
 
 void DRenderer::Vulkan::APIDataDeleter(void*& ptr)
@@ -142,10 +160,11 @@ namespace DRenderer::Vulkan
 	APIData::Version Init_LoadAPIVersion();
 	std::vector<vk::ExtensionProperties> Init_LoadInstanceExtensionProperties();
 	std::vector<vk::LayerProperties> Init_LoadInstanceLayerProperties();
-	vk::Instance Init_CreateInstance(const std::vector<vk::ExtensionProperties>& extensions, 
-									 const std::vector<vk::LayerProperties>& layers,
-									 vk::ApplicationInfo appInfo,
-									 const std::vector<std::string_view>& extensions2);
+	vk::Instance Init_CreateInstance(
+		const std::vector<vk::ExtensionProperties>& extensions, 
+		const std::vector<vk::LayerProperties>& layers,
+		vk::ApplicationInfo appInfo,
+		const std::vector<std::string_view>& extensions2);
 	vk::DebugUtilsMessengerEXT Init_CreateDebugMessenger(vk::Instance instance);
 	vk::SurfaceKHR Init_CreateSurface(vk::Instance instance, void* hwnd);
 	vk::SwapchainKHR Init_CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings);
@@ -154,6 +173,16 @@ namespace DRenderer::Vulkan
 	APIData::RenderTarget Init_CreateRenderTarget(vk::Device device, vk::Extent2D extents);
 	vk::RenderPass Init_CreateMainRenderPass(vk::Device device, vk::SampleCountFlagBits sampleCount);
 	vk::Framebuffer Init_CreateRenderTargetFramebuffer(vk::Device device, vk::Extent2D extents, vk::ImageView imgView, vk::RenderPass renderPass);
+	void Init_TransitionRenderTargetAndSwapchain(vk::Device device, vk::Queue queue, vk::Image renderTarget, const std::vector<vk::Image>& swapchainImages);
+	void Init_SetupRenderingCmdBuffers(vk::Device device, uint8_t swapchainLength, vk::CommandPool& pool, std::vector<vk::CommandBuffer>& commandBuffers);
+	void Init_SetupPresentCmdBuffers(
+		vk::Device device,
+		vk::Image renderTarget,
+		vk::Extent2D extents,
+		const std::vector<vk::Image>& swapchain,
+		vk::CommandPool& pool, 
+		std::vector<vk::CommandBuffer>& cmdBuffers
+	);
 }
 
 DRenderer::Vulkan::APIData::Version DRenderer::Vulkan::Init_LoadAPIVersion()
@@ -179,14 +208,11 @@ std::vector<vk::ExtensionProperties> DRenderer::Vulkan::Init_LoadInstanceExtensi
 	activeExts.reserve(Vulkan::requiredExtensions.size());
 
 	// Check if all required extensions are available. Load the required ones into vecRef when done.
-	for (size_t i = 0; i < Vulkan::requiredExtensions.size(); i++)
+	for (const auto& requiredExtension : Vulkan::requiredExtensions)
 	{
-		const auto& requiredExtension = Vulkan::requiredExtensions[i];
-
 		bool foundExtension = false;
-		for (size_t j = 0; j < availableExtensions.size(); j++)
+		for (const auto& availableExtension : availableExtensions)
 		{
-			const auto& availableExtension = availableExtensions[j];
 			if (std::strcmp(requiredExtension, availableExtension.extensionName) == 0)
 			{
 				foundExtension = true;
@@ -205,37 +231,29 @@ std::vector<vk::ExtensionProperties> DRenderer::Vulkan::Init_LoadInstanceExtensi
 std::vector<vk::LayerProperties> DRenderer::Vulkan::Init_LoadInstanceLayerProperties()
 {
 	// Load all the available validation layers, load all the ones we require into vecRef.
-	if constexpr (debugConfig)
+	auto availableLayers = vk::enumerateInstanceLayerProperties();
+
+	std::vector<vk::LayerProperties> activeLayers;
+	activeLayers.reserve(requiredValidLayers.size());
+
+	for (const auto& requiredLayer : requiredValidLayers)
 	{
-		auto availableLayers = vk::enumerateInstanceLayerProperties();
-
-		std::vector<vk::LayerProperties> activeLayers;
-		activeLayers.reserve(requiredValidLayers.size());
-
-		for (size_t i = 0; i < requiredValidLayers.size(); i++)
+		bool foundLayer = false;
+		for (const auto& availableLayer : availableLayers)
 		{
-			const auto& requiredLayer = requiredValidLayers[i];
-
-			bool foundLayer = false;
-			for (size_t j = 0; j < availableLayers.size(); j++)
+			if (std::strcmp(availableLayer.layerName, requiredLayer) == 0)
 			{
-				const auto& availableLayer = availableLayers[j];
-				
-				if (std::strcmp(availableLayer.layerName, requiredLayer) == 0)
-				{
-					foundLayer = true;
-					activeLayers.push_back(availableLayer);
-					break;
-				}
+				foundLayer = true;
+				activeLayers.push_back(availableLayer);
+				break;
 			}
-			// If we couldn't find the required validation layer, return failure.
-			if (foundLayer == false)
-				return {};
 		}
+		// If we couldn't find the required validation layer, return failure.
+		if (foundLayer == false)
+			return {};
 
 		return std::move(activeLayers);
 	}
-
 	return {};
 }
 
@@ -273,7 +291,7 @@ vk::Instance DRenderer::Vulkan::Init_CreateInstance(const std::vector<vk::Extens
 
 	// Create const char* array of the validation layer names.
 	std::vector<const char*> layerList;
-	if constexpr (debugConfig == true)
+	if constexpr (Core::debugLevel >= 2)
 	{
 		layerList.reserve(layers.size());
 		for (const auto& layer : layers)
@@ -307,10 +325,8 @@ vk::DebugUtilsMessengerEXT DRenderer::Vulkan::Init_CreateDebugMessenger(vk::Inst
 	vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
 	createInfo.messageSeverity =
 		vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
-		vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-		vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
-		vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
-	createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
+		vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
+	createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
 	createInfo.pfnUserCallback = (PFN_vkDebugUtilsMessengerCallbackEXT)&Callback;
 
 	vk::DebugUtilsMessengerEXT temp = instance.createDebugUtilsMessengerEXT(createInfo);
@@ -438,9 +454,6 @@ DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init_CreateRenderTar
 
 vk::RenderPass DRenderer::Vulkan::Init_CreateMainRenderPass(vk::Device device, vk::SampleCountFlagBits sampleCount)
 {
-	// Set up render pass
-	vk::RenderPassCreateInfo createInfo{};
-
 	vk::AttachmentDescription colorAttachment{};
 	colorAttachment.initialLayout = vk::ImageLayout::eColorAttachmentOptimal;
 	colorAttachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
@@ -451,20 +464,23 @@ vk::RenderPass DRenderer::Vulkan::Init_CreateMainRenderPass(vk::Device device, v
 	colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
 	colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
 
-	createInfo.attachmentCount = 1;
-	createInfo.pAttachments = &colorAttachment;
-
+	std::array attachments = { colorAttachment };
 
 	vk::AttachmentReference colorAttachmentRef{};
 	colorAttachmentRef.attachment = 0;
 	colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
-	vk::SubpassDescription sbDesc{};
-	sbDesc.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
-	sbDesc.colorAttachmentCount = 1;
-	sbDesc.pColorAttachments = &colorAttachmentRef;
 
+	vk::SubpassDescription subpassDescription{};
+	subpassDescription.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+	subpassDescription.colorAttachmentCount = 1;
+	subpassDescription.pColorAttachments = &colorAttachmentRef;
+
+	// Set up render pass
+	vk::RenderPassCreateInfo createInfo{};
+	createInfo.attachmentCount = uint32_t(attachments.size());
+	createInfo.pAttachments = attachments.data();
 	createInfo.subpassCount = 1;
-	createInfo.pSubpasses = &sbDesc;
+	createInfo.pSubpasses = &subpassDescription;
 
 	auto renderPass = device.createRenderPass(createInfo);
 	assert(renderPass);
@@ -486,6 +502,227 @@ vk::Framebuffer DRenderer::Vulkan::Init_CreateRenderTargetFramebuffer(vk::Device
 	return fb;
 }
 
+void DRenderer::Vulkan::Init_TransitionRenderTargetAndSwapchain(vk::Device device, vk::Queue queue, vk::Image renderTarget, const std::vector<vk::Image>& swapchainImages)
+{
+	vk::CommandPoolCreateInfo createInfo{};
+	createInfo.queueFamilyIndex = 0;
+
+	vk::CommandPool pool = device.createCommandPool(createInfo);
+
+	vk::CommandBufferAllocateInfo allocInfo{};
+	allocInfo.commandPool = pool;
+	allocInfo.commandBufferCount = 1;
+	allocInfo.level = vk::CommandBufferLevel::ePrimary;
+
+	auto vkCmdBuffers = device.allocateCommandBuffers(allocInfo);
+	auto cmdBuffer = vkCmdBuffers[0];
+
+	vk::CommandBufferBeginInfo beginInfo{};
+
+	cmdBuffer.begin(beginInfo);
+
+	vk::ImageMemoryBarrier barrier{};
+	barrier.image = renderTarget;
+	barrier.srcAccessMask = {};
+	barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+	barrier.srcQueueFamilyIndex = 0;
+	barrier.dstQueueFamilyIndex = 0;
+	barrier.oldLayout = vk::ImageLayout::eUndefined;
+	barrier.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+
+	vk::PipelineStageFlags srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
+	vk::PipelineStageFlags dstStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+
+	cmdBuffer.pipelineBarrier(srcStage, dstStage, vk::DependencyFlags(), {}, {}, { barrier });
+
+	std::vector<vk::ImageMemoryBarrier> swapchainBarriers(swapchainImages.size());
+	for (size_t i = 0; i < swapchainBarriers.size(); i++)
+	{
+		vk::ImageMemoryBarrier& barrier = swapchainBarriers[i];
+		barrier.image = swapchainImages[i];
+		barrier.srcAccessMask = {};
+		barrier.dstAccessMask = {};
+		barrier.srcQueueFamilyIndex = 0;
+		barrier.dstQueueFamilyIndex = 0;
+		barrier.oldLayout = vk::ImageLayout::eUndefined;
+		barrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
+		barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+		barrier.subresourceRange.baseMipLevel = 0;
+		barrier.subresourceRange.levelCount = 1;
+	}
+
+	dstStage = vk::PipelineStageFlagBits::eBottomOfPipe;
+
+	cmdBuffer.pipelineBarrier(srcStage, dstStage, vk::DependencyFlags(), {}, {}, swapchainBarriers);
+
+	cmdBuffer.end();
+
+	vk::SubmitInfo submitInfo{};
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &cmdBuffer;
+
+	queue.submit(submitInfo, vk::Fence());
+
+	queue.waitIdle();
+
+	device.destroyCommandPool(pool);
+}
+
+void DRenderer::Vulkan::Init_SetupRenderingCmdBuffers(vk::Device device, uint8_t swapchainLength, vk::CommandPool& pool, std::vector<vk::CommandBuffer>& commandBuffers)
+{
+	vk::CommandPoolCreateInfo createInfo{};
+	createInfo.queueFamilyIndex = 0;
+	createInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+
+	pool = device.createCommandPool(createInfo);
+
+	vk::CommandBufferAllocateInfo allocInfo{};
+	allocInfo.commandPool = pool;
+	allocInfo.commandBufferCount = swapchainLength;
+	allocInfo.level = vk::CommandBufferLevel::ePrimary;
+
+	commandBuffers = device.allocateCommandBuffers(allocInfo);
+}
+
+void DRenderer::Vulkan::Init_SetupPresentCmdBuffers(
+	vk::Device device,
+	vk::Image renderTarget, 
+	vk::Extent2D extents, 
+	const std::vector<vk::Image>& swapchain, 
+	vk::CommandPool& pool,
+	std::vector<vk::CommandBuffer>& cmdBuffers)
+{
+	vk::CommandPoolCreateInfo createInfo{};
+	createInfo.queueFamilyIndex = 0;
+
+	pool = device.createCommandPool(createInfo);
+
+	vk::CommandBufferAllocateInfo allocInfo{};
+	allocInfo.commandPool = pool;
+	allocInfo.commandBufferCount = swapchain.size();
+	allocInfo.level = vk::CommandBufferLevel::ePrimary;
+
+	cmdBuffers = device.allocateCommandBuffers(allocInfo);
+
+	for (size_t i = 0; i < swapchain.size(); i++)
+	{
+		auto& cmdBuffer = cmdBuffers[i];
+
+		if constexpr (Core::debugLevel >= 2)
+		{
+			vk::DebugUtilsObjectNameInfoEXT renderTargetNameInfo{};
+			renderTargetNameInfo.objectType = vk::ObjectType::eCommandBuffer;
+			renderTargetNameInfo.objectHandle = (uint64_t)(VkCommandBuffer)cmdBuffer;
+			std::string name = "Presentation Command Buffer " + std::to_string(i);
+			renderTargetNameInfo.pObjectName = name.data();
+			device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+		}
+
+		vk::CommandBufferBeginInfo beginInfo{};
+
+		beginInfo.flags = vk::CommandBufferUsageFlagBits::eSimultaneousUse;
+
+		cmdBuffer.begin(beginInfo);
+
+		vk::ImageMemoryBarrier renderTargetPreBarrier{};
+		renderTargetPreBarrier.image = renderTarget;
+		renderTargetPreBarrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+		renderTargetPreBarrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+		renderTargetPreBarrier.srcQueueFamilyIndex = 0;
+		renderTargetPreBarrier.dstQueueFamilyIndex = 0;
+		renderTargetPreBarrier.oldLayout = vk::ImageLayout::eColorAttachmentOptimal;
+		renderTargetPreBarrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+		renderTargetPreBarrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+		renderTargetPreBarrier.subresourceRange.baseArrayLayer = 0;
+		renderTargetPreBarrier.subresourceRange.layerCount = 1;
+		renderTargetPreBarrier.subresourceRange.baseMipLevel = 0;
+		renderTargetPreBarrier.subresourceRange.levelCount = 1;
+
+
+		vk::PipelineStageFlags srcStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+		vk::PipelineStageFlags dstStage = vk::PipelineStageFlagBits::eTransfer;
+		cmdBuffer.pipelineBarrier(srcStage, dstStage, vk::DependencyFlags(), {}, {}, { renderTargetPreBarrier });
+
+		vk::ImageMemoryBarrier swapchainPreBarrier{};
+		swapchainPreBarrier.image = swapchain[i];
+		swapchainPreBarrier.srcAccessMask = {};
+		swapchainPreBarrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+		swapchainPreBarrier.srcQueueFamilyIndex = 0;
+		swapchainPreBarrier.dstQueueFamilyIndex = 0;
+		swapchainPreBarrier.oldLayout = vk::ImageLayout::ePresentSrcKHR;
+		swapchainPreBarrier.newLayout = vk::ImageLayout::eTransferDstOptimal;
+		swapchainPreBarrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+		swapchainPreBarrier.subresourceRange.baseArrayLayer = 0;
+		swapchainPreBarrier.subresourceRange.layerCount = 1;
+		swapchainPreBarrier.subresourceRange.baseMipLevel = 0;
+		swapchainPreBarrier.subresourceRange.levelCount = 1;
+
+		srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
+		dstStage = vk::PipelineStageFlagBits::eTransfer;
+		cmdBuffer.pipelineBarrier(srcStage, dstStage, vk::DependencyFlags(), {}, {}, { swapchainPreBarrier });
+
+
+
+		vk::ImageCopy imgCopy{};
+		imgCopy.extent = { extents.width, extents.height, 1 };
+		imgCopy.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+		imgCopy.dstSubresource.baseArrayLayer = 0;
+		imgCopy.dstSubresource.layerCount = 1;
+		imgCopy.dstSubresource.mipLevel = 0;
+		imgCopy.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+		imgCopy.srcSubresource.baseArrayLayer = 0;
+		imgCopy.srcSubresource.layerCount = 1;
+		imgCopy.srcSubresource.mipLevel = 0;
+		cmdBuffer.copyImage(renderTarget, vk::ImageLayout::eTransferSrcOptimal, swapchain[i], vk::ImageLayout::eTransferDstOptimal, imgCopy);
+
+
+		vk::ImageMemoryBarrier renderTargetPostBarrier{};
+		renderTargetPostBarrier.image = renderTarget;
+		renderTargetPostBarrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+		renderTargetPostBarrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+		renderTargetPostBarrier.srcQueueFamilyIndex = 0;
+		renderTargetPostBarrier.dstQueueFamilyIndex = 0;
+		renderTargetPostBarrier.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+		renderTargetPostBarrier.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
+		renderTargetPostBarrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+		renderTargetPostBarrier.subresourceRange.baseArrayLayer = 0;
+		renderTargetPostBarrier.subresourceRange.layerCount = 1;
+		renderTargetPostBarrier.subresourceRange.baseMipLevel = 0;
+		renderTargetPostBarrier.subresourceRange.levelCount = 1;
+
+		srcStage = vk::PipelineStageFlagBits::eTransfer;
+		dstStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+		cmdBuffer.pipelineBarrier(srcStage, dstStage, vk::DependencyFlags(), {}, {}, { renderTargetPostBarrier });
+
+		vk::ImageMemoryBarrier swapchainPostBarrier{};
+		swapchainPostBarrier.image = swapchain[i];
+		swapchainPostBarrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+		swapchainPostBarrier.dstAccessMask = {};
+		swapchainPostBarrier.srcQueueFamilyIndex = 0;
+		swapchainPostBarrier.dstQueueFamilyIndex = 0;
+		swapchainPostBarrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+		swapchainPostBarrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
+		swapchainPostBarrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+		swapchainPostBarrier.subresourceRange.baseArrayLayer = 0;
+		swapchainPostBarrier.subresourceRange.layerCount = 1;
+		swapchainPostBarrier.subresourceRange.baseMipLevel = 0;
+		swapchainPostBarrier.subresourceRange.levelCount = 1;
+
+		srcStage = vk::PipelineStageFlagBits::eTransfer;
+		dstStage = vk::PipelineStageFlagBits::eBottomOfPipe;
+		cmdBuffer.pipelineBarrier(srcStage, dstStage, vk::DependencyFlags(), {}, {}, { swapchainPostBarrier });
+
+		cmdBuffer.end();
+	}
+}
+
 void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& initInfo)
 {
 	// Load the first function pointers.
@@ -499,8 +736,9 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	// Start initialization
 	data.apiVersion = Init_LoadAPIVersion();
 	data.instanceExtensionProperties = Init_LoadInstanceExtensionProperties();
-	data.instanceLayerProperties = Init_LoadInstanceLayerProperties();
-	
+	if constexpr (Core::debugLevel >= 2)
+		data.instanceLayerProperties = Init_LoadInstanceLayerProperties();
+
 	// Create our instance
 	vk::ApplicationInfo appInfo{};
 	appInfo.apiVersion = VK_MAKE_VERSION(data.apiVersion.major, data.apiVersion.minor, data.apiVersion.patch);
@@ -515,9 +753,9 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	Volk::LoadInstance(data.instance);
 
 	// Enable debugging only if we are in debug config, and the user requested debugging.
-	if constexpr (DRenderer::debugConfig == true)
+	if constexpr (Core::debugLevel >= 2)
 	{
-		if (DRenderer::Core::GetData().debugData.useDebugging == true)
+		if (Core::GetData().debugData.useDebugging == true)
 			data.debugMessenger = Init_CreateDebugMessenger(data.instance);
 	}
 
@@ -540,23 +778,16 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	data.physDevice.hostMemoryIsDeviceLocal = false;
 
 	SwapchainSettings swapchainSettings = GetSwapchainSettings(data.physDevice.handle, data.surface);
-
+	data.surfaceExtents = { swapchainSettings.capabilities.currentExtent.width, swapchainSettings.capabilities.currentExtent.height };
 
 
 	// Create logical device
 	auto queues = data.physDevice.handle.getQueueFamilyProperties();
-	bool presentSupport = data.physDevice.handle.getSurfaceSupportKHR(2, data.surface);
+
+	auto presentSupport = data.physDevice.handle.getSurfaceSupportKHR(0, data.surface);
 
 	uint32_t graphicsFamily = 0;
 	uint32_t graphicsQueue = 0;
-	uint32_t presentFamily = 2;
-	uint32_t presentQueue = 1;
-	uint32_t computeFamily = 1;
-	uint32_t computeQueue = 0;
-	uint32_t transferFamily = 2;
-	uint32_t transferQueue = 0;
-	uint32_t transferImageFamily = 1;
-	uint32_t transferImageQueue = 1;
 
 	vk::DeviceCreateInfo createInfo{};
 
@@ -581,13 +812,13 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 
 	vk::DeviceQueueCreateInfo secondQueueCreateInfo;
 	secondQueueCreateInfo.pQueuePriorities = priority;
-	secondQueueCreateInfo.queueCount = 2;
+	secondQueueCreateInfo.queueCount = 1;
 	secondQueueCreateInfo.queueFamilyIndex = 1;
 	queueCreateInfos.push_back(secondQueueCreateInfo);
 
 	vk::DeviceQueueCreateInfo thirdQueueCreateInfo;
 	thirdQueueCreateInfo.pQueuePriorities = priority;
-	thirdQueueCreateInfo.queueCount = 2;
+	thirdQueueCreateInfo.queueCount = 1;
 	thirdQueueCreateInfo.queueFamilyIndex = 2;
 	queueCreateInfos.push_back(thirdQueueCreateInfo);
 
@@ -599,7 +830,7 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	createInfo.ppEnabledExtensionNames = Vulkan::requiredDeviceExtensions.data();
 	createInfo.enabledExtensionCount = uint32_t(Vulkan::requiredDeviceExtensions.size());
 
-	auto deviceLayersAvailable = data.physDevice.handle.enumerateDeviceLayerProperties();
+	//auto deviceLayersAvailable = data.physDevice.handle.enumerateDeviceLayerProperties();
 	//createInfo.enabledLayerCount = uint32_t(Vulkan::requiredDeviceLayers.size());
 	//createInfo.ppEnabledLayerNames = Vulkan::requiredDeviceLayers.data();
 
@@ -612,25 +843,173 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	Volk::LoadDevice(data.device);
 
 	vk::Extent2D renderImgExtents = { swapchainSettings.capabilities.currentExtent.width, swapchainSettings.capabilities.currentExtent.height };
+
+	// Create our Render Target
 	data.renderTarget = Init_CreateRenderTarget(data.device, renderImgExtents);
+	if constexpr (Core::debugLevel >= 2)
+	{
+		vk::DebugUtilsObjectNameInfoEXT renderTargetNameInfo{};
+		renderTargetNameInfo.objectType = vk::ObjectType::eDeviceMemory;
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkDeviceMemory)data.renderTarget.memory;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - DeviceMemory";
+		data.device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+
+		renderTargetNameInfo.objectType = vk::ObjectType::eImage;
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkImage)data.renderTarget.image;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - Image";
+		data.device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+
+		renderTargetNameInfo.objectType = vk::ObjectType::eImageView;
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkImageView)data.renderTarget.imageView;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - ImageView";
+		data.device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+	}
+
 
 	// Set up main renderpass
 	data.renderPass = Init_CreateMainRenderPass(data.device, vk::SampleCountFlagBits::e1);
 
 	data.renderTarget.framebuffer = Init_CreateRenderTargetFramebuffer(data.device, renderImgExtents, data.renderTarget.imageView, data.renderPass);
+	if constexpr (Core::debugLevel >= 2)
+	{
+		vk::DebugUtilsObjectNameInfoEXT renderTargetNameInfo{};
+		renderTargetNameInfo.objectType = vk::ObjectType::eFramebuffer;
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkFramebuffer)data.renderTarget.framebuffer;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - Framebuffer";
+		data.device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+	}
 
 	// Set up swapchain
 	data.swapchain = Init_CreateSwapchain(data.device, data.surface, swapchainSettings);
 	data.swapchainImages = data.device.getSwapchainImagesKHR(data.swapchain);
 	data.swapchainLength = uint8_t(data.swapchainImages.size());
 	data.resourceSetCount = data.swapchainLength - 1;
+	data.swapchainImageViews = Init_CreateSwapchainImageViews(data.device, data.swapchainImages, vk::Format::eR8G8B8A8Unorm);
 
+	Init_SetupPresentCmdBuffers(data.device, data.renderTarget.image, renderImgExtents, data.swapchainImages, data.presentCmdPool, data.presentCmdBuffer);
 
-
+	Init_SetupRenderingCmdBuffers(data.device, data.swapchainLength, data.renderCmdPool, data.renderCmdBuffer);
 
 	data.graphicsQueue = data.device.getQueue(graphicsFamily, graphicsQueue);
-	data.presentQueue = data.device.getQueue(presentFamily, presentQueue);
-	data.transferQueue = data.device.getQueue(transferFamily, transferQueue);
-	data.computeQueue = data.device.getQueue(computeFamily, computeQueue);
-	data.transferImageQueue = data.device.getQueue(transferImageFamily, transferImageQueue);
+
+	Init_TransitionRenderTargetAndSwapchain(data.device, data.graphicsQueue, data.renderTarget.image, data.swapchainImages);
+
+	data.imageAvailableForPresentation.resize(data.swapchainLength);
+	data.renderCmdBufferAvailable.resize(data.swapchainLength);
+	for (size_t i = 0; i < data.swapchainLength; i++)
+	{
+		vk::FenceCreateInfo createInfo1{};
+		createInfo1.flags = vk::FenceCreateFlagBits::eSignaled;
+	
+		data.renderCmdBufferAvailable[i] = data.device.createFence(createInfo1);
+
+		data.imageAvailableForPresentation[i] = data.device.createFence({});
+	}
+
+	auto imageResult = data.device.acquireNextImageKHR(data.swapchain, std::numeric_limits<uint64_t>::max(), vk::Semaphore(), data.imageAvailableForPresentation[data.test]);
+	if constexpr (Core::debugLevel >= 2)
+	{
+		if (imageResult.result != vk::Result::eSuccess)
+		{
+			Core::LogDebugMessage("Result of vkAcquireNextImageKHR was not successful.");
+			std::abort();
+		}
+	}
+	data.currentSwapchainImage = imageResult.value;
+}
+
+void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyParams& in)
+{
+	APIData& data = GetAPIData();
+
+	data.device.waitForFences(data.renderCmdBufferAvailable[data.currentSwapchainImage], 1, std::numeric_limits<uint64_t>::max());
+	data.device.resetFences(data.renderCmdBufferAvailable[data.currentSwapchainImage]);
+
+	auto cmdBuffer = data.renderCmdBuffer[data.currentSwapchainImage];
+
+	vk::CommandBufferBeginInfo beginInfo{};
+	beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+
+	cmdBuffer.begin(beginInfo);
+
+	vk::RenderPassBeginInfo renderPassBeginInfo{};
+	renderPassBeginInfo.renderPass = data.renderPass;
+	renderPassBeginInfo.framebuffer = data.renderTarget.framebuffer;
+
+	vk::ClearValue clearValue;
+	clearValue.color.float32[0] = 1.f;
+	clearValue.color.float32[1] = 0.f;
+	clearValue.color.float32[2] = 0.f;
+	clearValue.color.float32[3] = 1.f;
+	renderPassBeginInfo.clearValueCount = 1;
+	renderPassBeginInfo.pClearValues = &clearValue;
+
+	vk::Rect2D renderArea{};
+	renderArea.extent = data.surfaceExtents;
+	renderPassBeginInfo.renderArea = renderArea;
+
+	cmdBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+
+	cmdBuffer.endRenderPass();
+
+	cmdBuffer.end();
+}
+
+void DRenderer::Vulkan::PrepareRenderingLate()
+{
+}
+
+void DRenderer::Vulkan::Draw()
+{
+	APIData& data = GetAPIData();
+
+	data.device.waitForFences(data.imageAvailableForPresentation[data.test], 1, std::numeric_limits<uint64_t>::max());
+	data.device.resetFences(data.imageAvailableForPresentation[data.test]);
+	
+	vk::SubmitInfo renderSubmitInfo{};
+
+	vk::SubmitInfo submitInfo{};
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &data.renderCmdBuffer[data.currentSwapchainImage];
+	data.graphicsQueue.submit(submitInfo, data.renderCmdBufferAvailable[data.currentSwapchainImage]);
+
+	vk::SubmitInfo submitInfo2{};
+	submitInfo2.commandBufferCount = 1;
+	submitInfo2.pCommandBuffers = &data.presentCmdBuffer[data.currentSwapchainImage];
+	data.graphicsQueue.submit(submitInfo2, {});
+
+
+	vk::PresentInfoKHR presentInfo{};
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = &data.swapchain;
+
+	uint32_t swapchainIndex = data.currentSwapchainImage;
+	presentInfo.pImageIndices = &swapchainIndex;
+
+	vk::Result presentResult{};
+	presentInfo.pResults = &presentResult;
+
+	data.graphicsQueue.presentKHR(presentInfo);
+
+	if constexpr (Core::debugLevel >= 2)
+	{
+		if (presentResult != vk::Result::eSuccess)
+		{
+			Core::LogDebugMessage("Presentation result of index " + std::to_string(swapchainIndex) + " was not success.");
+			std::abort();
+		}
+	}
+
+	data.test = (data.test + 1) % data.swapchainLength;
+	auto imageResult = data.device.acquireNextImageKHR(data.swapchain, std::numeric_limits<uint64_t>::max(), vk::Semaphore(), data.imageAvailableForPresentation[data.test]);
+	if constexpr (Core::debugLevel >= 2)
+	{
+		if (imageResult.result != vk::Result::eSuccess)
+		{
+			Core::LogDebugMessage("Result of vkAcquireNextImageKHR was not successful.");
+			std::abort();
+		}
+	}
+	data.currentSwapchainImage = imageResult.value;
+	
 }

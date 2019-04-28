@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DRenderer/DebugConfig.hpp"
+#include "RendererData.hpp"
 
 #include <cstdint>
 #include <cstddef>
@@ -23,7 +23,7 @@ namespace DRenderer::Vulkan
 	{
 		constexpr auto RequiredExtensionCombiner()
 		{
-			if constexpr (debugConfig == true)
+			if constexpr (Core::debugLevel >= 2)
 			{
 				constexpr size_t count = requiredInstanceExtensions.size() + requiredDebugExtensions.size();
 				std::array<const char*, count> returnArr{};

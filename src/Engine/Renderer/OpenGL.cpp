@@ -365,14 +365,14 @@ namespace Engine
 		//apiData = nullptr;
 	}
 
-	void Renderer::OpenGL::PrepareRenderingEarly(const std::vector<size_t>& spriteLoadQueue, const std::vector<size_t>& meshLoadQueue)
+	void Renderer::OpenGL::PrepareRenderingEarly(const DRenderer::Core::PrepareRenderingEarlyParams& input)
 	{
 		Data& data = GetAPIData();
 
 		// Loads any needed texture into the unordered_map of IBOs in Data.
-		UpdateIBODatabase(data, spriteLoadQueue);
+		UpdateIBODatabase(data, *input.textureLoadQueue);
 		// Loads any needed meshes into the unordered_map of VBOs in Data.
-		UpdateVBODatabase(data, meshLoadQueue);
+		UpdateVBODatabase(data, *input.meshLoadQueue);
 		// Sends signal that the renderer is done loading assets to render this frame.
 		// This helps the AssetManager know when it can discard loaded assets in CPU memory.
 		DRenderer::Core::GetData().assetLoadData.assetLoadEnd();

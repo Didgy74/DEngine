@@ -15,7 +15,7 @@ namespace Engine
 		{
 			void Initialize(DRenderer::Core::APIDataPointer& apiData, const InitInfo& createInfo);
 			void Terminate(void*& apiData);
-			void PrepareRenderingEarly(const std::vector<size_t>& spriteLoadQueue, const std::vector<size_t>& meshLoadQueue);
+			void PrepareRenderingEarly(const DRenderer::Core::PrepareRenderingEarlyParams& params);
 			void PrepareRenderingLate();
 			void Draw();
 		}

@@ -13,7 +13,7 @@ namespace DRenderer
 	{
 		void Initialize(Core::APIDataPointer& apiData, InitInfo& createInfo);
 		void Terminate(std::any& apiData);
-		void PrepareRenderingEarly(const std::vector<size_t>& spriteLoadQueue, const std::vector<size_t>& meshLoadQueue);
+		void PrepareRenderingEarly(const Core::PrepareRenderingEarlyParams& in);
 		void PrepareRenderingLate();
 		void Draw();
 	}

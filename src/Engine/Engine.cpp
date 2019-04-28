@@ -158,6 +158,8 @@ void Engine::Core::Run()
 	// Checks for any window events, like input etc and updates the Input system.
 	while (Application::Core::UpdateEvents(), Application::IsRunning())
 	{
+		std::cout << scene1.GetTimeData().GetFPS() << " - " << scene1.GetTimeData().GetDeltaTime() << std::endl;
+
 		// Calls all the custom script components' Tick function.
 		scene1.ScriptTick();
 

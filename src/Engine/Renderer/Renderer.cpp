@@ -1,6 +1,5 @@
 #include "DRenderer/Renderer.hpp"
 #include "RendererData.hpp"
-#include "DRenderer/DebugConfig.hpp"
 
 #include "OpenGL.hpp"
 #include "Vulkan.hpp"
@@ -94,7 +93,7 @@ namespace DRenderer::Core
 
 	void LogDebugMessage(std::string_view message)
 	{
-		if constexpr (DRenderer::debugConfig == true)
+		if constexpr (Core::debugLevel >= 1)
 		{
 			const Data& data = *Core::data;
 			if (data.debugData.useDebugging)
@@ -246,6 +245,9 @@ namespace Engine
 			break;
 		case API::Vulkan:
 			DRenderer::Vulkan::Initialize(data.apiData, createInfo.vulkanInitInfo);
+			data.PrepareRenderingEarly = &DRenderer::Vulkan::PrepareRenderingEarly;
+			data.PrepareRenderingLate = &DRenderer::Vulkan::PrepareRenderingLate;
+			data.Draw = &DRenderer::Vulkan::Draw;
 			break;
 		default:
 			break;
@@ -286,7 +288,11 @@ namespace Engine
 		// Logs a message whenever textures or mesh assets need to be loaded.
 		if (!data.loadTextureQueue.empty() || !data.loadMeshQueue.empty())
 			DRenderer::Core::LogDebugMessage("Loading sprite/mesh resource(s)...");
-		data.PrepareRenderingEarly(data.loadTextureQueue, data.loadMeshQueue);
+
+		DRenderer::Core::PrepareRenderingEarlyParams params{};
+		params.meshLoadQueue = &data.loadMeshQueue;
+		params.textureLoadQueue = &data.loadTextureQueue;
+		data.PrepareRenderingEarly(params);
 
 		// Clears all the load-asset queues.
 		data.loadTextureQueue.clear();

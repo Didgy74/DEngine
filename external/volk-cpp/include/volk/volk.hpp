@@ -68,7 +68,7 @@ namespace Volk
 	* Load function pointers using application-created VkDevice into a table.
 	* Application should use function pointers from that table instead of using global function pointers.
 	*/
-	void LoadDeviceTable(struct VolkDeviceTable* table, VkDevice device);
+	void LoadDeviceTable(DeviceTable* table, VkDevice device);
 }
 
 /**

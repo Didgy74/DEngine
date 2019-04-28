@@ -2359,6 +2359,433 @@ VKAPI_ATTR VkResult VKAPI_CALL vkResetCommandBuffer(
 	return Volk::funcPtrs->vkResetCommandBuffer(commandBuffer, flags);
 }
 
+VKAPI_ATTR void VKAPI_CALL vkCmdBindPipeline(
+	VkCommandBuffer                             commandBuffer,
+	VkPipelineBindPoint                         pipelineBindPoint,
+	VkPipeline                                  pipeline)
+{
+	return Volk::funcPtrs->vkCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdSetViewport(
+	VkCommandBuffer                             commandBuffer,
+	uint32_t                                    firstViewport,
+	uint32_t                                    viewportCount,
+	const VkViewport* pViewports)
+{
+	return Volk::funcPtrs->vkCmdSetViewport(commandBuffer, firstViewport, viewportCount, pViewports);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdSetScissor(
+	VkCommandBuffer                             commandBuffer,
+	uint32_t                                    firstScissor,
+	uint32_t                                    scissorCount,
+	const VkRect2D* pScissors)
+{
+	return Volk::funcPtrs->vkCmdSetScissor(commandBuffer, firstScissor, scissorCount, pScissors);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdSetLineWidth(
+	VkCommandBuffer                             commandBuffer,
+	float                                       lineWidth)
+{
+	return Volk::funcPtrs->vkCmdSetLineWidth(commandBuffer, lineWidth);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdSetDepthBias(
+	VkCommandBuffer                             commandBuffer,
+	float                                       depthBiasConstantFactor,
+	float                                       depthBiasClamp,
+	float                                       depthBiasSlopeFactor)
+{
+	return Volk::funcPtrs->vkCmdSetDepthBias(commandBuffer, depthBiasConstantFactor, depthBiasClamp, depthBiasSlopeFactor);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdSetBlendConstants(
+	VkCommandBuffer                             commandBuffer,
+	const float                                 blendConstants[4])
+{
+	return Volk::funcPtrs->vkCmdSetBlendConstants(commandBuffer, blendConstants);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdSetDepthBounds(
+	VkCommandBuffer                             commandBuffer,
+	float                                       minDepthBounds,
+	float                                       maxDepthBounds)
+{
+	return Volk::funcPtrs->vkCmdSetDepthBounds(commandBuffer, minDepthBounds, maxDepthBounds);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdSetStencilCompareMask(
+	VkCommandBuffer                             commandBuffer,
+	VkStencilFaceFlags                          faceMask,
+	uint32_t                                    compareMask)
+{
+	return Volk::funcPtrs->vkCmdSetStencilCompareMask(commandBuffer, faceMask, compareMask);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdSetStencilWriteMask(
+	VkCommandBuffer                             commandBuffer,
+	VkStencilFaceFlags                          faceMask,
+	uint32_t                                    writeMask)
+{
+	return Volk::funcPtrs->vkCmdSetStencilWriteMask(commandBuffer, faceMask, writeMask);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdSetStencilReference(
+	VkCommandBuffer                             commandBuffer,
+	VkStencilFaceFlags                          faceMask,
+	uint32_t                                    reference)
+{
+	return Volk::funcPtrs->vkCmdSetStencilReference(commandBuffer, faceMask, reference);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdBindDescriptorSets(
+	VkCommandBuffer                             commandBuffer,
+	VkPipelineBindPoint                         pipelineBindPoint,
+	VkPipelineLayout                            layout,
+	uint32_t                                    firstSet,
+	uint32_t                                    descriptorSetCount,
+	const VkDescriptorSet* pDescriptorSets,
+	uint32_t                                    dynamicOffsetCount,
+	const uint32_t* pDynamicOffsets)
+{
+	return Volk::funcPtrs->vkCmdBindDescriptorSets(commandBuffer, pipelineBindPoint, layout, firstSet, descriptorSetCount, pDescriptorSets, dynamicOffsetCount, pDynamicOffsets);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdBindIndexBuffer(
+	VkCommandBuffer                             commandBuffer,
+	VkBuffer                                    buffer,
+	VkDeviceSize                                offset,
+	VkIndexType                                 indexType)
+{
+	return Volk::funcPtrs->vkCmdBindIndexBuffer(commandBuffer, buffer, offset, indexType);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdBindVertexBuffers(
+	VkCommandBuffer                             commandBuffer,
+	uint32_t                                    firstBinding,
+	uint32_t                                    bindingCount,
+	const VkBuffer* pBuffers,
+	const VkDeviceSize* pOffsets)
+{
+	return Volk::funcPtrs->vkCmdBindVertexBuffers(commandBuffer, firstBinding, bindingCount, pBuffers, pOffsets);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdDraw(
+	VkCommandBuffer                             commandBuffer,
+	uint32_t                                    vertexCount,
+	uint32_t                                    instanceCount,
+	uint32_t                                    firstVertex,
+	uint32_t                                    firstInstance)
+{
+	return Volk::funcPtrs->vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdDrawIndexed(
+	VkCommandBuffer                             commandBuffer,
+	uint32_t                                    indexCount,
+	uint32_t                                    instanceCount,
+	uint32_t                                    firstIndex,
+	int32_t                                     vertexOffset,
+	uint32_t                                    firstInstance)
+{
+	return Volk::funcPtrs->vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdDrawIndirect(
+	VkCommandBuffer                             commandBuffer,
+	VkBuffer                                    buffer,
+	VkDeviceSize                                offset,
+	uint32_t                                    drawCount,
+	uint32_t                                    stride)
+{
+	return Volk::funcPtrs->vkCmdDrawIndirect(commandBuffer, buffer, offset, drawCount, stride);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdDrawIndexedIndirect(
+	VkCommandBuffer                             commandBuffer,
+	VkBuffer                                    buffer,
+	VkDeviceSize                                offset,
+	uint32_t                                    drawCount,
+	uint32_t                                    stride)
+{
+	return Volk::funcPtrs->vkCmdDrawIndexedIndirect(commandBuffer, buffer, offset, drawCount, stride);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdDispatch(
+	VkCommandBuffer                             commandBuffer,
+	uint32_t                                    groupCountX,
+	uint32_t                                    groupCountY,
+	uint32_t                                    groupCountZ)
+{
+	return Volk::funcPtrs->vkCmdDispatch(commandBuffer, groupCountX, groupCountY, groupCountZ);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdDispatchIndirect(
+	VkCommandBuffer                             commandBuffer,
+	VkBuffer                                    buffer,
+	VkDeviceSize                                offset)
+{
+	return Volk::funcPtrs->vkCmdDispatchIndirect(commandBuffer, buffer, offset);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdCopyBuffer(
+	VkCommandBuffer                             commandBuffer,
+	VkBuffer                                    srcBuffer,
+	VkBuffer                                    dstBuffer,
+	uint32_t                                    regionCount,
+	const VkBufferCopy* pRegions)
+{
+	return Volk::funcPtrs->vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, regionCount, pRegions);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdCopyImage(
+	VkCommandBuffer                             commandBuffer,
+	VkImage                                     srcImage,
+	VkImageLayout                               srcImageLayout,
+	VkImage                                     dstImage,
+	VkImageLayout                               dstImageLayout,
+	uint32_t                                    regionCount,
+	const VkImageCopy* pRegions)
+{
+	return Volk::funcPtrs->vkCmdCopyImage(commandBuffer, srcImage, srcImageLayout, dstImage, dstImageLayout, regionCount, pRegions);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdBlitImage(
+	VkCommandBuffer                             commandBuffer,
+	VkImage                                     srcImage,
+	VkImageLayout                               srcImageLayout,
+	VkImage                                     dstImage,
+	VkImageLayout                               dstImageLayout,
+	uint32_t                                    regionCount,
+	const VkImageBlit* pRegions,
+	VkFilter                                    filter)
+{
+	return Volk::funcPtrs->vkCmdBlitImage(commandBuffer, srcImage, srcImageLayout, dstImage, dstImageLayout, regionCount, pRegions, filter);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdCopyBufferToImage(
+	VkCommandBuffer                             commandBuffer,
+	VkBuffer                                    srcBuffer,
+	VkImage                                     dstImage,
+	VkImageLayout                               dstImageLayout,
+	uint32_t                                    regionCount,
+	const VkBufferImageCopy* pRegions)
+{
+	return Volk::funcPtrs->vkCmdCopyBufferToImage(commandBuffer, srcBuffer, dstImage, dstImageLayout, regionCount, pRegions);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdCopyImageToBuffer(
+	VkCommandBuffer                             commandBuffer,
+	VkImage                                     srcImage,
+	VkImageLayout                               srcImageLayout,
+	VkBuffer                                    dstBuffer,
+	uint32_t                                    regionCount,
+	const VkBufferImageCopy* pRegions)
+{
+	return Volk::funcPtrs->vkCmdCopyImageToBuffer(commandBuffer, srcImage, srcImageLayout, dstBuffer, regionCount, pRegions);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdUpdateBuffer(
+	VkCommandBuffer                             commandBuffer,
+	VkBuffer                                    dstBuffer,
+	VkDeviceSize                                dstOffset,
+	VkDeviceSize                                dataSize,
+	const void* pData)
+{
+	return Volk::funcPtrs->vkCmdUpdateBuffer(commandBuffer, dstBuffer, dstOffset, dataSize, pData);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdFillBuffer(
+	VkCommandBuffer                             commandBuffer,
+	VkBuffer                                    dstBuffer,
+	VkDeviceSize                                dstOffset,
+	VkDeviceSize                                size,
+	uint32_t                                    data)
+{
+	return Volk::funcPtrs->vkCmdFillBuffer(commandBuffer, dstBuffer, dstOffset, size, data);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdClearColorImage(
+	VkCommandBuffer                             commandBuffer,
+	VkImage                                     image,
+	VkImageLayout                               imageLayout,
+	const VkClearColorValue* pColor,
+	uint32_t                                    rangeCount,
+	const VkImageSubresourceRange* pRanges)
+{
+	return Volk::funcPtrs->vkCmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdClearDepthStencilImage(
+	VkCommandBuffer                             commandBuffer,
+	VkImage                                     image,
+	VkImageLayout                               imageLayout,
+	const VkClearDepthStencilValue* pDepthStencil,
+	uint32_t                                    rangeCount,
+	const VkImageSubresourceRange* pRanges)
+{
+	return Volk::funcPtrs->vkCmdClearDepthStencilImage(commandBuffer, image, imageLayout, pDepthStencil, rangeCount, pRanges);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdClearAttachments(
+	VkCommandBuffer                             commandBuffer,
+	uint32_t                                    attachmentCount,
+	const VkClearAttachment* pAttachments,
+	uint32_t                                    rectCount,
+	const VkClearRect* pRects)
+{
+	return Volk::funcPtrs->vkCmdClearAttachments(commandBuffer, attachmentCount, pAttachments, rectCount, pRects);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdResolveImage(
+	VkCommandBuffer                             commandBuffer,
+	VkImage                                     srcImage,
+	VkImageLayout                               srcImageLayout,
+	VkImage                                     dstImage,
+	VkImageLayout                               dstImageLayout,
+	uint32_t                                    regionCount,
+	const VkImageResolve* pRegions)
+{
+	return Volk::funcPtrs->vkCmdResolveImage(commandBuffer, srcImage, srcImageLayout, dstImage, dstImageLayout, regionCount, pRegions);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdSetEvent(
+	VkCommandBuffer                             commandBuffer,
+	VkEvent                                     event,
+	VkPipelineStageFlags                        stageMask)
+{
+	return Volk::funcPtrs->vkCmdSetEvent(commandBuffer, event, stageMask);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdResetEvent(
+	VkCommandBuffer                             commandBuffer,
+	VkEvent                                     event,
+	VkPipelineStageFlags                        stageMask)
+{
+	return Volk::funcPtrs->vkCmdResetEvent(commandBuffer, event, stageMask);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdWaitEvents(
+	VkCommandBuffer                             commandBuffer,
+	uint32_t                                    eventCount,
+	const VkEvent* pEvents,
+	VkPipelineStageFlags                        srcStageMask,
+	VkPipelineStageFlags                        dstStageMask,
+	uint32_t                                    memoryBarrierCount,
+	const VkMemoryBarrier* pMemoryBarriers,
+	uint32_t                                    bufferMemoryBarrierCount,
+	const VkBufferMemoryBarrier* pBufferMemoryBarriers,
+	uint32_t                                    imageMemoryBarrierCount,
+	const VkImageMemoryBarrier* pImageMemoryBarriers)
+{
+	return Volk::funcPtrs->vkCmdWaitEvents(commandBuffer, eventCount, pEvents, srcStageMask, dstStageMask, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdPipelineBarrier(
+	VkCommandBuffer                             commandBuffer,
+	VkPipelineStageFlags                        srcStageMask,
+	VkPipelineStageFlags                        dstStageMask,
+	VkDependencyFlags                           dependencyFlags,
+	uint32_t                                    memoryBarrierCount,
+	const VkMemoryBarrier* pMemoryBarriers,
+	uint32_t                                    bufferMemoryBarrierCount,
+	const VkBufferMemoryBarrier* pBufferMemoryBarriers,
+	uint32_t                                    imageMemoryBarrierCount,
+	const VkImageMemoryBarrier* pImageMemoryBarriers)
+{
+	return Volk::funcPtrs->vkCmdPipelineBarrier(commandBuffer, srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdBeginQuery(
+	VkCommandBuffer                             commandBuffer,
+	VkQueryPool                                 queryPool,
+	uint32_t                                    query,
+	VkQueryControlFlags                         flags)
+{
+	return Volk::funcPtrs->vkCmdBeginQuery(commandBuffer, queryPool, query, flags);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdEndQuery(
+	VkCommandBuffer                             commandBuffer,
+	VkQueryPool                                 queryPool,
+	uint32_t                                    query)
+{
+	return Volk::funcPtrs->vkCmdEndQuery(commandBuffer, queryPool, query);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdResetQueryPool(
+	VkCommandBuffer                             commandBuffer,
+	VkQueryPool                                 queryPool,
+	uint32_t                                    firstQuery,
+	uint32_t                                    queryCount)
+{
+	return Volk::funcPtrs->vkCmdResetQueryPool(commandBuffer, queryPool, firstQuery, queryCount);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdWriteTimestamp(
+	VkCommandBuffer                             commandBuffer,
+	VkPipelineStageFlagBits                     pipelineStage,
+	VkQueryPool                                 queryPool,
+	uint32_t                                    query)
+{
+	return Volk::funcPtrs->vkCmdWriteTimestamp(commandBuffer, pipelineStage, queryPool, query);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdCopyQueryPoolResults(
+	VkCommandBuffer                             commandBuffer,
+	VkQueryPool                                 queryPool,
+	uint32_t                                    firstQuery,
+	uint32_t                                    queryCount,
+	VkBuffer                                    dstBuffer,
+	VkDeviceSize                                dstOffset,
+	VkDeviceSize                                stride,
+	VkQueryResultFlags                          flags)
+{
+	return Volk::funcPtrs->vkCmdCopyQueryPoolResults(commandBuffer, queryPool, firstQuery, queryCount, dstBuffer, dstOffset, stride, flags);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdPushConstants(
+	VkCommandBuffer                             commandBuffer,
+	VkPipelineLayout                            layout,
+	VkShaderStageFlags                          stageFlags,
+	uint32_t                                    offset,
+	uint32_t                                    size,
+	const void* pValues)
+{
+	return Volk::funcPtrs->vkCmdPushConstants(commandBuffer, layout, stageFlags, offset, size, pValues);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdBeginRenderPass(
+	VkCommandBuffer                             commandBuffer,
+	const VkRenderPassBeginInfo* pRenderPassBegin,
+	VkSubpassContents                           contents)
+{
+	return Volk::funcPtrs->vkCmdBeginRenderPass(commandBuffer, pRenderPassBegin, contents);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdNextSubpass(
+	VkCommandBuffer                             commandBuffer,
+	VkSubpassContents                           contents)
+{
+	return Volk::funcPtrs->vkCmdNextSubpass(commandBuffer, contents);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdEndRenderPass(
+	VkCommandBuffer                             commandBuffer)
+{
+	return Volk::funcPtrs->vkCmdEndRenderPass(commandBuffer);
+}
+
+VKAPI_ATTR void VKAPI_CALL vkCmdExecuteCommands(
+	VkCommandBuffer                             commandBuffer,
+	uint32_t                                    commandBufferCount,
+	const VkCommandBuffer* pCommandBuffers)
+{
+	return Volk::funcPtrs->vkCmdExecuteCommands(commandBuffer, commandBufferCount, pCommandBuffers);
+}
+
 #endif /* defined(VK_VERSION_1_0) */
 
 #if defined(VK_KHR_surface)
