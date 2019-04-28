@@ -61,6 +61,7 @@ struct DRenderer::Vulkan::APIData
 	vk::DebugUtilsMessengerEXT debugMessenger = nullptr;
 
 	vk::SurfaceKHR surface = nullptr;
+	vk::Extent2D surfaceExtents{};
 
 	struct PhysDevice
 	{
@@ -75,8 +76,6 @@ struct DRenderer::Vulkan::APIData
 	PhysDevice physDevice{};
 
 	vk::Device device = nullptr;
-
-	vk::Extent2D surfaceExtents{};
 
 	vk::Queue graphicsQueue = nullptr;
 
@@ -102,7 +101,7 @@ struct DRenderer::Vulkan::APIData
 	std::vector<vk::ImageView> swapchainImageViews;
 	// Has swapchain length
 	std::vector<vk::Fence> imageAvailableForPresentation;
-	size_t test = 0;
+	uint8_t imageAvailableActiveIndex = 0;
 
 	vk::RenderPass renderPass = nullptr;
 
@@ -115,6 +114,8 @@ struct DRenderer::Vulkan::APIData
 	vk::CommandPool presentCmdPool = nullptr;
 	// Has swapchain length
 	std::vector<vk::CommandBuffer> presentCmdBuffer;
+
+	vk::Pipeline pipeline = nullptr;
 };
 
 void DRenderer::Vulkan::APIDataDeleter(void*& ptr)
@@ -134,23 +135,64 @@ struct DRenderer::Vulkan::SwapchainSettings
 	vk::SurfaceCapabilitiesKHR capabilities{};
 	vk::PresentModeKHR presentMode{};
 	vk::SurfaceFormatKHR surfaceFormat{};
+	uint8_t numImages{};
 };
 
 DRenderer::Vulkan::SwapchainSettings DRenderer::Vulkan::GetSwapchainSettings(vk::PhysicalDevice device, vk::SurfaceKHR surface)
 {
+	SwapchainSettings settings{};
+
 	// Query surface capabilities
 	auto capabilities = device.getSurfaceCapabilitiesKHR(surface);
+	settings.capabilities = capabilities;
+
+	// Handle swapchain length
+	constexpr uint8_t preferredSwapchainLength = 3;
+	settings.numImages = preferredSwapchainLength;
+	if (settings.numImages > capabilities.maxImageCount && capabilities.maxImageCount != 0)
+		settings.numImages = capabilities.maxImageCount;
+	if (settings.numImages < 2)
+	{
+		Core::LogDebugMessage("Error. Maximum swapchain-length cannot be less than 2.");
+		std::abort();
+	}
 
 	auto presentModes = device.getSurfacePresentModesKHR(surface);
 	vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
-
-	auto formats = device.getSurfaceFormatsKHR(surface);
-	vk::SurfaceFormatKHR surfaceFormat = { vk::Format::eR8G8B8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear };
-
-	SwapchainSettings settings{};
-	settings.capabilities = capabilities;
 	settings.presentMode = presentMode;
-	settings.surfaceFormat = surfaceFormat;
+
+	// Handle formats
+	constexpr std::array preferredFormats
+	{
+		vk::Format::eR8G8B8A8Unorm,
+		vk::Format::eB8G8R8A8Unorm
+	};
+	auto formats = device.getSurfaceFormatsKHR(surface);
+	vk::SurfaceFormatKHR formatToUse = { vk::Format::eUndefined, vk::ColorSpaceKHR::eSrgbNonlinear };
+	bool foundPreferredFormat = false;
+	for (const auto& preferredFormat : preferredFormats)
+	{
+		for (const auto& format : formats)
+		{
+			if (format.format == preferredFormat)
+			{
+				formatToUse.format = preferredFormat;
+				foundPreferredFormat = true;
+				break;
+			}
+		}
+	}
+	if constexpr (Core::debugLevel >= 2)
+	{
+		if (!foundPreferredFormat)
+		{
+			Core::LogDebugMessage("Found no usable surface formats.");
+			std::abort();
+		}
+	}
+	settings.surfaceFormat = formatToUse;
+
+
 
 	return settings;
 }
@@ -170,8 +212,8 @@ namespace DRenderer::Vulkan
 	vk::SwapchainKHR Init_CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings);
 	std::vector<vk::ImageView> Init_CreateSwapchainImageViews(vk::Device device, const std::vector<vk::Image>& imageArr, vk::Format format);
 	// Note! This does NOT create the associated framebuffer
-	APIData::RenderTarget Init_CreateRenderTarget(vk::Device device, vk::Extent2D extents);
-	vk::RenderPass Init_CreateMainRenderPass(vk::Device device, vk::SampleCountFlagBits sampleCount);
+	APIData::RenderTarget Init_CreateRenderTarget(vk::Device device, vk::Extent2D extents, vk::Format format);
+	vk::RenderPass Init_CreateMainRenderPass(vk::Device device, vk::SampleCountFlagBits sampleCount, vk::Format format);
 	vk::Framebuffer Init_CreateRenderTargetFramebuffer(vk::Device device, vk::Extent2D extents, vk::ImageView imgView, vk::RenderPass renderPass);
 	void Init_TransitionRenderTargetAndSwapchain(vk::Device device, vk::Queue queue, vk::Image renderTarget, const std::vector<vk::Image>& swapchainImages);
 	void Init_SetupRenderingCmdBuffers(vk::Device device, uint8_t swapchainLength, vk::CommandPool& pool, std::vector<vk::CommandBuffer>& commandBuffers);
@@ -357,9 +399,7 @@ vk::SwapchainKHR DRenderer::Vulkan::Init_CreateSwapchain(vk::Device device, vk::
 	swapchainCreateInfo.clipped = 1;
 	swapchainCreateInfo.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
 	swapchainCreateInfo.imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
-	swapchainCreateInfo.minImageCount = 3;
-	if (settings.capabilities.maxImageCount < swapchainCreateInfo.minImageCount)
-		swapchainCreateInfo.minImageCount = settings.capabilities.maxImageCount;
+	swapchainCreateInfo.minImageCount = settings.numImages;
 
 	auto swapchainResult = device.createSwapchainKHR(swapchainCreateInfo);
 	assert(swapchainResult);
@@ -401,11 +441,11 @@ std::vector<vk::ImageView> DRenderer::Vulkan::Init_CreateSwapchainImageViews(vk:
 }
 
 // Note! This does NOT create the associated framebuffer.
-DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init_CreateRenderTarget(vk::Device device, vk::Extent2D extents)
+DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init_CreateRenderTarget(vk::Device device, vk::Extent2D extents, vk::Format format)
 {
 	// Setup image for render target
 	vk::ImageCreateInfo imgCreateInfo{};
-	imgCreateInfo.format = vk::Format::eR8G8B8A8Unorm;
+	imgCreateInfo.format = format;
 	imgCreateInfo.imageType = vk::ImageType::e2D;
 	imgCreateInfo.initialLayout = vk::ImageLayout::eUndefined;
 	imgCreateInfo.mipLevels = 1;
@@ -414,7 +454,7 @@ DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init_CreateRenderTar
 	imgCreateInfo.sharingMode = vk::SharingMode::eExclusive;
 	imgCreateInfo.tiling = vk::ImageTiling::eOptimal;
 	imgCreateInfo.usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc;
-	imgCreateInfo.extent = { extents.width, extents.height, 1 };
+	imgCreateInfo.extent = vk::Extent3D{ extents.width, extents.height, 1 };
 
 	vk::Image img = device.createImage(imgCreateInfo);
 	assert(img);
@@ -449,15 +489,35 @@ DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init_CreateRenderTar
 	renderTarget.image = img;
 	renderTarget.imageView = imgView;
 
+	if constexpr (Core::debugLevel >= 2)
+	{
+		// Name our render target frame
+		vk::DebugUtilsObjectNameInfoEXT renderTargetNameInfo{};
+		renderTargetNameInfo.objectType = vk::ObjectType::eDeviceMemory;
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkDeviceMemory)renderTarget.memory;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - DeviceMemory";
+		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+
+		renderTargetNameInfo.objectType = vk::ObjectType::eImage;
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkImage)renderTarget.image;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - Image";
+		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+
+		renderTargetNameInfo.objectType = vk::ObjectType::eImageView;
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkImageView)renderTarget.imageView;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - ImageView";
+		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+	}
+
 	return renderTarget;
 }
 
-vk::RenderPass DRenderer::Vulkan::Init_CreateMainRenderPass(vk::Device device, vk::SampleCountFlagBits sampleCount)
+vk::RenderPass DRenderer::Vulkan::Init_CreateMainRenderPass(vk::Device device, vk::SampleCountFlagBits sampleCount, vk::Format format)
 {
 	vk::AttachmentDescription colorAttachment{};
 	colorAttachment.initialLayout = vk::ImageLayout::eColorAttachmentOptimal;
 	colorAttachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
-	colorAttachment.format = vk::Format::eR8G8B8A8Unorm;
+	colorAttachment.format = format;
 	colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
 	colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
 	colorAttachment.samples = sampleCount;
@@ -499,6 +559,16 @@ vk::Framebuffer DRenderer::Vulkan::Init_CreateRenderTargetFramebuffer(vk::Device
 
 	vk::Framebuffer fb = device.createFramebuffer(fbCreateInfo);
 	assert(fb);
+
+	if constexpr (Core::debugLevel >= 2)
+	{
+		vk::DebugUtilsObjectNameInfoEXT renderTargetNameInfo{};
+		renderTargetNameInfo.objectType = vk::ObjectType::eFramebuffer;
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkFramebuffer)fb;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - Framebuffer";
+		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+	}
+
 	return fb;
 }
 
@@ -626,7 +696,6 @@ void DRenderer::Vulkan::Init_SetupPresentCmdBuffers(
 		}
 
 		vk::CommandBufferBeginInfo beginInfo{};
-
 		beginInfo.flags = vk::CommandBufferUsageFlagBits::eSimultaneousUse;
 
 		cmdBuffer.begin(beginInfo);
@@ -668,10 +737,8 @@ void DRenderer::Vulkan::Init_SetupPresentCmdBuffers(
 		dstStage = vk::PipelineStageFlagBits::eTransfer;
 		cmdBuffer.pipelineBarrier(srcStage, dstStage, vk::DependencyFlags(), {}, {}, { swapchainPreBarrier });
 
-
-
 		vk::ImageCopy imgCopy{};
-		imgCopy.extent = { extents.width, extents.height, 1 };
+		imgCopy.extent = vk::Extent3D{ extents.width, extents.height, 1 };
 		imgCopy.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
 		imgCopy.dstSubresource.baseArrayLayer = 0;
 		imgCopy.dstSubresource.layerCount = 1;
@@ -723,6 +790,12 @@ void DRenderer::Vulkan::Init_SetupPresentCmdBuffers(
 	}
 }
 
+namespace DRenderer::Vulkan
+{
+	void MakePipeline();
+}
+
+
 void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& initInfo)
 {
 	// Load the first function pointers.
@@ -766,7 +839,7 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	// Find physical device
 	// TODO: Make code that is not hardcoded.
 	auto devices = data.instance.enumeratePhysicalDevices();
-	assert(devices.size() > 0);
+	assert(!devices.empty());
 	data.physDevice.handle = devices[0];
 
 	// We've picked a physical device. Grab some information from it.
@@ -777,8 +850,9 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	data.physDevice.hostVisibleMemory = 1;
 	data.physDevice.hostMemoryIsDeviceLocal = false;
 
+	// Get swapchain creation details
 	SwapchainSettings swapchainSettings = GetSwapchainSettings(data.physDevice.handle, data.surface);
-	data.surfaceExtents = { swapchainSettings.capabilities.currentExtent.width, swapchainSettings.capabilities.currentExtent.height };
+	data.surfaceExtents = vk::Extent2D{ swapchainSettings.capabilities.currentExtent.width, swapchainSettings.capabilities.currentExtent.height };
 
 
 	// Create logical device
@@ -810,18 +884,6 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	firstQueueCreateInfo.queueFamilyIndex = 0;
 	queueCreateInfos.push_back(firstQueueCreateInfo);
 
-	vk::DeviceQueueCreateInfo secondQueueCreateInfo;
-	secondQueueCreateInfo.pQueuePriorities = priority;
-	secondQueueCreateInfo.queueCount = 1;
-	secondQueueCreateInfo.queueFamilyIndex = 1;
-	queueCreateInfos.push_back(secondQueueCreateInfo);
-
-	vk::DeviceQueueCreateInfo thirdQueueCreateInfo;
-	thirdQueueCreateInfo.pQueuePriorities = priority;
-	thirdQueueCreateInfo.queueCount = 1;
-	thirdQueueCreateInfo.queueFamilyIndex = 2;
-	queueCreateInfos.push_back(thirdQueueCreateInfo);
-
 	createInfo.queueCreateInfoCount = uint32_t(queueCreateInfos.size());
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
@@ -842,51 +904,23 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	// Load function pointers for our device.
 	Volk::LoadDevice(data.device);
 
-	vk::Extent2D renderImgExtents = { swapchainSettings.capabilities.currentExtent.width, swapchainSettings.capabilities.currentExtent.height };
-
 	// Create our Render Target
-	data.renderTarget = Init_CreateRenderTarget(data.device, renderImgExtents);
-	if constexpr (Core::debugLevel >= 2)
-	{
-		vk::DebugUtilsObjectNameInfoEXT renderTargetNameInfo{};
-		renderTargetNameInfo.objectType = vk::ObjectType::eDeviceMemory;
-		renderTargetNameInfo.objectHandle = (uint64_t)(VkDeviceMemory)data.renderTarget.memory;
-		renderTargetNameInfo.pObjectName = "Render Target 0 - DeviceMemory";
-		data.device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
-
-		renderTargetNameInfo.objectType = vk::ObjectType::eImage;
-		renderTargetNameInfo.objectHandle = (uint64_t)(VkImage)data.renderTarget.image;
-		renderTargetNameInfo.pObjectName = "Render Target 0 - Image";
-		data.device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
-
-		renderTargetNameInfo.objectType = vk::ObjectType::eImageView;
-		renderTargetNameInfo.objectHandle = (uint64_t)(VkImageView)data.renderTarget.imageView;
-		renderTargetNameInfo.pObjectName = "Render Target 0 - ImageView";
-		data.device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
-	}
-
+	data.renderTarget = Init_CreateRenderTarget(data.device, data.surfaceExtents, swapchainSettings.surfaceFormat.format);
 
 	// Set up main renderpass
-	data.renderPass = Init_CreateMainRenderPass(data.device, vk::SampleCountFlagBits::e1);
+	data.renderPass = Init_CreateMainRenderPass(data.device, vk::SampleCountFlagBits::e1, swapchainSettings.surfaceFormat.format);
 
-	data.renderTarget.framebuffer = Init_CreateRenderTargetFramebuffer(data.device, renderImgExtents, data.renderTarget.imageView, data.renderPass);
-	if constexpr (Core::debugLevel >= 2)
-	{
-		vk::DebugUtilsObjectNameInfoEXT renderTargetNameInfo{};
-		renderTargetNameInfo.objectType = vk::ObjectType::eFramebuffer;
-		renderTargetNameInfo.objectHandle = (uint64_t)(VkFramebuffer)data.renderTarget.framebuffer;
-		renderTargetNameInfo.pObjectName = "Render Target 0 - Framebuffer";
-		data.device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
-	}
+	data.renderTarget.framebuffer = Init_CreateRenderTargetFramebuffer(data.device, data.surfaceExtents, data.renderTarget.imageView, data.renderPass);
+
 
 	// Set up swapchain
 	data.swapchain = Init_CreateSwapchain(data.device, data.surface, swapchainSettings);
 	data.swapchainImages = data.device.getSwapchainImagesKHR(data.swapchain);
 	data.swapchainLength = uint8_t(data.swapchainImages.size());
 	data.resourceSetCount = data.swapchainLength - 1;
-	data.swapchainImageViews = Init_CreateSwapchainImageViews(data.device, data.swapchainImages, vk::Format::eR8G8B8A8Unorm);
+	data.swapchainImageViews = Init_CreateSwapchainImageViews(data.device, data.swapchainImages, swapchainSettings.surfaceFormat.format);
 
-	Init_SetupPresentCmdBuffers(data.device, data.renderTarget.image, renderImgExtents, data.swapchainImages, data.presentCmdPool, data.presentCmdBuffer);
+	Init_SetupPresentCmdBuffers(data.device, data.renderTarget.image, data.surfaceExtents, data.swapchainImages, data.presentCmdPool, data.presentCmdBuffer);
 
 	Init_SetupRenderingCmdBuffers(data.device, data.swapchainLength, data.renderCmdPool, data.renderCmdBuffer);
 
@@ -906,7 +940,7 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 		data.imageAvailableForPresentation[i] = data.device.createFence({});
 	}
 
-	auto imageResult = data.device.acquireNextImageKHR(data.swapchain, std::numeric_limits<uint64_t>::max(), vk::Semaphore(), data.imageAvailableForPresentation[data.test]);
+	auto imageResult = data.device.acquireNextImageKHR(data.swapchain, std::numeric_limits<uint64_t>::max(), vk::Semaphore(), data.imageAvailableForPresentation[data.imageAvailableActiveIndex]);
 	if constexpr (Core::debugLevel >= 2)
 	{
 		if (imageResult.result != vk::Result::eSuccess)
@@ -916,6 +950,8 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 		}
 	}
 	data.currentSwapchainImage = imageResult.value;
+
+	MakePipeline();
 }
 
 void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyParams& in)
@@ -963,8 +999,8 @@ void DRenderer::Vulkan::Draw()
 {
 	APIData& data = GetAPIData();
 
-	data.device.waitForFences(data.imageAvailableForPresentation[data.test], 1, std::numeric_limits<uint64_t>::max());
-	data.device.resetFences(data.imageAvailableForPresentation[data.test]);
+	data.device.waitForFences(data.imageAvailableForPresentation[data.imageAvailableActiveIndex], 1, std::numeric_limits<uint64_t>::max());
+	data.device.resetFences(data.imageAvailableForPresentation[data.imageAvailableActiveIndex]);
 	
 	vk::SubmitInfo renderSubmitInfo{};
 
@@ -1000,8 +1036,8 @@ void DRenderer::Vulkan::Draw()
 		}
 	}
 
-	data.test = (data.test + 1) % data.swapchainLength;
-	auto imageResult = data.device.acquireNextImageKHR(data.swapchain, std::numeric_limits<uint64_t>::max(), vk::Semaphore(), data.imageAvailableForPresentation[data.test]);
+	data.imageAvailableActiveIndex = (data.imageAvailableActiveIndex + 1) % data.swapchainLength;
+	auto imageResult = data.device.acquireNextImageKHR(data.swapchain, std::numeric_limits<uint64_t>::max(), {}, data.imageAvailableForPresentation[data.imageAvailableActiveIndex]);
 	if constexpr (Core::debugLevel >= 2)
 	{
 		if (imageResult.result != vk::Result::eSuccess)
@@ -1012,4 +1048,12 @@ void DRenderer::Vulkan::Draw()
 	}
 	data.currentSwapchainImage = imageResult.value;
 	
+}
+
+void DRenderer::Vulkan::MakePipeline()
+{
+	APIData& data = GetAPIData();
+
+	vk::ShaderModuleCreateInfo vertModCreateInfo{};
+	vertModCreateInfo.
 }

@@ -54,7 +54,13 @@ namespace Engine::Application::Core
 
 		//glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 		//glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-		//glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+		//glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE)
+
+		bool vulkanTest = glfwVulkanSupported();
+		if (vulkanTest == false)
+			std::abort();
+
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		GLFWwindow* window = glfwCreateWindow(defaultWindowSize.width, defaultWindowSize.height, "My Title", NULL, NULL);
 		if (!window)
 		{

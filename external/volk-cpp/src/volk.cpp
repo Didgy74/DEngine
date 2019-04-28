@@ -586,13 +586,13 @@ VkResult Volk::Initialize(void)
 
 	vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)dlsym(module, "vkGetInstanceProcAddr");
 #else
-	void* module = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
-	if (!module)
-		module = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_LOCAL);
-	if (!module)
-		return VK_ERROR_INITIALIZATION_FAILED;
+	//void* module = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
+	//if (!module)
+		//module = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_LOCAL);
+	//if (!module)
+	//	return VK_ERROR_INITIALIZATION_FAILED;
 
-	vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)dlsym(module, "vkGetInstanceProcAddr");
+	//vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)(void*)dlsym(module, "vkGetInstanceProcAddr");
 #endif
 
 	volkGenLoadLoader(NULL, vkGetInstanceProcAddrStub);
