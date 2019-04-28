@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <array>
 #include <vector>
+#include <fstream>
 
 namespace DRenderer::Vulkan
 {
@@ -88,6 +89,14 @@ struct DRenderer::Vulkan::APIData
 	};
 	RenderTarget renderTarget{};
 
+	struct Swapchain
+	{
+		vk::SwapchainKHR handle = nullptr;
+		uint8_t length = 0;
+		uint8_t currentImage = 0;
+		std::vector<vk::Image> images;
+		std::vector<vk::ImageView> imageViews;
+	};
 	vk::SwapchainKHR swapchain = nullptr;
 	uint8_t swapchainLength = 0;
 	uint8_t currentSwapchainImage = 0;
@@ -116,6 +125,7 @@ struct DRenderer::Vulkan::APIData
 	std::vector<vk::CommandBuffer> presentCmdBuffer;
 
 	vk::Pipeline pipeline = nullptr;
+	vk::PipelineLayout pipelineLayout = nullptr;
 };
 
 void DRenderer::Vulkan::APIDataDeleter(void*& ptr)
@@ -233,8 +243,8 @@ DRenderer::Vulkan::APIData::Version DRenderer::Vulkan::Init_LoadAPIVersion()
 
 	// Query the highest API version available.
 	uint32_t apiVersion = 0;
-	auto enumerateVersionResult = vk::enumerateInstanceVersion(&apiVersion);
-	assert(enumerateVersionResult == vk::Result::eSuccess);
+	auto enumerateVersionResult = Volk::GetInstanceVersion();
+	assert(enumerateVersionResult != 0);
 	version.major = VK_VERSION_MAJOR(apiVersion);
 	version.minor = VK_VERSION_MINOR(apiVersion);
 	version.patch = VK_VERSION_PATCH(apiVersion);
@@ -676,7 +686,7 @@ void DRenderer::Vulkan::Init_SetupPresentCmdBuffers(
 
 	vk::CommandBufferAllocateInfo allocInfo{};
 	allocInfo.commandPool = pool;
-	allocInfo.commandBufferCount = swapchain.size();
+	allocInfo.commandBufferCount = uint32_t(swapchain.size());
 	allocInfo.level = vk::CommandBufferLevel::ePrimary;
 
 	cmdBuffers = device.allocateCommandBuffers(allocInfo);
@@ -973,7 +983,7 @@ void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyP
 	renderPassBeginInfo.framebuffer = data.renderTarget.framebuffer;
 
 	vk::ClearValue clearValue;
-	clearValue.color.float32[0] = 1.f;
+	clearValue.color.float32[0] = 0.25f;
 	clearValue.color.float32[1] = 0.f;
 	clearValue.color.float32[2] = 0.f;
 	clearValue.color.float32[3] = 1.f;
@@ -985,6 +995,10 @@ void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyP
 	renderPassBeginInfo.renderArea = renderArea;
 
 	cmdBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+
+	cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, data.pipeline);
+
+	cmdBuffer.draw(3, 1, 0, 0);
 
 	cmdBuffer.endRenderPass();
 
@@ -1013,7 +1027,6 @@ void DRenderer::Vulkan::Draw()
 	submitInfo2.commandBufferCount = 1;
 	submitInfo2.pCommandBuffers = &data.presentCmdBuffer[data.currentSwapchainImage];
 	data.graphicsQueue.submit(submitInfo2, {});
-
 
 	vk::PresentInfoKHR presentInfo{};
 	presentInfo.swapchainCount = 1;
@@ -1047,13 +1060,107 @@ void DRenderer::Vulkan::Draw()
 		}
 	}
 	data.currentSwapchainImage = imageResult.value;
-	
 }
 
 void DRenderer::Vulkan::MakePipeline()
 {
 	APIData& data = GetAPIData();
 
+	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+	data.pipelineLayout = data.device.createPipelineLayout(pipelineLayoutCreateInfo);
+
+	std::ifstream vertFile("data/Shaders/VulkanTest/vert.spv", std::ios::ate | std::ios::binary);
+	if (!vertFile.is_open())
+		std::abort();
+
+	std::vector<uint8_t> vertCode(vertFile.tellg());
+	vertFile.seekg(0);
+	vertFile.read(reinterpret_cast<char*>(vertCode.data()), vertCode.size());
+	vertFile.close();
+
 	vk::ShaderModuleCreateInfo vertModCreateInfo{};
-	vertModCreateInfo.
+	vertModCreateInfo.codeSize = vertCode.size();
+	vertModCreateInfo.pCode = reinterpret_cast<const uint32_t*>(vertCode.data());
+
+	vk::ShaderModule vertModule = data.device.createShaderModule(vertModCreateInfo);
+
+	vk::PipelineShaderStageCreateInfo vertStageCreateInfo{};
+	vertStageCreateInfo.stage = vk::ShaderStageFlagBits::eVertex;
+	vertStageCreateInfo.module = vertModule;
+	vertStageCreateInfo.pName = "main";
+
+	std::ifstream fragFile("data/Shaders/VulkanTest/frag.spv", std::ios::ate | std::ios::binary);
+	if (!fragFile.is_open())
+		std::abort();
+
+	std::vector<uint8_t> fragCode(fragFile.tellg());
+	fragFile.seekg(0);
+	fragFile.read(reinterpret_cast<char*>(fragCode.data()), fragCode.size());
+	fragFile.close();
+
+	vk::ShaderModuleCreateInfo fragModCreateInfo{};
+	fragModCreateInfo.codeSize = fragCode.size();
+	fragModCreateInfo.pCode = reinterpret_cast<const uint32_t*>(fragCode.data());
+
+	vk::ShaderModule fragModule = data.device.createShaderModule(fragModCreateInfo);
+
+	vk::PipelineShaderStageCreateInfo fragStageCreateInfo{};
+	fragStageCreateInfo.stage = vk::ShaderStageFlagBits::eFragment;
+	fragStageCreateInfo.module = fragModule;
+	fragStageCreateInfo.pName = "main";
+
+	std::array shaderStages = { vertStageCreateInfo, fragStageCreateInfo };
+
+
+	vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+
+	vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
+	inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
+
+
+	vk::Viewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float)data.surfaceExtents.width;
+	viewport.height = (float)data.surfaceExtents.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vk::Rect2D scissor{};
+	scissor.offset = { 0, 0 };
+	scissor.extent = data.surfaceExtents;
+	vk::PipelineViewportStateCreateInfo viewportState{};
+	viewportState.viewportCount = 1;
+	viewportState.pViewports = &viewport;
+	viewportState.scissorCount = 1;
+	viewportState.pScissors = &scissor;
+
+	vk::PipelineRasterizationStateCreateInfo rasterizer{};
+	rasterizer.lineWidth = 1.f;
+	rasterizer.polygonMode = vk::PolygonMode::eFill;
+
+	vk::PipelineMultisampleStateCreateInfo multisampling{};
+	multisampling.sampleShadingEnable = VK_FALSE;
+	multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
+
+	vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
+	colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+	vk::PipelineColorBlendStateCreateInfo colorBlending{};
+	colorBlending.attachmentCount = 1;
+	colorBlending.pAttachments = &colorBlendAttachment;
+
+	vk::GraphicsPipelineCreateInfo pipelineInfo{};
+	pipelineInfo.layout = data.pipelineLayout;
+	pipelineInfo.renderPass = data.renderPass;
+	pipelineInfo.pInputAssemblyState = &inputAssembly;
+	pipelineInfo.pVertexInputState = &vertexInputInfo;
+	pipelineInfo.pViewportState = &viewportState;
+	pipelineInfo.pMultisampleState = &multisampling;
+	pipelineInfo.pRasterizationState = &rasterizer;
+	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.stageCount = 2;
+	pipelineInfo.pStages = shaderStages.data();
+
+
+	data.pipeline = data.device.createGraphicsPipeline({}, pipelineInfo);
 }
