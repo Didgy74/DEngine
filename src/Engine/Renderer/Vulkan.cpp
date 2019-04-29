@@ -202,8 +202,6 @@ DRenderer::Vulkan::SwapchainSettings DRenderer::Vulkan::GetSwapchainSettings(vk:
 	}
 	settings.surfaceFormat = formatToUse;
 
-
-
 	return settings;
 }
 
@@ -217,6 +215,7 @@ namespace DRenderer::Vulkan
 		const std::vector<vk::LayerProperties>& layers,
 		vk::ApplicationInfo appInfo,
 		const std::vector<std::string_view>& extensions2);
+	void Init_LoadMemoryTypeIndex(const vk::PhysicalDeviceMemoryProperties& memProperties, uint32_t& deviceLocalIndex, uint32_t& hostVisibleIndex);
 	vk::DebugUtilsMessengerEXT Init_CreateDebugMessenger(vk::Instance instance);
 	vk::SurfaceKHR Init_CreateSurface(vk::Instance instance, void* hwnd);
 	vk::SwapchainKHR Init_CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings);
@@ -359,6 +358,29 @@ vk::Instance DRenderer::Vulkan::Init_CreateInstance(const std::vector<vk::Extens
 		return {};
 
 	return result;
+}
+
+void DRenderer::Vulkan::Init_LoadMemoryTypeIndex(const vk::PhysicalDeviceMemoryProperties& memProperties, uint32_t& deviceLocalIndex, uint32_t& hostVisibleIndex)
+{
+    // Find deviceLocal memory
+    for (size_t i = 0; i < memProperties.memoryTypeCount; i++)
+    {
+        if ((memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal) == vk::MemoryPropertyFlagBits::eDeviceLocal)
+        {
+            deviceLocalIndex = i;
+            break;
+        }
+    }
+
+    // Find host-visible memory
+    for (size_t i = 0; i < memProperties.memoryTypeCount; i++)
+    {
+        if ((memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible) == vk::MemoryPropertyFlagBits::eHostVisible)
+        {
+            hostVisibleIndex = i;
+            break;
+        }
+    }
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL DRenderer::Vulkan::Callback(
@@ -856,8 +878,7 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 
 	data.physDevice.properties = data.physDevice.handle.getProperties();
 	data.physDevice.memProperties = data.physDevice.handle.getMemoryProperties();
-	data.physDevice.deviceLocalMemory = 0;
-	data.physDevice.hostVisibleMemory = 1;
+	Init_LoadMemoryTypeIndex(data.physDevice.memProperties, data.physDevice.deviceLocalMemory, data.physDevice.hostVisibleMemory);
 	data.physDevice.hostMemoryIsDeviceLocal = false;
 
 	// Get swapchain creation details
@@ -1126,7 +1147,7 @@ void DRenderer::Vulkan::MakePipeline()
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 	vk::Rect2D scissor{};
-	scissor.offset = { 0, 0 };
+	scissor.offset = vk::Offset2D{ 0, 0 };
 	scissor.extent = data.surfaceExtents;
 	vk::PipelineViewportStateCreateInfo viewportState{};
 	viewportState.viewportCount = 1;
