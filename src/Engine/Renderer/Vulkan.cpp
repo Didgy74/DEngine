@@ -97,17 +97,12 @@ struct DRenderer::Vulkan::APIData
 		std::vector<vk::Image> images;
 		std::vector<vk::ImageView> imageViews;
 	};
-	vk::SwapchainKHR swapchain = nullptr;
-	uint8_t swapchainLength = 0;
+	Swapchain swapchain{};
 	uint8_t currentSwapchainImage = 0;
 	// Resource set means in-flight image
 	uint8_t resourceSetCount = 0;
 	// Resource set means in-flight image
 	uint8_t currentResourceSet = 0;
-	// Has swapchain length
-	std::vector<vk::Image> swapchainImages;
-	// Has swapchain length
-	std::vector<vk::ImageView> swapchainImageViews;
 	// Has swapchain length
 	std::vector<vk::Fence> imageAvailableForPresentation;
 	uint8_t imageAvailableActiveIndex = 0;
@@ -218,8 +213,8 @@ namespace DRenderer::Vulkan
 	void Init_LoadMemoryTypeIndex(const vk::PhysicalDeviceMemoryProperties& memProperties, uint32_t& deviceLocalIndex, uint32_t& hostVisibleIndex);
 	vk::DebugUtilsMessengerEXT Init_CreateDebugMessenger(vk::Instance instance);
 	vk::SurfaceKHR Init_CreateSurface(vk::Instance instance, void* hwnd);
-	vk::SwapchainKHR Init_CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings);
-	std::vector<vk::ImageView> Init_CreateSwapchainImageViews(vk::Device device, const std::vector<vk::Image>& imageArr, vk::Format format);
+	APIData::PhysDevice Init_LoadPhysDevice(vk::Instance instance, vk::SurfaceKHR surface);
+	APIData::Swapchain Init_CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings);
 	// Note! This does NOT create the associated framebuffer
 	APIData::RenderTarget Init_CreateRenderTarget(vk::Device device, vk::Extent2D extents, vk::Format format);
 	vk::RenderPass Init_CreateMainRenderPass(vk::Device device, vk::SampleCountFlagBits sampleCount, vk::Format format);
@@ -360,6 +355,18 @@ vk::Instance DRenderer::Vulkan::Init_CreateInstance(const std::vector<vk::Extens
 	return result;
 }
 
+vk::SurfaceKHR DRenderer::Vulkan::Init_CreateSurface(vk::Instance instance, void* hwnd)
+{
+	vk::SurfaceKHR tempSurfaceHandle;
+	bool surfaceCreationTest = GetAPIData().initInfo.test(&instance, hwnd, &tempSurfaceHandle);
+	assert(surfaceCreationTest);
+	return tempSurfaceHandle;
+}
+
+DRenderer::Vulkan::APIData::PhysDevice DRenderer::Vulkan::Init_LoadPhysDevice(vk::Instance instance,
+																			  vk::SurfaceKHR surface)
+{}
+
 void DRenderer::Vulkan::Init_LoadMemoryTypeIndex(const vk::PhysicalDeviceMemoryProperties& memProperties, uint32_t& deviceLocalIndex, uint32_t& hostVisibleIndex)
 {
     // Find deviceLocal memory
@@ -408,16 +415,12 @@ vk::DebugUtilsMessengerEXT DRenderer::Vulkan::Init_CreateDebugMessenger(vk::Inst
 	return temp;
 }
 
-vk::SurfaceKHR DRenderer::Vulkan::Init_CreateSurface(vk::Instance instance, void* hwnd)
-{
-	vk::SurfaceKHR tempSurfaceHandle;
-	bool surfaceCreationTest = GetAPIData().initInfo.test(&instance, hwnd, &tempSurfaceHandle);
-	assert(surfaceCreationTest);
-	return tempSurfaceHandle;
-}
 
-vk::SwapchainKHR DRenderer::Vulkan::Init_CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings)
+
+DRenderer::Vulkan::APIData::Swapchain DRenderer::Vulkan::Init_CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings)
 {
+	APIData::Swapchain swapchain;
+
 	vk::SwapchainCreateInfoKHR swapchainCreateInfo{};
 
 	swapchainCreateInfo.imageArrayLayers = 1;
@@ -436,40 +439,31 @@ vk::SwapchainKHR DRenderer::Vulkan::Init_CreateSwapchain(vk::Device device, vk::
 	auto swapchainResult = device.createSwapchainKHR(swapchainCreateInfo);
 	assert(swapchainResult);
 
-	return swapchainResult;
-}
+	swapchain.handle = swapchainResult;
 
-std::vector<vk::ImageView> DRenderer::Vulkan::Init_CreateSwapchainImageViews(vk::Device device, const std::vector<vk::Image>& imageArr, vk::Format format)
-{
-	std::vector<vk::ImageView> imageViews(imageArr.size());
-	for (size_t i = 0; i < imageViews.size(); i++)
+	swapchain.images = device.getSwapchainImagesKHR(swapchain.handle);
+
+	assert(swapchain.images.size() == settings.numImages);
+
+	swapchain.length = swapchain.images.size();
+
+	swapchain.imageViews.resize(swapchain.length);
+	for (size_t i = 0; i < swapchain.imageViews.size(); i++)
 	{
-		vk::ImageViewCreateInfo createInfo{};
+		vk::ImageViewCreateInfo imageViewCreateInfo{};
+		imageViewCreateInfo.image = swapchain.images[i];
+		imageViewCreateInfo.format = swapchainCreateInfo.imageFormat;
+		imageViewCreateInfo.viewType = vk::ImageViewType::e2D;
+		imageViewCreateInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+		imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+		imageViewCreateInfo.subresourceRange.layerCount = 1;
+		imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+		imageViewCreateInfo.subresourceRange.levelCount = 1;
 
-		createInfo.image = imageArr[i];
-
-		createInfo.viewType = vk::ImageViewType::e2D;
-
-		vk::ComponentMapping compMapping{};
-		compMapping.r = vk::ComponentSwizzle::eIdentity;
-		compMapping.g = vk::ComponentSwizzle::eIdentity;
-		compMapping.b = vk::ComponentSwizzle::eIdentity;
-		compMapping.a = vk::ComponentSwizzle::eIdentity;
-		createInfo.components = compMapping;
-
-		createInfo.format = format;
-
-		vk::ImageSubresourceRange subresourceRange;
-		subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-		subresourceRange.layerCount = 1;
-		subresourceRange.levelCount = 1;
-		createInfo.subresourceRange = subresourceRange;
-
-		vk::ImageView temp = device.createImageView(createInfo);
-		assert(temp);
-		imageViews[i] = temp;
+		swapchain.imageViews[i] = device.createImageView(imageViewCreateInfo);
 	}
-	return std::move(imageViews);
+
+	return std::move(swapchain);
 }
 
 // Note! This does NOT create the associated framebuffer.
@@ -869,17 +863,7 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	data.surface = Init_CreateSurface(data.instance, hwnd);
 
 	// Find physical device
-	// TODO: Make code that is not hardcoded.
-	auto devices = data.instance.enumeratePhysicalDevices();
-	assert(!devices.empty());
-	data.physDevice.handle = devices[0];
-
-	// We've picked a physical device. Grab some information from it.
-
-	data.physDevice.properties = data.physDevice.handle.getProperties();
-	data.physDevice.memProperties = data.physDevice.handle.getMemoryProperties();
-	Init_LoadMemoryTypeIndex(data.physDevice.memProperties, data.physDevice.deviceLocalMemory, data.physDevice.hostVisibleMemory);
-	data.physDevice.hostMemoryIsDeviceLocal = false;
+	data.physDevice = Init_LoadPhysDevice(data.instance, data.surface);
 
 	// Get swapchain creation details
 	SwapchainSettings swapchainSettings = GetSwapchainSettings(data.physDevice.handle, data.surface);
@@ -888,8 +872,6 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 
 	// Create logical device
 	auto queues = data.physDevice.handle.getQueueFamilyProperties();
-
-	auto presentSupport = data.physDevice.handle.getSurfaceSupportKHR(0, data.surface);
 
 	uint32_t graphicsFamily = 0;
 	uint32_t graphicsQueue = 0;
@@ -946,22 +928,18 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 
 	// Set up swapchain
 	data.swapchain = Init_CreateSwapchain(data.device, data.surface, swapchainSettings);
-	data.swapchainImages = data.device.getSwapchainImagesKHR(data.swapchain);
-	data.swapchainLength = uint8_t(data.swapchainImages.size());
-	data.resourceSetCount = data.swapchainLength - 1;
-	data.swapchainImageViews = Init_CreateSwapchainImageViews(data.device, data.swapchainImages, swapchainSettings.surfaceFormat.format);
 
-	Init_SetupPresentCmdBuffers(data.device, data.renderTarget.image, data.surfaceExtents, data.swapchainImages, data.presentCmdPool, data.presentCmdBuffer);
+	Init_SetupPresentCmdBuffers(data.device, data.renderTarget.image, data.surfaceExtents, data.swapchain.images, data.presentCmdPool, data.presentCmdBuffer);
 
-	Init_SetupRenderingCmdBuffers(data.device, data.swapchainLength, data.renderCmdPool, data.renderCmdBuffer);
+	Init_SetupRenderingCmdBuffers(data.device, data.swapchain.length, data.renderCmdPool, data.renderCmdBuffer);
 
 	data.graphicsQueue = data.device.getQueue(graphicsFamily, graphicsQueue);
 
-	Init_TransitionRenderTargetAndSwapchain(data.device, data.graphicsQueue, data.renderTarget.image, data.swapchainImages);
+	Init_TransitionRenderTargetAndSwapchain(data.device, data.graphicsQueue, data.renderTarget.image, data.swapchain.images);
 
-	data.imageAvailableForPresentation.resize(data.swapchainLength);
-	data.renderCmdBufferAvailable.resize(data.swapchainLength);
-	for (size_t i = 0; i < data.swapchainLength; i++)
+	data.imageAvailableForPresentation.resize(data.swapchain.length);
+	data.renderCmdBufferAvailable.resize(data.swapchain.length);
+	for (size_t i = 0; i < data.swapchain.length; i++)
 	{
 		vk::FenceCreateInfo createInfo1{};
 		createInfo1.flags = vk::FenceCreateFlagBits::eSignaled;
@@ -971,7 +949,7 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 		data.imageAvailableForPresentation[i] = data.device.createFence({});
 	}
 
-	auto imageResult = data.device.acquireNextImageKHR(data.swapchain, std::numeric_limits<uint64_t>::max(), vk::Semaphore(), data.imageAvailableForPresentation[data.imageAvailableActiveIndex]);
+	auto imageResult = data.device.acquireNextImageKHR(data.swapchain.handle, std::numeric_limits<uint64_t>::max(), vk::Semaphore(), data.imageAvailableForPresentation[data.imageAvailableActiveIndex]);
 	if constexpr (Core::debugLevel >= 2)
 	{
 		if (imageResult.result != vk::Result::eSuccess)
@@ -1051,7 +1029,7 @@ void DRenderer::Vulkan::Draw()
 
 	vk::PresentInfoKHR presentInfo{};
 	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = &data.swapchain;
+	presentInfo.pSwapchains = &data.swapchain.handle;
 
 	uint32_t swapchainIndex = data.currentSwapchainImage;
 	presentInfo.pImageIndices = &swapchainIndex;
@@ -1070,8 +1048,8 @@ void DRenderer::Vulkan::Draw()
 		}
 	}
 
-	data.imageAvailableActiveIndex = (data.imageAvailableActiveIndex + 1) % data.swapchainLength;
-	auto imageResult = data.device.acquireNextImageKHR(data.swapchain, std::numeric_limits<uint64_t>::max(), {}, data.imageAvailableForPresentation[data.imageAvailableActiveIndex]);
+	data.imageAvailableActiveIndex = (data.imageAvailableActiveIndex + 1) % data.swapchain.length;
+	auto imageResult = data.device.acquireNextImageKHR(data.swapchain.handle, std::numeric_limits<uint64_t>::max(), {}, data.imageAvailableForPresentation[data.imageAvailableActiveIndex]);
 	if constexpr (Core::debugLevel >= 2)
 	{
 		if (imageResult.result != vk::Result::eSuccess)
