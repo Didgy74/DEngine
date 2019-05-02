@@ -3,6 +3,12 @@
 #include <cstdint>
 #include <functional>
 
+namespace DRenderer
+{
+	class MeshDocument;
+	using MeshDoc = MeshDocument;
+}
+
 namespace Engine
 {
 	namespace Renderer
@@ -17,8 +23,6 @@ namespace Engine
 		struct DebugCreateInfo;
 		struct AssetLoadCreateInfo;
 		struct InitInfo;
-
-		class MeshDocument;
 
 		enum class API;
 		class Viewport;

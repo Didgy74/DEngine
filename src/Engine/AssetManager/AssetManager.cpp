@@ -98,7 +98,7 @@ namespace Engine
 			return returnValue;
 		}
 
-		std::optional<Renderer::MeshDoc> GetRendererMeshDoc(size_t id)
+		std::optional<DRenderer::MeshDoc> GetRendererMeshDoc(size_t id)
 		{
 			auto meshInfo = GetMeshInfo(id);
 			if (meshInfo.path == "")
@@ -113,7 +113,7 @@ namespace Engine
 				gltfDocIterator = insertResult.first;
 			}
 
-			Renderer::MeshDoc::CreateInfo meshDoc;
+			DRenderer::MeshDoc::CreateInfo meshDoc;
 
 			const auto& gltfDoc = gltfDocIterator->second;
 
@@ -164,11 +164,11 @@ namespace Engine
 
 			meshDoc.indexCount = indexAcc.count;
 			if (indexAcc.componentType == fx::gltf::Accessor::ComponentType::UnsignedShort)
-				meshDoc.indexType = Renderer::MeshDoc::IndexType::UInt16;
+				meshDoc.indexType = DRenderer::MeshDoc::IndexType::UInt16;
 			else if (indexAcc.componentType == fx::gltf::Accessor::ComponentType::UnsignedInt)
-				meshDoc.indexType = Renderer::MeshDoc::IndexType::UInt32;
+				meshDoc.indexType = DRenderer::MeshDoc::IndexType::UInt32;
 
-			return Renderer::MeshDoc{ std::move(meshDoc) };
+			return DRenderer::MeshDoc{ std::move(meshDoc) };
 		}
 
 		void Renderer_AssetLoadEndEvent()

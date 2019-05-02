@@ -2,99 +2,100 @@
 
 #include "DRenderer/MeshDocument.hpp"
 
-namespace Engine
+namespace DRenderer
 {
-	namespace Renderer
+	MeshDocument::MeshDocument(CreateInfo&& createInfo) :
+		byteArrayRef(createInfo.byteArrayRef),
+		indexType(createInfo.indexType),
+		indexCount(createInfo.indexCount),
+		vertexCount(createInfo.vertexCount),
+		byteOffsets()
 	{
-		MeshDocument::MeshDocument(CreateInfo&& createInfo) :
-			byteArrayRef(std::move(createInfo.byteArrayRef)),
-			indexType(std::move(createInfo.indexType)),
-			indexCount(std::move(createInfo.indexCount)),
-			vertexCount(std::move(createInfo.vertexCount))
-		{
-			GetByteOffset(Attribute::Position) = std::move(createInfo.posByteOffset);
-			GetByteOffset(Attribute::TexCoord) = std::move(createInfo.uvByteOffset);
-			GetByteOffset(Attribute::Normal) = std::move(createInfo.normalByteOffset);
-			GetByteOffset(Attribute::Tangent) = std::move(createInfo.tangentByteOffset);
-			GetByteOffset(Attribute::Index) = std::move(createInfo.indexByteOffset);
-		}
+		GetByteOffset(Attribute::Position) = createInfo.posByteOffset;
+		GetByteOffset(Attribute::TexCoord) = createInfo.uvByteOffset;
+		GetByteOffset(Attribute::Normal) = createInfo.normalByteOffset;
+		GetByteOffset(Attribute::Tangent) = createInfo.tangentByteOffset;
+		GetByteOffset(Attribute::Index) = createInfo.indexByteOffset;
+	}
 
-		size_t MeshDocument::GetByteLength(Attribute attr) const
+	size_t MeshDocument::GetByteLength(Attribute attr) const
+	{
+		switch (attr)
 		{
-			switch (attr)
-			{
-			case Attribute::Position:
-				return GetVertexCount() * sizeof(PositionType);
-			case Attribute::TexCoord:
-				return GetVertexCount() * sizeof(UVType);
-			case Attribute::Normal:
-				return GetVertexCount() * sizeof(NormalType);
-			case Attribute::Tangent:
-				return GetVertexCount() * sizeof(TangentType);
-			case Attribute::Index:
-				return GetIndexCount()* ToByteSize(GetIndexType());
-			default:
-				assert(false);
-				return 0;
-			}
-		}
-
-		const size_t& MeshDocument::GetByteOffset(Attribute attr) const
-		{
-			return byteOffsets.at(size_t(attr));
-		}
-
-		size_t& MeshDocument::GetByteOffset(Attribute attr)
-		{
-			return byteOffsets.at(static_cast<size_t>(attr));
-		}
-
-		const std::byte* MeshDocument::GetDataPtr(Attribute attr) const
-		{
-			return byteArrayRef + GetByteOffset(attr);
-		}
-
-		uint32_t MeshDocument::GetVertexCount() const
-		{
-			return vertexCount;
-		}
-
-		MeshDocument::IndexType MeshDocument::GetIndexType() const
-		{
-			return indexType;
-		}
-
-		uint32_t MeshDocument::GetIndexCount() const
-		{
-			return indexCount;
-		}
-
-		size_t MeshDocument::GetTotalSizeRequired() const
-		{
+		case Attribute::Position:
+			return GetVertexCount() * sizeof(PositionType);
+		case Attribute::TexCoord:
+			return GetVertexCount() * sizeof(UVType);
+		case Attribute::Normal:
+			return GetVertexCount() * sizeof(NormalType);
+		case Attribute::Tangent:
+			return GetVertexCount() * sizeof(TangentType);
+		case Attribute::Index:
+			return GetIndexCount() * ToByteSize(GetIndexType());
+		default:
+			assert(false);
 			return 0;
 		}
+	}
 
-		uint8_t MeshDocument::ToByteSize(IndexType type)
-		{
-			return type == IndexType::UInt16 ? uint8_t(2) : uint8_t(4);
-		}
+	const size_t& MeshDocument::GetByteOffset(Attribute attr) const
+	{
+		return byteOffsets.at(size_t(attr));
+	}
 
-		MeshDocument::CreateInfo MeshDocument::ToCreateInfo(MeshDocument&& input)
-		{
-			CreateInfo returnValue;
+	size_t& MeshDocument::GetByteOffset(Attribute attr)
+	{
+		return byteOffsets.at(static_cast<size_t>(attr));
+	}
 
-			returnValue.byteArrayRef = std::move(input.byteArrayRef);
-			returnValue.vertexCount = std::move(input.vertexCount);
-			returnValue.indexType = std::move(input.indexType);
-			returnValue.indexCount = std::move(input.indexCount);
+	const std::byte* MeshDocument::GetDataPtr(Attribute attr) const
+	{
+		return byteArrayRef + GetByteOffset(attr);
+	}
 
-			returnValue.posByteOffset = std::move(input.GetByteOffset(Attribute::Position));
-			returnValue.uvByteOffset = std::move(input.GetByteOffset(Attribute::TexCoord));
-			returnValue.normalByteOffset = std::move(input.GetByteOffset(Attribute::Normal));
-			returnValue.tangentByteOffset = std::move(input.GetByteOffset(Attribute::Tangent));
-			returnValue.indexByteOffset = std::move(input.GetByteOffset(Attribute::Index));
+	uint32_t MeshDocument::GetVertexCount() const
+	{
+		return vertexCount;
+	}
 
-			return returnValue;
-		}
+	MeshDocument::IndexType MeshDocument::GetIndexType() const
+	{
+		return indexType;
+	}
+
+	uint32_t MeshDocument::GetIndexCount() const
+	{
+		return indexCount;
+	}
+
+	size_t MeshDocument::GetTotalSizeRequired() const
+	{
+		size_t temp = sizeof(PositionType) + sizeof(UVType) + sizeof(NormalType) + sizeof(TangentType);
+		temp *= GetVertexCount();
+		temp += GetIndexCount() * ToByteSize(GetIndexType());
+		return temp;
+	}
+
+	uint8_t MeshDocument::ToByteSize(IndexType type)
+	{
+		return type == IndexType::UInt16 ? uint8_t(2) : uint8_t(4);
+	}
+
+	MeshDocument::CreateInfo MeshDocument::ToCreateInfo(MeshDocument&& input)
+	{
+		CreateInfo returnValue{};
+
+		returnValue.byteArrayRef = input.byteArrayRef;
+		returnValue.vertexCount = input.vertexCount;
+		returnValue.indexType = input.indexType;
+		returnValue.indexCount = input.indexCount;
+
+		returnValue.posByteOffset = input.GetByteOffset(Attribute::Position);
+		returnValue.uvByteOffset = input.GetByteOffset(Attribute::TexCoord);
+		returnValue.normalByteOffset = input.GetByteOffset(Attribute::Normal);
+		returnValue.tangentByteOffset = input.GetByteOffset(Attribute::Tangent);
+		returnValue.indexByteOffset = input.GetByteOffset(Attribute::Index);
+
+		return returnValue;
 	}
 }

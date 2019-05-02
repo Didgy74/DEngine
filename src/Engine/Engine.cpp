@@ -71,9 +71,15 @@ namespace Engine
 void Engine::Core::Run()
 {
 	AssetManager::Core::Initialize();
-	Application::Core::Initialize(Application::API3D::OpenGL);
+	Application::Core::Initialize(Application::API3D::Vulkan);
 	Time::Core::Initialize();
 	Input::Core::Initialize();
+
+	// Add our cube model to the assetmanager
+	AssMan::MeshInfo meshInfo;
+	meshInfo.path = "data/Meshes/Cube/Cube.gltf";
+	size_t cubeMesh = AssMan::AddMesh(std::move(meshInfo));
+
 	InitializeRenderer();
 
 
@@ -81,10 +87,7 @@ void Engine::Core::Run()
 	Scene& scene1 = Engine::NewScene();
 	Renderer::GetViewport(0).SetSceneRef(&scene1);
 
-	// Add our cube model to the asset manager
-	AssMan::MeshInfo meshInfo;
-	meshInfo.path = "data/Meshes/Cube/Cube.gltf";
-	size_t cubeMesh = AssMan::AddMesh(std::move(meshInfo));
+
 
 	// Create camera Object
 	// SceneObjects are guaranteed to be in the same place in memory always. No need for soft-references.

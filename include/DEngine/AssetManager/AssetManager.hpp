@@ -37,7 +37,7 @@ namespace Engine
 		TextureInfo GetTextureInfo(size_t i);
 		size_t AddTexture(TextureInfo&& textureInfo);
 		
-		std::optional<Renderer::MeshDoc> GetRendererMeshDoc(size_t id);
+		std::optional<DRenderer::MeshDoc> GetRendererMeshDoc(size_t id);
 		void Renderer_AssetLoadEndEvent();
 
 		namespace Core

@@ -1,8 +1,10 @@
 #include "Init.hpp"
 
+#include "../RendererData.hpp"
+
 #include "VulkanExtensionConfig.hpp"
 
-DRenderer::Vulkan::APIData::Version DRenderer::Vulkan::Init_LoadAPIVersion()
+DRenderer::Vulkan::APIData::Version DRenderer::Vulkan::Init::LoadAPIVersion()
 {
 	APIData::Version version;
 
@@ -17,7 +19,7 @@ DRenderer::Vulkan::APIData::Version DRenderer::Vulkan::Init_LoadAPIVersion()
 	return version;
 }
 
-std::vector<vk::ExtensionProperties> DRenderer::Vulkan::Init_LoadInstanceExtensionProperties()
+std::vector<vk::ExtensionProperties> DRenderer::Vulkan::Init::LoadInstanceExtensionProperties()
 {
 	auto availableExtensions = vk::enumerateInstanceExtensionProperties();
 
@@ -42,10 +44,10 @@ std::vector<vk::ExtensionProperties> DRenderer::Vulkan::Init_LoadInstanceExtensi
 			return {};
 	}
 
-	return std::move(activeExts);
+	return activeExts;
 }
 
-std::vector<vk::LayerProperties> DRenderer::Vulkan::Init_LoadInstanceLayerProperties()
+std::vector<vk::LayerProperties> DRenderer::Vulkan::Init::LoadInstanceLayerProperties()
 {
 	// Load all the available validation layers, load all the ones we require into vecRef.
 	auto availableLayers = vk::enumerateInstanceLayerProperties();
@@ -66,7 +68,7 @@ std::vector<vk::LayerProperties> DRenderer::Vulkan::Init_LoadInstanceLayerProper
 			}
 		}
 		// If we couldn't find the required validation layer, return failure.
-		if (foundLayer == false)
+		if (!foundLayer)
 			return {};
 
 		return std::move(activeLayers);
@@ -74,7 +76,7 @@ std::vector<vk::LayerProperties> DRenderer::Vulkan::Init_LoadInstanceLayerProper
 	return {};
 }
 
-vk::Instance DRenderer::Vulkan::Init_CreateInstance(const std::vector<vk::ExtensionProperties>& extensions,
+vk::Instance DRenderer::Vulkan::Init::CreateInstance(const std::vector<vk::ExtensionProperties>& extensions,
 													const std::vector<vk::LayerProperties>& layers,
 													vk::ApplicationInfo appInfo,
 													const std::vector<std::string_view>& extensions2)
@@ -99,7 +101,7 @@ vk::Instance DRenderer::Vulkan::Init_CreateInstance(const std::vector<vk::Extens
 				break;
 			}
 		}
-		if (extensionFound == false)
+		if (!extensionFound)
 			extensionList.push_back(extension2.data());
 	}
 
@@ -126,7 +128,7 @@ vk::Instance DRenderer::Vulkan::Init_CreateInstance(const std::vector<vk::Extens
 	return result;
 }
 
-vk::SurfaceKHR DRenderer::Vulkan::Init_CreateSurface(vk::Instance instance, void* hwnd)
+vk::SurfaceKHR DRenderer::Vulkan::Init::CreateSurface(vk::Instance instance, void* hwnd)
 {
 	vk::SurfaceKHR tempSurfaceHandle;
 	bool surfaceCreationTest = GetAPIData().initInfo.test(&instance, hwnd, &tempSurfaceHandle);
@@ -134,7 +136,7 @@ vk::SurfaceKHR DRenderer::Vulkan::Init_CreateSurface(vk::Instance instance, void
 	return tempSurfaceHandle;
 }
 
-DRenderer::Vulkan::APIData::PhysDeviceInfo DRenderer::Vulkan::Init_LoadPhysDevice(
+DRenderer::Vulkan::APIData::PhysDeviceInfo DRenderer::Vulkan::Init::LoadPhysDevice(
 		vk::Instance instance,
 		vk::SurfaceKHR surface)
 {
@@ -157,8 +159,7 @@ DRenderer::Vulkan::APIData::PhysDeviceInfo DRenderer::Vulkan::Init_LoadPhysDevic
 	// Find device-local memory
 	for (uint32_t i = 0; i < physDeviceInfo.memProperties.memoryTypeCount; i++)
 	{
-		if ((physDeviceInfo.memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal)
-			== vk::MemoryPropertyFlagBits::eDeviceLocal)
+		if (physDeviceInfo.memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal)
 		{
 			physDeviceInfo.deviceLocalMemory = i;
 			break;
@@ -173,8 +174,7 @@ DRenderer::Vulkan::APIData::PhysDeviceInfo DRenderer::Vulkan::Init_LoadPhysDevic
 	// Find host-visible memory
 	for (uint32_t i = 0; i < physDeviceInfo.memProperties.memoryTypeCount; i++)
 	{
-		if ((physDeviceInfo.memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible)
-			== vk::MemoryPropertyFlagBits::eHostVisible)
+		if (physDeviceInfo.memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible)
 		{
 			physDeviceInfo.hostVisibleMemory = i;
 			break;
@@ -190,7 +190,17 @@ DRenderer::Vulkan::APIData::PhysDeviceInfo DRenderer::Vulkan::Init_LoadPhysDevic
 	if (physDeviceInfo.hostVisibleMemory == physDeviceInfo.deviceLocalMemory)
 		physDeviceInfo.hostMemoryIsDeviceLocal = true;
 
-	return std::move(physDeviceInfo);
+
+	// Check framebuffer sample count
+	assert(physDeviceInfo.properties.limits.framebufferColorSampleCounts == physDeviceInfo.properties.limits.framebufferDepthSampleCounts);
+	if (physDeviceInfo.properties.limits.framebufferColorSampleCounts & vk::SampleCountFlagBits::e1)
+		physDeviceInfo.maxFramebufferSamples = vk::SampleCountFlagBits::e1;
+	if (physDeviceInfo.properties.limits.framebufferColorSampleCounts & vk::SampleCountFlagBits::e2)
+		physDeviceInfo.maxFramebufferSamples = vk::SampleCountFlagBits::e2;
+	if (physDeviceInfo.properties.limits.framebufferColorSampleCounts & vk::SampleCountFlagBits::e4)
+		physDeviceInfo.maxFramebufferSamples = vk::SampleCountFlagBits::e4;
+
+	return physDeviceInfo;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL DRenderer::Vulkan::Callback(
@@ -204,7 +214,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DRenderer::Vulkan::Callback(
 	return true;
 }
 
-vk::DebugUtilsMessengerEXT DRenderer::Vulkan::Init_CreateDebugMessenger(vk::Instance instance)
+vk::DebugUtilsMessengerEXT DRenderer::Vulkan::Init::CreateDebugMessenger(vk::Instance instance)
 {
 	vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
 	createInfo.messageSeverity =
@@ -218,7 +228,135 @@ vk::DebugUtilsMessengerEXT DRenderer::Vulkan::Init_CreateDebugMessenger(vk::Inst
 	return temp;
 }
 
-DRenderer::Vulkan::APIData::Swapchain DRenderer::Vulkan::Init_CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings)
+DRenderer::Vulkan::SwapchainSettings DRenderer::Vulkan::Init::GetSwapchainSettings(vk::PhysicalDevice device, vk::SurfaceKHR surface)
+{
+	SwapchainSettings settings{};
+
+	// Query surface capabilities
+	auto capabilities = device.getSurfaceCapabilitiesKHR(surface);
+	settings.capabilities = capabilities;
+
+	// Handle swapchain length
+	constexpr uint8_t preferredSwapchainLength = 3;
+	settings.numImages = preferredSwapchainLength;
+	if (settings.numImages > capabilities.maxImageCount && capabilities.maxImageCount != 0)
+		settings.numImages = capabilities.maxImageCount;
+	if (settings.numImages < 2)
+	{
+		Core::LogDebugMessage("Error. Maximum swapchain-length cannot be less than 2.");
+		std::abort();
+	}
+
+	auto presentModes = device.getSurfacePresentModesKHR(surface);
+	vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
+	settings.presentMode = presentMode;
+
+	// Handle formats
+	constexpr std::array preferredFormats
+			{
+					vk::Format::eR8G8B8A8Unorm,
+					vk::Format::eB8G8R8A8Unorm
+			};
+	auto formats = device.getSurfaceFormatsKHR(surface);
+	vk::SurfaceFormatKHR formatToUse = { vk::Format::eUndefined, vk::ColorSpaceKHR::eSrgbNonlinear };
+	bool foundPreferredFormat = false;
+	for (const auto& preferredFormat : preferredFormats)
+	{
+		for (const auto& format : formats)
+		{
+			if (format.format == preferredFormat)
+			{
+				formatToUse.format = preferredFormat;
+				foundPreferredFormat = true;
+				break;
+			}
+		}
+	}
+	if constexpr (Core::debugLevel >= 2)
+	{
+		if (!foundPreferredFormat)
+		{
+			Core::LogDebugMessage("Found no usable surface formats.");
+			std::abort();
+		}
+	}
+	settings.surfaceFormat = formatToUse;
+
+	return settings;
+}
+
+vk::Device DRenderer::Vulkan::Init::CreateDevice(vk::PhysicalDevice physDevice)
+{
+	// Create logical device
+	auto queues = physDevice.getQueueFamilyProperties();
+
+	vk::DeviceCreateInfo createInfo{};
+
+	// Feature configuration
+	auto physDeviceFeatures = physDevice.getFeatures();
+
+	vk::PhysicalDeviceFeatures features{};
+	if (physDeviceFeatures.robustBufferAccess == 1)
+		features.robustBufferAccess = true;
+	if (physDeviceFeatures.sampleRateShading == 1)
+		features.sampleRateShading = true;
+
+	createInfo.pEnabledFeatures = &features;
+
+	// Queue configuration
+	float priority[2] = { 1.f, 1.f };
+	std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
+
+	vk::DeviceQueueCreateInfo firstQueueCreateInfo;
+	firstQueueCreateInfo.pQueuePriorities = priority;
+	firstQueueCreateInfo.queueCount = 1;
+	firstQueueCreateInfo.queueFamilyIndex = 0;
+	queueCreateInfos.push_back(firstQueueCreateInfo);
+
+	createInfo.queueCreateInfoCount = uint32_t(queueCreateInfos.size());
+	createInfo.pQueueCreateInfos = queueCreateInfos.data();
+
+	auto deviceExtensionsAvailable = physDevice.enumerateDeviceExtensionProperties();
+	// TODO: Check if all required device extensions are available
+	createInfo.ppEnabledExtensionNames = Vulkan::requiredDeviceExtensions.data();
+	createInfo.enabledExtensionCount = uint32_t(Vulkan::requiredDeviceExtensions.size());
+
+	//auto deviceLayersAvailable = data.physDevice.handle.enumerateDeviceLayerProperties();
+	//createInfo.enabledLayerCount = uint32_t(Vulkan::requiredDeviceLayers.size());
+	//createInfo.ppEnabledLayerNames = Vulkan::requiredDeviceLayers.data();
+
+	auto result = physDevice.createDevice(createInfo);
+	if (!result)
+		std::abort();
+	return result;
+}
+
+vk::DescriptorSetLayout DRenderer::Vulkan::Init::CreatePrimaryDescriptorSetLayout(vk::Device device)
+{
+	vk::DescriptorSetLayoutCreateInfo layoutCreateInfo{};
+
+	vk::DescriptorSetLayoutBinding binding{};
+	binding.binding = 0;
+	binding.descriptorCount = 1;
+	binding.descriptorType = vk::DescriptorType::eUniformBuffer;
+	binding.stageFlags = vk::ShaderStageFlagBits::eVertex;
+
+	layoutCreateInfo.bindingCount = 1;
+	layoutCreateInfo.pBindings = &binding;
+
+	auto temp = device.createDescriptorSetLayout(layoutCreateInfo);
+	if constexpr (Core::debugLevel >= 2)
+	{
+		if (!temp)
+		{
+			Core::LogDebugMessage("Init error - Couldn't generate primary DescriptorSetLayout.");
+			std::abort();
+		}
+	}
+	return temp;
+}
+
+DRenderer::Vulkan::APIData::Swapchain DRenderer::Vulkan::Init::CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings)
 {
 	APIData::Swapchain swapchain;
 
@@ -264,57 +402,208 @@ DRenderer::Vulkan::APIData::Swapchain DRenderer::Vulkan::Init_CreateSwapchain(vk
 		swapchain.imageViews[i] = device.createImageView(imageViewCreateInfo);
 	}
 
-	return std::move(swapchain);
+	return swapchain;
+}
+
+std::pair<vk::DescriptorPool, std::vector<vk::DescriptorSet>> DRenderer::Vulkan::Init::AllocatePrimaryDescriptorSets(
+		vk::Device device,
+		vk::DescriptorSetLayout layout,
+		uint32_t resourceSetCount)
+{
+	vk::DescriptorPoolCreateInfo poolCreateInfo{};
+
+	vk::DescriptorPoolSize size{};
+	size.descriptorCount = resourceSetCount;
+	size.type = vk::DescriptorType::eUniformBuffer;
+
+	poolCreateInfo.maxSets = resourceSetCount;
+
+	poolCreateInfo.poolSizeCount = 1;
+	poolCreateInfo.pPoolSizes = &size;
+
+	vk::DescriptorPool descriptorSetPool = device.createDescriptorPool(poolCreateInfo);
+
+	vk::DescriptorSetAllocateInfo allocInfo{};
+	allocInfo.descriptorPool = descriptorSetPool;
+	allocInfo.descriptorSetCount = resourceSetCount;
+	std::vector<vk::DescriptorSetLayout> descriptorSetLayouts(resourceSetCount);
+	for (auto& setLayout : descriptorSetLayouts)
+		setLayout = layout;
+	allocInfo.pSetLayouts = descriptorSetLayouts.data();
+	std::vector<vk::DescriptorSet> descriptorSets = device.allocateDescriptorSets(allocInfo);
+
+	return { descriptorSetPool, std::move(descriptorSets) };
+}
+
+DRenderer::Vulkan::APIData::MainUniforms DRenderer::Vulkan::Init::BuildMainUniforms(vk::Device device, const vk::PhysicalDeviceMemoryProperties& memProperties, uint32_t resourceSetCount)
+{
+	size_t cameraUBOByteLength = sizeof(std::array<float, 16>);
+
+	vk::BufferCreateInfo tempBufferInfo{};
+	tempBufferInfo.sharingMode = vk::SharingMode::eExclusive;
+	tempBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
+	tempBufferInfo.size = cameraUBOByteLength * resourceSetCount;
+
+	vk::Buffer tempBuffer = device.createBuffer(tempBufferInfo);
+
+	auto memReqs = device.getBufferMemoryRequirements(tempBuffer);
+
+	device.destroyBuffer(tempBuffer);
+
+	vk::MemoryAllocateInfo allocInfo{};
+	allocInfo.allocationSize = memReqs.size;
+	allocInfo.memoryTypeIndex = std::numeric_limits<uint32_t>::max();
+
+	// Find host-visible memory we can allocate to
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+	{
+		if (memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible)
+		{
+			allocInfo.memoryTypeIndex = i;
+			break;
+		}
+	}
+	assert(allocInfo.memoryTypeIndex != std::numeric_limits<uint32_t>::max());
+
+	vk::DeviceMemory mem = device.allocateMemory(allocInfo);
+
+	std::vector<vk::Buffer> buffers(resourceSetCount);
+	vk::BufferCreateInfo bufferInfo{};
+	bufferInfo.sharingMode = vk::SharingMode::eExclusive;
+	bufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
+	bufferInfo.size = cameraUBOByteLength;
+	for (uint32_t i = 0; i < resourceSetCount; i++)
+	{
+		buffers[i] = device.createBuffer(bufferInfo);
+		vk::MemoryRequirements bufferMemReqs = device.getBufferMemoryRequirements(buffers[i]);
+
+		device.bindBufferMemory(buffers[i], mem, bufferInfo.size * i);
+	}
+
+	void* ptr = device.mapMemory(mem, 0, tempBufferInfo.size);
+
+	APIData::MainUniforms returnValue{};
+	returnValue.cameraBuffersMem = mem;
+	returnValue.cameraBuffer = std::move(buffers);
+	returnValue.cameraUBOByteLength = cameraUBOByteLength;
+	returnValue.cameraMemoryMap = static_cast<uint8_t*>(ptr);
+
+	return returnValue;
+}
+
+void DRenderer::Vulkan::Init::ConfigurePrimaryDescriptors()
+{
+	APIData& data = GetAPIData();
+
+	std::vector<vk::WriteDescriptorSet> descriptorWrites(data.resourceSetCount);
+	std::vector<vk::DescriptorBufferInfo> bufferInfos(data.resourceSetCount);
+
+	for (size_t i = 0; i < data.resourceSetCount; i++)
+	{
+		vk::WriteDescriptorSet& write = descriptorWrites[i];
+		write.dstSet = data.descriptorSets[i];
+		write.dstBinding = 0;
+		write.descriptorType = vk::DescriptorType::eUniformBuffer;
+
+		vk::DescriptorBufferInfo& bufferInfo = bufferInfos[i];
+		bufferInfo.buffer = data.mainUniforms.cameraBuffer[i];
+		bufferInfo.offset = 0;
+		bufferInfo.range = data.mainUniforms.cameraUBOByteLength;
+
+		write.descriptorCount = 1;
+		write.pBufferInfo = &bufferInfo;
+	}
+
+	data.device.updateDescriptorSets(descriptorWrites, {});
 }
 
 // Note! This does NOT create the associated framebuffer.
-DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init_CreateRenderTarget(vk::Device device, vk::Extent2D extents, vk::Format format)
+DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init::CreateRenderTarget(
+		vk::Device device,
+		vk::Extent2D extents,
+		vk::Format format,
+		vk::SampleCountFlagBits sampleCount)
 {
 	// Setup image for render target
-	vk::ImageCreateInfo imgCreateInfo{};
-	imgCreateInfo.format = format;
-	imgCreateInfo.imageType = vk::ImageType::e2D;
-	imgCreateInfo.initialLayout = vk::ImageLayout::eUndefined;
-	imgCreateInfo.mipLevels = 1;
-	imgCreateInfo.arrayLayers = 1;
-	imgCreateInfo.samples = vk::SampleCountFlagBits::e1;
-	imgCreateInfo.sharingMode = vk::SharingMode::eExclusive;
-	imgCreateInfo.tiling = vk::ImageTiling::eOptimal;
-	imgCreateInfo.usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc;
-	imgCreateInfo.extent = vk::Extent3D{ extents.width, extents.height, 1 };
+	vk::ImageCreateInfo colorImgInfo{};
+	colorImgInfo.format = format;
+	colorImgInfo.imageType = vk::ImageType::e2D;
+	colorImgInfo.initialLayout = vk::ImageLayout::eUndefined;
+	colorImgInfo.mipLevels = 1;
+	colorImgInfo.arrayLayers = 1;
+	colorImgInfo.samples = sampleCount;
+	colorImgInfo.sharingMode = vk::SharingMode::eExclusive;
+	colorImgInfo.tiling = vk::ImageTiling::eOptimal;
+	colorImgInfo.usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc;
+	colorImgInfo.extent = vk::Extent3D{ extents.width, extents.height, 1 };
 
-	vk::Image img = device.createImage(imgCreateInfo);
-	assert(img);
+	vk::Image colorImg = device.createImage(colorImgInfo);
+	assert(colorImg);
 
-	vk::MemoryRequirements memReqs = device.getImageMemoryRequirements(img);
+	vk::MemoryRequirements colorMemReqs = device.getImageMemoryRequirements(colorImg);
 
-	vk::MemoryAllocateInfo allocInfo;
-	allocInfo.allocationSize = memReqs.size;
+	vk::ImageCreateInfo depthImgInfo{};
+	depthImgInfo.format = vk::Format::eD32Sfloat;
+	depthImgInfo.imageType = vk::ImageType::e2D;
+	depthImgInfo.initialLayout = vk::ImageLayout::eUndefined;
+	depthImgInfo.mipLevels = 1;
+	depthImgInfo.arrayLayers = 1;
+	depthImgInfo.samples = sampleCount;
+	depthImgInfo.sharingMode = vk::SharingMode::eExclusive;
+	depthImgInfo.tiling = vk::ImageTiling::eOptimal;
+	depthImgInfo.usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
+	depthImgInfo.extent = vk::Extent3D{ extents.width, extents.height, 1 };
 
+	vk::Image depthImg = device.createImage(depthImgInfo);
+	assert(depthImg);
+
+	vk::MemoryRequirements depthMemReqs = device.getImageMemoryRequirements(depthImg);
+
+	size_t depthImgMemOffset = depthMemReqs.alignment * size_t(std::ceil(colorMemReqs.size / double(depthMemReqs.alignment)));
+	size_t allocationSize = depthMemReqs.size + depthImgMemOffset;
+	vk::MemoryAllocateInfo allocInfo{};
+	allocInfo.allocationSize = allocationSize;
 	allocInfo.memoryTypeIndex = GetAPIData().physDevice.deviceLocalMemory;
 
 	vk::DeviceMemory mem = device.allocateMemory(allocInfo);
 	assert(mem);
 
-	device.bindImageMemory(img, mem, 0);
+	device.bindImageMemory(colorImg, mem, 0);
+	device.bindImageMemory(depthImg, mem, depthImgMemOffset);
 
-	vk::ImageViewCreateInfo imgViewCreateInfo{};
-	imgViewCreateInfo.image = img;
-	imgViewCreateInfo.format = imgCreateInfo.format;
-	imgViewCreateInfo.viewType = vk::ImageViewType::e2D;
-	imgViewCreateInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-	imgViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-	imgViewCreateInfo.subresourceRange.layerCount = 1;
-	imgViewCreateInfo.subresourceRange.baseMipLevel = 0;
-	imgViewCreateInfo.subresourceRange.levelCount = 1;
+	vk::ImageViewCreateInfo colorImgViewInfo{};
+	colorImgViewInfo.image = colorImg;
+	colorImgViewInfo.format = colorImgInfo.format;
+	colorImgViewInfo.viewType = vk::ImageViewType::e2D;
+	colorImgViewInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+	colorImgViewInfo.subresourceRange.baseArrayLayer = 0;
+	colorImgViewInfo.subresourceRange.layerCount = 1;
+	colorImgViewInfo.subresourceRange.baseMipLevel = 0;
+	colorImgViewInfo.subresourceRange.levelCount = 1;
 
-	vk::ImageView imgView = device.createImageView(imgViewCreateInfo);
-	assert(imgView);
+	vk::ImageView colorImgView = device.createImageView(colorImgViewInfo);
+	assert(colorImgView);
+
+	vk::ImageViewCreateInfo depthImgViewInfo{};
+	depthImgViewInfo.image = depthImg;
+	depthImgViewInfo.format = depthImgInfo.format;
+	depthImgViewInfo.viewType = vk::ImageViewType::e2D;
+	depthImgViewInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+	depthImgViewInfo.subresourceRange.baseArrayLayer = 0;
+	depthImgViewInfo.subresourceRange.layerCount = 1;
+	depthImgViewInfo.subresourceRange.baseMipLevel = 0;
+	depthImgViewInfo.subresourceRange.levelCount = 1;
+
+	vk::ImageView depthImgView = device.createImageView(depthImgViewInfo);
+	assert(depthImgView);
 
 	APIData::RenderTarget renderTarget{};
 	renderTarget.memory = mem;
-	renderTarget.image = img;
-	renderTarget.imageView = imgView;
+	renderTarget.sampleCount = colorImgInfo.samples;
+	renderTarget.colorImg = colorImg;
+	renderTarget.colorImgView = colorImgView;
+	renderTarget.depthImg = depthImg;
+	renderTarget.depthImgView = depthImgView;
 
 	if constexpr (Core::debugLevel >= 2)
 	{
@@ -322,45 +611,70 @@ DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init_CreateRenderTar
 		vk::DebugUtilsObjectNameInfoEXT renderTargetNameInfo{};
 		renderTargetNameInfo.objectType = vk::ObjectType::eDeviceMemory;
 		renderTargetNameInfo.objectHandle = (uint64_t)(VkDeviceMemory)renderTarget.memory;
-		renderTargetNameInfo.pObjectName = "Render Target 0 - DeviceMemory";
+		renderTargetNameInfo.pObjectName = "Render Target - DeviceMemory";
 		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
 
 		renderTargetNameInfo.objectType = vk::ObjectType::eImage;
-		renderTargetNameInfo.objectHandle = (uint64_t)(VkImage)renderTarget.image;
-		renderTargetNameInfo.pObjectName = "Render Target 0 - Image";
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkImage)renderTarget.colorImg;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - Color Image";
 		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
 
 		renderTargetNameInfo.objectType = vk::ObjectType::eImageView;
-		renderTargetNameInfo.objectHandle = (uint64_t)(VkImageView)renderTarget.imageView;
-		renderTargetNameInfo.pObjectName = "Render Target 0 - ImageView";
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkImageView)renderTarget.colorImgView;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - Color ImageView";
+		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+
+		renderTargetNameInfo.objectType = vk::ObjectType::eImage;
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkImage)renderTarget.depthImg;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - Depth Image";
+		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+
+		renderTargetNameInfo.objectType = vk::ObjectType::eImageView;
+		renderTargetNameInfo.objectHandle = (uint64_t)(VkImageView)renderTarget.depthImgView;
+		renderTargetNameInfo.pObjectName = "Render Target 0 - Depth ImageView";
 		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
 	}
 
 	return renderTarget;
 }
 
-vk::RenderPass DRenderer::Vulkan::Init_CreateMainRenderPass(vk::Device device, vk::SampleCountFlagBits sampleCount, vk::Format format)
+vk::RenderPass DRenderer::Vulkan::Init::CreateMainRenderPass(vk::Device device, vk::SampleCountFlagBits sampleCount, vk::Format format)
 {
 	vk::AttachmentDescription colorAttachment{};
 	colorAttachment.initialLayout = vk::ImageLayout::eColorAttachmentOptimal;
 	colorAttachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
 	colorAttachment.format = format;
+	colorAttachment.samples = sampleCount;
 	colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
 	colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-	colorAttachment.samples = sampleCount;
 	colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
 	colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
 
-	std::array attachments = { colorAttachment };
+	vk::AttachmentDescription depthAttach{};
+	depthAttach.initialLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+	depthAttach.finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+	depthAttach.format = vk::Format::eD32Sfloat;
+	depthAttach.samples = sampleCount;
+	depthAttach.loadOp = vk::AttachmentLoadOp::eClear;
+	depthAttach.storeOp = vk::AttachmentStoreOp::eDontCare;
+	depthAttach.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+	depthAttach.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+
+	std::array attachments = { colorAttachment, depthAttach };
 
 	vk::AttachmentReference colorAttachmentRef{};
 	colorAttachmentRef.attachment = 0;
 	colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
 
+	vk::AttachmentReference depthAttachRef{};
+	depthAttachRef.attachment = 1;
+	depthAttachRef.layout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+
 	vk::SubpassDescription subpassDescription{};
 	subpassDescription.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
 	subpassDescription.colorAttachmentCount = 1;
 	subpassDescription.pColorAttachments = &colorAttachmentRef;
+	subpassDescription.pDepthStencilAttachment = &depthAttachRef;
 
 	// Set up render pass
 	vk::RenderPassCreateInfo createInfo{};
@@ -374,15 +688,26 @@ vk::RenderPass DRenderer::Vulkan::Init_CreateMainRenderPass(vk::Device device, v
 	return renderPass;
 }
 
-vk::Framebuffer DRenderer::Vulkan::Init_CreateRenderTargetFramebuffer(vk::Device device, vk::Extent2D extents, vk::ImageView imgView, vk::RenderPass renderPass)
+vk::Framebuffer DRenderer::Vulkan::Init::CreateRenderTargetFramebuffer(
+		vk::Device device,
+		vk::RenderPass renderPass,
+		vk::Extent2D extents,
+		vk::ImageView colorImgView,
+		vk::ImageView depthImgView)
 {
+	std::array attachImgViews
+	{
+		colorImgView,
+		depthImgView
+	};
+
 	vk::FramebufferCreateInfo fbCreateInfo{};
 	fbCreateInfo.renderPass = renderPass;
 	fbCreateInfo.width = extents.width;
 	fbCreateInfo.height = extents.height;
 	fbCreateInfo.layers = 1;
-	fbCreateInfo.attachmentCount = 1;
-	fbCreateInfo.pAttachments = &imgView;
+	fbCreateInfo.attachmentCount = uint32_t(attachImgViews.size());
+	fbCreateInfo.pAttachments = attachImgViews.data();
 
 	vk::Framebuffer fb = device.createFramebuffer(fbCreateInfo);
 	assert(fb);
@@ -399,7 +724,11 @@ vk::Framebuffer DRenderer::Vulkan::Init_CreateRenderTargetFramebuffer(vk::Device
 	return fb;
 }
 
-void DRenderer::Vulkan::Init_TransitionRenderTargetAndSwapchain(vk::Device device, vk::Queue queue, vk::Image renderTarget, const std::vector<vk::Image>& swapchainImages)
+void DRenderer::Vulkan::Init::TransitionRenderTargetAndSwapchain(
+		vk::Device device,
+		vk::Queue queue,
+		const APIData::RenderTarget& renderTarget,
+		const std::vector<vk::Image>& swapchainImages)
 {
 	vk::CommandPoolCreateInfo createInfo{};
 	createInfo.queueFamilyIndex = 0;
@@ -418,41 +747,55 @@ void DRenderer::Vulkan::Init_TransitionRenderTargetAndSwapchain(vk::Device devic
 
 	cmdBuffer.begin(beginInfo);
 
-	vk::ImageMemoryBarrier barrier{};
-	barrier.image = renderTarget;
-	barrier.srcAccessMask = {};
-	barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
-	barrier.srcQueueFamilyIndex = 0;
-	barrier.dstQueueFamilyIndex = 0;
-	barrier.oldLayout = vk::ImageLayout::eUndefined;
-	barrier.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
-	barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = 1;
-	barrier.subresourceRange.baseMipLevel = 0;
-	barrier.subresourceRange.levelCount = 1;
+	vk::ImageMemoryBarrier colorImgBarrier{};
+	colorImgBarrier.image = renderTarget.colorImg;
+	colorImgBarrier.srcAccessMask = {};
+	colorImgBarrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+	colorImgBarrier.srcQueueFamilyIndex = 0;
+	colorImgBarrier.dstQueueFamilyIndex = 0;
+	colorImgBarrier.oldLayout = vk::ImageLayout::eUndefined;
+	colorImgBarrier.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
+	colorImgBarrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+	colorImgBarrier.subresourceRange.baseArrayLayer = 0;
+	colorImgBarrier.subresourceRange.layerCount = 1;
+	colorImgBarrier.subresourceRange.baseMipLevel = 0;
+	colorImgBarrier.subresourceRange.levelCount = 1;
+
+	vk::ImageMemoryBarrier depthImgBarrier{};
+	depthImgBarrier.image = renderTarget.depthImg;
+	depthImgBarrier.srcAccessMask = {};
+	depthImgBarrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+	depthImgBarrier.srcQueueFamilyIndex = 0;
+	depthImgBarrier.dstQueueFamilyIndex = 0;
+	depthImgBarrier.oldLayout = vk::ImageLayout::eUndefined;
+	depthImgBarrier.newLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+	depthImgBarrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+	depthImgBarrier.subresourceRange.baseArrayLayer = 0;
+	depthImgBarrier.subresourceRange.layerCount = 1;
+	depthImgBarrier.subresourceRange.baseMipLevel = 0;
+	depthImgBarrier.subresourceRange.levelCount = 1;
 
 	vk::PipelineStageFlags srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
 	vk::PipelineStageFlags dstStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
-	cmdBuffer.pipelineBarrier(srcStage, dstStage, vk::DependencyFlags(), {}, {}, { barrier });
+	cmdBuffer.pipelineBarrier(srcStage, dstStage, vk::DependencyFlags(), {}, {}, { colorImgBarrier, depthImgBarrier });
 
 	std::vector<vk::ImageMemoryBarrier> swapchainBarriers(swapchainImages.size());
 	for (size_t i = 0; i < swapchainBarriers.size(); i++)
 	{
-		vk::ImageMemoryBarrier& barrier = swapchainBarriers[i];
-		barrier.image = swapchainImages[i];
-		barrier.srcAccessMask = {};
-		barrier.dstAccessMask = {};
-		barrier.srcQueueFamilyIndex = 0;
-		barrier.dstQueueFamilyIndex = 0;
-		barrier.oldLayout = vk::ImageLayout::eUndefined;
-		barrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
-		barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-		barrier.subresourceRange.baseArrayLayer = 0;
-		barrier.subresourceRange.layerCount = 1;
-		barrier.subresourceRange.baseMipLevel = 0;
-		barrier.subresourceRange.levelCount = 1;
+		vk::ImageMemoryBarrier& imgMemBarrier = swapchainBarriers[i];
+		imgMemBarrier.image = swapchainImages[i];
+		imgMemBarrier.srcAccessMask = {};
+		imgMemBarrier.dstAccessMask = {};
+		imgMemBarrier.srcQueueFamilyIndex = 0;
+		imgMemBarrier.dstQueueFamilyIndex = 0;
+		imgMemBarrier.oldLayout = vk::ImageLayout::eUndefined;
+		imgMemBarrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
+		imgMemBarrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+		imgMemBarrier.subresourceRange.baseArrayLayer = 0;
+		imgMemBarrier.subresourceRange.layerCount = 1;
+		imgMemBarrier.subresourceRange.baseMipLevel = 0;
+		imgMemBarrier.subresourceRange.levelCount = 1;
 	}
 
 	dstStage = vk::PipelineStageFlagBits::eBottomOfPipe;
@@ -472,7 +815,7 @@ void DRenderer::Vulkan::Init_TransitionRenderTargetAndSwapchain(vk::Device devic
 	device.destroyCommandPool(pool);
 }
 
-void DRenderer::Vulkan::Init_SetupRenderingCmdBuffers(vk::Device device, uint8_t swapchainLength, vk::CommandPool& pool, std::vector<vk::CommandBuffer>& commandBuffers)
+void DRenderer::Vulkan::Init::SetupRenderingCmdBuffers(vk::Device device, uint8_t swapchainLength, vk::CommandPool& pool, std::vector<vk::CommandBuffer>& commandBuffers)
 {
 	vk::CommandPoolCreateInfo createInfo{};
 	createInfo.queueFamilyIndex = 0;
@@ -488,9 +831,9 @@ void DRenderer::Vulkan::Init_SetupRenderingCmdBuffers(vk::Device device, uint8_t
 	commandBuffers = device.allocateCommandBuffers(allocInfo);
 }
 
-void DRenderer::Vulkan::Init_SetupPresentCmdBuffers(
+void DRenderer::Vulkan::Init::SetupPresentCmdBuffers(
 		vk::Device device,
-		vk::Image renderTarget,
+		const APIData::RenderTarget& renderTarget,
 		vk::Extent2D extents,
 		const std::vector<vk::Image>& swapchain,
 		vk::CommandPool& pool,
@@ -528,7 +871,7 @@ void DRenderer::Vulkan::Init_SetupPresentCmdBuffers(
 		cmdBuffer.begin(beginInfo);
 
 		vk::ImageMemoryBarrier renderTargetPreBarrier{};
-		renderTargetPreBarrier.image = renderTarget;
+		renderTargetPreBarrier.image = renderTarget.colorImg;
 		renderTargetPreBarrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 		renderTargetPreBarrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
 		renderTargetPreBarrier.srcQueueFamilyIndex = 0;
@@ -564,21 +907,37 @@ void DRenderer::Vulkan::Init_SetupPresentCmdBuffers(
 		dstStage = vk::PipelineStageFlagBits::eTransfer;
 		cmdBuffer.pipelineBarrier(srcStage, dstStage, vk::DependencyFlags(), {}, {}, { swapchainPreBarrier });
 
-		vk::ImageCopy imgCopy{};
-		imgCopy.extent = vk::Extent3D{ extents.width, extents.height, 1 };
-		imgCopy.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
-		imgCopy.dstSubresource.baseArrayLayer = 0;
-		imgCopy.dstSubresource.layerCount = 1;
-		imgCopy.dstSubresource.mipLevel = 0;
-		imgCopy.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
-		imgCopy.srcSubresource.baseArrayLayer = 0;
-		imgCopy.srcSubresource.layerCount = 1;
-		imgCopy.srcSubresource.mipLevel = 0;
-		cmdBuffer.copyImage(renderTarget, vk::ImageLayout::eTransferSrcOptimal, swapchain[i], vk::ImageLayout::eTransferDstOptimal, imgCopy);
-
+		if (renderTarget.sampleCount == vk::SampleCountFlagBits::e1)
+		{
+			vk::ImageCopy imgCopy{};
+			imgCopy.extent = vk::Extent3D{ extents.width, extents.height, 1 };
+			imgCopy.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+			imgCopy.dstSubresource.baseArrayLayer = 0;
+			imgCopy.dstSubresource.layerCount = 1;
+			imgCopy.dstSubresource.mipLevel = 0;
+			imgCopy.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+			imgCopy.srcSubresource.baseArrayLayer = 0;
+			imgCopy.srcSubresource.layerCount = 1;
+			imgCopy.srcSubresource.mipLevel = 0;
+			cmdBuffer.copyImage(renderTarget.colorImg, vk::ImageLayout::eTransferSrcOptimal, swapchain[i], vk::ImageLayout::eTransferDstOptimal, imgCopy);
+		}
+		else
+		{
+			vk::ImageResolve imgResolve{};
+			imgResolve.extent = vk::Extent3D{ extents.width, extents.height, 1 };
+			imgResolve.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+			imgResolve.dstSubresource.baseArrayLayer = 0;
+			imgResolve.dstSubresource.layerCount = 1;
+			imgResolve.dstSubresource.mipLevel = 0;
+			imgResolve.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+			imgResolve.srcSubresource.baseArrayLayer = 0;
+			imgResolve.srcSubresource.layerCount = 1;
+			imgResolve.srcSubresource.mipLevel = 0;
+			cmdBuffer.resolveImage(renderTarget.colorImg, vk::ImageLayout::eTransferSrcOptimal, swapchain[i], vk::ImageLayout::eTransferDstOptimal, imgResolve);
+		}
 
 		vk::ImageMemoryBarrier renderTargetPostBarrier{};
-		renderTargetPostBarrier.image = renderTarget;
+		renderTargetPostBarrier.image = renderTarget.colorImg;
 		renderTargetPostBarrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
 		renderTargetPostBarrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 		renderTargetPostBarrier.srcQueueFamilyIndex = 0;
@@ -616,3 +975,4 @@ void DRenderer::Vulkan::Init_SetupPresentCmdBuffers(
 		cmdBuffer.end();
 	}
 }
+

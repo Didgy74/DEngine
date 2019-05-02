@@ -32,7 +32,7 @@ namespace Engine
 
 			if (Input::Raw::GetValue(Input::Raw::Button::RightMouse))
 			{
-				float sensitivity = 15;
+				float sensitivity = 75.f;
 
 				float amountX = Input::Raw::GetMouseDelta()[0];
 

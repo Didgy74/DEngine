@@ -1,5 +1,7 @@
 ﻿#include "Vulkan.hpp"
 
+#include "DRenderer/MeshDocument.hpp"
+
 #include "VulkanData.hpp"
 #include "Init.hpp"
 
@@ -14,78 +16,76 @@
 
 void DRenderer::Vulkan::APIDataDeleter(void*& ptr)
 {
-	APIData* data = static_cast<APIData*>(ptr);
+	auto data = static_cast<APIData*>(ptr);
 	ptr = nullptr;
 	delete data;
 }
 
 DRenderer::Vulkan::APIData& DRenderer::Vulkan::GetAPIData()
 {
-	return *static_cast<APIData*>(Core::GetAPIData());
+	return *static_cast<APIData*>(DRenderer::Core::GetAPIData());
 }
 
-DRenderer::Vulkan::SwapchainSettings DRenderer::Vulkan::GetSwapchainSettings(vk::PhysicalDevice device, vk::SurfaceKHR surface)
+size_t DRenderer::Vulkan::VertexBufferObject::GetByteOffset(VertexBufferObject::Attribute attribute) const
 {
-	SwapchainSettings settings{};
+	size_t offset = 0;
+	for (size_t i = 0; i < static_cast<size_t>(attribute); i++)
+		offset += static_cast<size_t>(attributeSizes[i]);
+	return offset;
+}
 
-	// Query surface capabilities
-	auto capabilities = device.getSurfaceCapabilitiesKHR(surface);
-	settings.capabilities = capabilities;
+size_t& DRenderer::Vulkan::VertexBufferObject::GetAttrSize(Attribute attr)
+{
+	return attributeSizes[static_cast<size_t>(attr)];
+}
 
-	// Handle swapchain length
-	constexpr uint8_t preferredSwapchainLength = 3;
-	settings.numImages = preferredSwapchainLength;
-	if (settings.numImages > capabilities.maxImageCount && capabilities.maxImageCount != 0)
-		settings.numImages = capabilities.maxImageCount;
-	if (settings.numImages < 2)
-	{
-		Core::LogDebugMessage("Error. Maximum swapchain-length cannot be less than 2.");
-		std::abort();
-	}
+size_t DRenderer::Vulkan::VertexBufferObject::GetAttrSize(Attribute attr) const
+{
+	return attributeSizes[static_cast<size_t>(attr)];
+}
 
-	auto presentModes = device.getSurfacePresentModesKHR(surface);
-	vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
-	settings.presentMode = presentMode;
+std::array<vk::VertexInputBindingDescription, 3> DRenderer::Vulkan::GetVertexBindings()
+{
+	std::array<vk::VertexInputBindingDescription, 3> bindingDescriptions{};
+	bindingDescriptions[0].binding = 0;
+	bindingDescriptions[0].stride = sizeof(float) * 3;
+	bindingDescriptions[0].inputRate = vk::VertexInputRate::eVertex;
 
-	// Handle formats
-	constexpr std::array preferredFormats
-	{
-		vk::Format::eR8G8B8A8Unorm,
-		vk::Format::eB8G8R8A8Unorm
-	};
-	auto formats = device.getSurfaceFormatsKHR(surface);
-	vk::SurfaceFormatKHR formatToUse = { vk::Format::eUndefined, vk::ColorSpaceKHR::eSrgbNonlinear };
-	bool foundPreferredFormat = false;
-	for (const auto& preferredFormat : preferredFormats)
-	{
-		for (const auto& format : formats)
-		{
-			if (format.format == preferredFormat)
-			{
-				formatToUse.format = preferredFormat;
-				foundPreferredFormat = true;
-				break;
-			}
-		}
-	}
-	if constexpr (Core::debugLevel >= 2)
-	{
-		if (!foundPreferredFormat)
-		{
-			Core::LogDebugMessage("Found no usable surface formats.");
-			std::abort();
-		}
-	}
-	settings.surfaceFormat = formatToUse;
+	bindingDescriptions[1].binding = 1;
+	bindingDescriptions[1].stride = sizeof(float) * 2;
+	bindingDescriptions[1].inputRate = vk::VertexInputRate::eVertex;
 
-	return settings;
+	bindingDescriptions[2].binding = 2;
+	bindingDescriptions[2].stride = sizeof(float) * 3;
+	bindingDescriptions[2].inputRate = vk::VertexInputRate::eVertex;
+
+	return bindingDescriptions;
+}
+
+std::array<vk::VertexInputAttributeDescription, 3> DRenderer::Vulkan::GetVertexAttributes()
+{
+	std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions;
+
+	attributeDescriptions[0].binding = 0;
+	attributeDescriptions[0].location = 0;
+	attributeDescriptions[0].format = vk::Format::eR32G32B32A32Sfloat;
+
+	attributeDescriptions[1].binding = 1;
+	attributeDescriptions[1].location = 1;
+	attributeDescriptions[1].format = vk::Format::eR32G32Sfloat;
+
+	attributeDescriptions[2].binding = 2;
+	attributeDescriptions[2].location = 2;
+	attributeDescriptions[2].format = vk::Format::eR32G32B32A32Sfloat;
+
+	return attributeDescriptions;
 }
 
 namespace DRenderer::Vulkan
 {
 	void MakePipeline();
+	void MakeVBO();
 }
-
 
 void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& initInfo)
 {
@@ -98,10 +98,10 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	data.initInfo = initInfo;
 
 	// Start initialization
-	data.apiVersion = Init_LoadAPIVersion();
-	data.instanceExtensionProperties = Init_LoadInstanceExtensionProperties();
+	data.apiVersion = Init::LoadAPIVersion();
+	data.instanceExtensionProperties = Init::LoadInstanceExtensionProperties();
 	if constexpr (Core::debugLevel >= 2)
-		data.instanceLayerProperties = Init_LoadInstanceLayerProperties();
+		data.instanceLayerProperties = Init::LoadInstanceLayerProperties();
 
 	// Create our instance
 	vk::ApplicationInfo appInfo{};
@@ -111,7 +111,7 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	appInfo.pEngineName = "DEngine";
 	appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
 	auto wsiRequiredExtensions = data.initInfo.getRequiredInstanceExtensions();
-	data.instance = Init_CreateInstance(data.instanceExtensionProperties, data.instanceLayerProperties, appInfo, wsiRequiredExtensions);
+	data.instance = Init::CreateInstance(data.instanceExtensionProperties, data.instanceLayerProperties, appInfo, wsiRequiredExtensions);
 
 	// Load function pointers for our instance.
 	Volk::LoadInstance(data.instance);
@@ -120,101 +120,83 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	if constexpr (Core::debugLevel >= 2)
 	{
 		if (Core::GetData().debugData.useDebugging == true)
-			data.debugMessenger = Init_CreateDebugMessenger(data.instance);
+			data.debugMessenger = Init::CreateDebugMessenger(data.instance);
 	}
 
 	// Create our surface we will render onto
 	void* hwnd = Engine::Renderer::GetViewport(0).GetSurfaceHandle();
-	data.surface = Init_CreateSurface(data.instance, hwnd);
+	data.surface = Init::CreateSurface(data.instance, hwnd);
 
 	// Find physical device
-	data.physDevice = Init_LoadPhysDevice(data.instance, data.surface);
+	data.physDevice = Init::LoadPhysDevice(data.instance, data.surface);
 
 	// Get swapchain creation details
-	SwapchainSettings swapchainSettings = GetSwapchainSettings(data.physDevice.handle, data.surface);
+	SwapchainSettings swapchainSettings = Init::GetSwapchainSettings(data.physDevice.handle, data.surface);
 	data.surfaceExtents = vk::Extent2D{ swapchainSettings.capabilities.currentExtent.width, swapchainSettings.capabilities.currentExtent.height };
 
 
-	// Create logical device
-	auto queues = data.physDevice.handle.getQueueFamilyProperties();
-
-	uint32_t graphicsFamily = 0;
-	uint32_t graphicsQueue = 0;
-
-	vk::DeviceCreateInfo createInfo{};
-
-	// Feature configuration
-	auto physDeviceFeatures = data.physDevice.handle.getFeatures();
-
-	vk::PhysicalDeviceFeatures features{};
-	if (physDeviceFeatures.robustBufferAccess == 1)
-		features.robustBufferAccess = true;
-
-	createInfo.pEnabledFeatures = &features;
-
-	// Queue configuration
-	float priority[2] = { 1.f, 1.f };
-	std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
-	
-	vk::DeviceQueueCreateInfo firstQueueCreateInfo;
-	firstQueueCreateInfo.pQueuePriorities = priority;
-	firstQueueCreateInfo.queueCount = 1;
-	firstQueueCreateInfo.queueFamilyIndex = 0;
-	queueCreateInfos.push_back(firstQueueCreateInfo);
-
-	createInfo.queueCreateInfoCount = uint32_t(queueCreateInfos.size());
-	createInfo.pQueueCreateInfos = queueCreateInfos.data();
-
-	auto deviceExtensionsAvailable = data.physDevice.handle.enumerateDeviceExtensionProperties();
-	// TODO: Check if all required device extensions are available
-	createInfo.ppEnabledExtensionNames = Vulkan::requiredDeviceExtensions.data();
-	createInfo.enabledExtensionCount = uint32_t(Vulkan::requiredDeviceExtensions.size());
-
-	//auto deviceLayersAvailable = data.physDevice.handle.enumerateDeviceLayerProperties();
-	//createInfo.enabledLayerCount = uint32_t(Vulkan::requiredDeviceLayers.size());
-	//createInfo.ppEnabledLayerNames = Vulkan::requiredDeviceLayers.data();
-
-	auto result = data.physDevice.handle.createDevice(createInfo);
-	if (!result)
-		std::abort();
-	data.device = result;
+	data.device = Init::CreateDevice(data.physDevice.handle);
 
 	// Load function pointers for our device.
 	Volk::LoadDevice(data.device);
 
+	data.descriptorSetLayout = Init::CreatePrimaryDescriptorSetLayout(data.device);
+
 	// Create our Render Target
-	data.renderTarget = Init_CreateRenderTarget(data.device, data.surfaceExtents, swapchainSettings.surfaceFormat.format);
+	data.renderTarget = Init::CreateRenderTarget(data.device, data.surfaceExtents, swapchainSettings.surfaceFormat.format, data.physDevice.maxFramebufferSamples);
 
 	// Set up main renderpass
-	data.renderPass = Init_CreateMainRenderPass(data.device, vk::SampleCountFlagBits::e1, swapchainSettings.surfaceFormat.format);
+	data.renderPass = Init::CreateMainRenderPass(data.device, data.renderTarget.sampleCount, swapchainSettings.surfaceFormat.format);
 
-	data.renderTarget.framebuffer = Init_CreateRenderTargetFramebuffer(data.device, data.surfaceExtents, data.renderTarget.imageView, data.renderPass);
+	data.renderTarget.framebuffer = Init::CreateRenderTargetFramebuffer(
+			data.device,
+			data.renderPass,
+			data.surfaceExtents,
+			data.renderTarget.colorImgView,
+			data.renderTarget.depthImgView);
 
 
 	// Set up swapchain
-	data.swapchain = Init_CreateSwapchain(data.device, data.surface, swapchainSettings);
+	data.swapchain = Init::CreateSwapchain(data.device, data.surface, swapchainSettings);
+	data.resourceSetCount = data.swapchain.length - 1;
 
-	Init_SetupPresentCmdBuffers(data.device, data.renderTarget.image, data.surfaceExtents, data.swapchain.images, data.presentCmdPool, data.presentCmdBuffer);
+	auto [descPool, descSets] = Init::AllocatePrimaryDescriptorSets(data.device, data.descriptorSetLayout, data.resourceSetCount);
+	data.descriptorSetPool = descPool;
+	data.descriptorSets = std::move(descSets);
 
-	Init_SetupRenderingCmdBuffers(data.device, data.swapchain.length, data.renderCmdPool, data.renderCmdBuffer);
+	// Build main uniforms
+	data.mainUniforms = Init::BuildMainUniforms(data.device, data.physDevice.memProperties, data.resourceSetCount);
 
-	data.graphicsQueue = data.device.getQueue(graphicsFamily, graphicsQueue);
+	Init::ConfigurePrimaryDescriptors();
 
-	Init_TransitionRenderTargetAndSwapchain(data.device, data.graphicsQueue, data.renderTarget.image, data.swapchain.images);
+	// Set up presentation cmd buffers
+	Init::SetupPresentCmdBuffers(data.device, data.renderTarget, data.surfaceExtents, data.swapchain.images, data.presentCmdPool, data.presentCmdBuffer);
 
-	data.imageAvailableForPresentation.resize(data.swapchain.length);
-	data.renderCmdBufferAvailable.resize(data.swapchain.length);
-	for (size_t i = 0; i < data.swapchain.length; i++)
+	// Allocate rendering cmd buffers.
+	Init::SetupRenderingCmdBuffers(data.device, data.swapchain.length, data.renderCmdPool, data.renderCmdBuffer);
+
+	// Request our graphics queue
+	data.graphicsQueue = data.device.getQueue(0, 0);
+
+	// Transition layouts of our render target and swapchain
+	Init::TransitionRenderTargetAndSwapchain(data.device, data.graphicsQueue, data.renderTarget, data.swapchain.images);
+
+	data.resourceSetAvailable.resize(data.resourceSetCount);
+	for (size_t i = 0; i < data.resourceSetCount; i++)
 	{
-		vk::FenceCreateInfo createInfo1{};
-		createInfo1.flags = vk::FenceCreateFlagBits::eSignaled;
-	
-		data.renderCmdBufferAvailable[i] = data.device.createFence(createInfo1);
-
-		data.imageAvailableForPresentation[i] = data.device.createFence({});
+		vk::FenceCreateInfo createInfo{};
+		createInfo.flags = vk::FenceCreateFlagBits::eSignaled;
+		data.resourceSetAvailable[i] = data.device.createFence(createInfo);
 	}
 
-	auto imageResult = data.device.acquireNextImageKHR(data.swapchain.handle, std::numeric_limits<uint64_t>::max(), vk::Semaphore(), data.imageAvailableForPresentation[data.imageAvailableActiveIndex]);
+	data.swapchainImageAvailable.resize(data.swapchain.length);
+	for (size_t i = 0; i < data.swapchain.length; i++)
+	{
+		vk::SemaphoreCreateInfo info{};
+		data.swapchainImageAvailable[i] = data.device.createSemaphore(info);
+	}
+
+	auto imageResult = data.device.acquireNextImageKHR(data.swapchain.handle, std::numeric_limits<uint64_t>::max(), data.swapchainImageAvailable[data.imageAvailableActiveIndex], {});
 	if constexpr (Core::debugLevel >= 2)
 	{
 		if (imageResult.result != vk::Result::eSuccess)
@@ -226,16 +208,14 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	data.swapchain.currentImage = imageResult.value;
 
 	MakePipeline();
+	MakeVBO();
 }
 
 void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyParams& in)
 {
 	APIData& data = GetAPIData();
 
-	data.device.waitForFences(data.renderCmdBufferAvailable[data.swapchain.currentImage], 1, std::numeric_limits<uint64_t>::max());
-	data.device.resetFences(data.renderCmdBufferAvailable[data.swapchain.currentImage]);
-
-	auto cmdBuffer = data.renderCmdBuffer[data.swapchain.currentImage];
+	auto cmdBuffer = data.renderCmdBuffer[data.imageAvailableActiveIndex];
 
 	vk::CommandBufferBeginInfo beginInfo{};
 	beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
@@ -246,13 +226,19 @@ void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyP
 	renderPassBeginInfo.renderPass = data.renderPass;
 	renderPassBeginInfo.framebuffer = data.renderTarget.framebuffer;
 
-	vk::ClearValue clearValue;
-	clearValue.color.float32[0] = 0.25f;
-	clearValue.color.float32[1] = 0.f;
-	clearValue.color.float32[2] = 0.f;
-	clearValue.color.float32[3] = 1.f;
-	renderPassBeginInfo.clearValueCount = 1;
-	renderPassBeginInfo.pClearValues = &clearValue;
+	vk::ClearValue colorClearValue{};
+	colorClearValue.color.float32[0] = 0.25f;
+	colorClearValue.color.float32[1] = 0.f;
+	colorClearValue.color.float32[2] = 0.f;
+	colorClearValue.color.float32[3] = 1.f;
+
+	vk::ClearValue depthClearValue{};
+	depthClearValue.depthStencil.setDepth(1.f);
+
+	std::array clearValues { colorClearValue, depthClearValue };
+
+	renderPassBeginInfo.clearValueCount = uint32_t(clearValues.size());
+	renderPassBeginInfo.pClearValues = clearValues.data();
 
 	vk::Rect2D renderArea{};
 	renderArea.extent = data.surfaceExtents;
@@ -260,9 +246,23 @@ void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyP
 
 	cmdBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 
+	cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, data.pipelineLayout, 0, data.descriptorSets[data.currentResourceSet], {});
+
 	cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, data.pipeline);
 
-	cmdBuffer.draw(3, 1, 0, 0);
+	// Bind VBO
+	VBO& vbo = data.testVBO;
+	std::array<vk::Buffer, 3> vertexBuffers{ vbo.buffer, vbo.buffer, vbo.buffer };
+	std::array<vk::DeviceSize, 3> vboOffsets
+	{
+		vbo.GetByteOffset(VBO::Attribute::Position),
+		vbo.GetByteOffset(VBO::Attribute::TexCoord),
+		vbo.GetByteOffset(VBO::Attribute::Normal)
+	};
+	cmdBuffer.bindVertexBuffers(0, vertexBuffers, vboOffsets);
+	cmdBuffer.bindIndexBuffer(vbo.buffer, vbo.GetByteOffset(VBO::Attribute::Index), vbo.indexType);
+
+	cmdBuffer.drawIndexed(vbo.indexCount, 1, 0, 0, 0);
 
 	cmdBuffer.endRenderPass();
 
@@ -271,29 +271,48 @@ void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyP
 
 void DRenderer::Vulkan::PrepareRenderingLate()
 {
+	APIData& data = GetAPIData();
+
+	data.device.waitForFences(data.resourceSetAvailable[data.currentResourceSet], 1, std::numeric_limits<uint64_t>::max());
+	data.device.resetFences(data.resourceSetAvailable[data.currentResourceSet]);
+
+	const auto& viewport = Engine::Renderer::GetViewport(0);
+	const auto& renderGraphTransform = Engine::Renderer::Core::GetRenderGraphTransform();
+
+	// Update camera UBO
+	const auto& cameraInfo = Engine::Renderer::Core::GetCameraInfo();
+	uint8_t* cameraBufferPtr = data.mainUniforms.cameraMemoryMap + (data.mainUniforms.cameraUBOByteLength * data.currentResourceSet);
+	auto cameraMatrix = cameraInfo.GetModel(viewport.GetDimensions().GetAspectRatio());
+	std::memcpy(cameraBufferPtr, &cameraMatrix, sizeof(cameraMatrix));
+
+	vk::MappedMemoryRange range{};
+	range.memory = data.mainUniforms.cameraBuffersMem;
+	range.offset = (data.mainUniforms.cameraUBOByteLength * data.currentResourceSet);
+	range.size = sizeof(cameraMatrix);
+
+	data.device.flushMappedMemoryRanges(range);
 }
 
 void DRenderer::Vulkan::Draw()
 {
 	APIData& data = GetAPIData();
 
-	data.device.waitForFences(
-			data.imageAvailableForPresentation[data.imageAvailableActiveIndex],
-			1,
-			std::numeric_limits<uint64_t>::max());
-	data.device.resetFences(data.imageAvailableForPresentation[data.imageAvailableActiveIndex]);
-	
-	vk::SubmitInfo renderSubmitInfo{};
+	vk::SubmitInfo renderImageSubmit{};
+	renderImageSubmit.commandBufferCount = 1;
+	renderImageSubmit.pCommandBuffers = &data.renderCmdBuffer[data.swapchain.currentImage];
+	data.graphicsQueue.submit(renderImageSubmit, data.resourceSetAvailable[data.currentResourceSet]);
 
-	vk::SubmitInfo submitInfo{};
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &data.renderCmdBuffer[data.swapchain.currentImage];
-	data.graphicsQueue.submit(submitInfo, data.renderCmdBufferAvailable[data.swapchain.currentImage]);
+	vk::SubmitInfo resolveImageSubmit{};
+	resolveImageSubmit.commandBufferCount = 1;
+	resolveImageSubmit.pCommandBuffers = &data.presentCmdBuffer[data.swapchain.currentImage];
 
-	vk::SubmitInfo submitInfo2{};
-	submitInfo2.commandBufferCount = 1;
-	submitInfo2.pCommandBuffers = &data.presentCmdBuffer[data.swapchain.currentImage];
-	data.graphicsQueue.submit(submitInfo2, {});
+	resolveImageSubmit.waitSemaphoreCount = 1;
+	resolveImageSubmit.pWaitSemaphores = &data.swapchainImageAvailable[data.imageAvailableActiveIndex];
+	vk::PipelineStageFlags semaphoreWaitFlag = vk::PipelineStageFlagBits::eBottomOfPipe;
+	resolveImageSubmit.pWaitDstStageMask = &semaphoreWaitFlag;
+	data.graphicsQueue.submit(resolveImageSubmit, {});
+
+
 
 	vk::PresentInfoKHR presentInfo{};
 	presentInfo.swapchainCount = 1;
@@ -316,12 +335,17 @@ void DRenderer::Vulkan::Draw()
 		}
 	}
 
+
+	// Linearly increment index-counters
+	data.currentResourceSet = (data.currentResourceSet + 1) % data.resourceSetCount;
 	data.imageAvailableActiveIndex = (data.imageAvailableActiveIndex + 1) % data.swapchain.length;
+
+	// Acquire next image
 	auto imageResult = data.device.acquireNextImageKHR(
 			data.swapchain.handle,
 			std::numeric_limits<uint64_t>::max(),
-			{},
-			data.imageAvailableForPresentation[data.imageAvailableActiveIndex]);
+			data.swapchainImageAvailable[data.imageAvailableActiveIndex],
+			{});
 	if constexpr (Core::debugLevel >= 2)
 	{
 		if (imageResult.result != vk::Result::eSuccess)
@@ -338,6 +362,9 @@ void DRenderer::Vulkan::MakePipeline()
 	APIData& data = GetAPIData();
 
 	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+	pipelineLayoutCreateInfo.setLayoutCount = 1;
+	pipelineLayoutCreateInfo.pSetLayouts = &data.descriptorSetLayout;
+
 	data.pipelineLayout = data.device.createPipelineLayout(pipelineLayoutCreateInfo);
 
 	std::ifstream vertFile("data/Shaders/VulkanTest/vert.spv", std::ios::ate | std::ios::binary);
@@ -382,8 +409,13 @@ void DRenderer::Vulkan::MakePipeline()
 
 	std::array shaderStages = { vertStageCreateInfo, fragStageCreateInfo };
 
-
 	vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+	auto vertexBindingDescriptions = GetVertexBindings();
+	vertexInputInfo.vertexBindingDescriptionCount = uint32_t(vertexBindingDescriptions.size());
+	vertexInputInfo.pVertexBindingDescriptions = vertexBindingDescriptions.data();
+	auto vertexAttributes = GetVertexAttributes();
+	vertexInputInfo.vertexAttributeDescriptionCount = vertexAttributes.size();
+	vertexInputInfo.pVertexAttributeDescriptions = vertexAttributes.data();
 
 	vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
 	inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
@@ -408,10 +440,19 @@ void DRenderer::Vulkan::MakePipeline()
 	vk::PipelineRasterizationStateCreateInfo rasterizer{};
 	rasterizer.lineWidth = 1.f;
 	rasterizer.polygonMode = vk::PolygonMode::eFill;
+	rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
+
+	vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
+	depthStencilInfo.depthTestEnable = 1;
+	depthStencilInfo.depthCompareOp = vk::CompareOp::eLess;
+	depthStencilInfo.stencilTestEnable = 0;
+	depthStencilInfo.depthWriteEnable = 1;
+	depthStencilInfo.minDepthBounds = 0.f;
+	depthStencilInfo.maxDepthBounds = 1.f;
 
 	vk::PipelineMultisampleStateCreateInfo multisampling{};
-	multisampling.sampleShadingEnable = VK_FALSE;
-	multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
+	multisampling.sampleShadingEnable = 1;
+	multisampling.rasterizationSamples = data.renderTarget.sampleCount;
 
 	vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
 	colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
@@ -429,9 +470,85 @@ void DRenderer::Vulkan::MakePipeline()
 	pipelineInfo.pMultisampleState = &multisampling;
 	pipelineInfo.pRasterizationState = &rasterizer;
 	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.pDepthStencilState = &depthStencilInfo;
 	pipelineInfo.stageCount = 2;
 	pipelineInfo.pStages = shaderStages.data();
 
-
 	data.pipeline = data.device.createGraphicsPipeline({}, pipelineInfo);
+}
+
+void DRenderer::Vulkan::MakeVBO()
+{
+	APIData& data = GetAPIData();
+
+	auto meshDocumentOpt = Core::GetData().assetLoadData.meshLoader(0);
+
+	assert(meshDocumentOpt.has_value());
+
+	MeshDocument& meshDoc = meshDocumentOpt.value();
+
+	vk::BufferCreateInfo bufferInfo{};
+	bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer;
+	bufferInfo.sharingMode = vk::SharingMode::eExclusive;
+	bufferInfo.size = meshDoc.GetTotalSizeRequired();
+
+	vk::Buffer buffer = data.device.createBuffer(bufferInfo);
+
+	vk::MemoryRequirements memReqs = data.device.getBufferMemoryRequirements(buffer);
+
+	vk::MemoryAllocateInfo allocInfo{};
+	allocInfo.allocationSize = memReqs.size;
+	allocInfo.memoryTypeIndex = std::numeric_limits<uint32_t>::max();
+
+	// Find host-visible memory we can allocate to
+	for (uint32_t i = 0; i < data.physDevice.memProperties.memoryTypeCount; i++)
+	{
+		if (data.physDevice.memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible)
+		{
+			allocInfo.memoryTypeIndex = i;
+			break;
+		}
+	}
+
+	vk::DeviceMemory mem = data.device.allocateMemory(allocInfo);
+
+	data.device.bindBufferMemory(buffer, mem, 0);
+
+	VBO vbo;
+	vbo.buffer = buffer;
+	vbo.deviceMemory = mem;
+	vbo.indexType = meshDoc.GetIndexType() == MeshDoc::IndexType::UInt32 ? vk::IndexType::eUint32 : vk::IndexType::eUint16;
+	vbo.indexCount = meshDoc.GetIndexCount();
+
+
+	uint8_t* ptr = static_cast<uint8_t*>(data.device.mapMemory(mem, 0, bufferInfo.size));
+
+	using MeshDocAttr = MeshDoc::Attribute;
+	using VBOAttr = VBO::Attribute;
+
+	// Copy position data
+	std::memcpy(ptr, meshDoc.GetDataPtr(MeshDocAttr::Position), meshDoc.GetByteLength(MeshDocAttr::Position));
+	vbo.GetAttrSize(VBOAttr::Position) = meshDoc.GetByteLength(MeshDocAttr::Position);
+
+	ptr += vbo.GetAttrSize(VBOAttr::Position);
+
+	// Copy UV data
+	std::memcpy(ptr, meshDoc.GetDataPtr(MeshDocAttr::TexCoord), meshDoc.GetByteLength(MeshDocAttr::TexCoord));
+	vbo.GetAttrSize(VBOAttr::TexCoord) = meshDoc.GetByteLength(MeshDocAttr::TexCoord);
+
+	ptr += vbo.GetAttrSize(VBOAttr::TexCoord);
+
+	// Copy normal data
+	std::memcpy(ptr, meshDoc.GetDataPtr(MeshDocAttr::Normal), meshDoc.GetByteLength(MeshDocAttr::Normal));
+	vbo.GetAttrSize(VBOAttr::Normal) = meshDoc.GetByteLength(MeshDocAttr::Normal);
+
+	ptr += vbo.GetAttrSize(VBOAttr::Normal);
+
+	// Copy index data
+	std::memcpy(ptr, meshDoc.GetDataPtr(MeshDocAttr::Index), meshDoc.GetByteLength(MeshDocAttr::Index));
+	vbo.GetAttrSize(VBOAttr::Index) = meshDoc.GetByteLength(MeshDocAttr::Index);
+
+	data.device.unmapMemory(mem);
+
+	data.testVBO = vbo;
 }

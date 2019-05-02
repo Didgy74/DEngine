@@ -52,23 +52,33 @@ namespace Engine::Application::Core
 
 		glfwSetErrorCallback(error_callback);
 
-		//glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-		//glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-		//glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE)
+		if (api == API3D::OpenGL)
+		{
+			glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+			glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+			glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, 1);
+		}
+		else if(api == API3D::Vulkan)
+		{
+			bool vulkanTest = glfwVulkanSupported();
+			if (!vulkanTest)
+				std::abort();
 
-		bool vulkanTest = glfwVulkanSupported();
-		if (vulkanTest == false)
-			std::abort();
+			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		}
 
-		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		GLFWwindow* window = glfwCreateWindow(defaultWindowSize.width, defaultWindowSize.height, "My Title", NULL, NULL);
 		if (!window)
 		{
 			// Window or OpenGL context creation failed
 			assert(false);
 		}
-		//glfwMakeContextCurrent(window);
-		//glfwSwapInterval(1);
+		if (api == API3D::OpenGL)
+		{
+			glfwMakeContextCurrent(window);
+			glfwSwapInterval(1);
+
+		}
 
 		glfwSetKeyCallback(window, &KeyCallback);
 		glfwSetCursorPosCallback(window, &MousePosCallback);

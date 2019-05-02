@@ -50,7 +50,7 @@ namespace Engine
 
             void GLAPIENTRY GLDebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam);
 
-			GLint ToGLType(MeshDocument::IndexType indexType);
+			GLint ToGLType(DRenderer::MeshDocument::IndexType indexType);
 		}
 	}
 
@@ -392,7 +392,7 @@ namespace Engine
 
 		// Update intensities
 		const size_t elements = Math::Min(10, renderGraph.pointLightIntensities.size());
-		std::array<std::array<float, 4>, 10> intensityData;
+		std::array<std::array<float, 4>, 10> intensityData{};
 		for (size_t i = 0; i < elements; i++)
 		{
 			for (size_t j = 0; j < 3; j++)
@@ -414,7 +414,7 @@ namespace Engine
 
 		// Update lights positions
 		const size_t elements = Math::Min(10, renderGraphTransform.pointLights.size());
-		std::array<std::array<float, 4>, 10> posData;
+		std::array<std::array<float, 4>, 10> posData{};
 		for (size_t i = 0; i < elements; i++)
 		{
 			for (size_t j = 0; j < 3; j++)
@@ -647,29 +647,29 @@ namespace Engine
 		// Below we move all the mesh-data onto the GPU on a per-attribute basis.
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[size_t(VBO::Attribute::Position)]);
-		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetByteLength(MeshDocument::Attribute::Position), meshDocument.GetDataPtr(MeshDocument::Attribute::Position), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetByteLength(DRenderer::MeshDocument::Attribute::Position), meshDocument.GetDataPtr(DRenderer::MeshDocument::Attribute::Position), GL_STATIC_DRAW);
 		glEnableVertexAttribArray(size_t(VBO::Attribute::Position));
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[size_t(VBO::Attribute::TexCoord)]);
-		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetByteLength(MeshDocument::Attribute::TexCoord), meshDocument.GetDataPtr(MeshDocument::Attribute::TexCoord), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetByteLength(DRenderer::MeshDocument::Attribute::TexCoord), meshDocument.GetDataPtr(DRenderer::MeshDocument::Attribute::TexCoord), GL_STATIC_DRAW);
 		glEnableVertexAttribArray(size_t(VBO::Attribute::TexCoord));
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[size_t(VBO::Attribute::Normal)]);
-		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetByteLength(MeshDocument::Attribute::Normal), meshDocument.GetDataPtr(MeshDocument::Attribute::Normal), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetByteLength(DRenderer::MeshDocument::Attribute::Normal), meshDocument.GetDataPtr(DRenderer::MeshDocument::Attribute::Normal), GL_STATIC_DRAW);
 		glEnableVertexAttribArray(size_t(VBO::Attribute::Normal));
 		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo.attributeBuffers[size_t(VBO::Attribute::Index)]);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshDocument.GetByteLength(MeshDocument::Attribute::Index), meshDocument.GetDataPtr(MeshDocument::Attribute::Index), GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshDocument.GetByteLength(DRenderer::MeshDocument::Attribute::Index), meshDocument.GetDataPtr(DRenderer::MeshDocument::Attribute::Index), GL_STATIC_DRAW);
 
 		return vbo;
 	}
 
-	GLint Renderer::OpenGL::ToGLType(MeshDocument::IndexType indexType)
+	GLint Renderer::OpenGL::ToGLType(DRenderer::MeshDocument::IndexType indexType)
 	{
-		using IndexType = MeshDocument::IndexType;
+		using IndexType = DRenderer::MeshDocument::IndexType;
 		switch (indexType)
 		{
 		case IndexType::UInt16:

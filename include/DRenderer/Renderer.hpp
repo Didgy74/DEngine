@@ -62,7 +62,7 @@ namespace Engine
 
 	struct Renderer::AssetLoadCreateInfo
 	{
-		using MeshLoaderPFN = std::optional<MeshDocument>(*)(size_t);
+		using MeshLoaderPFN = std::optional<DRenderer::MeshDocument>(*)(size_t);
 		MeshLoaderPFN meshLoader = nullptr;
 
 		using TextureLoaderPFN = std::optional<DTex::TexDoc>(*)(size_t);

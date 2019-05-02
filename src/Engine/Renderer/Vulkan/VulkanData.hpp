@@ -26,12 +26,15 @@ namespace DRenderer::Vulkan
 		"VK_LAYER_LUNARG_standard_validation"
 	};
 
+	struct VertexBufferObject;
+	using VBO = VertexBufferObject;
+
 	struct APIData;
 	void APIDataDeleter(void*& ptr);
 	APIData& GetAPIData();
 
-	struct SwapchainSettings;
-	SwapchainSettings GetSwapchainSettings(vk::PhysicalDevice device, vk::SurfaceKHR surface);
+	std::array<vk::VertexInputBindingDescription, 3> GetVertexBindings();
+	std::array<vk::VertexInputAttributeDescription, 3> GetVertexAttributes();
 
 	VKAPI_ATTR VkBool32 VKAPI_CALL Callback(
 			vk::DebugUtilsMessageTypeFlagBitsEXT messageSeverity,
@@ -39,6 +42,29 @@ namespace DRenderer::Vulkan
 			const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
 			void* pUserData);
 }
+
+struct DRenderer::Vulkan::VertexBufferObject
+{
+	enum class Attribute
+	{
+		Position,
+		TexCoord,
+		Normal,
+		Index,
+		COUNT
+	};
+
+	vk::Buffer buffer = nullptr;
+	vk::DeviceMemory deviceMemory = nullptr;
+	std::array<size_t, static_cast<size_t>(Attribute::COUNT)> attributeSizes{};
+
+	vk::DeviceSize indexCount = 0;
+	vk::IndexType indexType{};
+
+	size_t GetByteOffset(Attribute attribute) const;
+	size_t& GetAttrSize(Attribute attr);
+	size_t GetAttrSize(Attribute attr) const;
+};
 
 struct DRenderer::Vulkan::APIData
 {
@@ -72,9 +98,9 @@ struct DRenderer::Vulkan::APIData
 	struct PhysDeviceInfo
 	{
 		vk::PhysicalDevice handle = nullptr;
-
 		vk::PhysicalDeviceProperties properties{};
 		vk::PhysicalDeviceMemoryProperties memProperties{};
+		vk::SampleCountFlagBits maxFramebufferSamples{};
 		uint32_t deviceLocalMemory = invalidIndex;
 		uint32_t hostVisibleMemory = invalidIndex;
 		bool hostMemoryIsDeviceLocal = false;
@@ -88,8 +114,11 @@ struct DRenderer::Vulkan::APIData
 	struct RenderTarget
 	{
 		vk::DeviceMemory memory = nullptr;
-		vk::Image image = nullptr;
-		vk::ImageView imageView = nullptr;
+		vk::SampleCountFlagBits sampleCount{};
+		vk::Image colorImg = nullptr;
+		vk::ImageView colorImgView = nullptr;
+		vk::Image depthImg = nullptr;
+		vk::ImageView depthImgView = nullptr;
 		vk::Framebuffer framebuffer = nullptr;
 	};
 	RenderTarget renderTarget{};
@@ -103,21 +132,33 @@ struct DRenderer::Vulkan::APIData
 		std::vector<vk::ImageView> imageViews;
 	};
 	Swapchain swapchain{};
+
 	// Resource set means in-flight image
 	uint32_t resourceSetCount = invalidIndex;
 	// Resource set means in-flight image
-	uint32_t currentResourceSet = invalidIndex;
+	uint32_t currentResourceSet = 0;
 	// Has swapchain length
-	std::vector<vk::Fence> imageAvailableForPresentation;
 	uint32_t imageAvailableActiveIndex = 0;
+
+	struct MainUniforms
+	{
+		vk::DeviceMemory cameraBuffersMem = nullptr;
+		size_t cameraUBOByteLength = std::numeric_limits<size_t>::max();
+		// Has resourceSetCount length
+		std::vector<vk::Buffer> cameraBuffer;
+		uint8_t* cameraMemoryMap = nullptr;
+
+		vk::DeviceMemory perObjectUBOMem = nullptr;
+
+	};
+	MainUniforms mainUniforms{};
+	std::vector<vk::Fence> resourceSetAvailable;
 
 	vk::RenderPass renderPass = nullptr;
 
 	vk::CommandPool renderCmdPool = nullptr;
 	// Has the length of Swapchain-length
 	std::vector<vk::CommandBuffer> renderCmdBuffer;
-	// Has swapchain length
-	std::vector<vk::Fence> renderCmdBufferAvailable;
 
 	vk::CommandPool presentCmdPool = nullptr;
 	// Has swapchain length
@@ -125,12 +166,13 @@ struct DRenderer::Vulkan::APIData
 
 	vk::Pipeline pipeline = nullptr;
 	vk::PipelineLayout pipelineLayout = nullptr;
-};
 
-struct DRenderer::Vulkan::SwapchainSettings
-{
-	vk::SurfaceCapabilitiesKHR capabilities{};
-	vk::PresentModeKHR presentMode{};
-	vk::SurfaceFormatKHR surfaceFormat{};
-	uint8_t numImages{};
+	// Has swapchain length
+	std::vector<vk::Semaphore> swapchainImageAvailable;
+
+	vk::DescriptorSetLayout descriptorSetLayout = nullptr;
+	vk::DescriptorPool descriptorSetPool = nullptr;
+	std::vector<vk::DescriptorSet> descriptorSets;
+
+	VBO testVBO{};
 };
