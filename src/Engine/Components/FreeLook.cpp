@@ -32,11 +32,11 @@ namespace Engine
 
 			if (Input::Raw::GetValue(Input::Raw::Button::RightMouse))
 			{
-				float sensitivity = 75.f;
+				float sensitivity = 0.1f;
 
 				float amountX = Input::Raw::GetMouseDelta()[0];
 
-				obj.localRotation = Math::UnitQuaternion<float>(Math::Vector3D{ 0, -sensitivity * deltaTime * amountX, 0 }) * obj.localRotation;
+				obj.localRotation = Math::UnitQuaternion<float>(Math::Vector3D{ 0, -sensitivity * amountX, 0 }) * obj.localRotation;
 
 				auto amountY = -Input::Raw::GetMouseDelta()[1];
 
@@ -49,7 +49,7 @@ namespace Engine
 
 				Math::Vector3D right = GetSceneObject().GetRightVector(Space::Local);
 
-				obj.localRotation = Math::UnitQuaternion<float>(right, sensitivity * deltaTime * -amountY) * obj.localRotation;
+				obj.localRotation = Math::UnitQuaternion<float>(right, sensitivity * -amountY) * obj.localRotation;
 			}
 
 			auto mat = GetSceneObject().GetRotationModel(Space::Local);

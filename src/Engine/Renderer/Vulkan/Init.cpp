@@ -253,10 +253,10 @@ DRenderer::Vulkan::SwapchainSettings DRenderer::Vulkan::Init::GetSwapchainSettin
 
 	// Handle formats
 	constexpr std::array preferredFormats
-			{
-					vk::Format::eR8G8B8A8Unorm,
-					vk::Format::eB8G8R8A8Unorm
-			};
+	{
+		vk::Format::eR8G8B8A8Unorm,
+		vk::Format::eB8G8R8A8Unorm
+	};
 	auto formats = device.getSurfaceFormatsKHR(surface);
 	vk::SurfaceFormatKHR formatToUse = { vk::Format::eUndefined, vk::ColorSpaceKHR::eSrgbNonlinear };
 	bool foundPreferredFormat = false;
@@ -458,50 +458,39 @@ DRenderer::Vulkan::APIData::MainUniforms DRenderer::Vulkan::Init::BuildMainUnifo
 
 	size_t cameraUBOByteLength = sizeof(std::array<float, 16>);
 
-	vk::BufferCreateInfo tempCameraBufferInfo{};
-	tempCameraBufferInfo.sharingMode = vk::SharingMode::eExclusive;
-	tempCameraBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
-	tempCameraBufferInfo.size = cameraUBOByteLength * resourceSetCount;
+	vk::BufferCreateInfo camBufferInfo{};
+	camBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
+	camBufferInfo.sharingMode = vk::SharingMode::eExclusive;
+	camBufferInfo.size = cameraUBOByteLength;
+	if (camBufferInfo.size < limits.minUniformBufferOffsetAlignment)
+		camBufferInfo.size = limits.minUniformBufferOffsetAlignment;
 
-	vk::Buffer tempCameraBuffer = device.createBuffer(tempCameraBufferInfo);
-
-	auto camMemReqs = device.getBufferMemoryRequirements(tempCameraBuffer);
-
-	device.destroyBuffer(tempCameraBuffer);
-
-	vk::MemoryAllocateInfo camMemAllocInfo{};
-	camMemAllocInfo.allocationSize = camMemReqs.size;
-	camMemAllocInfo.memoryTypeIndex = std::numeric_limits<uint32_t>::max();
-
-	// Find host-visible memory we can allocate to
+	vk::MemoryAllocateInfo camAllocInfo{};
+	camAllocInfo.allocationSize = camBufferInfo.size * resourceSetCount;
+	camAllocInfo.memoryTypeIndex = std::numeric_limits<uint32_t>::max();
+	// Find host-visible memory
 	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
 	{
 		if (memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible)
 		{
-			camMemAllocInfo.memoryTypeIndex = i;
+			camAllocInfo.memoryTypeIndex = i;
 			break;
 		}
 	}
-	assert(camMemAllocInfo.memoryTypeIndex != std::numeric_limits<uint32_t>::max());
+	assert(camAllocInfo.memoryTypeIndex != std::numeric_limits<uint32_t>::max());
 
-	vk::DeviceMemory mem = device.allocateMemory(camMemAllocInfo);
+	vk::DeviceMemory camMem = device.allocateMemory(camAllocInfo);
+
+	void* camMappedMemory = device.mapMemory(camMem, 0, camAllocInfo.allocationSize);
 
 	std::vector<vk::Buffer> camBuffers(resourceSetCount);
-	vk::BufferCreateInfo camBufferInfo{};
-	camBufferInfo.sharingMode = vk::SharingMode::eExclusive;
-	camBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
-	camBufferInfo.size = cameraUBOByteLength;
-	for (uint32_t i = 0; i < resourceSetCount; i++)
+	for (size_t i = 0; i < resourceSetCount; i++)
 	{
 		camBuffers[i] = device.createBuffer(camBufferInfo);
-		vk::MemoryRequirements bufferMemReqs = device.getBufferMemoryRequirements(camBuffers[i]);
+		vk::MemoryRequirements memReqs = device.getBufferMemoryRequirements(camBuffers[i]);
 
-		device.bindBufferMemory(camBuffers[i], mem, camBufferInfo.size * i);
+		device.bindBufferMemory(camBuffers[i], camMem, memReqs.alignment * i);
 	}
-
-	void* camMappedMemory = device.mapMemory(mem, 0, tempCameraBufferInfo.size);
-
-
 
 	// SETUP PER OBJECT STUFF
 	size_t singleUBOByteLength = sizeof(std::array<float, 16>);
@@ -521,7 +510,7 @@ DRenderer::Vulkan::APIData::MainUniforms DRenderer::Vulkan::Init::BuildMainUnifo
 
 	vk::MemoryAllocateInfo modelAllocInfo{};
 	modelAllocInfo.allocationSize = modelMemReqs.size;
-	modelAllocInfo.memoryTypeIndex = camMemAllocInfo.memoryTypeIndex;
+	modelAllocInfo.memoryTypeIndex = camAllocInfo.memoryTypeIndex;
 
 	vk::DeviceMemory modelMem = device.allocateMemory(modelAllocInfo);
 
@@ -530,9 +519,9 @@ DRenderer::Vulkan::APIData::MainUniforms DRenderer::Vulkan::Init::BuildMainUnifo
 	void* modelMappedMemory = device.mapMemory(modelMem, 0, modelBufferInfo.size);
 
 	APIData::MainUniforms returnValue{};
-	returnValue.cameraBuffersMem = mem;
+	returnValue.cameraBuffersMem = camMem;
 	returnValue.cameraBuffer = std::move(camBuffers);
-	returnValue.cameraUBOByteLength = cameraUBOByteLength;
+	returnValue.cameraUBOByteLength = camBufferInfo.size;
 	returnValue.cameraMemoryMap = static_cast<uint8_t*>(camMappedMemory);
 
 	returnValue.modelDataBuffer = modelBuffer;
