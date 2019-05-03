@@ -649,17 +649,17 @@ namespace Engine
 		glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[size_t(VBO::Attribute::Position)]);
 		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetByteLength(DRenderer::MeshDocument::Attribute::Position), meshDocument.GetDataPtr(DRenderer::MeshDocument::Attribute::Position), GL_STATIC_DRAW);
 		glEnableVertexAttribArray(size_t(VBO::Attribute::Position));
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[size_t(VBO::Attribute::TexCoord)]);
 		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetByteLength(DRenderer::MeshDocument::Attribute::TexCoord), meshDocument.GetDataPtr(DRenderer::MeshDocument::Attribute::TexCoord), GL_STATIC_DRAW);
 		glEnableVertexAttribArray(size_t(VBO::Attribute::TexCoord));
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo.attributeBuffers[size_t(VBO::Attribute::Normal)]);
 		glBufferData(GL_ARRAY_BUFFER, meshDocument.GetByteLength(DRenderer::MeshDocument::Attribute::Normal), meshDocument.GetDataPtr(DRenderer::MeshDocument::Attribute::Normal), GL_STATIC_DRAW);
 		glEnableVertexAttribArray(size_t(VBO::Attribute::Normal));
-		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo.attributeBuffers[size_t(VBO::Attribute::Index)]);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshDocument.GetByteLength(DRenderer::MeshDocument::Attribute::Index), meshDocument.GetDataPtr(DRenderer::MeshDocument::Attribute::Index), GL_STATIC_DRAW);

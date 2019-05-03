@@ -44,6 +44,27 @@ size_t DRenderer::Vulkan::VertexBufferObject::GetAttrSize(Attribute attr) const
 	return attributeSizes[static_cast<size_t>(attr)];
 }
 
+uint8_t* DRenderer::Vulkan::APIData::MainUniforms::GetModelBufferResourceSet(uint32_t resourceSet)
+{
+	return modelDataMappedMem + GetModelBufferSetOffset(resourceSet);
+}
+
+size_t DRenderer::Vulkan::APIData::MainUniforms::GetModelBufferSetOffset(uint32_t resourceSet) const
+{
+	return GetModelDataResourceSetLength() * resourceSet;
+}
+
+size_t DRenderer::Vulkan::APIData::MainUniforms::GetModelDataResourceSetLength() const
+{
+	return modelDataCapacity * modelDataUBOByteLength;
+}
+
+size_t DRenderer::Vulkan::APIData::MainUniforms::GetModelDataDynamicOffset(size_t modelDataIndex) const
+{
+	assert(modelDataIndex < modelDataCapacity);
+	return modelDataUBOByteLength * modelDataIndex;
+}
+
 std::array<vk::VertexInputBindingDescription, 3> DRenderer::Vulkan::GetVertexBindings()
 {
 	std::array<vk::VertexInputBindingDescription, 3> bindingDescriptions{};
@@ -165,7 +186,7 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	data.descriptorSets = std::move(descSets);
 
 	// Build main uniforms
-	data.mainUniforms = Init::BuildMainUniforms(data.device, data.physDevice.memProperties, data.resourceSetCount);
+	data.mainUniforms = Init::BuildMainUniforms(data.device, data.physDevice.memProperties, data.physDevice.properties.limits, data.resourceSetCount);
 
 	Init::ConfigurePrimaryDescriptors();
 
@@ -215,6 +236,8 @@ void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyP
 {
 	APIData& data = GetAPIData();
 
+	const Core::Data& drendererData = Core::GetData();
+
 	auto cmdBuffer = data.renderCmdBuffer[data.imageAvailableActiveIndex];
 
 	vk::CommandBufferBeginInfo beginInfo{};
@@ -246,8 +269,6 @@ void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyP
 
 	cmdBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 
-	cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, data.pipelineLayout, 0, data.descriptorSets[data.currentResourceSet], {});
-
 	cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, data.pipeline);
 
 	// Bind VBO
@@ -262,7 +283,11 @@ void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyP
 	cmdBuffer.bindVertexBuffers(0, vertexBuffers, vboOffsets);
 	cmdBuffer.bindIndexBuffer(vbo.buffer, vbo.GetByteOffset(VBO::Attribute::Index), vbo.indexType);
 
-	cmdBuffer.drawIndexed(vbo.indexCount, 1, 0, 0, 0);
+	for (size_t i = 0; i < drendererData.renderGraph.meshes.size(); i++)
+	{
+		cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, data.pipelineLayout, 0, data.descriptorSets[data.currentResourceSet], data.mainUniforms.GetModelDataDynamicOffset(i));
+		cmdBuffer.drawIndexed(vbo.indexCount, 1, 0, 0, 0);
+	}
 
 	cmdBuffer.endRenderPass();
 
@@ -285,12 +310,20 @@ void DRenderer::Vulkan::PrepareRenderingLate()
 	auto cameraMatrix = cameraInfo.GetModel(viewport.GetDimensions().GetAspectRatio());
 	std::memcpy(cameraBufferPtr, &cameraMatrix, sizeof(cameraMatrix));
 
-	vk::MappedMemoryRange range{};
-	range.memory = data.mainUniforms.cameraBuffersMem;
-	range.offset = (data.mainUniforms.cameraUBOByteLength * data.currentResourceSet);
-	range.size = sizeof(cameraMatrix);
+	vk::MappedMemoryRange cameraRange{};
+	cameraRange.memory = data.mainUniforms.cameraBuffersMem;
+	cameraRange.offset = (data.mainUniforms.cameraUBOByteLength * data.currentResourceSet);
+	cameraRange.size = sizeof(cameraMatrix);
 
-	data.device.flushMappedMemoryRanges(range);
+
+	uint8_t* modelUBOBufferPtr = data.mainUniforms.GetModelBufferResourceSet(data.currentResourceSet);
+	std::memcpy(modelUBOBufferPtr, renderGraphTransform.meshes.data(), renderGraphTransform.meshes.size() * sizeof(renderGraphTransform.meshes.front()));
+	vk::MappedMemoryRange modelUBORange{};
+	modelUBORange.memory = data.mainUniforms.modelDataMem;
+	modelUBORange.size = renderGraphTransform.meshes.size() * sizeof(renderGraphTransform.meshes.front());
+	modelUBORange.offset = data.mainUniforms.modelDataUBOByteLength * data.mainUniforms.modelDataCapacity;
+
+	data.device.flushMappedMemoryRanges({ cameraRange, modelUBORange });
 }
 
 void DRenderer::Vulkan::Draw()

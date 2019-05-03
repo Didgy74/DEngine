@@ -148,8 +148,16 @@ struct DRenderer::Vulkan::APIData
 		std::vector<vk::Buffer> cameraBuffer;
 		uint8_t* cameraMemoryMap = nullptr;
 
-		vk::DeviceMemory perObjectUBOMem = nullptr;
+		vk::DeviceMemory modelDataMem = nullptr;
+		vk::Buffer modelDataBuffer = nullptr;
+		size_t modelDataUBOByteLength = 0;
+		size_t modelDataCapacity = 0;
+		uint8_t* modelDataMappedMem = nullptr;
 
+		uint8_t* GetModelBufferResourceSet(uint32_t resourceSet);
+		size_t GetModelBufferSetOffset(uint32_t resourceSet) const;
+		size_t GetModelDataResourceSetLength() const;
+		size_t GetModelDataDynamicOffset(size_t modelDataIndex) const;
 	};
 	MainUniforms mainUniforms{};
 	std::vector<vk::Fence> resourceSetAvailable;

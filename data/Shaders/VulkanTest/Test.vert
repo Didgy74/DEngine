@@ -21,7 +21,7 @@ layout(location = 2) in vec3 vtxNormal;
 
 void main()
 {
-	gl_Position =  cameraInfo.model * vec4(vtxPosition, 1.0);
+	gl_Position =  cameraInfo.model * objectInfo.model * vec4(vtxPosition, 1.0);
 	gl_Position.y = -gl_Position.y;
 	
 	fragData.color = vec3(vtxUV, 0.5);

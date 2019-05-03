@@ -333,16 +333,25 @@ vk::Device DRenderer::Vulkan::Init::CreateDevice(vk::PhysicalDevice physDevice)
 
 vk::DescriptorSetLayout DRenderer::Vulkan::Init::CreatePrimaryDescriptorSetLayout(vk::Device device)
 {
+
+
+	vk::DescriptorSetLayoutBinding cameraBindingInfo{};
+	cameraBindingInfo.binding = 0;
+	cameraBindingInfo.descriptorCount = 1;
+	cameraBindingInfo.descriptorType = vk::DescriptorType::eUniformBuffer;
+	cameraBindingInfo.stageFlags = vk::ShaderStageFlagBits::eVertex;
+
+	vk::DescriptorSetLayoutBinding modelBindingInfo{};
+	modelBindingInfo.binding = 1;
+	modelBindingInfo.descriptorCount = 1;
+	modelBindingInfo.descriptorType = vk::DescriptorType ::eUniformBufferDynamic;
+	modelBindingInfo.stageFlags = vk::ShaderStageFlagBits::eVertex;
+
+	std::array bindingInfos { cameraBindingInfo, modelBindingInfo };
+
 	vk::DescriptorSetLayoutCreateInfo layoutCreateInfo{};
-
-	vk::DescriptorSetLayoutBinding binding{};
-	binding.binding = 0;
-	binding.descriptorCount = 1;
-	binding.descriptorType = vk::DescriptorType::eUniformBuffer;
-	binding.stageFlags = vk::ShaderStageFlagBits::eVertex;
-
-	layoutCreateInfo.bindingCount = 1;
-	layoutCreateInfo.pBindings = &binding;
+	layoutCreateInfo.bindingCount = uint32_t(bindingInfos.size());
+	layoutCreateInfo.pBindings = bindingInfos.data();
 
 	auto temp = device.createDescriptorSetLayout(layoutCreateInfo);
 	if constexpr (Core::debugLevel >= 2)
@@ -410,16 +419,20 @@ std::pair<vk::DescriptorPool, std::vector<vk::DescriptorSet>> DRenderer::Vulkan:
 		vk::DescriptorSetLayout layout,
 		uint32_t resourceSetCount)
 {
+	vk::DescriptorPoolSize cameraUBOPoolSize{};
+	cameraUBOPoolSize.descriptorCount = resourceSetCount;
+	cameraUBOPoolSize.type = vk::DescriptorType::eUniformBuffer;
+
+	vk::DescriptorPoolSize modelUBOPoolSize{};
+	modelUBOPoolSize.descriptorCount = resourceSetCount;
+	modelUBOPoolSize.type = vk::DescriptorType::eUniformBufferDynamic;
+
+	std::array poolSizes { cameraUBOPoolSize, modelUBOPoolSize };
+
 	vk::DescriptorPoolCreateInfo poolCreateInfo{};
-
-	vk::DescriptorPoolSize size{};
-	size.descriptorCount = resourceSetCount;
-	size.type = vk::DescriptorType::eUniformBuffer;
-
 	poolCreateInfo.maxSets = resourceSetCount;
-
-	poolCreateInfo.poolSizeCount = 1;
-	poolCreateInfo.pPoolSizes = &size;
+	poolCreateInfo.poolSizeCount = uint32_t(poolSizes.size());
+	poolCreateInfo.pPoolSizes = poolSizes.data();
 
 	vk::DescriptorPool descriptorSetPool = device.createDescriptorPool(poolCreateInfo);
 
@@ -435,58 +448,98 @@ std::pair<vk::DescriptorPool, std::vector<vk::DescriptorSet>> DRenderer::Vulkan:
 	return { descriptorSetPool, std::move(descriptorSets) };
 }
 
-DRenderer::Vulkan::APIData::MainUniforms DRenderer::Vulkan::Init::BuildMainUniforms(vk::Device device, const vk::PhysicalDeviceMemoryProperties& memProperties, uint32_t resourceSetCount)
+DRenderer::Vulkan::APIData::MainUniforms DRenderer::Vulkan::Init::BuildMainUniforms(
+		vk::Device device,
+		const vk::PhysicalDeviceMemoryProperties& memProperties,
+		const vk::PhysicalDeviceLimits& limits,
+		uint32_t resourceSetCount)
 {
+	// SETUP CAMERA STUFF
+
 	size_t cameraUBOByteLength = sizeof(std::array<float, 16>);
 
-	vk::BufferCreateInfo tempBufferInfo{};
-	tempBufferInfo.sharingMode = vk::SharingMode::eExclusive;
-	tempBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
-	tempBufferInfo.size = cameraUBOByteLength * resourceSetCount;
+	vk::BufferCreateInfo tempCameraBufferInfo{};
+	tempCameraBufferInfo.sharingMode = vk::SharingMode::eExclusive;
+	tempCameraBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
+	tempCameraBufferInfo.size = cameraUBOByteLength * resourceSetCount;
 
-	vk::Buffer tempBuffer = device.createBuffer(tempBufferInfo);
+	vk::Buffer tempCameraBuffer = device.createBuffer(tempCameraBufferInfo);
 
-	auto memReqs = device.getBufferMemoryRequirements(tempBuffer);
+	auto camMemReqs = device.getBufferMemoryRequirements(tempCameraBuffer);
 
-	device.destroyBuffer(tempBuffer);
+	device.destroyBuffer(tempCameraBuffer);
 
-	vk::MemoryAllocateInfo allocInfo{};
-	allocInfo.allocationSize = memReqs.size;
-	allocInfo.memoryTypeIndex = std::numeric_limits<uint32_t>::max();
+	vk::MemoryAllocateInfo camMemAllocInfo{};
+	camMemAllocInfo.allocationSize = camMemReqs.size;
+	camMemAllocInfo.memoryTypeIndex = std::numeric_limits<uint32_t>::max();
 
 	// Find host-visible memory we can allocate to
 	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
 	{
 		if (memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible)
 		{
-			allocInfo.memoryTypeIndex = i;
+			camMemAllocInfo.memoryTypeIndex = i;
 			break;
 		}
 	}
-	assert(allocInfo.memoryTypeIndex != std::numeric_limits<uint32_t>::max());
+	assert(camMemAllocInfo.memoryTypeIndex != std::numeric_limits<uint32_t>::max());
 
-	vk::DeviceMemory mem = device.allocateMemory(allocInfo);
+	vk::DeviceMemory mem = device.allocateMemory(camMemAllocInfo);
 
-	std::vector<vk::Buffer> buffers(resourceSetCount);
-	vk::BufferCreateInfo bufferInfo{};
-	bufferInfo.sharingMode = vk::SharingMode::eExclusive;
-	bufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
-	bufferInfo.size = cameraUBOByteLength;
+	std::vector<vk::Buffer> camBuffers(resourceSetCount);
+	vk::BufferCreateInfo camBufferInfo{};
+	camBufferInfo.sharingMode = vk::SharingMode::eExclusive;
+	camBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
+	camBufferInfo.size = cameraUBOByteLength;
 	for (uint32_t i = 0; i < resourceSetCount; i++)
 	{
-		buffers[i] = device.createBuffer(bufferInfo);
-		vk::MemoryRequirements bufferMemReqs = device.getBufferMemoryRequirements(buffers[i]);
+		camBuffers[i] = device.createBuffer(camBufferInfo);
+		vk::MemoryRequirements bufferMemReqs = device.getBufferMemoryRequirements(camBuffers[i]);
 
-		device.bindBufferMemory(buffers[i], mem, bufferInfo.size * i);
+		device.bindBufferMemory(camBuffers[i], mem, camBufferInfo.size * i);
 	}
 
-	void* ptr = device.mapMemory(mem, 0, tempBufferInfo.size);
+	void* camMappedMemory = device.mapMemory(mem, 0, tempCameraBufferInfo.size);
+
+
+
+	// SETUP PER OBJECT STUFF
+	size_t singleUBOByteLength = sizeof(std::array<float, 16>);
+	if (singleUBOByteLength < limits.minUniformBufferOffsetAlignment)
+		singleUBOByteLength = limits.minUniformBufferOffsetAlignment;
+
+	vk::BufferCreateInfo modelBufferInfo{};
+	modelBufferInfo.sharingMode = vk::SharingMode::eExclusive;
+	modelBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
+	modelBufferInfo.size = singleUBOByteLength * resourceSetCount * 256;
+
+	vk::Buffer modelBuffer = device.createBuffer(modelBufferInfo);
+
+	vk::MemoryRequirements modelMemReqs = device.getBufferMemoryRequirements(modelBuffer);
+
+	size_t modelCountCapacity = modelMemReqs.size / singleUBOByteLength / resourceSetCount;
+
+	vk::MemoryAllocateInfo modelAllocInfo{};
+	modelAllocInfo.allocationSize = modelMemReqs.size;
+	modelAllocInfo.memoryTypeIndex = camMemAllocInfo.memoryTypeIndex;
+
+	vk::DeviceMemory modelMem = device.allocateMemory(modelAllocInfo);
+
+	device.bindBufferMemory(modelBuffer, modelMem, 0);
+
+	void* modelMappedMemory = device.mapMemory(modelMem, 0, modelBufferInfo.size);
 
 	APIData::MainUniforms returnValue{};
 	returnValue.cameraBuffersMem = mem;
-	returnValue.cameraBuffer = std::move(buffers);
+	returnValue.cameraBuffer = std::move(camBuffers);
 	returnValue.cameraUBOByteLength = cameraUBOByteLength;
-	returnValue.cameraMemoryMap = static_cast<uint8_t*>(ptr);
+	returnValue.cameraMemoryMap = static_cast<uint8_t*>(camMappedMemory);
+
+	returnValue.modelDataBuffer = modelBuffer;
+	returnValue.modelDataMem = modelMem;
+	returnValue.modelDataMappedMem = static_cast<uint8_t*>(modelMappedMemory);
+	returnValue.modelDataUBOByteLength = singleUBOByteLength;
+	returnValue.modelDataCapacity = modelCountCapacity;
 
 	return returnValue;
 }
@@ -495,26 +548,49 @@ void DRenderer::Vulkan::Init::ConfigurePrimaryDescriptors()
 {
 	APIData& data = GetAPIData();
 
-	std::vector<vk::WriteDescriptorSet> descriptorWrites(data.resourceSetCount);
-	std::vector<vk::DescriptorBufferInfo> bufferInfos(data.resourceSetCount);
+	std::vector<vk::WriteDescriptorSet> camDescWrites(data.resourceSetCount);
+	std::vector<vk::DescriptorBufferInfo> camBufferInfos(data.resourceSetCount);
 
 	for (size_t i = 0; i < data.resourceSetCount; i++)
 	{
-		vk::WriteDescriptorSet& write = descriptorWrites[i];
-		write.dstSet = data.descriptorSets[i];
-		write.dstBinding = 0;
-		write.descriptorType = vk::DescriptorType::eUniformBuffer;
+		vk::WriteDescriptorSet& camWrite = camDescWrites[i];
+		camWrite.dstSet = data.descriptorSets[i];
+		camWrite.dstBinding = 0;
+		camWrite.descriptorType = vk::DescriptorType::eUniformBuffer;
 
-		vk::DescriptorBufferInfo& bufferInfo = bufferInfos[i];
-		bufferInfo.buffer = data.mainUniforms.cameraBuffer[i];
-		bufferInfo.offset = 0;
-		bufferInfo.range = data.mainUniforms.cameraUBOByteLength;
+		vk::DescriptorBufferInfo& camBufferInfo = camBufferInfos[i];
+		camBufferInfo.buffer = data.mainUniforms.cameraBuffer[i];
+		camBufferInfo.offset = 0;
+		camBufferInfo.range = data.mainUniforms.cameraUBOByteLength;
 
-		write.descriptorCount = 1;
-		write.pBufferInfo = &bufferInfo;
+		camWrite.descriptorCount = 1;
+		camWrite.pBufferInfo = &camBufferInfo;
 	}
 
-	data.device.updateDescriptorSets(descriptorWrites, {});
+
+	std::vector<vk::WriteDescriptorSet> modelDescWrites(data.resourceSetCount);
+	std::vector<vk::DescriptorBufferInfo> modelBufferInfos(data.resourceSetCount);
+
+	for (size_t i = 0; i < data.resourceSetCount; i++)
+	{
+		vk::WriteDescriptorSet& modelWrite = modelDescWrites[i];
+		modelWrite.dstSet = data.descriptorSets[i];
+		modelWrite.dstBinding = 1;
+		modelWrite.descriptorType = vk::DescriptorType::eUniformBufferDynamic;
+		modelWrite.descriptorCount = 1;
+
+		vk::DescriptorBufferInfo& modelBufferInfo = modelBufferInfos[i];
+		modelBufferInfo.buffer = data.mainUniforms.modelDataBuffer;
+		modelBufferInfo.range = data.mainUniforms.modelDataUBOByteLength;
+		modelBufferInfo.offset = data.mainUniforms.GetModelBufferSetOffset(i);
+
+		modelWrite.pBufferInfo = &modelBufferInfo;
+	}
+
+	for (const auto& write : modelDescWrites)
+		camDescWrites.push_back(write);
+
+	data.device.updateDescriptorSets(camDescWrites, {});
 }
 
 // Note! This does NOT create the associated framebuffer.

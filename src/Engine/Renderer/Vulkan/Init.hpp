@@ -47,7 +47,12 @@ namespace DRenderer::Vulkan::Init
 
 	std::pair<vk::DescriptorPool, std::vector<vk::DescriptorSet>> AllocatePrimaryDescriptorSets(vk::Device device, vk::DescriptorSetLayout layout, uint32_t resourceSetCount);
 
-	APIData::MainUniforms BuildMainUniforms(vk::Device device, const vk::PhysicalDeviceMemoryProperties& memProperties, uint32_t resourceSetCount);
+	APIData::MainUniforms BuildMainUniforms(
+			vk::Device device,
+			const vk::PhysicalDeviceMemoryProperties& memProperties,
+			const vk::PhysicalDeviceLimits& limits,
+			uint32_t resourceSetCount
+			);
 
 	void ConfigurePrimaryDescriptors();
 
