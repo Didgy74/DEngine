@@ -64,4 +64,6 @@ void main()
 	vec3 resultIntensity = (ambient + diffuse)  * color + specular;
 	vec3 resultColor = resultIntensity;
 	frag_color = vec4(resultColor, 1.0);
+	
+	frag_color = vec4(color, 1.0);
 }

@@ -145,7 +145,7 @@ void Engine::Core::Run()
 	// Load the GLTF scene, with a reference to the SceneObject we want to add it to
 	auto& rootObj = scene1.NewSceneObject();
 	rootObj.AddComponent<Assignment02::InputRotate>();
-	LoadGLTFScene(rootObj, "data/Sponza/Sponza.gltf");
+	//LoadGLTFScene(rootObj, "data/Sponza/Sponza.gltf");
 
 	lightObj.SetParent(&rootObj);
 	lightObj2.SetParent(&rootObj);

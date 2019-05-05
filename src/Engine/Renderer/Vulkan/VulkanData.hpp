@@ -58,7 +58,7 @@ struct DRenderer::Vulkan::VertexBufferObject
 	vk::DeviceMemory deviceMemory = nullptr;
 	std::array<size_t, static_cast<size_t>(Attribute::COUNT)> attributeSizes{};
 
-	vk::DeviceSize indexCount = 0;
+	uint32_t indexCount = 0;
 	vk::IndexType indexType{};
 
 	size_t GetByteOffset(Attribute attribute) const;
@@ -143,21 +143,26 @@ struct DRenderer::Vulkan::APIData
 	struct MainUniforms
 	{
 		vk::DeviceMemory cameraBuffersMem = nullptr;
-		size_t cameraUBOByteLength = std::numeric_limits<size_t>::max();
-		// Has resourceSetCount length
-		std::vector<vk::Buffer> cameraBuffer;
+		vk::Buffer cameraBuffer = nullptr;
 		uint8_t* cameraMemoryMap = nullptr;
+		size_t cameraDataResourceSetSize = 0;
 
-		vk::DeviceMemory modelDataMem = nullptr;
-		vk::Buffer modelDataBuffer = nullptr;
-		size_t modelDataUBOByteLength = 0;
-		size_t modelDataCapacity = 0;
-		uint8_t* modelDataMappedMem = nullptr;
+		uint8_t* GetCameraBufferResourceSet(uint32_t resourceSet);
+		size_t GetCameraResourceSetSize() const;
+		// Grabs the offset to the resource-set from the start of the whole camera-resource set buffer.
+		size_t GetCameraResourceSetOffset(uint32_t resourceSet) const;
 
-		uint8_t* GetModelBufferResourceSet(uint32_t resourceSet);
-		size_t GetModelBufferSetOffset(uint32_t resourceSet) const;
-		size_t GetModelDataResourceSetLength() const;
-		size_t GetModelDataDynamicOffset(size_t modelDataIndex) const;
+		vk::DeviceMemory objectDataMemory = nullptr;
+		vk::Buffer objectDataBuffer = nullptr;
+		size_t objectDataSize = 0;
+		size_t objectDataResourceSetSize = 0;
+		uint8_t* objectDataMappedMem = nullptr;
+
+		uint8_t* GetObjectDataResourceSet(uint32_t resourceSet);
+		size_t GetObjectDataResourceSetOffset(uint32_t resourceSet) const;
+		size_t GetObjectDataResourceSetSize() const;
+		size_t GetObjectDataDynamicOffset(size_t modelDataIndex) const;
+		size_t GetObjectDataSize() const;
 	};
 	MainUniforms mainUniforms{};
 	std::vector<vk::Fence> resourceSetAvailable;

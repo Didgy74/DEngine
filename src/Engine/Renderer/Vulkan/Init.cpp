@@ -1,5 +1,7 @@
 #include "Init.hpp"
 
+#include "DMath/Common.hpp"
+
 #include "../RendererData.hpp"
 
 #include "VulkanExtensionConfig.hpp"
@@ -333,8 +335,6 @@ vk::Device DRenderer::Vulkan::Init::CreateDevice(vk::PhysicalDevice physDevice)
 
 vk::DescriptorSetLayout DRenderer::Vulkan::Init::CreatePrimaryDescriptorSetLayout(vk::Device device)
 {
-
-
 	vk::DescriptorSetLayoutBinding cameraBindingInfo{};
 	cameraBindingInfo.binding = 0;
 	cameraBindingInfo.descriptorCount = 1;
@@ -361,7 +361,18 @@ vk::DescriptorSetLayout DRenderer::Vulkan::Init::CreatePrimaryDescriptorSetLayou
 			Core::LogDebugMessage("Init error - Couldn't generate primary DescriptorSetLayout.");
 			std::abort();
 		}
+
+		// Give debug names to our layout
+		if (Core::GetData().debugData.useDebugging)
+		{
+			vk::DebugUtilsObjectNameInfoEXT objectNameInfo{};
+			objectNameInfo.objectType = vk::ObjectType::eDescriptorSetLayout;
+			objectNameInfo.objectHandle = (uint64_t)(VkDescriptorSetLayout)temp;
+			objectNameInfo.pObjectName = "Primary Descriptor Set Layout";
+			device.setDebugUtilsObjectNameEXT(objectNameInfo);
+		}
 	}
+
 	return temp;
 }
 
@@ -393,7 +404,7 @@ DRenderer::Vulkan::APIData::Swapchain DRenderer::Vulkan::Init::CreateSwapchain(v
 
 	assert(swapchain.images.size() == settings.numImages);
 
-	swapchain.length = swapchain.images.size();
+	swapchain.length = uint32_t(swapchain.images.size());
 
 	swapchain.imageViews.resize(swapchain.length);
 	for (size_t i = 0; i < swapchain.imageViews.size(); i++)
@@ -409,6 +420,30 @@ DRenderer::Vulkan::APIData::Swapchain DRenderer::Vulkan::Init::CreateSwapchain(v
 		imageViewCreateInfo.subresourceRange.levelCount = 1;
 
 		swapchain.imageViews[i] = device.createImageView(imageViewCreateInfo);
+	}
+
+	if constexpr (Core::debugLevel >= 2)
+	{
+		if (Core::GetData().debugData.useDebugging)
+		{
+			// Make debug names for objects
+			for (size_t i = 0; i < swapchain.length; i++)
+			{
+				vk::DebugUtilsObjectNameInfoEXT imageObjectNameInfo{};
+				imageObjectNameInfo.objectType = vk::ObjectType::eImage;
+				imageObjectNameInfo.objectHandle = (uint64_t)(VkImage)swapchain.images[i];
+				std::string imageName = "Swapchain Image #" + std::to_string(i);
+				imageObjectNameInfo.pObjectName = imageName.data();
+				device.setDebugUtilsObjectNameEXT(imageObjectNameInfo);
+
+				vk::DebugUtilsObjectNameInfoEXT imageViewObjectNameInfo{};
+				imageViewObjectNameInfo.objectType = vk::ObjectType::eImageView;
+				imageViewObjectNameInfo.objectHandle = (uint64_t)(VkImageView)swapchain.imageViews[i];
+				std::string imageViewName = "Swapchain Image #" + std::to_string(i);
+				imageViewObjectNameInfo.pObjectName = imageName.data();
+				device.setDebugUtilsObjectNameEXT(imageObjectNameInfo);
+			}
+		}
 	}
 
 	return swapchain;
@@ -445,6 +480,28 @@ std::pair<vk::DescriptorPool, std::vector<vk::DescriptorSet>> DRenderer::Vulkan:
 	allocInfo.pSetLayouts = descriptorSetLayouts.data();
 	std::vector<vk::DescriptorSet> descriptorSets = device.allocateDescriptorSets(allocInfo);
 
+	if constexpr (Core::debugLevel >= 2)
+	{
+		if (Core::GetData().debugData.useDebugging)
+		{
+			vk::DebugUtilsObjectNameInfoEXT descSetPoolObjectInfo{};
+			descSetPoolObjectInfo.objectType = vk::ObjectType::eDescriptorPool;
+			descSetPoolObjectInfo.objectHandle = (uint64_t)(VkDescriptorPool)descriptorSetPool;
+			descSetPoolObjectInfo.pObjectName = "Primary Descriptor Pool";
+			device.setDebugUtilsObjectNameEXT(descSetPoolObjectInfo);
+
+			for (size_t i = 0; i < descriptorSets.size(); i++)
+			{
+				vk::DebugUtilsObjectNameInfoEXT descSetObjectInfo{};
+				descSetObjectInfo.objectType = vk::ObjectType::eDescriptorSet;
+				descSetObjectInfo.objectHandle = (uint64_t)(VkDescriptorSet)descriptorSets[i];
+				std::string name = "Primary Descriptor Set #" + std::to_string(i);
+				descSetObjectInfo.pObjectName = name.data();
+				device.setDebugUtilsObjectNameEXT(descSetObjectInfo);
+			}
+		}
+	}
+
 	return { descriptorSetPool, std::move(descriptorSets) };
 }
 
@@ -455,18 +512,23 @@ DRenderer::Vulkan::APIData::MainUniforms DRenderer::Vulkan::Init::BuildMainUnifo
 		uint32_t resourceSetCount)
 {
 	// SETUP CAMERA STUFF
-
 	size_t cameraUBOByteLength = sizeof(std::array<float, 16>);
+	cameraUBOByteLength = Math::CeilToNearestMultiple(cameraUBOByteLength, limits.minUniformBufferOffsetAlignment);
 
 	vk::BufferCreateInfo camBufferInfo{};
 	camBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
 	camBufferInfo.sharingMode = vk::SharingMode::eExclusive;
-	camBufferInfo.size = cameraUBOByteLength;
-	if (camBufferInfo.size < limits.minUniformBufferOffsetAlignment)
-		camBufferInfo.size = limits.minUniformBufferOffsetAlignment;
+
+	// Configure size of buffer
+	size_t cameraResourceSetSize = Math::CeilToNearestMultiple(cameraUBOByteLength, limits.nonCoherentAtomSize);
+	camBufferInfo.size = cameraResourceSetSize * resourceSetCount;
+
+	vk::Buffer camBuffer = device.createBuffer(camBufferInfo);
+
+	vk::MemoryRequirements camMemReqs = device.getBufferMemoryRequirements(camBuffer);
 
 	vk::MemoryAllocateInfo camAllocInfo{};
-	camAllocInfo.allocationSize = camBufferInfo.size * resourceSetCount;
+	camAllocInfo.allocationSize = camMemReqs.size;
 	camAllocInfo.memoryTypeIndex = std::numeric_limits<uint32_t>::max();
 	// Find host-visible memory
 	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
@@ -481,32 +543,25 @@ DRenderer::Vulkan::APIData::MainUniforms DRenderer::Vulkan::Init::BuildMainUnifo
 
 	vk::DeviceMemory camMem = device.allocateMemory(camAllocInfo);
 
+	device.bindBufferMemory(camBuffer, camMem, 0);
+
 	void* camMappedMemory = device.mapMemory(camMem, 0, camAllocInfo.allocationSize);
 
-	std::vector<vk::Buffer> camBuffers(resourceSetCount);
-	for (size_t i = 0; i < resourceSetCount; i++)
-	{
-		camBuffers[i] = device.createBuffer(camBufferInfo);
-		vk::MemoryRequirements memReqs = device.getBufferMemoryRequirements(camBuffers[i]);
-
-		device.bindBufferMemory(camBuffers[i], camMem, memReqs.alignment * i);
-	}
 
 	// SETUP PER OBJECT STUFF
 	size_t singleUBOByteLength = sizeof(std::array<float, 16>);
-	if (singleUBOByteLength < limits.minUniformBufferOffsetAlignment)
-		singleUBOByteLength = limits.minUniformBufferOffsetAlignment;
+	singleUBOByteLength = Math::CeilToNearestMultiple(singleUBOByteLength, limits.minUniformBufferOffsetAlignment);
+	size_t objectDataResourceSetSize = singleUBOByteLength * 256;
+	objectDataResourceSetSize = Math::CeilToNearestMultiple(objectDataResourceSetSize, limits.nonCoherentAtomSize);
 
 	vk::BufferCreateInfo modelBufferInfo{};
 	modelBufferInfo.sharingMode = vk::SharingMode::eExclusive;
 	modelBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
-	modelBufferInfo.size = singleUBOByteLength * resourceSetCount * 256;
+	modelBufferInfo.size = objectDataResourceSetSize * resourceSetCount;
 
 	vk::Buffer modelBuffer = device.createBuffer(modelBufferInfo);
 
 	vk::MemoryRequirements modelMemReqs = device.getBufferMemoryRequirements(modelBuffer);
-
-	size_t modelCountCapacity = modelMemReqs.size / singleUBOByteLength / resourceSetCount;
 
 	vk::MemoryAllocateInfo modelAllocInfo{};
 	modelAllocInfo.allocationSize = modelMemReqs.size;
@@ -520,15 +575,43 @@ DRenderer::Vulkan::APIData::MainUniforms DRenderer::Vulkan::Init::BuildMainUnifo
 
 	APIData::MainUniforms returnValue{};
 	returnValue.cameraBuffersMem = camMem;
-	returnValue.cameraBuffer = std::move(camBuffers);
-	returnValue.cameraUBOByteLength = camBufferInfo.size;
+	returnValue.cameraBuffer = camBuffer;
+	returnValue.cameraDataResourceSetSize = cameraResourceSetSize;
 	returnValue.cameraMemoryMap = static_cast<uint8_t*>(camMappedMemory);
 
-	returnValue.modelDataBuffer = modelBuffer;
-	returnValue.modelDataMem = modelMem;
-	returnValue.modelDataMappedMem = static_cast<uint8_t*>(modelMappedMemory);
-	returnValue.modelDataUBOByteLength = singleUBOByteLength;
-	returnValue.modelDataCapacity = modelCountCapacity;
+	returnValue.objectDataBuffer = modelBuffer;
+	returnValue.objectDataMemory = modelMem;
+	returnValue.objectDataMappedMem = static_cast<uint8_t*>(modelMappedMemory);
+	returnValue.objectDataSize = singleUBOByteLength;
+	returnValue.objectDataResourceSetSize = objectDataResourceSetSize;
+
+	if constexpr (Core::debugLevel >= 2)
+	{
+		if (Core::GetData().debugData.useDebugging)
+		{
+			vk::DebugUtilsObjectNameInfoEXT objectNameInfo{};
+
+			objectNameInfo.objectType = vk::ObjectType::eDeviceMemory;
+			objectNameInfo.objectHandle = (uint64_t)(VkDeviceMemory)camMem;
+			objectNameInfo.pObjectName = "Camera Data Memory";
+			device.setDebugUtilsObjectNameEXT(objectNameInfo);
+
+			objectNameInfo.objectType = vk::ObjectType::eBuffer;
+			objectNameInfo.objectHandle = (uint64_t)(VkBuffer)camBuffer;
+			objectNameInfo.pObjectName = "Camera Data Buffer";
+			device.setDebugUtilsObjectNameEXT(objectNameInfo);
+
+			objectNameInfo.objectType = vk::ObjectType::eDeviceMemory;
+			objectNameInfo.objectHandle = (uint64_t)(VkDeviceMemory)modelMem;
+			objectNameInfo.pObjectName = "Object Data Memory";
+			device.setDebugUtilsObjectNameEXT(objectNameInfo);
+
+			objectNameInfo.objectType = vk::ObjectType::eBuffer;
+			objectNameInfo.objectHandle = (uint64_t)(VkBuffer)modelBuffer;
+			objectNameInfo.pObjectName = "Object Data Buffer";
+			device.setDebugUtilsObjectNameEXT(objectNameInfo);
+		}
+	}
 
 	return returnValue;
 }
@@ -548,14 +631,13 @@ void DRenderer::Vulkan::Init::ConfigurePrimaryDescriptors()
 		camWrite.descriptorType = vk::DescriptorType::eUniformBuffer;
 
 		vk::DescriptorBufferInfo& camBufferInfo = camBufferInfos[i];
-		camBufferInfo.buffer = data.mainUniforms.cameraBuffer[i];
-		camBufferInfo.offset = 0;
-		camBufferInfo.range = data.mainUniforms.cameraUBOByteLength;
+		camBufferInfo.buffer = data.mainUniforms.cameraBuffer;
+		camBufferInfo.offset = data.mainUniforms.GetCameraResourceSetOffset(i);
+		camBufferInfo.range = data.mainUniforms.GetCameraResourceSetSize();
 
 		camWrite.descriptorCount = 1;
 		camWrite.pBufferInfo = &camBufferInfo;
 	}
-
 
 	std::vector<vk::WriteDescriptorSet> modelDescWrites(data.resourceSetCount);
 	std::vector<vk::DescriptorBufferInfo> modelBufferInfos(data.resourceSetCount);
@@ -569,9 +651,9 @@ void DRenderer::Vulkan::Init::ConfigurePrimaryDescriptors()
 		modelWrite.descriptorCount = 1;
 
 		vk::DescriptorBufferInfo& modelBufferInfo = modelBufferInfos[i];
-		modelBufferInfo.buffer = data.mainUniforms.modelDataBuffer;
-		modelBufferInfo.range = data.mainUniforms.modelDataUBOByteLength;
-		modelBufferInfo.offset = data.mainUniforms.GetModelBufferSetOffset(i);
+		modelBufferInfo.buffer = data.mainUniforms.objectDataBuffer;
+		modelBufferInfo.range = data.mainUniforms.GetObjectDataSize();
+		modelBufferInfo.offset = data.mainUniforms.GetObjectDataResourceSetOffset(i);
 
 		modelWrite.pBufferInfo = &modelBufferInfo;
 	}
