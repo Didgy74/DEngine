@@ -33,7 +33,7 @@ namespace DRenderer::Core
 		Engine::Renderer::RenderGraphTransform renderGraphTransform;
 		Engine::Renderer::CameraInfo cameraInfo;
 
-		Engine::Renderer::API activeAPI = Engine::Renderer::API::None;
+		API activeAPI = API::None;
 
 		std::unordered_map<size_t, size_t> meshReferences;
 		std::unordered_map<size_t, size_t> textureReferences;

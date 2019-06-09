@@ -1,14 +1,14 @@
 #version 450 core
 
-layout(set = 0, binding = 0) uniform CameraInfo
+layout(set = 0, binding = 0) uniform CameraData
 {
 	mat4 model;
-} cameraInfo;
+} cameraData;
 
-layout(set = 0, binding = 1) uniform ObjectInfo
+layout(set = 0, binding = 1) uniform ObjectData
 {
 	mat4 model;
-} objectInfo;
+} objectData;
 
 layout(location = 0) out FragData
 {
@@ -21,7 +21,7 @@ layout(location = 2) in vec3 vtxNormal;
 
 void main()
 {
-	gl_Position =  cameraInfo.model * objectInfo.model * vec4(vtxPosition, 1.0);
+	gl_Position =  cameraData.model * objectData.model * vec4(vtxPosition, 1.0);
 	gl_Position.y = -gl_Position.y;
 	
 	fragData.color = vec3(vtxUV, 0.5);

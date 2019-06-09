@@ -1289,11 +1289,6 @@ VKAPI_ATTR VkResult VKAPI_CALL vkQueuePresentKHR(
 	const VkPresentInfoKHR* pPresentInfo);
 #endif /* defined(VK_KHR_swapchain) */
 
-#if (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
-extern PFN_vkGetDeviceGroupPresentCapabilitiesKHR vkGetDeviceGroupPresentCapabilitiesKHR;
-extern PFN_vkGetDeviceGroupSurfacePresentModesKHR vkGetDeviceGroupSurfacePresentModesKHR;
-extern PFN_vkGetPhysicalDevicePresentRectanglesKHR vkGetPhysicalDevicePresentRectanglesKHR;
-#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
 #if (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
 VKAPI_ATTR VkResult VKAPI_CALL vkAcquireNextImage2KHR(
 	VkDevice                                    device,
@@ -1550,6 +1545,31 @@ VKAPI_ATTR VkResult VKAPI_CALL vkGetPhysicalDeviceSurfacePresentModesKHR(
 	VkPresentModeKHR* pPresentModes);
 #endif /* defined(VK_KHR_surface) */
 
+#if defined(VK_KHR_descriptor_update_template)
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateDescriptorUpdateTemplateKHR(
+	VkDevice                                    device,
+	const VkDescriptorUpdateTemplateCreateInfo* pCreateInfo,
+	const VkAllocationCallbacks* pAllocator,
+	VkDescriptorUpdateTemplate* pDescriptorUpdateTemplate);
+
+VKAPI_ATTR void VKAPI_CALL vkDestroyDescriptorUpdateTemplateKHR(
+	VkDevice                                    device,
+	VkDescriptorUpdateTemplate                  descriptorUpdateTemplate,
+	const VkAllocationCallbacks* pAllocator);
+
+VKAPI_ATTR void VKAPI_CALL vkUpdateDescriptorSetWithTemplateKHR(
+	VkDevice                                    device,
+	VkDescriptorSet                             descriptorSet,
+	VkDescriptorUpdateTemplate                  descriptorUpdateTemplate,
+	const void* pData);
+#endif /* defined(VK_KHR_descriptor_update_template) */
+
+#if (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1))
+extern PFN_vkGetDeviceGroupPresentCapabilitiesKHR vkGetDeviceGroupPresentCapabilitiesKHR;
+extern PFN_vkGetDeviceGroupSurfacePresentModesKHR vkGetDeviceGroupSurfacePresentModesKHR;
+extern PFN_vkGetPhysicalDevicePresentRectanglesKHR vkGetPhysicalDevicePresentRectanglesKHR;
+#endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_surface)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
+
 #if defined(VK_AMD_draw_indirect_count)
 extern PFN_vkCmdDrawIndexedIndirectCountAMD vkCmdDrawIndexedIndirectCountAMD;
 extern PFN_vkCmdDrawIndirectCountAMD vkCmdDrawIndirectCountAMD;
@@ -1663,11 +1683,6 @@ extern PFN_vkCmdEndRenderPass2KHR vkCmdEndRenderPass2KHR;
 extern PFN_vkCmdNextSubpass2KHR vkCmdNextSubpass2KHR;
 extern PFN_vkCreateRenderPass2KHR vkCreateRenderPass2KHR;
 #endif /* defined(VK_KHR_create_renderpass2) */
-#if defined(VK_KHR_descriptor_update_template)
-extern PFN_vkCreateDescriptorUpdateTemplateKHR vkCreateDescriptorUpdateTemplateKHR;
-extern PFN_vkDestroyDescriptorUpdateTemplateKHR vkDestroyDescriptorUpdateTemplateKHR;
-extern PFN_vkUpdateDescriptorSetWithTemplateKHR vkUpdateDescriptorSetWithTemplateKHR;
-#endif /* defined(VK_KHR_descriptor_update_template) */
 #if defined(VK_KHR_device_group)
 extern PFN_vkCmdDispatchBaseKHR vkCmdDispatchBaseKHR;
 extern PFN_vkCmdSetDeviceMaskKHR vkCmdSetDeviceMaskKHR;

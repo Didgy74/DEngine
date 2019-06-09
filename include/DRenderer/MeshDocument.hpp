@@ -34,23 +34,25 @@ namespace DRenderer
 
 		struct CreateInfo
 		{
-			const std::byte* byteArrayRef{};
-			size_t posByteOffset;
-			size_t uvByteOffset;
-			size_t normalByteOffset;
-			size_t tangentByteOffset;
-			size_t indexByteOffset;
+			const std::byte* posBuffer = nullptr;
+			const std::byte* uvBuffer = nullptr;
+			const std::byte* normalBuffer = nullptr;
+			const std::byte* tangentBuffer = nullptr;
+			const std::byte* indexBuffer = nullptr;
+			uint32_t vertexCount = 0;
 			IndexType indexType{};
-			uint32_t vertexCount;
-			uint32_t indexCount;
+			uint32_t indexCount = 0;
 		};
 
 		explicit MeshDocument(CreateInfo&& info);
+		MeshDocument() = delete;
+		MeshDocument(const MeshDocument&) = default;
 		MeshDocument(MeshDocument&&) = default;
-		MeshDocument(const MeshDocument&) = delete;
 
-		const size_t& GetByteOffset(Attribute attr) const;
-		size_t GetByteLength(Attribute attr) const;
+		MeshDocument& operator=(const MeshDocument&) = default;
+		MeshDocument& operator=(MeshDocument&&) = default;
+
+		size_t GetBufferSize(Attribute attr) const;
 		const std::byte* GetDataPtr(Attribute attr) const;
 
 		uint32_t GetVertexCount() const;
@@ -63,10 +65,9 @@ namespace DRenderer
 		static CreateInfo ToCreateInfo(MeshDocument&& input);
 
 	private:
-		size_t& GetByteOffset(Attribute attr);
+		const std::byte*& GetDataPtr(Attribute attr);
 
-		const std::byte* byteArrayRef;
-		std::array<size_t, static_cast<size_t>(Attribute::COUNT)> byteOffsets;
+		std::array<const std::byte*, static_cast<size_t>(Attribute::COUNT)> bufferRefs;
 		uint32_t vertexCount{};
 		IndexType indexType{};
 		uint32_t indexCount{};

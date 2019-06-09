@@ -49,7 +49,7 @@
       "variables": []
     },
     {
-      "name": "MinGW 64 Debug",
+      "name": "MinGW x64 Debug",
       "generator": "Ninja",
       "configurationType": "Debug",
       "buildRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\build\\${name}",
@@ -84,7 +84,7 @@
       "intelliSenseMode": "linux-gcc-x64"
     },
     {
-      "name": "MinGW 64 Release",
+      "name": "MinGW x64 Release",
       "generator": "Ninja",
       "configurationType": "RelWithDebInfo",
       "buildRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\build\\${name}",

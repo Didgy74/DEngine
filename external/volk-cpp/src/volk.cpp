@@ -3014,18 +3014,27 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateDescriptorUpdateTemplate(
 	VkDevice                                    device,
 	const VkDescriptorUpdateTemplateCreateInfo* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
-	VkDescriptorUpdateTemplate* pDescriptorUpdateTemplate);
+	VkDescriptorUpdateTemplate* pDescriptorUpdateTemplate)
+{
+	return Volk::funcPtrs->vkCreateDescriptorUpdateTemplate(device, pCreateInfo, pAllocator, pDescriptorUpdateTemplate);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkDestroyDescriptorUpdateTemplate(
 	VkDevice                                    device,
 	VkDescriptorUpdateTemplate                  descriptorUpdateTemplate,
-	const VkAllocationCallbacks* pAllocator);
+	const VkAllocationCallbacks* pAllocator)
+{
+	return Volk::funcPtrs->vkDestroyDescriptorUpdateTemplate(device, descriptorUpdateTemplate, pAllocator);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkUpdateDescriptorSetWithTemplate(
 	VkDevice                                    device,
 	VkDescriptorSet                             descriptorSet,
 	VkDescriptorUpdateTemplate                  descriptorUpdateTemplate,
-	const void* pData);
+	const void* pData)
+{
+	return Volk::funcPtrs->vkUpdateDescriptorSetWithTemplate(device, descriptorSet, descriptorUpdateTemplate, pData);
+}
 
 VKAPI_ATTR void VKAPI_CALL vkGetPhysicalDeviceExternalBufferProperties(
 	VkPhysicalDevice                            physicalDevice,
@@ -3130,7 +3139,24 @@ VKAPI_ATTR void VKAPI_CALL vkSubmitDebugUtilsMessageEXT(
 }
 #endif /* defined(VK_EXT_debug_utils) */
 
+#if defined(VK_KHR_descriptor_update_template)
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateDescriptorUpdateTemplateKHR(
+	VkDevice                                    device,
+	const VkDescriptorUpdateTemplateCreateInfo* pCreateInfo,
+	const VkAllocationCallbacks* pAllocator,
+	VkDescriptorUpdateTemplate* pDescriptorUpdateTemplate);
 
+VKAPI_ATTR void VKAPI_CALL vkDestroyDescriptorUpdateTemplateKHR(
+	VkDevice                                    device,
+	VkDescriptorUpdateTemplate                  descriptorUpdateTemplate,
+	const VkAllocationCallbacks* pAllocator);
+
+VKAPI_ATTR void VKAPI_CALL vkUpdateDescriptorSetWithTemplateKHR(
+	VkDevice                                    device,
+	VkDescriptorSet                             descriptorSet,
+	VkDescriptorUpdateTemplate                  descriptorUpdateTemplate,
+	const void* pData);
+#endif /* defined(VK_KHR_descriptor_update_template) */
 
 #ifdef __GNUC__
 #	pragma GCC visibility push(hidden)
@@ -3250,11 +3276,6 @@ PFN_vkCmdEndRenderPass2KHR vkCmdEndRenderPass2KHR;
 PFN_vkCmdNextSubpass2KHR vkCmdNextSubpass2KHR;
 PFN_vkCreateRenderPass2KHR vkCreateRenderPass2KHR;
 #endif /* defined(VK_KHR_create_renderpass2) */
-#if defined(VK_KHR_descriptor_update_template)
-PFN_vkCreateDescriptorUpdateTemplateKHR vkCreateDescriptorUpdateTemplateKHR;
-PFN_vkDestroyDescriptorUpdateTemplateKHR vkDestroyDescriptorUpdateTemplateKHR;
-PFN_vkUpdateDescriptorSetWithTemplateKHR vkUpdateDescriptorSetWithTemplateKHR;
-#endif /* defined(VK_KHR_descriptor_update_template) */
 #if defined(VK_KHR_device_group)
 PFN_vkCmdDispatchBaseKHR vkCmdDispatchBaseKHR;
 PFN_vkCmdSetDeviceMaskKHR vkCmdSetDeviceMaskKHR;

@@ -18,6 +18,23 @@
 #include <any>
 #include <array>
 
+namespace DRenderer
+{
+	API GetActiveAPI();
+
+	namespace Core
+	{
+		void Terminate();
+	}
+}
+
+enum class DRenderer::API
+{
+	None,
+	OpenGL,
+	Vulkan
+};
+
 namespace Engine
 {
 	namespace Renderer
@@ -28,7 +45,7 @@ namespace Engine
 		size_t GetViewportCount();
 		Viewport& GetViewport(size_t index);
 
-		API GetActiveAPI();
+		
 
 		bool IsCompatible(const RenderGraph& renderGraph, const RenderGraphTransform& transforms);
 
@@ -47,12 +64,7 @@ namespace Engine
 		};
 	}
 
-	enum class Renderer::API
-	{
-		None,
-		OpenGL,
-		Vulkan
-	};
+
 
 	struct Renderer::DebugCreateInfo
 	{
@@ -62,7 +74,7 @@ namespace Engine
 
 	struct Renderer::AssetLoadCreateInfo
 	{
-		using MeshLoaderPFN = std::optional<DRenderer::MeshDocument>(*)(size_t);
+		using MeshLoaderPFN = std::vector<std::optional<DRenderer::MeshDocument>>(*)(const std::vector<size_t>&);
 		MeshLoaderPFN meshLoader = nullptr;
 
 		using TextureLoaderPFN = std::optional<DTex::TexDoc>(*)(size_t);
@@ -74,7 +86,7 @@ namespace Engine
 
 	struct Renderer::InitInfo
 	{
-		API preferredAPI = API::None;
+		DRenderer::API preferredAPI = DRenderer::API::None;
 		Utility::ImgDim surfaceDimensions{};
 		void* surfaceHandle = nullptr;
 

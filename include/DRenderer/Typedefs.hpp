@@ -7,6 +7,8 @@ namespace DRenderer
 {
 	class MeshDocument;
 	using MeshDoc = MeshDocument;
+
+	enum class API;
 }
 
 namespace Engine
@@ -23,8 +25,7 @@ namespace Engine
 		struct DebugCreateInfo;
 		struct AssetLoadCreateInfo;
 		struct InitInfo;
-
-		enum class API;
+		
 		class Viewport;
 
 		struct MeshID;

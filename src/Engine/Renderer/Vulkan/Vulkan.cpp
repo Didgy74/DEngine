@@ -1,9 +1,8 @@
 ﻿#include "Vulkan.hpp"
 
-#include "DRenderer/MeshDocument.hpp"
-
 #include "VulkanData.hpp"
 #include "Init.hpp"
+#include "AssetSystem.hpp"
 
 #include "volk/volk.hpp"
 #include <vulkan/vulkan.hpp>
@@ -24,65 +23,6 @@ void DRenderer::Vulkan::APIDataDeleter(void*& ptr)
 DRenderer::Vulkan::APIData& DRenderer::Vulkan::GetAPIData()
 {
 	return *static_cast<APIData*>(DRenderer::Core::GetAPIData());
-}
-
-size_t DRenderer::Vulkan::VertexBufferObject::GetByteOffset(VertexBufferObject::Attribute attribute) const
-{
-	size_t offset = 0;
-	for (size_t i = 0; i < static_cast<size_t>(attribute); i++)
-		offset += static_cast<size_t>(attributeSizes[i]);
-	return offset;
-}
-
-size_t& DRenderer::Vulkan::VertexBufferObject::GetAttrSize(Attribute attr)
-{
-	return attributeSizes[static_cast<size_t>(attr)];
-}
-
-size_t DRenderer::Vulkan::VertexBufferObject::GetAttrSize(Attribute attr) const
-{
-	return attributeSizes[static_cast<size_t>(attr)];
-}
-
-uint8_t* DRenderer::Vulkan::APIData::MainUniforms::GetObjectDataResourceSet(uint32_t resourceSet)
-{
-	return objectDataMappedMem + GetObjectDataResourceSetOffset(resourceSet);
-}
-
-size_t DRenderer::Vulkan::APIData::MainUniforms::GetObjectDataResourceSetOffset(uint32_t resourceSet) const
-{
-	return GetObjectDataResourceSetSize() * resourceSet;
-}
-
-size_t DRenderer::Vulkan::APIData::MainUniforms::GetObjectDataResourceSetSize() const
-{
-	return objectDataResourceSetSize;
-}
-
-size_t DRenderer::Vulkan::APIData::MainUniforms::GetObjectDataDynamicOffset(size_t modelDataIndex) const
-{
-	assert(modelDataIndex < objectDataResourceSetSize);
-	return objectDataSize * modelDataIndex;
-}
-
-uint8_t* DRenderer::Vulkan::APIData::MainUniforms::GetCameraBufferResourceSet(uint32_t resourceSet)
-{
-	return cameraMemoryMap + GetCameraResourceSetOffset(resourceSet);
-}
-
-size_t DRenderer::Vulkan::APIData::MainUniforms::GetCameraResourceSetOffset(uint32_t resourceSet) const
-{
-	return GetCameraResourceSetSize() * resourceSet;
-}
-
-size_t DRenderer::Vulkan::APIData::MainUniforms::GetCameraResourceSetSize() const
-{
-	return cameraDataResourceSetSize;
-}
-
-size_t DRenderer::Vulkan::APIData::MainUniforms::GetObjectDataSize() const
-{
-	return objectDataSize;
 }
 
 std::array<vk::VertexInputBindingDescription, 3> DRenderer::Vulkan::GetVertexBindings()
@@ -124,8 +64,8 @@ std::array<vk::VertexInputAttributeDescription, 3> DRenderer::Vulkan::GetVertexA
 
 namespace DRenderer::Vulkan
 {
+	QueueInfo LoadQueueInfo(vk::Device device, const QueueInfo& queuesToLoad);
 	void MakePipeline();
-	void MakeVBO();
 }
 
 void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& initInfo)
@@ -141,6 +81,7 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	// Start initialization
 	data.apiVersion = Init::LoadAPIVersion();
 	data.instanceExtensionProperties = Init::LoadInstanceExtensionProperties();
+	assert(!data.instanceExtensionProperties.empty());
 	if constexpr (Core::debugLevel >= 2)
 		data.instanceLayerProperties = Init::LoadInstanceLayerProperties();
 
@@ -175,13 +116,12 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	SwapchainSettings swapchainSettings = Init::GetSwapchainSettings(data.physDevice.handle, data.surface);
 	data.surfaceExtents = vk::Extent2D{ swapchainSettings.capabilities.currentExtent.width, swapchainSettings.capabilities.currentExtent.height };
 
-
-	data.device = Init::CreateDevice(data.physDevice.handle);
+	data.device = Init::CreateDevice(data.physDevice);
 
 	// Load function pointers for our device.
 	Volk::LoadDevice(data.device);
 
-	data.descriptorSetLayout = Init::CreatePrimaryDescriptorSetLayout(data.device);
+	MainUniforms::Init_CreateDescriptorSetAndPipelineLayout(data.mainUniforms, data.device);
 
 	// Create our Render Target
 	data.renderTarget = Init::CreateRenderTarget(data.device, data.surfaceExtents, swapchainSettings.surfaceFormat.format, data.physDevice.maxFramebufferSamples);
@@ -196,19 +136,18 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 			data.renderTarget.colorImgView,
 			data.renderTarget.depthImgView);
 
-
 	// Set up swapchain
 	data.swapchain = Init::CreateSwapchain(data.device, data.surface, swapchainSettings);
 	data.resourceSetCount = data.swapchain.length - 1;
 
-	auto [descPool, descSets] = Init::AllocatePrimaryDescriptorSets(data.device, data.descriptorSetLayout, data.resourceSetCount);
-	data.descriptorSetPool = descPool;
-	data.descriptorSets = std::move(descSets);
+	// Setup deletion queue
+	data.deletionQueue.device = data.device;
 
-	// Build main uniforms
-	data.mainUniforms = Init::BuildMainUniforms(data.device, data.physDevice.memProperties, data.physDevice.properties.limits, data.resourceSetCount);
+	MainUniforms::Init_AllocateDescriptorSets(data.mainUniforms, data.resourceSetCount);
 
-	Init::ConfigurePrimaryDescriptors();
+	MainUniforms::Init_BuildBuffers(data.mainUniforms, data.physDevice.memInfo, data.physDevice.memProperties, data.physDevice.properties.limits);
+
+	MainUniforms::Init_ConfigureDescriptors(data.mainUniforms);
 
 	// Set up presentation cmd buffers
 	Init::SetupPresentCmdBuffers(data.device, data.renderTarget, data.surfaceExtents, data.swapchain.images, data.presentCmdPool, data.presentCmdBuffer);
@@ -216,11 +155,13 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	// Allocate rendering cmd buffers.
 	Init::SetupRenderingCmdBuffers(data.device, data.swapchain.length, data.renderCmdPool, data.renderCmdBuffer);
 
-	// Request our graphics queue
-	data.graphicsQueue = data.device.getQueue(0, 0);
+	// Load all queues
+	data.queues = LoadQueueInfo(data.device, data.physDevice.preferredQueues);
+
+	AssetSystem::Init(data.device, data.queues, data.resourceSetCount, data.assetSystem);
 
 	// Transition layouts of our render target and swapchain
-	Init::TransitionRenderTargetAndSwapchain(data.device, data.graphicsQueue, data.renderTarget, data.swapchain.images);
+	Init::TransitionRenderTargetAndSwapchain(data.device, data.queues.graphics.handle, data.renderTarget, data.swapchain.images);
 
 	data.resourceSetAvailable.resize(data.resourceSetCount);
 	for (size_t i = 0; i < data.resourceSetCount; i++)
@@ -249,12 +190,55 @@ void DRenderer::Vulkan::Initialize(Core::APIDataPointer& apiData, InitInfo& init
 	data.swapchain.currentImage = imageResult.value;
 
 	MakePipeline();
-	MakeVBO();
+}
+
+DRenderer::Vulkan::QueueInfo DRenderer::Vulkan::LoadQueueInfo(vk::Device device, const QueueInfo& queuesToLoad)
+{
+	APIData& data = GetAPIData();
+
+	QueueInfo qInfo = queuesToLoad;
+
+	qInfo.graphics.handle = device.getQueue(qInfo.graphics.familyIndex, qInfo.graphics.queueIndex);
+
+	if (qInfo.TransferIsSeparate())
+		qInfo.transfer.handle = device.getQueue(qInfo.transfer.familyIndex, qInfo.transfer.queueIndex);
+	else
+		qInfo.transfer.handle = qInfo.graphics.handle;
+
+	if constexpr (Core::debugLevel >= 2)
+	{
+		if (Core::GetData().debugData.useDebugging)
+		{
+			// Name our render target frame
+			vk::DebugUtilsObjectNameInfoEXT debugObjectNameInfo{};
+			debugObjectNameInfo.objectType = vk::ObjectType::eQueue;
+			debugObjectNameInfo.objectHandle = (uint64_t)(VkQueue)qInfo.graphics.handle;
+			debugObjectNameInfo.pObjectName = "Render Queue";
+			device.setDebugUtilsObjectNameEXT(debugObjectNameInfo);
+
+			if (qInfo.TransferIsSeparate())
+			{
+				debugObjectNameInfo.objectType = vk::ObjectType::eQueue;
+				debugObjectNameInfo.objectHandle = (uint64_t)(VkQueue)qInfo.transfer.handle;
+				debugObjectNameInfo.pObjectName = "Transfer Queue";
+				device.setDebugUtilsObjectNameEXT(debugObjectNameInfo);
+			}
+		}
+	}
+
+	return qInfo;
 }
 
 void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyParams& in)
 {
 	APIData& data = GetAPIData();
+	data.deletionQueue.CleanupCurrentFrame();
+
+	// Reconfigure object model matrix buffer if necessary
+	MainUniforms::Update(data.mainUniforms, in.meshLoadQueue->size(), data.deletionQueue);
+
+	// Load all assets
+	AssetSystem::LoadAssets(data.assetSystem, data.physDevice.memInfo, data.queues, data.deletionQueue, in);
 
 	const Core::Data& drendererData = Core::GetData();
 
@@ -291,21 +275,35 @@ void DRenderer::Vulkan::PrepareRenderingEarly(const Core::PrepareRenderingEarlyP
 
 	cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, data.pipeline);
 
-	// Bind VBO
-	VBO& vbo = data.testVBO;
-	std::array<vk::Buffer, 3> vertexBuffers{ vbo.buffer, vbo.buffer, vbo.buffer };
-	std::array<vk::DeviceSize, 3> vboOffsets
-	{
-		vbo.GetByteOffset(VBO::Attribute::Position),
-		vbo.GetByteOffset(VBO::Attribute::TexCoord),
-		vbo.GetByteOffset(VBO::Attribute::Normal)
-	};
-	cmdBuffer.bindVertexBuffers(0, vertexBuffers, vboOffsets);
-	cmdBuffer.bindIndexBuffer(vbo.buffer, vbo.GetByteOffset(VBO::Attribute::Index), vbo.indexType);
-
 	for (size_t i = 0; i < drendererData.renderGraph.meshes.size(); i++)
 	{
-		cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, data.pipelineLayout, 0, data.descriptorSets[data.currentResourceSet], data.mainUniforms.GetObjectDataDynamicOffset(i));
+		// Bind VBO
+		auto vboIter = data.assetSystem.vboDatabase.find(drendererData.renderGraph.meshes[i].meshID);
+
+		if constexpr (Core::debugLevel >= 2)
+		{
+			if (Core::GetData().debugData.useDebugging)
+			{
+				if (vboIter == data.assetSystem.vboDatabase.end())
+				{
+					Core::LogDebugMessage("Fatal error. Couldn't find designated VBO in VBO database.");
+					std::abort();
+				}
+			}
+		}
+
+		VBO& vbo = vboIter->second;
+		std::array<vk::Buffer, 3> vertexBuffers{ vbo.buffer, vbo.buffer, vbo.buffer };
+		std::array<vk::DeviceSize, 3> vboOffsets
+		{
+			vbo.GetByteOffset(VBO::Attribute::Position),
+			vbo.GetByteOffset(VBO::Attribute::TexCoord),
+			vbo.GetByteOffset(VBO::Attribute::Normal)
+		};
+		cmdBuffer.bindVertexBuffers(0, vertexBuffers, vboOffsets);
+		cmdBuffer.bindIndexBuffer(vbo.buffer, vbo.GetByteOffset(VBO::Attribute::Index), vbo.indexType);
+
+		cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, data.pipelineLayout, 0, data.mainUniforms.descrSets[data.currentResourceSet], data.mainUniforms.GetObjectDataDynamicOffset(i));
 		cmdBuffer.drawIndexed(vbo.indexCount, 1, 0, 0, 0);
 	}
 
@@ -344,9 +342,7 @@ void DRenderer::Vulkan::PrepareRenderingLate()
 		const auto& transform = renderGraphTransform.meshes[i];
 
 		std::memcpy(uboPtr, transform.data(), sizeof(transform));
-
 	}
-
 
 	vk::MappedMemoryRange modelUBORange{};
 	modelUBORange.memory = data.mainUniforms.objectDataMemory;
@@ -360,11 +356,23 @@ void DRenderer::Vulkan::Draw()
 {
 	APIData& data = GetAPIData();
 
+	// Queue rendering
+	
 	vk::SubmitInfo renderImageSubmit{};
 	renderImageSubmit.commandBufferCount = 1;
 	renderImageSubmit.pCommandBuffers = &data.renderCmdBuffer[data.swapchain.currentImage];
-	data.graphicsQueue.submit(renderImageSubmit, data.resourceSetAvailable[data.currentResourceSet]);
 
+	// Build wait semaphore array for render submit
+	auto assetSystemWaits = AssetSystem::GetWaitSemaphores(data.assetSystem);
+	renderImageSubmit.waitSemaphoreCount = uint32_t(assetSystemWaits.first.size());
+	renderImageSubmit.pWaitSemaphores = assetSystemWaits.first.data();
+	renderImageSubmit.pWaitDstStageMask = assetSystemWaits.second.data();
+
+	data.queues.graphics.handle.submit(renderImageSubmit, data.resourceSetAvailable[data.currentResourceSet]);
+
+	AssetSystem::SubmittedFrame(data.assetSystem);
+
+	// Queue rendertarget to swapchain image copy
 	vk::SubmitInfo resolveImageSubmit{};
 	resolveImageSubmit.commandBufferCount = 1;
 	resolveImageSubmit.pCommandBuffers = &data.presentCmdBuffer[data.swapchain.currentImage];
@@ -373,9 +381,8 @@ void DRenderer::Vulkan::Draw()
 	resolveImageSubmit.pWaitSemaphores = &data.swapchainImageAvailable[data.imageAvailableActiveIndex];
 	vk::PipelineStageFlags semaphoreWaitFlag = vk::PipelineStageFlagBits::eBottomOfPipe;
 	resolveImageSubmit.pWaitDstStageMask = &semaphoreWaitFlag;
-	data.graphicsQueue.submit(resolveImageSubmit, {});
 
-
+	data.queues.graphics.handle.submit(resolveImageSubmit, {});
 
 	vk::PresentInfoKHR presentInfo{};
 	presentInfo.swapchainCount = 1;
@@ -387,7 +394,7 @@ void DRenderer::Vulkan::Draw()
 	vk::Result presentResult{};
 	presentInfo.pResults = &presentResult;
 
-	data.graphicsQueue.presentKHR(presentInfo);
+	data.queues.graphics.handle.presentKHR(presentInfo);
 
 	if constexpr (Core::debugLevel >= 2)
 	{
@@ -397,7 +404,6 @@ void DRenderer::Vulkan::Draw()
 			std::abort();
 		}
 	}
-
 
 	// Linearly increment index-counters
 	data.currentResourceSet = (data.currentResourceSet + 1) % data.resourceSetCount;
@@ -426,7 +432,7 @@ void DRenderer::Vulkan::MakePipeline()
 
 	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
 	pipelineLayoutCreateInfo.setLayoutCount = 1;
-	pipelineLayoutCreateInfo.pSetLayouts = &data.descriptorSetLayout;
+	pipelineLayoutCreateInfo.pSetLayouts = &data.mainUniforms.descrSetLayout;
 
 	data.pipelineLayout = data.device.createPipelineLayout(pipelineLayoutCreateInfo);
 
@@ -435,7 +441,7 @@ void DRenderer::Vulkan::MakePipeline()
 	{
 		std::abort();
 	}
-		
+
 	std::vector<uint8_t> vertCode(vertFile.tellg());
 	vertFile.seekg(0);
 	vertFile.read(reinterpret_cast<char*>(vertCode.data()), vertCode.size());
@@ -540,80 +546,52 @@ void DRenderer::Vulkan::MakePipeline()
 	pipelineInfo.pStages = shaderStages.data();
 
 	data.pipeline = data.device.createGraphicsPipeline({}, pipelineInfo);
+
+	data.device.destroyShaderModule(vertModule);
+	data.device.destroyShaderModule(fragModule);
 }
 
-void DRenderer::Vulkan::MakeVBO()
+void DRenderer::Vulkan::Terminate(void*& apiData)
 {
-	APIData& data = GetAPIData();
+	APIData& data = *reinterpret_cast<APIData*>(apiData);
 
-	auto meshDocumentOpt = Core::GetData().assetLoadData.meshLoader(0);
+	data.device.waitIdle();
 
-	assert(meshDocumentOpt.has_value());
+	MainUniforms::Terminate(data.mainUniforms);
 
-	MeshDocument& meshDoc = meshDocumentOpt.value();
+	// Delete main semaphores
+	for (auto item : data.swapchainImageAvailable)
+		data.device.destroySemaphore(item);
+	for (auto item : data.resourceSetAvailable)
+		data.device.destroyFence(item);
 
-	vk::BufferCreateInfo bufferInfo{};
-	bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer;
-	bufferInfo.sharingMode = vk::SharingMode::eExclusive;
-	bufferInfo.size = meshDoc.GetTotalSizeRequired();
+	// Destroy all main command pools / buffers
+	data.device.destroyCommandPool(data.renderCmdPool);
+	data.device.destroyCommandPool(data.presentCmdPool);
 
-	vk::Buffer buffer = data.device.createBuffer(bufferInfo);
+	// Cleanup swapchain
+	for (auto item : data.swapchain.imageViews)
+		data.device.destroyImageView(item);
+	data.device.destroySwapchainKHR(data.swapchain.handle);
 
-	vk::MemoryRequirements memReqs = data.device.getBufferMemoryRequirements(buffer);
+	// Clean up rendertarget
+	data.device.destroyImage(data.renderTarget.colorImg);
+	data.device.destroyImageView(data.renderTarget.colorImgView);
+	data.device.destroyImage(data.renderTarget.depthImg);
+	data.device.destroyImageView(data.renderTarget.depthImgView);
+	data.device.destroyFramebuffer(data.renderTarget.framebuffer);
+	data.device.freeMemory(data.renderTarget.memory);
 
-	vk::MemoryAllocateInfo allocInfo{};
-	allocInfo.allocationSize = memReqs.size;
-	allocInfo.memoryTypeIndex = std::numeric_limits<uint32_t>::max();
+	// Clean up renderPass
+	data.device.destroyRenderPass(data.renderPass);
 
-	// Find host-visible memory we can allocate to
-	for (uint32_t i = 0; i < data.physDevice.memProperties.memoryTypeCount; i++)
-	{
-		if (data.physDevice.memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible)
-		{
-			allocInfo.memoryTypeIndex = i;
-			break;
-		}
-	}
+	AssetSystem::Terminate(data.assetSystem);
 
-	vk::DeviceMemory mem = data.device.allocateMemory(allocInfo);
+	data.device.destroy();
 
-	data.device.bindBufferMemory(buffer, mem, 0);
+	data.instance.destroyDebugUtilsMessengerEXT(data.debugMessenger);
+	data.instance.destroy();
 
-	VBO vbo;
-	vbo.buffer = buffer;
-	vbo.deviceMemory = mem;
-	vbo.indexType = meshDoc.GetIndexType() == MeshDoc::IndexType::UInt32 ? vk::IndexType::eUint32 : vk::IndexType::eUint16;
-	vbo.indexCount = meshDoc.GetIndexCount();
-
-
-	uint8_t* ptr = static_cast<uint8_t*>(data.device.mapMemory(mem, 0, bufferInfo.size));
-
-	using MeshDocAttr = MeshDoc::Attribute;
-	using VBOAttr = VBO::Attribute;
-
-	// Copy position data
-	std::memcpy(ptr, meshDoc.GetDataPtr(MeshDocAttr::Position), meshDoc.GetByteLength(MeshDocAttr::Position));
-	vbo.GetAttrSize(VBOAttr::Position) = meshDoc.GetByteLength(MeshDocAttr::Position);
-
-	ptr += vbo.GetAttrSize(VBOAttr::Position);
-
-	// Copy UV data
-	std::memcpy(ptr, meshDoc.GetDataPtr(MeshDocAttr::TexCoord), meshDoc.GetByteLength(MeshDocAttr::TexCoord));
-	vbo.GetAttrSize(VBOAttr::TexCoord) = meshDoc.GetByteLength(MeshDocAttr::TexCoord);
-
-	ptr += vbo.GetAttrSize(VBOAttr::TexCoord);
-
-	// Copy normal data
-	std::memcpy(ptr, meshDoc.GetDataPtr(MeshDocAttr::Normal), meshDoc.GetByteLength(MeshDocAttr::Normal));
-	vbo.GetAttrSize(VBOAttr::Normal) = meshDoc.GetByteLength(MeshDocAttr::Normal);
-
-	ptr += vbo.GetAttrSize(VBOAttr::Normal);
-
-	// Copy index data
-	std::memcpy(ptr, meshDoc.GetDataPtr(MeshDocAttr::Index), meshDoc.GetByteLength(MeshDocAttr::Index));
-	vbo.GetAttrSize(VBOAttr::Index) = meshDoc.GetByteLength(MeshDocAttr::Index);
-
-	data.device.unmapMemory(mem);
-
-	data.testVBO = vbo;
+	delete reinterpret_cast<APIData*>(apiData);
+	apiData = nullptr;
 }

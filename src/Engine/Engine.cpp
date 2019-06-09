@@ -39,7 +39,7 @@ namespace Engine
 		// Initialize renderer
 		Renderer::InitInfo rendererInitInfo;
 
-		rendererInitInfo.preferredAPI = Renderer::API::Vulkan;
+		rendererInitInfo.preferredAPI = DRenderer::API::Vulkan;
 
 		// Debug info
 		// Whether we want to enable debugging in the rendering system
@@ -75,11 +75,6 @@ void Engine::Core::Run()
 	Time::Core::Initialize();
 	Input::Core::Initialize();
 
-	// Add our cube model to the assetmanager
-	AssMan::MeshInfo meshInfo;
-	meshInfo.path = "data/Meshes/Cube/Cube.gltf";
-	size_t cubeMesh = AssMan::AddMesh(std::move(meshInfo));
-
 	InitializeRenderer();
 
 
@@ -87,6 +82,10 @@ void Engine::Core::Run()
 	Scene& scene1 = Engine::NewScene();
 	Renderer::GetViewport(0).SetSceneRef(&scene1);
 
+	// Add our cube model to the assetmanager
+	AssMan::MeshInfo meshInfo;
+	meshInfo.path = "data/Meshes/Cube/Cube.gltf";
+	size_t cubeMesh = AssMan::AddMesh(std::move(meshInfo));
 
 
 	// Create camera Object
@@ -98,7 +97,6 @@ void Engine::Core::Run()
 	// We use hard-references, but components may move in memory over the lifetime of the program
 	// so soft-references are usually preferred.
 	auto& camera = objCamera.AddComponent<Components::Camera>().second.get();
-	camera.rotation = camera.rotation;
 	objCamera.AddComponent<Components::FreeLook>();
 
 	// Light object 1
@@ -145,7 +143,7 @@ void Engine::Core::Run()
 	// Load the GLTF scene, with a reference to the SceneObject we want to add it to
 	auto& rootObj = scene1.NewSceneObject();
 	rootObj.AddComponent<Assignment02::InputRotate>();
-	//LoadGLTFScene(rootObj, "data/Sponza/Sponza.gltf");
+
 
 	lightObj.SetParent(&rootObj);
 	lightObj2.SetParent(&rootObj);
@@ -161,7 +159,13 @@ void Engine::Core::Run()
 	// Checks for any window events, like input etc and updates the Input system.
 	while (Application::Core::UpdateEvents(), Application::IsRunning())
 	{
-		//std::cout << scene1.GetTimeData().GetFPS() << " - " << scene1.GetTimeData().GetDeltaTime() << std::endl;
+		static bool pressed = false;
+		if (pressed == false && Input::Raw::GetValue(Input::Raw::Button::F))
+		{
+			pressed = true;
+
+			LoadGLTFScene(rootObj, "data/Sponza/Sponza.gltf");
+		}
 
 		// Calls all the custom script components' Tick function.
 		scene1.ScriptTick();
@@ -190,7 +194,7 @@ void Engine::Core::Run()
 
 	Time::Core::Terminate();
 	Input::Core::Terminate();
-	Renderer::Core::Terminate();
+	DRenderer::Core::Terminate();
 	Application::Core::Terminate();
 	AssetManager::Core::Terminate();
 }

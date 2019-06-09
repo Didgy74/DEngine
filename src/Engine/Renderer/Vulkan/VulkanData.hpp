@@ -1,33 +1,25 @@
 #pragma once
 
-#include "DRenderer/VulkanInitInfo.hpp"
-
 #include "volk/volk.hpp"
 #include <vulkan/vulkan.hpp>
+
+#include "DRenderer/VulkanInitInfo.hpp"
+#include "QueueInfo.hpp"
+#include "DeletionQueues.hpp"
+#include "AssetSystem.hpp"
+#include "MemoryTypes.hpp"
+#include "MainUniforms.hpp"
+#include "Constants.hpp"
+
 
 #include <array>
 #include <vector>
 
 namespace DRenderer::Vulkan
 {
-	constexpr std::array requiredValidLayers
-	{
-		"VK_LAYER_LUNARG_standard_validation",
-		//"VK_LAYER_RENDERDOC_Capture"
-	};
+	struct PhysDeviceInfo;
 
-	constexpr std::array requiredDeviceExtensions
-	{
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-	};
-
-	constexpr std::array requiredDeviceLayers
-	{
-		"VK_LAYER_LUNARG_standard_validation"
-	};
-
-	struct VertexBufferObject;
-	using VBO = VertexBufferObject;
+	struct DeletionQueues;
 
 	struct APIData;
 	void APIDataDeleter(void*& ptr);
@@ -43,33 +35,18 @@ namespace DRenderer::Vulkan
 			void* pUserData);
 }
 
-struct DRenderer::Vulkan::VertexBufferObject
+struct DRenderer::Vulkan::PhysDeviceInfo
 {
-	enum class Attribute
-	{
-		Position,
-		TexCoord,
-		Normal,
-		Index,
-		COUNT
-	};
-
-	vk::Buffer buffer = nullptr;
-	vk::DeviceMemory deviceMemory = nullptr;
-	std::array<size_t, static_cast<size_t>(Attribute::COUNT)> attributeSizes{};
-
-	uint32_t indexCount = 0;
-	vk::IndexType indexType{};
-
-	size_t GetByteOffset(Attribute attribute) const;
-	size_t& GetAttrSize(Attribute attr);
-	size_t GetAttrSize(Attribute attr) const;
+	vk::PhysicalDevice handle = nullptr;
+	vk::PhysicalDeviceProperties properties{};
+	vk::PhysicalDeviceMemoryProperties memProperties{};
+	vk::SampleCountFlagBits maxFramebufferSamples{};
+	QueueInfo preferredQueues{};
+	MemoryTypes memInfo{};
 };
 
 struct DRenderer::Vulkan::APIData
 {
-	static constexpr uint32_t invalidIndex = std::numeric_limits<uint32_t>::max();
-
 	APIData() = default;
 	APIData(const APIData&) = delete;
 	APIData(APIData&&) = delete;
@@ -95,21 +72,13 @@ struct DRenderer::Vulkan::APIData
 	vk::SurfaceKHR surface = nullptr;
 	vk::Extent2D surfaceExtents{};
 
-	struct PhysDeviceInfo
-	{
-		vk::PhysicalDevice handle = nullptr;
-		vk::PhysicalDeviceProperties properties{};
-		vk::PhysicalDeviceMemoryProperties memProperties{};
-		vk::SampleCountFlagBits maxFramebufferSamples{};
-		uint32_t deviceLocalMemory = invalidIndex;
-		uint32_t hostVisibleMemory = invalidIndex;
-		bool hostMemoryIsDeviceLocal = false;
-	};
 	PhysDeviceInfo physDevice{};
 
 	vk::Device device = nullptr;
 
-	vk::Queue graphicsQueue = nullptr;
+	DeletionQueues deletionQueue;
+
+	QueueInfo queues{};
 
 	struct RenderTarget
 	{
@@ -126,44 +95,21 @@ struct DRenderer::Vulkan::APIData
 	struct Swapchain
 	{
 		vk::SwapchainKHR handle = nullptr;
-		uint32_t length = invalidIndex;
-		uint32_t currentImage = invalidIndex;
+		uint32_t length = 0;
+		uint32_t currentImage = Constants::invalidIndex;
 		std::vector<vk::Image> images;
 		std::vector<vk::ImageView> imageViews;
 	};
 	Swapchain swapchain{};
 
 	// Resource set means in-flight image
-	uint32_t resourceSetCount = invalidIndex;
+	uint32_t resourceSetCount = 0;
 	// Resource set means in-flight image
 	uint32_t currentResourceSet = 0;
 	// Has swapchain length
 	uint32_t imageAvailableActiveIndex = 0;
 
-	struct MainUniforms
-	{
-		vk::DeviceMemory cameraBuffersMem = nullptr;
-		vk::Buffer cameraBuffer = nullptr;
-		uint8_t* cameraMemoryMap = nullptr;
-		size_t cameraDataResourceSetSize = 0;
-
-		uint8_t* GetCameraBufferResourceSet(uint32_t resourceSet);
-		size_t GetCameraResourceSetSize() const;
-		// Grabs the offset to the resource-set from the start of the whole camera-resource set buffer.
-		size_t GetCameraResourceSetOffset(uint32_t resourceSet) const;
-
-		vk::DeviceMemory objectDataMemory = nullptr;
-		vk::Buffer objectDataBuffer = nullptr;
-		size_t objectDataSize = 0;
-		size_t objectDataResourceSetSize = 0;
-		uint8_t* objectDataMappedMem = nullptr;
-
-		uint8_t* GetObjectDataResourceSet(uint32_t resourceSet);
-		size_t GetObjectDataResourceSetOffset(uint32_t resourceSet) const;
-		size_t GetObjectDataResourceSetSize() const;
-		size_t GetObjectDataDynamicOffset(size_t modelDataIndex) const;
-		size_t GetObjectDataSize() const;
-	};
+	
 	MainUniforms mainUniforms{};
 	std::vector<vk::Fence> resourceSetAvailable;
 
@@ -183,9 +129,5 @@ struct DRenderer::Vulkan::APIData
 	// Has swapchain length
 	std::vector<vk::Semaphore> swapchainImageAvailable;
 
-	vk::DescriptorSetLayout descriptorSetLayout = nullptr;
-	vk::DescriptorPool descriptorSetPool = nullptr;
-	std::vector<vk::DescriptorSet> descriptorSets;
-
-	VBO testVBO{};
+	AssetData assetSystem{};
 };

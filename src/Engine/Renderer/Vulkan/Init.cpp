@@ -6,14 +6,16 @@
 
 #include "VulkanExtensionConfig.hpp"
 
+#include <array>
+
 DRenderer::Vulkan::APIData::Version DRenderer::Vulkan::Init::LoadAPIVersion()
 {
 	APIData::Version version;
 
 	// Query the highest API version available.
-	uint32_t apiVersion = 0;
-	auto enumerateVersionResult = Volk::GetInstanceVersion();
-	assert(enumerateVersionResult != 0);
+	
+	uint32_t apiVersion = Volk::GetInstanceVersion();
+	assert(apiVersion != 0);
 	version.major = VK_VERSION_MAJOR(apiVersion);
 	version.minor = VK_VERSION_MINOR(apiVersion);
 	version.patch = VK_VERSION_PATCH(apiVersion);
@@ -55,9 +57,9 @@ std::vector<vk::LayerProperties> DRenderer::Vulkan::Init::LoadInstanceLayerPrope
 	auto availableLayers = vk::enumerateInstanceLayerProperties();
 
 	std::vector<vk::LayerProperties> activeLayers;
-	activeLayers.reserve(requiredValidLayers.size());
+	activeLayers.reserve(Constants::requiredValidLayers.size());
 
-	for (const auto& requiredLayer : requiredValidLayers)
+	for (const auto& requiredLayer : Constants::requiredValidLayers)
 	{
 		bool foundLayer = false;
 		for (const auto& availableLayer : availableLayers)
@@ -138,11 +140,11 @@ vk::SurfaceKHR DRenderer::Vulkan::Init::CreateSurface(vk::Instance instance, voi
 	return tempSurfaceHandle;
 }
 
-DRenderer::Vulkan::APIData::PhysDeviceInfo DRenderer::Vulkan::Init::LoadPhysDevice(
+DRenderer::Vulkan::PhysDeviceInfo DRenderer::Vulkan::Init::LoadPhysDevice(
 		vk::Instance instance,
 		vk::SurfaceKHR surface)
 {
-	APIData::PhysDeviceInfo physDeviceInfo{};
+	PhysDeviceInfo physDeviceInfo{};
 
 	auto physDevices = instance.enumeratePhysicalDevices();
 	assert(!physDevices.empty());
@@ -150,7 +152,7 @@ DRenderer::Vulkan::APIData::PhysDeviceInfo DRenderer::Vulkan::Init::LoadPhysDevi
 	physDeviceInfo.handle = physDevices[0];
 
 	// Check presentation support
-	physDeviceInfo.handle.getQueueFamilyProperties();
+	auto temp = physDeviceInfo.handle.getQueueFamilyProperties();
 	bool presentSupport = physDeviceInfo.handle.getSurfaceSupportKHR(0, surface);
 	assert(presentSupport && "Error. Queuefamily 0 does not have presentation support.");
 
@@ -163,11 +165,11 @@ DRenderer::Vulkan::APIData::PhysDeviceInfo DRenderer::Vulkan::Init::LoadPhysDevi
 	{
 		if (physDeviceInfo.memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal)
 		{
-			physDeviceInfo.deviceLocalMemory = i;
+			physDeviceInfo.memInfo.deviceLocal = i;
 			break;
 		}
 	}
-	if (physDeviceInfo.deviceLocalMemory == APIData::invalidIndex)
+	if (physDeviceInfo.memInfo.deviceLocal == Constants::invalidIndex)
 	{
 		Core::LogDebugMessage("Error. Found no device local memory.");
 		std::abort();
@@ -178,20 +180,29 @@ DRenderer::Vulkan::APIData::PhysDeviceInfo DRenderer::Vulkan::Init::LoadPhysDevi
 	{
 		if (physDeviceInfo.memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible)
 		{
-			physDeviceInfo.hostVisibleMemory = i;
+			physDeviceInfo.memInfo.hostVisible = i;
 			break;
 		}
 	}
-	if (physDeviceInfo.hostVisibleMemory == APIData::invalidIndex)
+	if (physDeviceInfo.memInfo.hostVisible == Constants::invalidIndex)
 	{
 		Core::LogDebugMessage("Error. Found no host visible memory.");
 		std::abort();
 	}
 
-
-	if (physDeviceInfo.hostVisibleMemory == physDeviceInfo.deviceLocalMemory)
-		physDeviceInfo.hostMemoryIsDeviceLocal = true;
-
+	// Find host-visible | device local memory
+	for (uint32_t i = 0; i < physDeviceInfo.memProperties.memoryTypeCount; i++)
+	{
+		vk::MemoryPropertyFlags searchFlags = vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible;
+		if ((physDeviceInfo.memProperties.memoryTypes[i].propertyFlags & searchFlags) == searchFlags)
+		{
+			if (physDeviceInfo.memProperties.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal)
+			{
+				physDeviceInfo.memInfo.deviceLocalAndHostVisible = i;
+				break;
+			}
+		}
+	}
 
 	// Check framebuffer sample count
 	assert(physDeviceInfo.properties.limits.framebufferColorSampleCounts == physDeviceInfo.properties.limits.framebufferDepthSampleCounts);
@@ -201,6 +212,39 @@ DRenderer::Vulkan::APIData::PhysDeviceInfo DRenderer::Vulkan::Init::LoadPhysDevi
 		physDeviceInfo.maxFramebufferSamples = vk::SampleCountFlagBits::e2;
 	if (physDeviceInfo.properties.limits.framebufferColorSampleCounts & vk::SampleCountFlagBits::e4)
 		physDeviceInfo.maxFramebufferSamples = vk::SampleCountFlagBits::e4;
+
+
+	// Find preferred queues
+	const auto queueFamilyProperties = physDeviceInfo.handle.getQueueFamilyProperties();
+	// Find render queue
+	for (uint32_t i = 0; i < queueFamilyProperties.size(); i++)
+	{
+		const auto& queueFamily = queueFamilyProperties[i];
+		if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
+		{
+			physDeviceInfo.preferredQueues.graphics.familyIndex = i;
+			physDeviceInfo.preferredQueues.graphics.queueIndex = 0;
+			break;
+		}
+	}
+	assert(physDeviceInfo.preferredQueues.graphics.familyIndex != Constants::invalidIndex);
+
+	// Find transfer queue, prefer a queue on a different family
+	for (uint32_t i = 0; i < queueFamilyProperties.size(); i++)
+	{
+		if (i == physDeviceInfo.preferredQueues.graphics.familyIndex)
+			continue;
+
+		const auto& queueFamily = queueFamilyProperties[i];
+		if (queueFamily.queueFlags & vk::QueueFlagBits::eTransfer)
+		{
+			physDeviceInfo.preferredQueues.transfer.familyIndex = i;
+			physDeviceInfo.preferredQueues.transfer.queueIndex = 0;
+			break;
+		}
+	}
+	if (physDeviceInfo.preferredQueues.transfer.familyIndex == Constants::invalidIndex)
+		physDeviceInfo.preferredQueues.transfer.familyIndex = physDeviceInfo.preferredQueues.graphics.familyIndex;
 
 	return physDeviceInfo;
 }
@@ -287,15 +331,15 @@ DRenderer::Vulkan::SwapchainSettings DRenderer::Vulkan::Init::GetSwapchainSettin
 	return settings;
 }
 
-vk::Device DRenderer::Vulkan::Init::CreateDevice(vk::PhysicalDevice physDevice)
+vk::Device DRenderer::Vulkan::Init::CreateDevice(const PhysDeviceInfo& physDevice)
 {
 	// Create logical device
-	auto queues = physDevice.getQueueFamilyProperties();
+	
 
 	vk::DeviceCreateInfo createInfo{};
 
 	// Feature configuration
-	auto physDeviceFeatures = physDevice.getFeatures();
+	auto physDeviceFeatures = physDevice.handle.getFeatures();
 
 	vk::PhysicalDeviceFeatures features{};
 	if (physDeviceFeatures.robustBufferAccess == 1)
@@ -309,71 +353,37 @@ vk::Device DRenderer::Vulkan::Init::CreateDevice(vk::PhysicalDevice physDevice)
 	float priority[2] = { 1.f, 1.f };
 	std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
 
-	vk::DeviceQueueCreateInfo firstQueueCreateInfo;
-	firstQueueCreateInfo.pQueuePriorities = priority;
-	firstQueueCreateInfo.queueCount = 1;
-	firstQueueCreateInfo.queueFamilyIndex = 0;
-	queueCreateInfos.push_back(firstQueueCreateInfo);
+	vk::DeviceQueueCreateInfo queueCreateInfo;
+
+	queueCreateInfo.pQueuePriorities = priority;
+	queueCreateInfo.queueCount = 1;
+	queueCreateInfo.queueFamilyIndex = physDevice.preferredQueues.graphics.familyIndex;
+	queueCreateInfos.push_back(queueCreateInfo);
+
+	if (physDevice.preferredQueues.TransferIsSeparate())
+	{
+		queueCreateInfo.pQueuePriorities = priority;
+		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.queueFamilyIndex = physDevice.preferredQueues.transfer.familyIndex;
+		queueCreateInfos.push_back(queueCreateInfo);
+	}
 
 	createInfo.queueCreateInfoCount = uint32_t(queueCreateInfos.size());
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-	auto deviceExtensionsAvailable = physDevice.enumerateDeviceExtensionProperties();
+	auto deviceExtensionsAvailable = physDevice.handle.enumerateDeviceExtensionProperties();
 	// TODO: Check if all required device extensions are available
-	createInfo.ppEnabledExtensionNames = Vulkan::requiredDeviceExtensions.data();
-	createInfo.enabledExtensionCount = uint32_t(Vulkan::requiredDeviceExtensions.size());
+	createInfo.ppEnabledExtensionNames = Constants::requiredDeviceExtensions.data();
+	createInfo.enabledExtensionCount = uint32_t(Constants::requiredDeviceExtensions.size());
 
 	//auto deviceLayersAvailable = data.physDevice.handle.enumerateDeviceLayerProperties();
 	//createInfo.enabledLayerCount = uint32_t(Vulkan::requiredDeviceLayers.size());
 	//createInfo.ppEnabledLayerNames = Vulkan::requiredDeviceLayers.data();
 
-	auto result = physDevice.createDevice(createInfo);
+	auto result = physDevice.handle.createDevice(createInfo);
 	if (!result)
 		std::abort();
 	return result;
-}
-
-vk::DescriptorSetLayout DRenderer::Vulkan::Init::CreatePrimaryDescriptorSetLayout(vk::Device device)
-{
-	vk::DescriptorSetLayoutBinding cameraBindingInfo{};
-	cameraBindingInfo.binding = 0;
-	cameraBindingInfo.descriptorCount = 1;
-	cameraBindingInfo.descriptorType = vk::DescriptorType::eUniformBuffer;
-	cameraBindingInfo.stageFlags = vk::ShaderStageFlagBits::eVertex;
-
-	vk::DescriptorSetLayoutBinding modelBindingInfo{};
-	modelBindingInfo.binding = 1;
-	modelBindingInfo.descriptorCount = 1;
-	modelBindingInfo.descriptorType = vk::DescriptorType ::eUniformBufferDynamic;
-	modelBindingInfo.stageFlags = vk::ShaderStageFlagBits::eVertex;
-
-	std::array bindingInfos { cameraBindingInfo, modelBindingInfo };
-
-	vk::DescriptorSetLayoutCreateInfo layoutCreateInfo{};
-	layoutCreateInfo.bindingCount = uint32_t(bindingInfos.size());
-	layoutCreateInfo.pBindings = bindingInfos.data();
-
-	auto temp = device.createDescriptorSetLayout(layoutCreateInfo);
-	if constexpr (Core::debugLevel >= 2)
-	{
-		if (!temp)
-		{
-			Core::LogDebugMessage("Init error - Couldn't generate primary DescriptorSetLayout.");
-			std::abort();
-		}
-
-		// Give debug names to our layout
-		if (Core::GetData().debugData.useDebugging)
-		{
-			vk::DebugUtilsObjectNameInfoEXT objectNameInfo{};
-			objectNameInfo.objectType = vk::ObjectType::eDescriptorSetLayout;
-			objectNameInfo.objectHandle = (uint64_t)(VkDescriptorSetLayout)temp;
-			objectNameInfo.pObjectName = "Primary Descriptor Set Layout";
-			device.setDebugUtilsObjectNameEXT(objectNameInfo);
-		}
-	}
-
-	return temp;
 }
 
 DRenderer::Vulkan::APIData::Swapchain DRenderer::Vulkan::Init::CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings)
@@ -449,221 +459,6 @@ DRenderer::Vulkan::APIData::Swapchain DRenderer::Vulkan::Init::CreateSwapchain(v
 	return swapchain;
 }
 
-std::pair<vk::DescriptorPool, std::vector<vk::DescriptorSet>> DRenderer::Vulkan::Init::AllocatePrimaryDescriptorSets(
-		vk::Device device,
-		vk::DescriptorSetLayout layout,
-		uint32_t resourceSetCount)
-{
-	vk::DescriptorPoolSize cameraUBOPoolSize{};
-	cameraUBOPoolSize.descriptorCount = resourceSetCount;
-	cameraUBOPoolSize.type = vk::DescriptorType::eUniformBuffer;
-
-	vk::DescriptorPoolSize modelUBOPoolSize{};
-	modelUBOPoolSize.descriptorCount = resourceSetCount;
-	modelUBOPoolSize.type = vk::DescriptorType::eUniformBufferDynamic;
-
-	std::array poolSizes { cameraUBOPoolSize, modelUBOPoolSize };
-
-	vk::DescriptorPoolCreateInfo poolCreateInfo{};
-	poolCreateInfo.maxSets = resourceSetCount;
-	poolCreateInfo.poolSizeCount = uint32_t(poolSizes.size());
-	poolCreateInfo.pPoolSizes = poolSizes.data();
-
-	vk::DescriptorPool descriptorSetPool = device.createDescriptorPool(poolCreateInfo);
-
-	vk::DescriptorSetAllocateInfo allocInfo{};
-	allocInfo.descriptorPool = descriptorSetPool;
-	allocInfo.descriptorSetCount = resourceSetCount;
-	std::vector<vk::DescriptorSetLayout> descriptorSetLayouts(resourceSetCount);
-	for (auto& setLayout : descriptorSetLayouts)
-		setLayout = layout;
-	allocInfo.pSetLayouts = descriptorSetLayouts.data();
-	std::vector<vk::DescriptorSet> descriptorSets = device.allocateDescriptorSets(allocInfo);
-
-	if constexpr (Core::debugLevel >= 2)
-	{
-		if (Core::GetData().debugData.useDebugging)
-		{
-			vk::DebugUtilsObjectNameInfoEXT descSetPoolObjectInfo{};
-			descSetPoolObjectInfo.objectType = vk::ObjectType::eDescriptorPool;
-			descSetPoolObjectInfo.objectHandle = (uint64_t)(VkDescriptorPool)descriptorSetPool;
-			descSetPoolObjectInfo.pObjectName = "Primary Descriptor Pool";
-			device.setDebugUtilsObjectNameEXT(descSetPoolObjectInfo);
-
-			for (size_t i = 0; i < descriptorSets.size(); i++)
-			{
-				vk::DebugUtilsObjectNameInfoEXT descSetObjectInfo{};
-				descSetObjectInfo.objectType = vk::ObjectType::eDescriptorSet;
-				descSetObjectInfo.objectHandle = (uint64_t)(VkDescriptorSet)descriptorSets[i];
-				std::string name = "Primary Descriptor Set #" + std::to_string(i);
-				descSetObjectInfo.pObjectName = name.data();
-				device.setDebugUtilsObjectNameEXT(descSetObjectInfo);
-			}
-		}
-	}
-
-	return { descriptorSetPool, std::move(descriptorSets) };
-}
-
-DRenderer::Vulkan::APIData::MainUniforms DRenderer::Vulkan::Init::BuildMainUniforms(
-		vk::Device device,
-		const vk::PhysicalDeviceMemoryProperties& memProperties,
-		const vk::PhysicalDeviceLimits& limits,
-		uint32_t resourceSetCount)
-{
-	// SETUP CAMERA STUFF
-	size_t cameraUBOByteLength = sizeof(std::array<float, 16>);
-	cameraUBOByteLength = Math::CeilToNearestMultiple(cameraUBOByteLength, limits.minUniformBufferOffsetAlignment);
-
-	vk::BufferCreateInfo camBufferInfo{};
-	camBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
-	camBufferInfo.sharingMode = vk::SharingMode::eExclusive;
-
-	// Configure size of buffer
-	size_t cameraResourceSetSize = Math::CeilToNearestMultiple(cameraUBOByteLength, limits.nonCoherentAtomSize);
-	camBufferInfo.size = cameraResourceSetSize * resourceSetCount;
-
-	vk::Buffer camBuffer = device.createBuffer(camBufferInfo);
-
-	vk::MemoryRequirements camMemReqs = device.getBufferMemoryRequirements(camBuffer);
-
-	vk::MemoryAllocateInfo camAllocInfo{};
-	camAllocInfo.allocationSize = camMemReqs.size;
-	camAllocInfo.memoryTypeIndex = std::numeric_limits<uint32_t>::max();
-	// Find host-visible memory
-	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
-	{
-		if (memProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible)
-		{
-			camAllocInfo.memoryTypeIndex = i;
-			break;
-		}
-	}
-	assert(camAllocInfo.memoryTypeIndex != std::numeric_limits<uint32_t>::max());
-
-	vk::DeviceMemory camMem = device.allocateMemory(camAllocInfo);
-
-	device.bindBufferMemory(camBuffer, camMem, 0);
-
-	void* camMappedMemory = device.mapMemory(camMem, 0, camAllocInfo.allocationSize);
-
-
-	// SETUP PER OBJECT STUFF
-	size_t singleUBOByteLength = sizeof(std::array<float, 16>);
-	singleUBOByteLength = Math::CeilToNearestMultiple(singleUBOByteLength, limits.minUniformBufferOffsetAlignment);
-	size_t objectDataResourceSetSize = singleUBOByteLength * 256;
-	objectDataResourceSetSize = Math::CeilToNearestMultiple(objectDataResourceSetSize, limits.nonCoherentAtomSize);
-
-	vk::BufferCreateInfo modelBufferInfo{};
-	modelBufferInfo.sharingMode = vk::SharingMode::eExclusive;
-	modelBufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
-	modelBufferInfo.size = objectDataResourceSetSize * resourceSetCount;
-
-	vk::Buffer modelBuffer = device.createBuffer(modelBufferInfo);
-
-	vk::MemoryRequirements modelMemReqs = device.getBufferMemoryRequirements(modelBuffer);
-
-	vk::MemoryAllocateInfo modelAllocInfo{};
-	modelAllocInfo.allocationSize = modelMemReqs.size;
-	modelAllocInfo.memoryTypeIndex = camAllocInfo.memoryTypeIndex;
-
-	vk::DeviceMemory modelMem = device.allocateMemory(modelAllocInfo);
-
-	device.bindBufferMemory(modelBuffer, modelMem, 0);
-
-	void* modelMappedMemory = device.mapMemory(modelMem, 0, modelBufferInfo.size);
-
-	APIData::MainUniforms returnValue{};
-	returnValue.cameraBuffersMem = camMem;
-	returnValue.cameraBuffer = camBuffer;
-	returnValue.cameraDataResourceSetSize = cameraResourceSetSize;
-	returnValue.cameraMemoryMap = static_cast<uint8_t*>(camMappedMemory);
-
-	returnValue.objectDataBuffer = modelBuffer;
-	returnValue.objectDataMemory = modelMem;
-	returnValue.objectDataMappedMem = static_cast<uint8_t*>(modelMappedMemory);
-	returnValue.objectDataSize = singleUBOByteLength;
-	returnValue.objectDataResourceSetSize = objectDataResourceSetSize;
-
-	if constexpr (Core::debugLevel >= 2)
-	{
-		if (Core::GetData().debugData.useDebugging)
-		{
-			vk::DebugUtilsObjectNameInfoEXT objectNameInfo{};
-
-			objectNameInfo.objectType = vk::ObjectType::eDeviceMemory;
-			objectNameInfo.objectHandle = (uint64_t)(VkDeviceMemory)camMem;
-			objectNameInfo.pObjectName = "Camera Data Memory";
-			device.setDebugUtilsObjectNameEXT(objectNameInfo);
-
-			objectNameInfo.objectType = vk::ObjectType::eBuffer;
-			objectNameInfo.objectHandle = (uint64_t)(VkBuffer)camBuffer;
-			objectNameInfo.pObjectName = "Camera Data Buffer";
-			device.setDebugUtilsObjectNameEXT(objectNameInfo);
-
-			objectNameInfo.objectType = vk::ObjectType::eDeviceMemory;
-			objectNameInfo.objectHandle = (uint64_t)(VkDeviceMemory)modelMem;
-			objectNameInfo.pObjectName = "Object Data Memory";
-			device.setDebugUtilsObjectNameEXT(objectNameInfo);
-
-			objectNameInfo.objectType = vk::ObjectType::eBuffer;
-			objectNameInfo.objectHandle = (uint64_t)(VkBuffer)modelBuffer;
-			objectNameInfo.pObjectName = "Object Data Buffer";
-			device.setDebugUtilsObjectNameEXT(objectNameInfo);
-		}
-	}
-
-	return returnValue;
-}
-
-void DRenderer::Vulkan::Init::ConfigurePrimaryDescriptors()
-{
-	APIData& data = GetAPIData();
-
-	std::vector<vk::WriteDescriptorSet> camDescWrites(data.resourceSetCount);
-	std::vector<vk::DescriptorBufferInfo> camBufferInfos(data.resourceSetCount);
-
-	for (size_t i = 0; i < data.resourceSetCount; i++)
-	{
-		vk::WriteDescriptorSet& camWrite = camDescWrites[i];
-		camWrite.dstSet = data.descriptorSets[i];
-		camWrite.dstBinding = 0;
-		camWrite.descriptorType = vk::DescriptorType::eUniformBuffer;
-
-		vk::DescriptorBufferInfo& camBufferInfo = camBufferInfos[i];
-		camBufferInfo.buffer = data.mainUniforms.cameraBuffer;
-		camBufferInfo.offset = data.mainUniforms.GetCameraResourceSetOffset(i);
-		camBufferInfo.range = data.mainUniforms.GetCameraResourceSetSize();
-
-		camWrite.descriptorCount = 1;
-		camWrite.pBufferInfo = &camBufferInfo;
-	}
-
-	std::vector<vk::WriteDescriptorSet> modelDescWrites(data.resourceSetCount);
-	std::vector<vk::DescriptorBufferInfo> modelBufferInfos(data.resourceSetCount);
-
-	for (size_t i = 0; i < data.resourceSetCount; i++)
-	{
-		vk::WriteDescriptorSet& modelWrite = modelDescWrites[i];
-		modelWrite.dstSet = data.descriptorSets[i];
-		modelWrite.dstBinding = 1;
-		modelWrite.descriptorType = vk::DescriptorType::eUniformBufferDynamic;
-		modelWrite.descriptorCount = 1;
-
-		vk::DescriptorBufferInfo& modelBufferInfo = modelBufferInfos[i];
-		modelBufferInfo.buffer = data.mainUniforms.objectDataBuffer;
-		modelBufferInfo.range = data.mainUniforms.GetObjectDataSize();
-		modelBufferInfo.offset = data.mainUniforms.GetObjectDataResourceSetOffset(i);
-
-		modelWrite.pBufferInfo = &modelBufferInfo;
-	}
-
-	for (const auto& write : modelDescWrites)
-		camDescWrites.push_back(write);
-
-	data.device.updateDescriptorSets(camDescWrites, {});
-}
-
 // Note! This does NOT create the associated framebuffer.
 DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init::CreateRenderTarget(
 		vk::Device device,
@@ -710,7 +505,7 @@ DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init::CreateRenderTa
 	size_t allocationSize = depthMemReqs.size + depthImgMemOffset;
 	vk::MemoryAllocateInfo allocInfo{};
 	allocInfo.allocationSize = allocationSize;
-	allocInfo.memoryTypeIndex = GetAPIData().physDevice.deviceLocalMemory;
+	allocInfo.memoryTypeIndex = GetAPIData().physDevice.memInfo.deviceLocal;
 
 	vk::DeviceMemory mem = device.allocateMemory(allocInfo);
 	assert(mem);
@@ -754,32 +549,35 @@ DRenderer::Vulkan::APIData::RenderTarget DRenderer::Vulkan::Init::CreateRenderTa
 
 	if constexpr (Core::debugLevel >= 2)
 	{
-		// Name our render target frame
-		vk::DebugUtilsObjectNameInfoEXT renderTargetNameInfo{};
-		renderTargetNameInfo.objectType = vk::ObjectType::eDeviceMemory;
-		renderTargetNameInfo.objectHandle = (uint64_t)(VkDeviceMemory)renderTarget.memory;
-		renderTargetNameInfo.pObjectName = "Render Target - DeviceMemory";
-		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+		if (Core::GetData().debugData.useDebugging)
+		{
+			// Name our render target frame
+			vk::DebugUtilsObjectNameInfoEXT renderTargetNameInfo{};
+			renderTargetNameInfo.objectType = vk::ObjectType::eDeviceMemory;
+			renderTargetNameInfo.objectHandle = (uint64_t)(VkDeviceMemory)renderTarget.memory;
+			renderTargetNameInfo.pObjectName = "Render Target - DeviceMemory";
+			device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
 
-		renderTargetNameInfo.objectType = vk::ObjectType::eImage;
-		renderTargetNameInfo.objectHandle = (uint64_t)(VkImage)renderTarget.colorImg;
-		renderTargetNameInfo.pObjectName = "Render Target 0 - Color Image";
-		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+			renderTargetNameInfo.objectType = vk::ObjectType::eImage;
+			renderTargetNameInfo.objectHandle = (uint64_t)(VkImage)renderTarget.colorImg;
+			renderTargetNameInfo.pObjectName = "Render Target 0 - Color Image";
+			device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
 
-		renderTargetNameInfo.objectType = vk::ObjectType::eImageView;
-		renderTargetNameInfo.objectHandle = (uint64_t)(VkImageView)renderTarget.colorImgView;
-		renderTargetNameInfo.pObjectName = "Render Target 0 - Color ImageView";
-		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+			renderTargetNameInfo.objectType = vk::ObjectType::eImageView;
+			renderTargetNameInfo.objectHandle = (uint64_t)(VkImageView)renderTarget.colorImgView;
+			renderTargetNameInfo.pObjectName = "Render Target 0 - Color ImageView";
+			device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
 
-		renderTargetNameInfo.objectType = vk::ObjectType::eImage;
-		renderTargetNameInfo.objectHandle = (uint64_t)(VkImage)renderTarget.depthImg;
-		renderTargetNameInfo.pObjectName = "Render Target 0 - Depth Image";
-		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+			renderTargetNameInfo.objectType = vk::ObjectType::eImage;
+			renderTargetNameInfo.objectHandle = (uint64_t)(VkImage)renderTarget.depthImg;
+			renderTargetNameInfo.pObjectName = "Render Target 0 - Depth Image";
+			device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
 
-		renderTargetNameInfo.objectType = vk::ObjectType::eImageView;
-		renderTargetNameInfo.objectHandle = (uint64_t)(VkImageView)renderTarget.depthImgView;
-		renderTargetNameInfo.pObjectName = "Render Target 0 - Depth ImageView";
-		device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+			renderTargetNameInfo.objectType = vk::ObjectType::eImageView;
+			renderTargetNameInfo.objectHandle = (uint64_t)(VkImageView)renderTarget.depthImgView;
+			renderTargetNameInfo.pObjectName = "Render Target 0 - Depth ImageView";
+			device.setDebugUtilsObjectNameEXT(renderTargetNameInfo);
+		}
 	}
 
 	return renderTarget;
@@ -957,7 +755,7 @@ void DRenderer::Vulkan::Init::TransitionRenderTargetAndSwapchain(
 
 	queue.submit(submitInfo, vk::Fence());
 
-	queue.waitIdle();
+	device.waitIdle();
 
 	device.destroyCommandPool(pool);
 }

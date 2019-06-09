@@ -12,7 +12,7 @@ namespace DRenderer
 	namespace Vulkan
 	{
 		void Initialize(Core::APIDataPointer& apiData, InitInfo& createInfo);
-		void Terminate(std::any& apiData);
+		void Terminate(void*& apiData);
 		void PrepareRenderingEarly(const Core::PrepareRenderingEarlyParams& in);
 		void PrepareRenderingLate();
 		void Draw();

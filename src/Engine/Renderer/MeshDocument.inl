@@ -5,20 +5,18 @@
 namespace DRenderer
 {
 	MeshDocument::MeshDocument(CreateInfo&& createInfo) :
-		byteArrayRef(createInfo.byteArrayRef),
 		indexType(createInfo.indexType),
 		indexCount(createInfo.indexCount),
-		vertexCount(createInfo.vertexCount),
-		byteOffsets()
+		vertexCount(createInfo.vertexCount)
 	{
-		GetByteOffset(Attribute::Position) = createInfo.posByteOffset;
-		GetByteOffset(Attribute::TexCoord) = createInfo.uvByteOffset;
-		GetByteOffset(Attribute::Normal) = createInfo.normalByteOffset;
-		GetByteOffset(Attribute::Tangent) = createInfo.tangentByteOffset;
-		GetByteOffset(Attribute::Index) = createInfo.indexByteOffset;
+		GetDataPtr(Attribute::Position) = createInfo.posBuffer;
+		GetDataPtr(Attribute::TexCoord) = createInfo.uvBuffer;
+		GetDataPtr(Attribute::Normal) = createInfo.normalBuffer;
+		GetDataPtr(Attribute::Tangent) = createInfo.tangentBuffer;
+		GetDataPtr(Attribute::Index) = createInfo.indexBuffer;
 	}
 
-	size_t MeshDocument::GetByteLength(Attribute attr) const
+	size_t MeshDocument::GetBufferSize(Attribute attr) const
 	{
 		switch (attr)
 		{
@@ -38,19 +36,14 @@ namespace DRenderer
 		}
 	}
 
-	const size_t& MeshDocument::GetByteOffset(Attribute attr) const
-	{
-		return byteOffsets.at(size_t(attr));
-	}
-
-	size_t& MeshDocument::GetByteOffset(Attribute attr)
-	{
-		return byteOffsets.at(static_cast<size_t>(attr));
-	}
-
 	const std::byte* MeshDocument::GetDataPtr(Attribute attr) const
 	{
-		return byteArrayRef + GetByteOffset(attr);
+		return bufferRefs[static_cast<size_t>(attr)];
+	}
+
+	const std::byte*& MeshDocument::GetDataPtr(Attribute attr)
+	{
+		return bufferRefs[static_cast<size_t>(attr)];
 	}
 
 	uint32_t MeshDocument::GetVertexCount() const
@@ -85,16 +78,15 @@ namespace DRenderer
 	{
 		CreateInfo returnValue{};
 
-		returnValue.byteArrayRef = input.byteArrayRef;
 		returnValue.vertexCount = input.vertexCount;
 		returnValue.indexType = input.indexType;
 		returnValue.indexCount = input.indexCount;
 
-		returnValue.posByteOffset = input.GetByteOffset(Attribute::Position);
-		returnValue.uvByteOffset = input.GetByteOffset(Attribute::TexCoord);
-		returnValue.normalByteOffset = input.GetByteOffset(Attribute::Normal);
-		returnValue.tangentByteOffset = input.GetByteOffset(Attribute::Tangent);
-		returnValue.indexByteOffset = input.GetByteOffset(Attribute::Index);
+		returnValue.posBuffer = input.GetDataPtr(Attribute::Position);
+		returnValue.uvBuffer = input.GetDataPtr(Attribute::TexCoord);
+		returnValue.normalBuffer = input.GetDataPtr(Attribute::Normal);
+		returnValue.tangentBuffer = input.GetDataPtr(Attribute::Tangent);
+		returnValue.indexBuffer = input.GetDataPtr(Attribute::Index);
 
 		return returnValue;
 	}

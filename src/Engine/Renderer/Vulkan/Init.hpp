@@ -2,6 +2,8 @@
 
 #include "VulkanData.hpp"
 
+#include "Constants.hpp"
+
 #include <vector>
 
 namespace DRenderer::Vulkan
@@ -14,7 +16,7 @@ struct DRenderer::Vulkan::SwapchainSettings
 	vk::SurfaceCapabilitiesKHR capabilities{};
 	vk::PresentModeKHR presentMode{};
 	vk::SurfaceFormatKHR surfaceFormat{};
-	uint32_t numImages = APIData::invalidIndex;
+	uint32_t numImages = Constants::invalidIndex;
 };
 
 namespace DRenderer::Vulkan::Init
@@ -35,26 +37,15 @@ namespace DRenderer::Vulkan::Init
 
 	vk::SurfaceKHR CreateSurface(vk::Instance instance, void* hwnd);
 
-	APIData::PhysDeviceInfo LoadPhysDevice(vk::Instance instance, vk::SurfaceKHR surface);
+	PhysDeviceInfo LoadPhysDevice(
+		vk::Instance instance, 
+		vk::SurfaceKHR surface);
 
 	SwapchainSettings GetSwapchainSettings(vk::PhysicalDevice device, vk::SurfaceKHR surface);
 
-	vk::Device CreateDevice(vk::PhysicalDevice physDevice);
-
-	vk::DescriptorSetLayout CreatePrimaryDescriptorSetLayout(vk::Device device);
+	vk::Device CreateDevice(const PhysDeviceInfo& physDevice);
 
 	APIData::Swapchain CreateSwapchain(vk::Device device, vk::SurfaceKHR surface, const SwapchainSettings& settings);
-
-	std::pair<vk::DescriptorPool, std::vector<vk::DescriptorSet>> AllocatePrimaryDescriptorSets(vk::Device device, vk::DescriptorSetLayout layout, uint32_t resourceSetCount);
-
-	APIData::MainUniforms BuildMainUniforms(
-			vk::Device device,
-			const vk::PhysicalDeviceMemoryProperties& memProperties,
-			const vk::PhysicalDeviceLimits& limits,
-			uint32_t resourceSetCount
-			);
-
-	void ConfigurePrimaryDescriptors();
 
 	// Note! This does NOT create the associated framebuffer
 	APIData::RenderTarget CreateRenderTarget(vk::Device device, vk::Extent2D extents, vk::Format format, vk::SampleCountFlagBits sampleCount);
@@ -85,7 +76,7 @@ namespace DRenderer::Vulkan::Init
 			const std::vector<vk::Image>& swapchain,
 			vk::CommandPool& pool,
 			std::vector<vk::CommandBuffer>& cmdBuffers
-	);
+			);
 
 
 }

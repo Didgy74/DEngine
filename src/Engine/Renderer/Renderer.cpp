@@ -70,11 +70,11 @@ namespace DRenderer::Core
 
 		switch (createInfo.preferredAPI)
 		{
-		case Engine::Renderer::API::OpenGL:
+		case API::OpenGL:
 			if (IsValid(createInfo.openGLInitInfo, createInfo.debugInitInfo.errorMessageCallback) == false)
 				return false;
 			break;
-		case Engine::Renderer::API::Vulkan:
+		case API::Vulkan:
 			break;
 		default:
 			DebugMessage("Error. InitInfo::preferredAPI can't be set to 'API::None'");
@@ -163,6 +163,30 @@ namespace DRenderer::Core
 	}
 }
 
+DRenderer::API DRenderer::GetActiveAPI()
+{
+	if (Core::data)
+		return Core::data->activeAPI;
+	else
+		return API::None;
+}
+
+void DRenderer::Core::Terminate()
+{
+	switch (GetActiveAPI())
+	{
+	case API::OpenGL:
+		Engine::Renderer::OpenGL::Terminate(DRenderer::Core::data->apiData.data);
+		break;
+	case API::Vulkan:
+		Vulkan::Terminate(data->apiData.data);
+	default:
+		break;
+	}
+
+	DRenderer::Core::data = nullptr;
+}
+
 namespace Engine
 {
 	bool Renderer::OpenGL::IsValid(const InitInfo& initInfo, ErrorMessageCallbackPFN callback)
@@ -191,16 +215,6 @@ namespace Engine
 	size_t Renderer::GetViewportCount() { return DRenderer::Core::data->viewports.size(); }
 
 	Renderer::Viewport& Renderer::GetViewport(size_t index) { return *DRenderer::Core::data->viewports[index]; }
-
-	Renderer::API Renderer::GetActiveAPI()
-	{
-		if (DRenderer::Core::data)
-			return DRenderer::Core::data->activeAPI;
-		else
-			return API::None;
-	}
-
-
 
 	bool Renderer::Core::Initialize(InitInfo createInfo)
 	{
@@ -237,13 +251,13 @@ namespace Engine
 		// Initializes correct function pointers based on the preferred 3D API
 		switch (data.activeAPI)
 		{
-		case API::OpenGL:
+		case DRenderer::API::OpenGL:
 			OpenGL::Initialize(data.apiData, createInfo.openGLInitInfo);
 			data.Draw = &OpenGL::Draw;
 			data.PrepareRenderingEarly = &OpenGL::PrepareRenderingEarly;
 			data.PrepareRenderingLate = &OpenGL::PrepareRenderingLate;
 			break;
-		case API::Vulkan:
+		case DRenderer::API::Vulkan:
 			DRenderer::Vulkan::Initialize(data.apiData, createInfo.vulkanInitInfo);
 			data.PrepareRenderingEarly = &DRenderer::Vulkan::PrepareRenderingEarly;
 			data.PrepareRenderingLate = &DRenderer::Vulkan::PrepareRenderingLate;
@@ -254,20 +268,6 @@ namespace Engine
 		}
 
 		return true;
-	}
-
-	void Renderer::Core::Terminate()
-	{
-		switch (GetActiveAPI())
-		{
-		case API::OpenGL:
-			OpenGL::Terminate(DRenderer::Core::data->apiData.data);
-			break;
-		default:
-			break;
-		}
-
-		DRenderer::Core::data = nullptr;
 	}
 
 	void Renderer::Core::PrepareRenderingEarly(RenderGraph& renderGraphInput)
@@ -389,11 +389,11 @@ namespace Engine
 		using namespace Math::LinTran3D;
 		if (projectMode == ProjectionMode::Perspective)
 		{
-			switch (GetActiveAPI())
+			switch (DRenderer::GetActiveAPI())
 			{
-			case API::OpenGL:
+			case DRenderer::API::OpenGL:
 				return Perspective<float>(Math::API3D::OpenGL, fovY, aspectRatio, zNear, zFar) * transform;
-			case API::Vulkan:
+			case DRenderer::API::Vulkan:
 				return Perspective<float>(Math::API3D::Vulkan, fovY, aspectRatio, zNear, zFar) * transform;
 			default:
 				assert(false);
@@ -406,11 +406,11 @@ namespace Engine
 			const float& left = -right;
 			const float& top = orthoWidth / aspectRatio / 2;
 			const float& bottom = -top;
-			switch (GetActiveAPI())
+			switch (DRenderer::GetActiveAPI())
 			{
-			case API::OpenGL:
+			case DRenderer::API::OpenGL:
 				return Orthographic<float>(Math::API3D::OpenGL, left, right, bottom, top, zNear, zFar);
-			case API::Vulkan:
+			case DRenderer::API::Vulkan:
 				return Orthographic<float>(Math::API3D::Vulkan, left, right, bottom, top, zNear, zFar);
 			default:
 				assert(false);
