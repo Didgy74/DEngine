@@ -1,16 +1,1 @@
-[submodule "DMath"]
-	path = external/DMath
-	url = https://github.com/Didgy74/DMath.git
-	branch = master
-[submodule "fx-gltf"]
-	path = external/fx-gltf
-	url = https://github.com/jessey-git/fx-gltf.git
-	branch = master
-[submodule "DTex"]
-	path = external/DTex
-	url = https://github.com/Didgy74/DTex.git
-	branch = master
-[submodule "Vulkan-Headers"]
-	path = external/Vulkan-Headers
-	url = https://github.com/KhronosGroup/Vulkan-Headers.git
-	branch = master
+

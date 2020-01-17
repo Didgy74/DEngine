@@ -1,94 +1,147 @@
 cmake_minimum_required(VERSION 3.13)
-project(DEngine)
+project(DEngineEditor)
 
 set(CMAKE_CXX_STANDARD 17)
 
-if(WIN32)
-	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build")
-endif()
+# -------------------
+# Set DEngine options
+# -------------------
+# START
+	option(DENGINE_GFX_ENABLE_ASSERT "Asserts inside the rendering code" ON)
 
-add_compile_definitions(DRENDERER_DEVELOPMENT)
+	option(DENGINE_CONTAINERS_ENABLE_ASSERT "Asserts inside DEngine containers" ON)
+#
+# END
+#
 
-file(GLOB_RECURSE SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.inl")
-add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-	target_link_libraries(${PROJECT_NAME} stdc++fs)
-endif()
+# ------------------------
+# Make the main executable
+# ------------------------
+# START
+	file(GLOB_RECURSE DENGINE_SRC_FILES 
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" 
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/*.h" 
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
 
-target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+	add_executable(${PROJECT_NAME} ${DENGINE_SRC_FILES})
 
-add_subdirectory(external)
-target_link_libraries(${PROJECT_NAME} external::external)
+	target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
-# Add custom command to copy Data directory to build directory
-# Remove Data directory in build directory if present
-#add_custom_command(
-#	TARGET ${PROJECT_NAME} POST_BUILD
-#	COMMAND ${CMAKE_COMMAND} -E remove_directory
-#	$<TARGET_FILE_DIR:${PROJECT_NAME}>/data
-#	)
-
-# Copy directory from source folder to build folder
-add_custom_command(
-	TARGET ${PROJECT_NAME} POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${PROJECT_SOURCE_DIR}/data
-	$<TARGET_FILE_DIR:${PROJECT_NAME}>/data
-	)
-
-# GLFW3 binaries
-if(WIN32)
-	set(GLFW3_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/external/GLFW3")
-    if(MSVC)
-		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
-			set(GLFW3_BINDIR ${GLFW3_FOLDER}/MSVC/x86/bin)
-		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
-			set(GLFW3_BINDIR ${GLFW3_FOLDER}/MSVC/x64/bin)
-		endif()
-    elseif(MINGW)
-		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
-			set(GLFW3_BINDIR ${GLFW3_FOLDER}/MinGW/x86/bin)	
-		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
-			set(GLFW3_BINDIR ${GLFW3_FOLDER}/MinGW/x64/bin)
-		endif()
-	else()
-		message(FATAL_ERROR "Platform not supported. Couldn't link GLEW.")
-	endif()
-	set(GLFW3_BINNAME glfw3.dll)
-    set(GLFW3_BINARY "${GLFW3_BINDIR}/${GLFW3_BINNAME}")
+	# Remove data folder from target binary directory
 	add_custom_command(
 		TARGET ${PROJECT_NAME} POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		"${GLFW3_BINARY}"
-		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/${GLFW3_BINNAME}"
+		COMMAND ${CMAKE_COMMAND} -E remove_directory
+		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
 		)
-endif()
 
-# GLEW binaries
+	# Copy data directory from source folder to build folder
+	add_custom_command(
+		TARGET ${PROJECT_NAME} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_directory
+		"${PROJECT_SOURCE_DIR}/data"
+		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
+		)
+#
+# END
+#
+
+# ----------------------
+# Handle DEngine options
+# ----------------------
+# START
+	# Handles the renderer's assert option
+	if(DENGINE_GFX_ENABLE_ASSERT)
+		set(DENGINE_GFX_ASSERT_SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}/tools/DEngine_Gfx_Assert/Assert.cpp")
+		target_sources(${PROJECT_NAME} PRIVATE ${DENGINE_GFX_ASSERT_SRC_FILES})
+		target_compile_definitions(${PROJECT_NAME} PRIVATE "DENGINE_GFX_ENABLE_ASSERT")
+	endif()
+
+	# Handles the DEngine container's assert option
+	if(DENGINE_CONTAINERS_ENABLE_ASSERT)
+		set(DENGINE_CONTAINERS_ASSERT_SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}/tools/DEngine_Containers_Assert/Assert.cpp")
+		target_sources(${PROJECT_NAME} PRIVATE ${DENGINE_CONTAINERS_ASSERT_SRC_FILES})
+		target_compile_definitions(${PROJECT_NAME} PRIVATE "DENGINE_CONTAINERS_ENABLE_ASSERT")
+	endif()
+#
+# END
+#
+
+
+
+# ---------
+# Link DTex
+# ---------
+# START
+	set(TEXAS_ENABLE_EVERYTHING ON)
+	#set(TEXAS_ENABLE_KTX_READ OFF)
+	#set(TEXAS_ENABLE_PNG_READ ON)
+	set(TEXAS_ENABLE_VULKAN_TOOLS ON)
+
+	add_subdirectory("Texas")
+	
+	target_link_libraries(${PROJECT_NAME} PUBLIC Texas)
+#
+# END
+#
+
+
+
+# ----------------------------
+# Include and link ImGui stuff
+# ----------------------------
+# START
+	#set(IMGUI_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/ImGui/src")
+	#file(GLOB_RECURSE IMGUI_SOURCE_FILES "${IMGUI_SRC_DIR}/*.cpp" "${IMGUI_SRC_DIR}/*.h" "${IMGUI_SRC_DIR}/*.hpp")
+	#target_sources(${PROJECT_NAME} PRIVATE ${IMGUI_SOURCE_FILES})
+
+	#target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/external/ImGui/include")
+#
+# END
+#
+
+
+# -----------------------
+# Link external libraries
+# -----------------------
+# START
+	if(WIN32)
+		set(SDL2_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/SDL2/Windows")
+	endif()
+	find_package(SDL2 REQUIRED)
+	target_link_libraries(${PROJECT_NAME} PUBLIC SDL2)
+
+	find_package(Vulkan REQUIRED)
+	target_link_libraries(${PROJECT_NAME} PUBLIC Vulkan::Vulkan)
+#
+# END
+#
+
+
+# SDL2 binaries
 if(WIN32)
-	set(GLEW_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/external/GLEW")
+	set(SDL2_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/external/SDL2/Windows")
     if(MSVC)
 		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
-			set(GLEW_BINDIR ${GLEW_FOLDER}/MSVC/x86/bin)
+			set(SDL2_BINDIR "${SDL2_FOLDER}/MSVC x86")
 		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
-			set(GLEW_BINDIR ${GLEW_FOLDER}/MSVC/x64/bin)
+			set(SDL2_BINDIR "${SDL2_FOLDER}/MSVC x64")
 		endif()
     elseif(MINGW)
 		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
-			set(GLEW_BINDIR ${GLEW_FOLDER}/MinGW/x86/bin)	
+			set(SDL2_BINDIR "${SDL2_FOLDER}/MinGW/x86/bin")	
 		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
-			set(GLEW_BINDIR ${GLEW_FOLDER}/MinGW/x64/bin)
+			set(SDL2_BINDIR "${SDL2_FOLDER}/MinGW/x64/bin")
 		endif()
 	else()
 		message(FATAL_ERROR "Platform not supported. Couldn't link GLEW.")
 	endif()
-	set(GLEW_BINNAME glew32.dll)
-    set(GLEW_BINARY "${GLEW_BINDIR}/${GLEW_BINNAME}")
+	set(SDL2_BINNAME "SDL2.dll")
+    set(SDL2_BINARY "${SDL2_BINDIR}/${SDL2_BINNAME}")
 	add_custom_command(
 		TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		"${GLEW_BINARY}"
-		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/${GLEW_BINNAME}"
+		"${SDL2_BINARY}"
+		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/${SDL2_BINNAME}"
 		)
 endif()
