@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.9)
 project(DEngineEditor)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -69,18 +69,16 @@ set(CMAKE_CXX_STANDARD 17)
 
 
 
-# ---------
-# Link DTex
-# ---------
+# ----------
+# Link Texas
+# ----------
 # START
 	set(TEXAS_ENABLE_EVERYTHING ON)
 	#set(TEXAS_ENABLE_KTX_READ OFF)
 	#set(TEXAS_ENABLE_PNG_READ ON)
 	set(TEXAS_ENABLE_VULKAN_TOOLS ON)
-
-	add_subdirectory("Texas")
-	
-	target_link_libraries(${PROJECT_NAME} PUBLIC Texas)
+	#add_subdirectory("Texas")
+	#target_link_libraries(${PROJECT_NAME} PUBLIC Texas)
 #
 # END
 #
@@ -112,7 +110,7 @@ set(CMAKE_CXX_STANDARD 17)
 	target_link_libraries(${PROJECT_NAME} PUBLIC SDL2)
 
 	find_package(Vulkan REQUIRED)
-	target_link_libraries(${PROJECT_NAME} PUBLIC Vulkan::Vulkan)
+	target_include_directories(${PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
 #
 # END
 #

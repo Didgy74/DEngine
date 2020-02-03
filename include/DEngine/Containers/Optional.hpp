@@ -4,67 +4,72 @@
 #include "DEngine/Utility.hpp"
 #include "DEngine/Containers/Assert.hpp"
 
+#include <stdexcept>
+#include <new>
+
 namespace DEngine::Containers
 {
 	template<typename T>
 	class Optional
 	{
 		bool m_hasValue = false;
-		union InnerData
+		union
 		{
-			u8 bytePadding;
-			T value;
-			
-			InnerData(u8 padding) noexcept : bytePadding(padding) {}
-			InnerData(const T& in) : value(in) {}
-			InnerData(T&& in) : value(Util::move(in)) {}
+			alignas(T) unsigned char m_valueBuffer[sizeof(T)] = {};
+			T m_value;
 		};
-		InnerData m_innerData;
-
+		
 	public:
-		[[nodiscard]] inline Optional() noexcept :
-			m_hasValue(false),
-			m_innerData(u8(0)) 
-		{}
+		inline Optional() = default;
 
-		[[nodiscard]] inline Optional(const T& value) noexcept :
-			m_hasValue(true),
-			m_innerData(value)
-		{}
+		inline Optional(const T& value);
 
-		[[nodiscard]] inline Optional(T&& value) noexcept :
-			m_hasValue(true),
-			m_innerData(Util::move(value))
-		{}
+		inline Optional(T&& value);
 
-		[[nodiscard]] inline bool hasValue() const noexcept;
+		[[nodiscard]] inline bool hasValue() const;
 
-		[[nodiscard]] inline const T& value() const noexcept;
+		[[nodiscard]] inline const T& value() const;
 
-		[[nodiscard]] inline T& value() noexcept;
+		[[nodiscard]] inline T& value();
 	};
 
 	template<typename T>
 	using Opt = Optional<T>;
 
 	template<typename T>
-	inline bool Optional<T>::hasValue() const noexcept
+	inline Optional<T>::Optional(const T& value) :
+		m_hasValue(true)
+	{
+		new(m_valueBuffer) T(value);
+	}
+
+	template<typename T>
+	inline Optional<T>::Optional(T&& value) :
+		m_hasValue(true)
+	{
+		new(m_valueBuffer) T(static_cast<T&&>(value));
+	}
+
+	template<typename T>
+	inline bool Optional<T>::hasValue() const
 	{
 		return m_hasValue;
 	}
 
 	template<typename T>
-	inline const T& Optional<T>::value() const noexcept
+	inline const T& Optional<T>::value() const
 	{
-		DENGINE_CONTAINERS_ASSERT_MSG(m_hasValue == true, "Tried to deference Optional-variable without value.");
-		return m_innerData.value;
+		if (m_hasValue == false)
+			throw std::runtime_error("Tried to deference Optional-variable without value.");
+		return *reinterpret_cast<T const*>(m_valueBuffer);
 	}
 
 	template<typename T>
-	inline T& Optional<T>::value() noexcept
+	inline T& Optional<T>::value()
 	{
-		DENGINE_CONTAINERS_ASSERT_MSG(m_hasValue == true, "Tried to deference Optional-variable without value.");
-		return m_innerData.value;
+		if (m_hasValue == false)
+			throw std::runtime_error("Tried to deference Optional-variable without value.");
+		return *reinterpret_cast<T*>(m_valueBuffer);
 	}
 }
 

@@ -13,8 +13,23 @@ namespace DEngine
 	using u32 = unsigned int;
 	using u64 = unsigned long long;
 
+#if defined(_WIN32) || defined(_WIN64)
+#	if defined(_WIN64)
 	using iSize = i64;
 	using uSize = u64;
+#	else
+	using iSize = i32;
+	using uSize = u32;
+#	endif
+#elif defined(__GNUC__)
+#	if defined(__x86_64__) || defined(__aarch64__)
+	using iSize = i64;
+	using uSize = u64;
+#else
+	using iSize = i32;
+	using uSize = u32;
+#	endif
+#endif
 
 	using f32 = float;
 	using f64 = double;

@@ -3,7 +3,6 @@
 #include "DEngine/Int.hpp"
 #include "DEngine/Containers/Span.hpp"
 #include "DEngine/Containers/Optional.hpp"
-#include "DEngine/Containers/Array.hpp"
 
 namespace DEngine::Gfx
 {
@@ -17,7 +16,7 @@ namespace DEngine::Gfx
 	private:
 		const ILog* iLog = nullptr;
 
-		Cont::Array<u8, apiDataBufferSize> apiDataBuffer{};
+		void* apiDataBuffer{};
 
 		inline Data() = default;
 

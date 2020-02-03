@@ -9,13 +9,37 @@
 //#include "imgui_impl_sdl.h"
 //#include "imgui_impl_vulkan.h"
 
-#include "stuff.hpp"
-
 #include "DEngine/Gfx/Gfx.hpp"
 
 #include <optional>
 #include <utility>
 #include <iostream>
+
+enum class OS
+{
+	Windows,
+	Linux,
+	Android
+};
+
+enum class OSType
+{
+	Desktop,
+	Mobile
+};
+
+#if defined(_WIN32) || defined(_WIN64)
+constexpr OS targetOS = OS::Windows;
+constexpr OSType targetOSType = OSType::Desktop;
+#elif defined(__ANDROID__)
+constexpr OS targetOS = OS::Android;
+constexpr OSType targetOsType = OSType::Mobile;
+#elif defined(__GNUC__)
+constexpr OS targetOS = OS::Linux;
+constexpr OSType targetOSType = OSType::Desktop;
+#endif
+
+
 
 bool CreateVkSurface(DEngine::u64 vkInstance, void* userData, DEngine::u64* vkSurface)
 {
@@ -31,7 +55,7 @@ class GfxLogger : public DEngine::Gfx::ILog
 public:
 	virtual void log(const char* msg) const override 
 	{
-		std::cout << msg << std::endl;
+		SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, msg);
 	}
 
 	virtual ~GfxLogger() override
@@ -42,8 +66,6 @@ public:
 
 int main(int argc, char** argv)
 {
-	constexpr auto test = alignof(std::uint32_t);
-
 	using namespace DEngine;
 
 	// Setup SDL
@@ -54,10 +76,32 @@ int main(int argc, char** argv)
 	}
 
 	// Setup window
-	SDL_WindowFlags sdlWindowFlags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI);
-	SDL_Window* sdlWindow = SDL_CreateWindow("Dear ImGui SDL2+Vulkan example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, sdlWindowFlags);
+	Uint32 sdlWindowFlags = 0;
+	sdlWindowFlags |= SDL_WINDOW_VULKAN;
+	sdlWindowFlags |= SDL_WINDOW_ALLOW_HIGHDPI;
+	int windowWidth = 0;
+	int windowHeight = 0;
+	if constexpr (targetOSType == OSType::Desktop)
+	{
+		sdlWindowFlags |= SDL_WINDOW_RESIZABLE;
+		windowWidth = 1280;
+		windowHeight = 720;
+	}
+	else if (targetOSType == OSType::Mobile)
+	{
+		sdlWindowFlags |= SDL_WINDOW_FULLSCREEN;
+		windowWidth = 400;
+		windowHeight = 400;
+	}
+	
+
+	SDL_Window* sdlWindow = SDL_CreateWindow("Dear ImGui SDL2+Vulkan example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowWidth, windowHeight, sdlWindowFlags);
 	assert(sdlWindow != nullptr);
-	SDL_SetWindowMinimumSize(sdlWindow, 1280, 720);
+	if constexpr (targetOSType == OSType::Desktop)
+	{
+		SDL_SetWindowMinimumSize(sdlWindow, 1280, 720);
+	}
+	
 
 	unsigned int requiredInstanceExtensionCount = 0;
 	SDL_bool sdlGetInstanceExtensionsResult = SDL_Vulkan_GetInstanceExtensions(sdlWindow, &requiredInstanceExtensionCount, nullptr);
@@ -73,7 +117,7 @@ int main(int argc, char** argv)
 	rendererInitInfo.requiredVkInstanceExtensions = Containers::Span<const char*>(requiredInstanceExtensions.data(), requiredInstanceExtensionCount);
 	rendererInitInfo.iLog = &gfxLogger;
 
-	auto rendererDataOpt = Gfx::Initialize(rendererInitInfo);
+	Cont::Optional<Gfx::Data> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
 	if (!rendererDataOpt.hasValue() == true)
 	{
 		std::cout << "Could not initialize renderer." << std::endl;
@@ -81,13 +125,7 @@ int main(int argc, char** argv)
 	}
 	auto& rendererData = rendererDataOpt.value();
 
-	bool show_demo_window = true;
-
 	bool shutDownProgram = false;
-
-	float scale = 1.0f;
-	bool upIsBeingHeld = false;
-	bool downIsBeingHeld = false;
 
 	while (!shutDownProgram)
 	{
@@ -102,43 +140,14 @@ int main(int argc, char** argv)
 				int g_SwapChainResizeWidth = (int)event.window.data1;
 				int g_SwapChainResizeHeight = (int)event.window.data2;
 			}
-			else if (event.type == SDL_EventType::SDL_KEYDOWN)
-			{
-				if (event.key.keysym.scancode == SDL_Scancode::SDL_SCANCODE_UP)
-				{
-					upIsBeingHeld = true;
-				}
-				else if (event.key.keysym.scancode == SDL_Scancode::SDL_SCANCODE_DOWN)
-				{
-					downIsBeingHeld = true;
-				}
-			}
-			else if (event.type == SDL_EventType::SDL_KEYUP)
-			{
-				if (event.key.keysym.scancode == SDL_Scancode::SDL_SCANCODE_UP)
-				{
-					upIsBeingHeld = false;
-				}
-				if (event.key.keysym.scancode == SDL_Scancode::SDL_SCANCODE_DOWN)
-				{
-					downIsBeingHeld = false;
-				}
-			}
 		}
 		if (shutDownProgram == true)
 		{
 			break;
 		}
 
-		if (upIsBeingHeld == true)
-			scale += 0.005f;
-		if (downIsBeingHeld == true)
-			scale -= 0.005f;
 
-		std::cout << "Scale: " << scale << std::endl;
-
-		Gfx::Draw(rendererData, scale);
-
+		Gfx::Draw(rendererData, 0.0f);
 
 	}
 

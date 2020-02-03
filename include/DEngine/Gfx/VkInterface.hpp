@@ -6,9 +6,7 @@
 
 namespace DEngine::Gfx::Vk
 {
-	uSize GetAPIDataSize();
-
-	bool InitializeBackend(Data& gfxData, const InitInfo& initInfo, void* buffer);
+	bool InitializeBackend(Data& gfxData, InitInfo const& initInfo, void*& buffer);
 
 	void Draw(Data& gfxData, void* apiDataBuffer, float scale);
 }
