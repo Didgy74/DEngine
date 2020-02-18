@@ -11,7 +11,7 @@ namespace DEngine::Containers
 	class Span
 	{
 	private:
-		T* m_data = nullptr;
+		T* m_dataBuffer = nullptr;
 		uSize m_size = 0;
 
 	public:
@@ -40,14 +40,14 @@ namespace DEngine::Containers
 
 	template<typename T>
 	inline constexpr Span<T>::Span(T* data, uSize size) noexcept :
-		m_data(data),
+		m_dataBuffer(data),
 		m_size(size)
 	{}
 
 	template<typename T>
 	inline constexpr Span<T const> Span<T>::constSpan() const noexcept
 	{
-		return Span<T const>(m_data, m_size);
+		return Span<T const>(m_dataBuffer, m_size);
 	}
 
 	template<typename T>
@@ -59,7 +59,7 @@ namespace DEngine::Containers
 	template<typename T>
 	inline T* Span<T>::data() const noexcept
 	{
-		return m_data;
+		return m_dataBuffer;
 	}
 
 	template<typename T>
@@ -73,7 +73,7 @@ namespace DEngine::Containers
 	{
 		if (i >= m_size)
 			throw std::out_of_range("Called .at() on Span object with index out of bounds.");
-		return m_data[i];
+		return m_dataBuffer[i];
 	}
 
 	template<typename T>
@@ -81,45 +81,45 @@ namespace DEngine::Containers
 	{
 		if (i >= m_size)
 			throw std::out_of_range("Called .at() on Span object with index out of bounds.");
-		return m_data[i];
+		return m_dataBuffer[i];
 	}
 
 	template<typename T>
 	inline T& Span<T>::operator[](uSize i) noexcept
 	{
 		DENGINE_CONTAINERS_ASSERT_MSG(i < m_size, "Span subscript out of range.");
-		return m_data[i];
+		return m_dataBuffer[i];
 	}
 
 	template<typename T>
 	inline T const& Span<T>::operator[](uSize i) const noexcept
 	{
 		DENGINE_CONTAINERS_ASSERT_MSG(i < m_size, "Span subscript out of range.");
-		return m_data[i];
+		return m_dataBuffer[i];
 	}
 
 	template<typename T>
 	inline T* Span<T>::begin() noexcept
 	{
-		return m_data;
+		return m_dataBuffer;
 	}
 
 	template<typename T>
 	inline T const* Span<T>::begin() const noexcept
 	{
-		return m_data;
+		return m_dataBuffer;
 	}
 
 	template<typename T>
 	inline T* Span<T>::end() noexcept
 	{
-		return m_data + m_size;
+		return m_dataBuffer + m_size;
 	}
 
 	template<typename T>
 	inline T const* Span<T>::end() const noexcept
 	{
-		return m_data + m_size;
+		return m_dataBuffer + m_size;
 	}
 }
 

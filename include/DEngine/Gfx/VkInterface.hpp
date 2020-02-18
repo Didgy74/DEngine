@@ -8,5 +8,7 @@ namespace DEngine::Gfx::Vk
 {
 	bool InitializeBackend(Data& gfxData, InitInfo const& initInfo, void*& buffer);
 
-	void Draw(Data& gfxData, void* apiDataBuffer, float scale);
+	void NewViewport(void* apiDataBuffer, std::uint8_t& viewportID, void*& imguiTexID);
+
+	void Draw(Data& gfxData, void* apiDataBuffer);
 }

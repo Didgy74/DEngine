@@ -377,6 +377,11 @@ namespace DEngine::Gfx::Vk
             return physDevice.createDevice(createInfo, allocator, raw);
         }
 
+        void destroy(vk::Optional<vk::AllocationCallbacks const> allocator = nullptr)
+        {
+            return handle.destroy(allocator, raw);
+        }
+
         vk::Result enumeratePhysicalDevices(std::uint32_t* pPhysicalDeviceCount, vk::PhysicalDevice* pPhysicalDevices) const
         {
             return handle.enumeratePhysicalDevices(pPhysicalDeviceCount, pPhysicalDevices, raw);
@@ -410,6 +415,10 @@ namespace DEngine::Gfx::Vk
         }
 
         KHR_SurfaceDispatchRaw surface_raw{};
+        void destroySurface(vk::SurfaceKHR surface, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
+        {
+            return handle.destroySurfaceKHR(surface, allocator, surface_raw);
+        }
         vk::SurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilitiesKHR(vk::PhysicalDevice physDevice, vk::SurfaceKHR surface) const
         {
             return physDevice.getSurfaceCapabilitiesKHR(surface, surface_raw);
@@ -454,33 +463,61 @@ namespace DEngine::Gfx::Vk
         vk::Device handle{};
         DeviceDispatchRaw raw{};
 
-        vk::Result allocateCommandBuffers(vk::CommandBufferAllocateInfo const* pAllocateInfo, vk::CommandBuffer* pCommandBuffers) const
+        vk::Result allocateCommandBuffers(
+            vk::CommandBufferAllocateInfo const* pAllocateInfo, 
+            vk::CommandBuffer* pCommandBuffers) const
         {
             return handle.allocateCommandBuffers(pAllocateInfo, pCommandBuffers, raw);
         }
 
-        vk::DeviceMemory allocateMemory(vk::MemoryAllocateInfo const& allocInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
+        vk::DeviceMemory allocateMemory(
+            vk::MemoryAllocateInfo const& allocInfo, 
+            vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
         {
             return handle.allocateMemory(allocInfo, allocator, raw);
         }
 
-        void bindBufferMemory(vk::Buffer buffer, vk::DeviceMemory memory, vk::DeviceSize memoryOffset) const
+        void bindBufferMemory(
+            vk::Buffer buffer, 
+            vk::DeviceMemory memory, 
+            vk::DeviceSize memoryOffset) const
         {
             return handle.bindBufferMemory(buffer, memory, memoryOffset, raw);
         }
 
-        void bindImageMemory(vk::Image image, vk::DeviceMemory memory, vk::DeviceSize memoryOffset) const
+        void bindImageMemory(
+            vk::Image image, 
+            vk::DeviceMemory memory, 
+            vk::DeviceSize memoryOffset) const
         {
             return handle.bindImageMemory(image, memory, memoryOffset, raw);
         }
 
-        void freeCommandBuffers(vk::CommandPool commandPool, vk::ArrayProxy<vk::CommandBuffer const> commandBuffers) const
+        vk::DescriptorPool createDescriptorPool(
+            vk::DescriptorPoolCreateInfo const& createInfo, 
+            vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
+        {
+            return handle.createDescriptorPool(createInfo, allocator, raw);
+        }
+
+        vk::Sampler createSampler(
+            vk::SamplerCreateInfo const& createInfo,
+            vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
+        {
+            return handle.createSampler(createInfo, allocator, raw);
+        }
+
+        void freeCommandBuffers(
+            vk::CommandPool commandPool, 
+            vk::ArrayProxy<vk::CommandBuffer const> commandBuffers) const
         {
             return handle.freeCommandBuffers(commandPool, commandBuffers, raw);
         }
 
         // Command pool
-        vk::CommandPool createCommandPool(vk::CommandPoolCreateInfo const& createInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
+        vk::CommandPool createCommandPool(
+            vk::CommandPoolCreateInfo const& createInfo, 
+            vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
         {
             return handle.createCommandPool(createInfo, allocator, raw);
         }
@@ -489,11 +526,15 @@ namespace DEngine::Gfx::Vk
             return handle.destroyCommandPool(commandPool, allocator, raw);
         }
 
-        vk::Framebuffer createFramebuffer(vk::FramebufferCreateInfo const& createInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
+        vk::Framebuffer createFramebuffer(
+            vk::FramebufferCreateInfo const& createInfo, 
+            vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
         {
             return handle.createFramebuffer(createInfo, allocator, raw);
         }
-        void destroyFramebuffer(vk::Framebuffer framebuffer, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
+        void destroyFramebuffer(
+            vk::Framebuffer framebuffer, 
+            vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
         {
             return handle.destroyFramebuffer(framebuffer, allocator, raw);
         }

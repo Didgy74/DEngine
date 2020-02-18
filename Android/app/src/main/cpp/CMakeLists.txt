@@ -1,20 +1,44 @@
-# For more information about using CMake with Android Studio, read the
-# documentation: https://d.android.com/studio/projects/add-native-code.html
 
-# Sets the minimum version of CMake required to build the native library.
+cmake_minimum_required(VERSION 3.10)
 
-cmake_minimum_required(VERSION 3.9)
+set(CMAKE_CXX_STANDARD 17)
 
-# Creates and names a library, sets it as either STATIC
-# or SHARED, and provides the relative paths to its source code.
-# You can define multiple libraries, and CMake builds them for you.
-# Gradle automatically packages shared libraries with your APK.
+set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../..")
 
-add_library( # Sets the name of the library.
-        native-lib
+file(GLOB_RECURSE DENGINE_SRC_FILES
+        "${DENGINE_ROOT_DIR}/src/*.cpp"
+        "${DENGINE_ROOT_DIR}/src/*.hpp"
+        "${DENGINE_ROOT_DIR}/include/*.hpp")
 
-        # Sets the library as a shared library.
-        SHARED
+set(DENGINE_INCLUDE_DIR "${DENGINE_ROOT_DIR}/include")
 
-        # Provides a relative path to your source file(s).
-        native-lib.cpp)
+set(LIB_NAME "main")
+add_library(${LIB_NAME} SHARED ${DENGINE_SRC_FILES})
+
+target_include_directories(${LIB_NAME} PUBLIC ${DENGINE_INCLUDE_DIR})
+
+set(VULKAN_INCLUDE_DIR "C:/VulkanSDK/1.2.131.1/Include")
+target_include_directories(${LIB_NAME} PUBLIC ${VULKAN_INCLUDE_DIR})
+
+set(SDL2_INCLUDE_DIR "${DENGINE_ROOT_DIR}/external/SDL2/include")
+target_include_directories(${LIB_NAME} PUBLIC ${SDL2_INCLUDE_DIR})
+
+set(SDL2_LIBRARIES
+        "${DENGINE_ROOT_DIR}/Android/app/src/main/jni/${CMAKE_ANDROID_ARCH_ABI}/libSDL2.so"
+        "${DENGINE_ROOT_DIR}/Android/app/src/main/jni/${CMAKE_ANDROID_ARCH_ABI}/libhidapi.so")
+target_link_libraries(${LIB_NAME} PUBLIC ${SDL2_LIBRARIES})
+
+# ----------------------------
+# Include and link ImGui stuff
+# ----------------------------
+# START
+set(IMGUI_ROOT_DIR "${DENGINE_ROOT_DIR}/external/ImGui")
+set(IMGUI_SRC_DIR "${IMGUI_ROOT_DIR}/src")
+set(IMGUI_INCLUDE_DIR "${IMGUI_ROOT_DIR}/include")
+file(GLOB_RECURSE IMGUI_SOURCE_FILES "${IMGUI_SRC_DIR}/*.cpp" "${IMGUI_SRC_DIR}/*.h" "${IMGUI_SRC_DIR}/*.hpp")
+target_sources(${LIB_NAME} PRIVATE ${IMGUI_SOURCE_FILES})
+
+target_include_directories(${LIB_NAME} PRIVATE ${IMGUI_INCLUDE_DIR})
+#
+# END
+#

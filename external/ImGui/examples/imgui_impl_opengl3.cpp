@@ -317,7 +317,7 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
 #endif
 
     // Setup desired GL state
-    // Recreate the VAO every time (this is to easily allow multiple GL contexts to be rendered to. VAO are not shared among GL contexts)
+    // RecreateSwapchain the VAO every time (this is to easily allow multiple GL contexts to be rendered to. VAO are not shared among GL contexts)
     // The renderer would actually work without any VAO bound, but then our VertexAttrib calls would overwrite the default one currently bound.
     GLuint vertex_array_object = 0;
 #ifndef IMGUI_IMPL_OPENGL_ES2

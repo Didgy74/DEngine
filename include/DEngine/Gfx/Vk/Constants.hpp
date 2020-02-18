@@ -2,7 +2,7 @@
 
 namespace DEngine::Gfx::Vk::Constants
 {
-	constexpr u32 maxResourceSets = 3;
+	constexpr u32 maxResourceSets = 2;
 	constexpr u32 preferredResourceSetCount = 2;
 
 	constexpr u32 maxRequiredInstanceExtensions = 20;
@@ -12,8 +12,8 @@ namespace DEngine::Gfx::Vk::Constants
 	constexpr u32 maxAvailablePresentModes = 10;
 	constexpr vk::PresentModeKHR preferredPresentMode = vk::PresentModeKHR::eFifo;
 	constexpr u32 maxAvailableSurfaceFormats = 25;
-	constexpr u32 maxSwapchainLength = 4;
-	constexpr u32 preferredSwapchainLength = 3;
+	constexpr u32 maxSwapchainLength = 2;
+	constexpr u32 preferredSwapchainLength = 2;
 
 	constexpr std::array<const char*, 1> preferredValidationLayers
 	{

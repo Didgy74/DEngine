@@ -24,7 +24,21 @@ Cont::Opt<Gfx::Data> DEngine::Gfx::Initialize(const InitInfo& initInfo)
 	return Cont::Opt<Gfx::Data>(Util::move(returnVal));
 }
 
-void DEngine::Gfx::Draw(Data& data, float scale)
+void DEngine::Gfx::Draw(Data& data)
 {
-	Vk::Draw(data, data.apiDataBuffer, scale);
+	Vk::Draw(data, data.apiDataBuffer);
+
+	// Resize event is handled, we reset it.
+	data.resizeEvent = false;
+	data.rebuildVkSurface = false;
+}
+
+DEngine::Gfx::ViewportRef DEngine::Gfx::Data::NewViewport()
+{
+	ViewportRef returnVal{};
+	
+
+	Vk::NewViewport(this->apiDataBuffer, returnVal.viewportID, returnVal.imguiTexID);
+
+	return returnVal;
 }

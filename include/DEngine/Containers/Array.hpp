@@ -11,7 +11,7 @@ namespace DEngine::Containers
 	{
 	public:
 		// Please don't use this field directly
-		T m_data[length] = {};
+		T m_dataBuffer[length] = {};
 
 		inline constexpr void fill(const T& value) noexcept;
 
@@ -43,13 +43,13 @@ namespace DEngine::Containers
 	template<typename T, uSize length>
 	inline constexpr T* Array<T, length>::data() noexcept
 	{
-		return m_data;
+		return m_dataBuffer;
 	}
 
 	template<typename T, uSize length>
 	inline constexpr const T* Array<T, length>::data() const noexcept
 	{
-		return m_data;
+		return m_dataBuffer;
 	}
 
 	template<typename T, uSize length>
@@ -65,38 +65,38 @@ namespace DEngine::Containers
 	inline constexpr T& Array<T, length>::operator[](uSize i) noexcept
 	{
 		DENGINE_CONTAINERS_ASSERT_MSG(i < length, "DEngine Array subscript out of range.");
-		return m_data[i];
+		return m_dataBuffer[i];
 	}
 
 	template<typename T, uSize length>
 	inline constexpr const T& Array<T, length>::operator[](uSize i) const noexcept
 	{
 		DENGINE_CONTAINERS_ASSERT_MSG(i < length, "DEngine Array subscript out of range.");
-		return m_data[i];
+		return m_dataBuffer[i];
 	}
 
 	template<typename T, uSize length>
 	inline constexpr T* Array<T, length>::begin() noexcept
 	{
-		return m_data;
+		return m_dataBuffer;
 	}
 
 	template<typename T, uSize length>
 	inline constexpr const T* Array<T, length>::begin() const noexcept
 	{
-		return m_data;
+		return m_dataBuffer;
 	}
 
 	template<typename T, uSize length>
 	inline constexpr T* Array<T, length>::end() noexcept
 	{
-		return m_data + length;
+		return m_dataBuffer + length;
 	}
 
 	template<typename T, uSize length>
 	inline constexpr const T* Array<T, length>::end() const noexcept
 	{
-		return m_data + length;
+		return m_dataBuffer + length;
 	}
 }
 

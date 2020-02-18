@@ -23,7 +23,55 @@
 
 #pragma once
 
+#define VK_NO_PROTOTYPES
 #include <vulkan/vulkan.h>
+
+// PROTOTYPES FOR FUNCTION POINTERS
+extern PFN_vkAllocateDescriptorSets vkAllocateDescriptorSets;
+extern PFN_vkAllocateMemory vkAllocateMemory;
+extern PFN_vkBindBufferMemory vkBindBufferMemory;
+extern PFN_vkBindImageMemory vkBindImageMemory;
+extern PFN_vkCmdBindDescriptorSets vkCmdBindDescriptorSets;
+extern PFN_vkCmdBindIndexBuffer vkCmdBindIndexBuffer;
+extern PFN_vkCmdBindPipeline vkCmdBindPipeline;
+extern PFN_vkCmdBindVertexBuffers vkCmdBindVertexBuffers;
+extern PFN_vkCmdCopyBufferToImage vkCmdCopyBufferToImage;
+extern PFN_vkCmdDrawIndexed vkCmdDrawIndexed;
+extern PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
+extern PFN_vkCmdPushConstants vkCmdPushConstants;
+extern PFN_vkCmdSetScissor vkCmdSetScissor;
+extern PFN_vkCmdSetViewport vkCmdSetViewport;
+extern PFN_vkCreateBuffer vkCreateBuffer;
+extern PFN_vkCreateDescriptorSetLayout vkCreateDescriptorSetLayout;
+extern PFN_vkCreateGraphicsPipelines vkCreateGraphicsPipelines;
+extern PFN_vkCreateImage vkCreateImage;
+extern PFN_vkCreateImageView vkCreateImageView;
+extern PFN_vkCreatePipelineLayout vkCreatePipelineLayout;
+extern PFN_vkCreateSampler vkCreateSampler;
+extern PFN_vkCreateShaderModule vkCreateShaderModule;
+extern PFN_vkDestroyBuffer vkDestroyBuffer;
+extern PFN_vkDestroyDescriptorSetLayout vkDestroyDescriptorSetLayout;
+extern PFN_vkDestroyImage vkDestroyImage;
+extern PFN_vkDestroyImageView vkDestroyImageView;
+extern PFN_vkDestroyPipeline vkDestroyPipeline;
+extern PFN_vkDestroyPipelineLayout vkDestroyPipelineLayout;
+extern PFN_vkDestroySampler vkDestroySampler;
+extern PFN_vkDestroyShaderModule vkDestroyShaderModule;
+extern PFN_vkDeviceWaitIdle vkDeviceWaitIdle;
+extern PFN_vkFlushMappedMemoryRanges vkFlushMappedMemoryRanges;
+extern PFN_vkFreeMemory vkFreeMemory;
+extern PFN_vkGetBufferMemoryRequirements vkGetBufferMemoryRequirements;
+extern PFN_vkGetImageMemoryRequirements vkGetImageMemoryRequirements;
+extern PFN_vkGetPhysicalDeviceMemoryProperties vkGetPhysicalDeviceMemoryProperties;
+extern PFN_vkMapMemory vkMapMemory;
+extern PFN_vkUnmapMemory vkUnmapMemory;
+extern PFN_vkUpdateDescriptorSets vkUpdateDescriptorSets;
+
+
+
+
+//
+
 
 // Initialization data, for ImGui_ImplVulkan_Init()
 // [Please zero-clear before use!]
@@ -46,11 +94,11 @@ struct ImGui_ImplVulkan_InitInfo
 // Called by user code
 IMGUI_IMPL_API bool     ImGui_ImplVulkan_Init(ImGui_ImplVulkan_InitInfo* info, VkRenderPass render_pass);
 IMGUI_IMPL_API void     ImGui_ImplVulkan_Shutdown();
-IMGUI_IMPL_API void     ImGui_ImplVulkan_NewFrame();
 IMGUI_IMPL_API void     ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer command_buffer);
 IMGUI_IMPL_API bool     ImGui_ImplVulkan_CreateFontsTexture(VkCommandBuffer command_buffer);
 IMGUI_IMPL_API void     ImGui_ImplVulkan_DestroyFontUploadObjects();
 IMGUI_IMPL_API void     ImGui_ImplVulkan_SetMinImageCount(uint32_t min_image_count); // To override MinImageCount after initialization (e.g. if swap chain is recreated)
+IMGUI_IMPL_API ImTextureID ImGui_ImplVulkan_AddTexture(VkSampler sampler, VkImageView image_view, VkImageLayout image_layout);
 
 
 //-------------------------------------------------------------------------

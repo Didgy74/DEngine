@@ -4,6 +4,8 @@
 #include "DynamicDispatch.hpp"
 #include "Constants.hpp"
 
+#include "DEngine/Gfx/Gfx.hpp"
+
 #include "DEngine/Int.hpp"
 #include "DEngine/Containers/Array.hpp"
 #include "DEngine/Containers/FixedVector.hpp"
@@ -32,7 +34,10 @@ namespace DEngine::Gfx::Vk
         Queue graphics{};
         Queue transfer{};
 
-        inline bool dedicatedTransfer() const { return transfer.familyIndex != graphics.familyIndex; }
+        inline bool dedicatedTransfer() const
+        {
+            return transfer.familyIndex != invalidIndex && transfer.familyIndex != graphics.familyIndex;
+        }
     };
 
     struct MemoryTypes
@@ -61,6 +66,7 @@ namespace DEngine::Gfx::Vk
     public:
         vk::SurfaceKHR handle{};
         vk::SurfaceCapabilitiesKHR capabilities{};
+        vk::CompositeAlphaFlagBitsKHR compositeAlphaFlag = {};
 
         Cont::FixedVector<vk::PresentModeKHR, Constants::maxAvailablePresentModes> supportedPresentModes;
         Cont::FixedVector<vk::SurfaceFormatKHR, Constants::maxAvailableSurfaceFormats> supportedSurfaceFormats;
@@ -73,6 +79,7 @@ namespace DEngine::Gfx::Vk
         vk::PresentModeKHR presentMode{};
         vk::SurfaceFormatKHR surfaceFormat{};
         vk::SurfaceTransformFlagBitsKHR transform = {};
+        vk::CompositeAlphaFlagBitsKHR compositeAlphaFlag = {};
         vk::Extent2D extents{};
         u32 numImages{};
     };
@@ -86,7 +93,7 @@ namespace DEngine::Gfx::Vk
     struct SwapchainData
     {
         vk::SwapchainKHR handle{};
-        std::uint_least8_t uid = 0;
+        std::uint8_t uid = 0;
 
         vk::Extent2D extents{};
         vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
@@ -105,50 +112,68 @@ namespace DEngine::Gfx::Vk
         vk::PhysicalDevice physDeviceHandle{};
     };
 
-    struct GUIRenderTarget
+    struct GfxRenderTarget
     {
+        vk::Extent2D extent{};
         vk::DeviceMemory memory{};
         vk::DeviceSize memorySize{};
-        vk::Format format{};
-        vk::Extent2D extent{};
         vk::Image img{};
         vk::ImageView imgView{};
-        vk::RenderPass renderPass{};
         vk::Framebuffer framebuffer{};
-        vk::Semaphore imguiRenderFinished{};
+        vk::CommandPool cmdPool{};
+        Cont::FixedVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
     };
 
-    struct GUIRenderCmdBuffers
+    struct GUIRenderTarget
     {
+        vk::Extent2D extent{};
+        vk::Format format{};
+        vk::DeviceMemory memory{};
+        vk::DeviceSize memorySize{};
+        vk::Image img{};
+        vk::ImageView imgView{};
+        vk::Framebuffer framebuffer{};
+    };
+
+    struct GUIData
+    {
+        vk::RenderPass renderPass{};
+        vk::Sampler viewportSampler = vk::Sampler{};
+        GUIRenderTarget renderTarget{};
         vk::CommandPool cmdPool{};
         // Has length of resource sets
-        Cont::FixedVector<FencedCmdBuffer, Constants::maxResourceSets> cmdBuffers{};
+        Cont::FixedVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
     };
 
     struct APIData
     {
-        InstanceDispatch instance{};
+        bool (*createVkSurfacePFN)(u64 vkInstance, void* userData, u64* vkSurface) = nullptr;
+        void* createVkSurfaceUserData = nullptr;
 
+        InstanceDispatch instance{};
         DebugUtilsDispatch debugUtils{};
         DebugUtilsDispatch const* DebugUtilsPtr() const { return debugUtils.raw.vkCmdBeginDebugUtilsLabelEXT != nullptr ? &debugUtils : nullptr; }
         vk::DebugUtilsMessengerEXT debugMessenger{};
-
-        std::uint_least8_t resourceSetCount = 0;
-        std::uint_least8_t currentResourceSet = 0;
-
-        PhysDeviceInfo physDeviceInfo{};
-
-        SurfaceInfo surface{};
-
         Vk::DeviceDispatch device{};
+
+        Gfx::ILog* logger = nullptr;
+
+        PhysDeviceInfo physDevice{};
+        SurfaceInfo surface{};
+        SwapchainData swapchain{};
 
         vk::Queue renderQueue{};
 
-        SwapchainData swapchain{};
+        std::uint8_t resourceSetCount = 0;
+        std::uint8_t currentResourceSet = 0;
 
-        GUIRenderTarget guiRenderTarget{};
+        Cont::FixedVector<vk::Fence, Constants::maxResourceSets> mainFences{};
 
-        GUIRenderCmdBuffers guiRenderCmdBuffers{};
+        GUIData guiData{};
+
+        // The main renderpass for rendering the 3D stuff
+        vk::RenderPass gfxRenderPass{};
+        Cont::FixedVector<GfxRenderTarget, Gfx::Constants::maxViewportCount> viewportRenderTargets{};
 
         vk::PipelineLayout testPipelineLayout{};
         vk::Pipeline testPipeline{};

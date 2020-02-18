@@ -6678,7 +6678,7 @@ static void ImGui::TabBarLayout(ImGuiTabBar* tab_bar)
         tab_bar->ScrollingSpeed = 0.0f;
     }
 
-    // Clear name buffers
+    // Clear name cmdBuffers
     if ((tab_bar->Flags & ImGuiTabBarFlags_DockNode) == 0)
         tab_bar->TabsNames.Buf.resize(0);
 }

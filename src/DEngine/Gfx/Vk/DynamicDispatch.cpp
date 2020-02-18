@@ -321,48 +321,25 @@ namespace DEngine::Gfx::Vk
 		*this = in;
 	}
 
-    PFN_vkGetInstanceProcAddr DEngine::Gfx::Vk::loadInstanceProcAddressPFN()
+    PFN_vkGetInstanceProcAddr loadInstanceProcAddressPFN()
     {
-        bool m_success = false;
-#if defined(__linux__)
-        void* m_library = nullptr;
-#elif defined(_WIN32)
-        HMODULE m_library = nullptr;
-#else
-#error unsupported platform
-#endif
-
-#if defined(__linux__)
-        m_library = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
-#elif defined(_WIN32)
-        m_library = LoadLibrary(TEXT("vulkan-1.dll"));
-#else
-        assert(false && "unsupported platform");
-#endif
-
-        m_success = m_library != 0;
-        if (!m_success)
-        {
-            // NOTE there should be an InitializationFailedError, but msvc insists on the symbol does not exist within the scope of this function.
-            throw std::runtime_error("Vulkan: Failed to load Vulkan library.");
-        }
-
         PFN_vkGetInstanceProcAddr procAddr = nullptr;
 
 #if defined(__linux__)
-        procAddr = (PFN_vkGetInstanceProcAddr)dlsym(m_library, "vkGetInstanceProcAddr");
+        void* m_library = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
+        if (m_library == nullptr)
+            throw std::runtime_error("Vulkan: Unable to load the system libvulkan.so for dynamic dispatching");
+        procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(m_library, "vkGetInstanceProcAddr"));
+        dlclose(m_library);
 #elif defined(_WIN32)
-        procAddr = (PFN_vkGetInstanceProcAddr)GetProcAddress(m_library, "vkGetInstanceProcAddr");
+        HMODULE m_library = LoadLibrary(TEXT("vulkan-1.dll"));
+        if (m_library == nullptr)
+            throw std::runtime_error("Vulkan: Unable to load the system vulkan-1.dll for dynamic dispatching");
+        procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(m_library, "vkGetInstanceProcAddr"));
+        FreeLibrary(m_library);
+#else
+#error Unsupported platform
 #endif
-
-        if (m_library)
-        {
-#if defined(__linux__) || defined(__APPLE__)
-            dlclose(m_library);
-#elif defined(_WIN32)
-            FreeLibrary(m_library);
-#endif
-        }
 
         if (procAddr == nullptr)
             throw std::runtime_error("Vulkan: Unable to load the vkGetInstanceProcAddr function pointer.");

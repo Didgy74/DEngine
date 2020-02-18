@@ -1298,7 +1298,7 @@ static inline bool CanMergeDrawCommands(ImDrawCmd* a, ImDrawCmd* b)
 
 void ImDrawListSplitter::Merge(ImDrawList* draw_list)
 {
-    // Note that we never use or rely on channels.Size because it is merely a buffer that we never shrink back to 0 to keep all sub-buffers ready for use.
+    // Note that we never use or rely on channels.Size because it is merely a buffer that we never shrink back to 0 to keep all sub-cmdBuffers ready for use.
     if (_Count <= 1)
         return;
 
@@ -1369,7 +1369,7 @@ void ImDrawListSplitter::SetCurrentChannel(ImDrawList* draw_list, int idx)
 // [SECTION] ImDrawData
 //-----------------------------------------------------------------------------
 
-// For backward compatibility: convert all buffers from indexed to de-indexed, in case you cannot render indexed. Note: this is slow and most likely a waste of resources. Always prefer indexed rendering!
+// For backward compatibility: convert all cmdBuffers from indexed to de-indexed, in case you cannot render indexed. Note: this is slow and most likely a waste of resources. Always prefer indexed rendering!
 void ImDrawData::DeIndexAllBuffers()
 {
     ImVector<ImDrawVert> new_vtx_buffer;

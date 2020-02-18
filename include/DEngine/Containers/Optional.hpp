@@ -26,6 +26,8 @@ namespace DEngine::Containers
 
 		inline Optional(T&& value);
 
+		inline ~Optional();
+
 		[[nodiscard]] inline bool hasValue() const;
 
 		[[nodiscard]] inline const T& value() const;
@@ -51,6 +53,13 @@ namespace DEngine::Containers
 	}
 
 	template<typename T>
+	inline Optional<T>::~Optional()
+	{
+		if (m_hasValue)
+			m_value.~T();
+	}
+
+	template<typename T>
 	inline bool Optional<T>::hasValue() const
 	{
 		return m_hasValue;
@@ -61,7 +70,7 @@ namespace DEngine::Containers
 	{
 		if (m_hasValue == false)
 			throw std::runtime_error("Tried to deference Optional-variable without value.");
-		return *reinterpret_cast<T const*>(m_valueBuffer);
+		return m_value;
 	}
 
 	template<typename T>
@@ -69,7 +78,7 @@ namespace DEngine::Containers
 	{
 		if (m_hasValue == false)
 			throw std::runtime_error("Tried to deference Optional-variable without value.");
-		return *reinterpret_cast<T*>(m_valueBuffer);
+		return m_value;
 	}
 }
 

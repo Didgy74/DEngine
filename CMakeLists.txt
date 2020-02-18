@@ -20,28 +20,28 @@ set(CMAKE_CXX_STANDARD 17)
 # ------------------------
 # START
 	file(GLOB_RECURSE DENGINE_SRC_FILES 
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" 
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/*.h" 
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
+		"${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" 
+		"${CMAKE_CURRENT_SOURCE_DIR}/src/*.h" 
+		"${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
 
 	add_executable(${PROJECT_NAME} ${DENGINE_SRC_FILES})
-
-	target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 	# Remove data folder from target binary directory
 	add_custom_command(
 		TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E remove_directory
-		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
-		)
+		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/data")
 
 	# Copy data directory from source folder to build folder
 	add_custom_command(
 		TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_directory
 		"${PROJECT_SOURCE_DIR}/data"
-		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
-		)
+		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/data")
+
+	target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+
 #
 # END
 #
@@ -52,15 +52,11 @@ set(CMAKE_CXX_STANDARD 17)
 # START
 	# Handles the renderer's assert option
 	if(DENGINE_GFX_ENABLE_ASSERT)
-		set(DENGINE_GFX_ASSERT_SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}/tools/DEngine_Gfx_Assert/Assert.cpp")
-		target_sources(${PROJECT_NAME} PRIVATE ${DENGINE_GFX_ASSERT_SRC_FILES})
 		target_compile_definitions(${PROJECT_NAME} PRIVATE "DENGINE_GFX_ENABLE_ASSERT")
 	endif()
 
 	# Handles the DEngine container's assert option
 	if(DENGINE_CONTAINERS_ENABLE_ASSERT)
-		set(DENGINE_CONTAINERS_ASSERT_SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}/tools/DEngine_Containers_Assert/Assert.cpp")
-		target_sources(${PROJECT_NAME} PRIVATE ${DENGINE_CONTAINERS_ASSERT_SRC_FILES})
 		target_compile_definitions(${PROJECT_NAME} PRIVATE "DENGINE_CONTAINERS_ENABLE_ASSERT")
 	endif()
 #
@@ -89,11 +85,13 @@ set(CMAKE_CXX_STANDARD 17)
 # Include and link ImGui stuff
 # ----------------------------
 # START
-	#set(IMGUI_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/ImGui/src")
-	#file(GLOB_RECURSE IMGUI_SOURCE_FILES "${IMGUI_SRC_DIR}/*.cpp" "${IMGUI_SRC_DIR}/*.h" "${IMGUI_SRC_DIR}/*.hpp")
-	#target_sources(${PROJECT_NAME} PRIVATE ${IMGUI_SOURCE_FILES})
+	set(IMGUI_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/ImGui")
+	set(IMGUI_SRC_DIR "${IMGUI_ROOT_DIR}/src")
+	set(IMGUI_INCLUDE_DIR "${IMGUI_ROOT_DIR}/include")
+	file(GLOB_RECURSE IMGUI_SOURCE_FILES "${IMGUI_SRC_DIR}/*.cpp" "${IMGUI_SRC_DIR}/*.h" "${IMGUI_SRC_DIR}/*.hpp")
+	target_sources(${PROJECT_NAME} PRIVATE ${IMGUI_SOURCE_FILES})
 
-	#target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/external/ImGui/include")
+	target_include_directories(${PROJECT_NAME} PRIVATE ${IMGUI_INCLUDE_DIR})
 #
 # END
 #
@@ -111,6 +109,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 	find_package(Vulkan REQUIRED)
 	target_include_directories(${PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
+	#target_link_libraries(${DENGINE_TARGET_NAME} PRIVATE Vulkan::Vulkan)
 #
 # END
 #

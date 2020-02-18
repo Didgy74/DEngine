@@ -5,8 +5,8 @@
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_vulkan.h"
 
-//#include "imgui.h"
-//#include "imgui_impl_sdl.h"
+#include "imgui.h"
+#include "imgui_impl_sdl.h"
 //#include "imgui_impl_vulkan.h"
 
 #include "DEngine/Gfx/Gfx.hpp"
@@ -33,13 +33,11 @@ constexpr OS targetOS = OS::Windows;
 constexpr OSType targetOSType = OSType::Desktop;
 #elif defined(__ANDROID__)
 constexpr OS targetOS = OS::Android;
-constexpr OSType targetOsType = OSType::Mobile;
+constexpr OSType targetOSType = OSType::Mobile;
 #elif defined(__GNUC__)
 constexpr OS targetOS = OS::Linux;
 constexpr OSType targetOSType = OSType::Desktop;
 #endif
-
-
 
 bool CreateVkSurface(DEngine::u64 vkInstance, void* userData, DEngine::u64* vkSurface)
 {
@@ -53,9 +51,9 @@ bool CreateVkSurface(DEngine::u64 vkInstance, void* userData, DEngine::u64* vkSu
 class GfxLogger : public DEngine::Gfx::ILog
 {
 public:
-	virtual void log(const char* msg) const override 
+	virtual void log(const char* msg) override 
 	{
-		SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, msg);
+		SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "DENGINE GFX ERROR: %s\n", msg);
 	}
 
 	virtual ~GfxLogger() override
@@ -63,6 +61,17 @@ public:
 
 	}
 };
+
+void RenderImGuiStuff()
+{
+	ImGui::NewFrame();
+	static bool testShowWindow = true;
+	ImGui::ShowDemoWindow(&testShowWindow);
+	static bool yo = true;
+	static bool yo2 = true;
+
+	ImGui::Render();
+}
 
 int main(int argc, char** argv)
 {
@@ -79,11 +88,11 @@ int main(int argc, char** argv)
 	Uint32 sdlWindowFlags = 0;
 	sdlWindowFlags |= SDL_WINDOW_VULKAN;
 	sdlWindowFlags |= SDL_WINDOW_ALLOW_HIGHDPI;
+	sdlWindowFlags |= SDL_WINDOW_RESIZABLE;
 	int windowWidth = 0;
 	int windowHeight = 0;
 	if constexpr (targetOSType == OSType::Desktop)
 	{
-		sdlWindowFlags |= SDL_WINDOW_RESIZABLE;
 		windowWidth = 1280;
 		windowHeight = 720;
 	}
@@ -101,44 +110,83 @@ int main(int argc, char** argv)
 	{
 		SDL_SetWindowMinimumSize(sdlWindow, 1280, 720);
 	}
-	
-
 	unsigned int requiredInstanceExtensionCount = 0;
 	SDL_bool sdlGetInstanceExtensionsResult = SDL_Vulkan_GetInstanceExtensions(sdlWindow, &requiredInstanceExtensionCount, nullptr);
 	assert(sdlGetInstanceExtensionsResult == SDL_TRUE);
 	std::vector<const char*> requiredInstanceExtensions(requiredInstanceExtensionCount);
 	SDL_Vulkan_GetInstanceExtensions(sdlWindow, &requiredInstanceExtensionCount, requiredInstanceExtensions.data());
 
-	GfxLogger gfxLogger{};
 
+
+	{
+		// Initialize ImGui stuff
+		IMGUI_CHECKVERSION();
+		ImGuiContext* imguiContext = ImGui::CreateContext();
+		ImGui::SetCurrentContext(imguiContext);
+		ImGuiIO& imguiIO = ImGui::GetIO();
+		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_DockingEnable;
+		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_IsTouchScreen;
+
+
+		ImGui::StyleColorsDark();
+		ImGui_ImplSDL2_InitForVulkan(sdlWindow);
+	}
+
+
+
+	GfxLogger gfxLogger{};
 	Gfx::InitInfo rendererInitInfo{};
 	rendererInitInfo.createVkSurfaceUserData = sdlWindow;
 	rendererInitInfo.createVkSurfacePFN = CreateVkSurface;
-	rendererInitInfo.requiredVkInstanceExtensions = Containers::Span<const char*>(requiredInstanceExtensions.data(), requiredInstanceExtensionCount);
+	rendererInitInfo.requiredVkInstanceExtensions = Cont::Span<const char*>(requiredInstanceExtensions.data(), requiredInstanceExtensionCount);
 	rendererInitInfo.iLog = &gfxLogger;
 
 	Cont::Optional<Gfx::Data> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
-	if (!rendererDataOpt.hasValue() == true)
+	if (!rendererDataOpt.hasValue())
 	{
 		std::cout << "Could not initialize renderer." << std::endl;
 		std::abort();
 	}
-	auto& rendererData = rendererDataOpt.value();
+	Gfx::Data rendererData = std::move(rendererDataOpt.value());
+
+	//Gfx::ViewportRef viewportA = rendererData.NewViewport();
+
+
+
 
 	bool shutDownProgram = false;
+	bool firstTick = true;
+	bool submitRendering = true;
 
 	while (!shutDownProgram)
 	{
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
-			//ImGui_ImplSDL2_ProcessEvent(&event);
+			ImGui_ImplSDL2_ProcessEvent(&event);
 			if (event.type == SDL_EventType::SDL_QUIT)
-				shutDownProgram = true;
-			else if (event.type == SDL_EventType::SDL_WINDOWEVENT && event.window.event == SDL_WindowEventID::SDL_WINDOWEVENT_RESIZED && event.window.windowID == SDL_GetWindowID(sdlWindow))
 			{
-				int g_SwapChainResizeWidth = (int)event.window.data1;
-				int g_SwapChainResizeHeight = (int)event.window.data2;
+				shutDownProgram = true;
+			}
+			else if (event.type == SDL_EventType::SDL_WINDOWEVENT && event.window.windowID == SDL_GetWindowID(sdlWindow))
+			{
+				if (event.window.event == SDL_WindowEventID::SDL_WINDOWEVENT_RESIZED)
+				{
+					gfxLogger.log("Resize event");
+					rendererData.resizeEvent = true;
+				}
+				else if (event.window.event == SDL_WindowEventID::SDL_WINDOWEVENT_MINIMIZED)
+				{
+					gfxLogger.log("Window minimized event");
+					submitRendering = false;
+				}
+				else if (event.window.event == SDL_WindowEventID::SDL_WINDOWEVENT_RESTORED)
+				{
+					gfxLogger.log("Window restored event");
+					submitRendering = true;
+					//if constexpr (targetOSType == OSType::Mobile)
+						rendererData.rebuildVkSurface = true;
+				}
 			}
 		}
 		if (shutDownProgram == true)
@@ -146,10 +194,15 @@ int main(int argc, char** argv)
 			break;
 		}
 
+		ImGui_ImplSDL2_NewFrame(sdlWindow);
+		RenderImGuiStuff();
 
-		Gfx::Draw(rendererData, 0.0f);
+		if (submitRendering)
+			Gfx::Draw(rendererData);
 
+		firstTick = false;
 	}
+
 
 
 	return 0;
