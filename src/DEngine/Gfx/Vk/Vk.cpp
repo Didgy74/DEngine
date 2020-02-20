@@ -1,22 +1,17 @@
 #include "Vk.hpp"
-#include "DEngine/Gfx/VkInterface.hpp"
+#include "../VkInterface.hpp"
 #include "DEngine/Gfx/Assert.hpp"
 #include "Init.hpp"
-
-#include "StaticDispatcher.hpp"
 
 #include "DEngine/Int.hpp"
 #include "DEngine/Containers/Span.hpp"
 #include "DEngine/Containers/Array.hpp"
 #include "DEngine/Containers/FixedVector.hpp"
 
-#include "imgui.h"
-#include "imgui_impl_vulkan.h"
+#include "ImGui/imgui.h"
+#include "ImGui/imgui_impl_vulkan.h"
 
 #include <string>
-#include <unordered_map>
-std::uint32_t imgui_imgID = 0;
-std::unordered_map<std::uint32_t, VkDescriptorSet> imgui_descrSets{};
 
 //vk::DispatchLoaderDynamic vk::defaultDispatchLoaderDynamic;
 
@@ -130,7 +125,7 @@ namespace DEngine::Gfx::Vk
     struct RecordGraphicsCmdBuffer_Params
     {
         DevDispatch const* device = nullptr;
-        GfxRenderTarget const* gfxRenderTarget = nullptr;
+        GfxViewportData const* gfxViewportData = nullptr;
         std::uint8_t viewportID = 255;
         std::uint8_t resourceSetIndex = 255;
         vk::RenderPass renderPass{};
@@ -138,9 +133,9 @@ namespace DEngine::Gfx::Vk
         vk::Pipeline testPipeline{};
         DebugUtilsDispatch const* debugUtils = nullptr;;
     };
-    void RecordGraphicsCmdBuffer(RecordGraphicsCmdBuffer_Params const& params)
+    void RecordGraphicsCmdBuffer(RecordGraphicsCmdBuffer_Params params)
     {
-        vk::CommandBuffer cmdBuffer = params.gfxRenderTarget->cmdBuffers[params.resourceSetIndex];
+        vk::CommandBuffer cmdBuffer = params.gfxViewportData->cmdBuffers[params.resourceSetIndex];
 
         // We need to rename the command buffer every time we record it
         if (params.debugUtils)
@@ -149,6 +144,7 @@ namespace DEngine::Gfx::Vk
             nameInfo.objectHandle = (u64)(VkCommandBuffer)cmdBuffer;
             nameInfo.objectType = cmdBuffer.objectType;
             std::string name = std::string("Graphics viewport #") + std::to_string(params.viewportID) + std::string(" - CmdBuffer #") + std::to_string(params.resourceSetIndex);
+            nameInfo.pObjectName = name.data();
             params.debugUtils->setDebugUtilsObjectNameEXT(params.device->handle, nameInfo);
         }
 
@@ -158,9 +154,9 @@ namespace DEngine::Gfx::Vk
         params.device->beginCommandBuffer(cmdBuffer, beginInfo);
 
             vk::RenderPassBeginInfo rpBegin{};
-            rpBegin.framebuffer = params.gfxRenderTarget->framebuffer;
+            rpBegin.framebuffer = params.gfxViewportData->renderTarget.framebuffer;
             rpBegin.renderPass = params.renderPass;
-            rpBegin.renderArea.extent = params.gfxRenderTarget->extent;
+            rpBegin.renderArea.extent = params.gfxViewportData->renderTarget.extent;
             rpBegin.clearValueCount = 1;
             vk::ClearColorValue clearVal{};
             clearVal.setFloat32({ 0.f, 0.f, 0.5f, 1.f });
@@ -169,8 +165,8 @@ namespace DEngine::Gfx::Vk
             params.device->cmdBeginRenderPass(cmdBuffer, rpBegin, vk::SubpassContents::eInline);
 
                 vk::Viewport viewport{};
-                viewport.width = static_cast<float>(params.gfxRenderTarget->extent.width);
-                viewport.height = static_cast<float>(params.gfxRenderTarget->extent.height);
+                viewport.width = static_cast<float>(params.gfxViewportData->renderTarget.extent.width);
+                viewport.height = static_cast<float>(params.gfxViewportData->renderTarget.extent.height);
                 params.device->cmdSetViewport(cmdBuffer, 0, { viewport });
                 params.device->cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, params.testPipeline);
                 params.device->cmdDraw(cmdBuffer, 3, 1, 0, 0);
@@ -181,7 +177,7 @@ namespace DEngine::Gfx::Vk
             if (params.useEditorPipeline)
             {
                 vk::ImageMemoryBarrier imgBarrier{};
-                imgBarrier.image = params.gfxRenderTarget->img;
+                imgBarrier.image = params.gfxViewportData->renderTarget.img;
                 imgBarrier.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
                 imgBarrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
                 imgBarrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
@@ -207,14 +203,17 @@ namespace DEngine::Gfx::Vk
 
     void NewViewport(void* apiDataBuffer, u8& viewportID, void*& imguiTexID)
     {
+        vk::Result vkResult{};
         APIData& apiData = *reinterpret_cast<APIData*>(apiDataBuffer);
 
-        GfxRenderTarget gfxRenderTarget = Init::InitializeMainRenderingStuff(
+        viewportID = (u8)apiData.viewportDatas.size();
+
+        GfxViewportData viewportData{};
+        viewportData.viewportID = viewportID;
+        viewportData.renderTarget = Init::InitializeGfxViewport(
             apiData.device,
-            apiData.resourceSetCount,
-            0,
+            viewportID,
             apiData.physDevice.memInfo.deviceLocal,
-            { 250, 250 },
             { 250, 250 },
             apiData.gfxRenderPass,
             apiData.renderQueue,
@@ -222,12 +221,36 @@ namespace DEngine::Gfx::Vk
             apiData.DebugUtilsPtr());
 
         imguiTexID = ImGui_ImplVulkan_AddTexture(
-            (VkSampler)apiData.guiData.viewportSampler,
-            (VkImageView)gfxRenderTarget.imgView, 
+            (VkImageView)viewportData.renderTarget.imgView,
             (VkImageLayout)vk::ImageLayout::eShaderReadOnlyOptimal);
 
-        viewportID = (u8)apiData.viewportRenderTargets.size();
-        apiData.viewportRenderTargets.pushBack(std::move(gfxRenderTarget));
+        viewportData.imguiTextureID = imguiTexID;
+        
+        // Make the command pool
+        vk::CommandPoolCreateInfo cmdPoolInfo{};
+        cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+        viewportData.cmdPool = apiData.device.createCommandPool(cmdPoolInfo);
+        if (apiData.DebugUtilsPtr() != nullptr)
+        {
+            vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+            nameInfo.objectHandle = (u64)(VkCommandPool)viewportData.cmdPool;
+            nameInfo.objectType = viewportData.cmdPool.objectType;
+            std::string name = std::string("Graphics viewport #") + std::to_string(viewportID) + " - CmdPool";
+            nameInfo.pObjectName = name.data();
+            apiData.DebugUtilsPtr()->setDebugUtilsObjectNameEXT(apiData.device.handle, nameInfo);
+        }
+
+        vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
+        cmdBufferAllocInfo.commandPool = viewportData.cmdPool;
+        cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
+        cmdBufferAllocInfo.commandBufferCount = apiData.resourceSetCount;
+        viewportData.cmdBuffers.resize(cmdBufferAllocInfo.commandBufferCount);
+        vkResult = apiData.device.allocateCommandBuffers(&cmdBufferAllocInfo, viewportData.cmdBuffers.data());
+        if (vkResult != vk::Result::eSuccess)
+            throw std::runtime_error("Vulkan: Unable to allocate command cmdBuffers for GUI rendering.");
+        
+
+        apiData.viewportDatas.pushBack(std::move(viewportData));
     }
 
     namespace Init
@@ -236,11 +259,32 @@ namespace DEngine::Gfx::Vk
     }
 }
 
-void DEngine::Gfx::Vk::Draw(Data& gfxData, void* apiDataBuffer)
+void DEngine::Gfx::Vk::Draw(Data& gfxData, Draw_Params const& drawParams, void* apiDataBuffer)
 {
     vk::Result vkResult{};
     APIData& apiData = *(reinterpret_cast<APIData*>(apiDataBuffer));
 
+    if (drawParams.viewportResizeEvents.size() > 0)
+    {
+        vkResult = apiData.device.waitForFences({ (u32)apiData.mainFences.size(), apiData.mainFences.data() }, true, std::numeric_limits<std::uint64_t>::max());
+        if (vkResult != vk::Result::eSuccess)
+            throw std::runtime_error("Vulkan: Failed to wait for cmd buffer fence.");
+
+        for (auto& viewportResizeEvent : drawParams.viewportResizeEvents)
+        {
+            GfxViewportData& viewport = apiData.viewportDatas[viewportResizeEvent.viewportID];
+            Init::ResizeGfxViewport(
+                apiData.device,
+                apiData.renderQueue,
+                apiData.gfxRenderPass,
+                viewport.viewportID,
+                viewport.imguiTextureID,
+                { viewportResizeEvent.width, viewportResizeEvent.width },
+                true,
+                viewport.renderTarget,
+                apiData.DebugUtilsPtr());
+        }
+    }
     {
         // Handles events the renderer must handle.
         // TODO: Move this into a function
@@ -251,8 +295,8 @@ void DEngine::Gfx::Vk::Draw(Data& gfxData, void* apiDataBuffer)
             apiData.swapchain.handle = vk::SwapchainKHR();
 
             u64 tempNewSurface = 0;
-            bool test = apiData.createVkSurfacePFN((u64)(VkInstance)apiData.instance.handle, apiData.createVkSurfaceUserData, &tempNewSurface);
-            if (!test)
+            vk::Result result = (vk::Result)apiData.wsiInterface->createVkSurface((u64)(VkInstance)apiData.instance.handle, nullptr, &tempNewSurface);
+            if (result != vk::Result::eSuccess)
                 throw std::runtime_error("Vulkan: Couldn't recreate the VkSurfaceKHR");
             vk::SurfaceKHR newSurface = *reinterpret_cast<vk::SurfaceKHR const*>(&tempNewSurface);
 
@@ -280,22 +324,22 @@ void DEngine::Gfx::Vk::Draw(Data& gfxData, void* apiDataBuffer)
     Cont::FixedVector<vk::CommandBuffer, 10> cmdBuffersToSubmit{};
 
     // Build all graphics command buffers
-    for (std::size_t i = 0; i < apiData.viewportRenderTargets.size(); i += 1)
+    for (std::size_t i = 0; i < apiData.viewportDatas.size(); i += 1)
     {
-        auto const& item = apiData.viewportRenderTargets[i];
+        auto const& item = apiData.viewportDatas[i];
 
         RecordGraphicsCmdBuffer_Params params{};
         params.debugUtils = apiData.DebugUtilsPtr();
         params.device = &apiData.device;
-        params.gfxRenderTarget = &item;
+        params.gfxViewportData = &item;
         params.renderPass = apiData.gfxRenderPass;
         params.resourceSetIndex = currentResourceSet;
         params.testPipeline = apiData.testPipeline;
         params.useEditorPipeline = true;
-        params.viewportID = static_cast<std::uint8_t>(i);
+        params.viewportID = item.viewportID;
         RecordGraphicsCmdBuffer(params);
 
-        cmdBuffersToSubmit.pushBack(apiData.viewportRenderTargets[i].cmdBuffers[currentResourceSet]);
+        cmdBuffersToSubmit.pushBack(apiData.viewportDatas[i].cmdBuffers[currentResourceSet]);
     }
 
     // First we re-record the GUI cmd buffer and submit it.
@@ -307,6 +351,7 @@ void DEngine::Gfx::Vk::Draw(Data& gfxData, void* apiDataBuffer)
         currentResourceSet,
         apiData.DebugUtilsPtr());
     cmdBuffersToSubmit.pushBack(apiData.guiData.cmdBuffers[currentResourceSet]);
+
 
     // Submit the command cmdBuffers
     vk::SubmitInfo submitInfo{};
@@ -323,9 +368,9 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
     apiDataBuffer = new APIData;
     APIData& apiData = *static_cast<APIData*>(apiDataBuffer);
 
-    apiData.createVkSurfacePFN = initInfo.createVkSurfacePFN;
-    apiData.createVkSurfaceUserData = initInfo.createVkSurfaceUserData;
-    apiData.logger = initInfo.iLog;
+    apiData.logger = initInfo.optional_iLog;
+    apiData.wsiInterface = initInfo.iWsi;
+
     apiData.resourceSetCount = 2;
     apiData.currentResourceSet = 0;
 
@@ -343,14 +388,14 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
     if (createVkInstanceResult.debugUtilsEnabled)
     {
         apiData.debugUtils = DebugUtilsDispatch::Build(apiData.instance.handle, instanceProcAddr);
-        apiData.debugMessenger = Init::CreateLayerMessenger(apiData.instance.handle, apiData.DebugUtilsPtr(), initInfo.iLog);
+        apiData.debugMessenger = Init::CreateLayerMessenger(apiData.instance.handle, apiData.DebugUtilsPtr(), initInfo.optional_iLog);
     }
 
     // TODO: I don't think I like this code
     // Create the VkSurface using the callback
     vk::SurfaceKHR surface{};
-    bool surfaceCreateResult = initInfo.createVkSurfacePFN((u64)(VkInstance)apiData.instance.handle, initInfo.createVkSurfaceUserData, reinterpret_cast<u64*>(&surface));
-    if (surfaceCreateResult == false || surface == vk::SurfaceKHR{})
+    vk::Result surfaceCreateResult = (vk::Result)apiData.wsiInterface->createVkSurface((u64)(VkInstance)apiData.instance.handle, nullptr, reinterpret_cast<u64*>(&surface));
+    if (surfaceCreateResult != vk::Result::eSuccess)
         throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
 
 
@@ -379,11 +424,23 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 
     // Create our main fences
     apiData.mainFences.resize(apiData.resourceSetCount);
-    for (auto& item : apiData.mainFences)
+    for (uSize i = 0; i < apiData.mainFences.size(); i += 1)
     {
         vk::FenceCreateInfo info{};
         info.flags = vk::FenceCreateFlagBits::eSignaled;
-        item = apiData.device.createFence(info);
+        apiData.mainFences[i] = apiData.device.createFence(info);
+
+        if (apiData.DebugUtilsPtr())
+        {
+            std::string name = std::string("Main Fence #") + std::to_string(i);
+
+            vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+            nameInfo.objectHandle = (u64)(VkFence)apiData.mainFences[i];
+            nameInfo.objectType = apiData.mainFences[i].objectType;
+            nameInfo.pObjectName = name.data();
+
+            apiData.debugUtils.setDebugUtilsObjectNameEXT(apiData.device.handle, nameInfo);
+        }
     }
 
 
@@ -400,7 +457,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
     Init::RecordSwapchainCmdBuffers(apiData.device, apiData.swapchain, apiData.guiData.renderTarget.img);
 
     // Initialize ImGui stuff
-    Init::InitializeImGui(apiData, instanceProcAddr);
+    Init::InitializeImGui(apiData, apiData.device, instanceProcAddr, apiData.DebugUtilsPtr());
 
     // Create the main render stuff
     apiData.gfxRenderPass = Init::BuildMainGfxRenderPass(apiData.device, true, apiData.DebugUtilsPtr());
@@ -481,7 +538,7 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
     viewport.maxDepth = 1.0f;
     vk::Rect2D scissor{};
     scissor.offset = vk::Offset2D{ 0, 0 };
-    scissor.extent = vk::Extent2D{ 16384, 16384 };
+    scissor.extent = vk::Extent2D{ 8192, 8192 };
     vk::PipelineViewportStateCreateInfo viewportState{};
     viewportState.viewportCount = 1;
     viewportState.pViewports = &viewport;

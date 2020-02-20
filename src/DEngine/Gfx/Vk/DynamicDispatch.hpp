@@ -514,6 +514,18 @@ namespace DEngine::Gfx::Vk
             return handle.freeCommandBuffers(commandPool, commandBuffers, raw);
         }
 
+        void freeMemory(
+            vk::DeviceMemory memory,
+            vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
+        {
+            return handle.freeMemory(memory, allocator, raw);
+        }
+
+        void waitQueueIdle(vk::Queue queue) const
+        {
+            return queue.waitIdle(raw);
+        }
+
         // Command pool
         vk::CommandPool createCommandPool(
             vk::CommandPoolCreateInfo const& createInfo, 

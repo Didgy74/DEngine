@@ -3,6 +3,7 @@
 #include "DEngine/Int.hpp"
 #include "DEngine/Containers/Span.hpp"
 #include "DEngine/Containers/Optional.hpp"
+#include "DEngine/Containers/FixedVector.hpp"
 
 namespace DEngine::Gfx
 {
@@ -11,10 +12,23 @@ namespace DEngine::Gfx
 		constexpr u8 maxViewportCount = 8;
 	}
 
-	class IWSIInterfacer;
+	class IWsi;
 	class ILog;
 	struct InitInfo;
 	class ViewportRef;
+	struct Draw_Params;
+
+	struct ViewportResizeEvent
+	{
+		u8 viewportID = 255;
+		u32 width = 0;
+		u32 height = 0;
+	};
+
+	struct Draw_Params
+	{
+		Cont::FixedVector<ViewportResizeEvent, 10> viewportResizeEvents{};
+	};
 
 	class Data
 	{
@@ -27,16 +41,18 @@ namespace DEngine::Gfx
 		ViewportRef NewViewport();
 		u8 GetViewportCount();
 
+		void Draw(Draw_Params const& params);
+
 	private:
 		Data() = default;
 		Data(Data const&) = delete;
 
-		const ILog* iLog = nullptr;
+		ILog* iLog = nullptr;
+		IWsi* iWsi = nullptr;
 
 		void* apiDataBuffer{};
 
-		friend Cont::Opt<Data> Initialize(const InitInfo&);
-		friend void Draw(Data&);
+		friend Cont::Opt<Data> Initialize(const InitInfo& initInfo);
 	};
 
 	struct InitInfo
@@ -44,11 +60,8 @@ namespace DEngine::Gfx
 		u32 maxWidth = 0;
 		u32 maxHeight = 0;
 
-		bool (*createVkSurfacePFN)(u64 vkInstance, void* userData, u64* vkSurface) = nullptr;
-		void* createVkSurfaceUserData = nullptr;
-
-		ILog* iLog = nullptr;
-		IWSIInterfacer* iWsiInterface = nullptr;
+		ILog* optional_iLog = nullptr;
+		IWsi* iWsi = nullptr;
 		Cont::Span<char const*> requiredVkInstanceExtensions{};
 	};
 
@@ -60,10 +73,10 @@ namespace DEngine::Gfx
 		virtual void log(char const* msg) = 0;
 	};
 
-	class IWSIInterfacer
+	class IWsi
 	{
 	public:
-		virtual ~IWSIInterfacer() {};
+		virtual ~IWsi() {};
 
 		// Return type is VkResult
 		//
@@ -87,7 +100,6 @@ namespace DEngine::Gfx
 		friend class Data;
 	};
 
+	
 	Cont::Opt<Data> Initialize(const InitInfo& initInfo);
-
-	void Draw(Data& data);
 }

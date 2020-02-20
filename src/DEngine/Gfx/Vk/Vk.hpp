@@ -117,11 +117,19 @@ namespace DEngine::Gfx::Vk
         vk::Extent2D extent{};
         vk::DeviceMemory memory{};
         vk::DeviceSize memorySize{};
+        u8 memoryTypeIndex{};
         vk::Image img{};
         vk::ImageView imgView{};
         vk::Framebuffer framebuffer{};
+    };
+
+    struct GfxViewportData
+    {
+        u8 viewportID = 255;
+        GfxRenderTarget renderTarget{};
         vk::CommandPool cmdPool{};
         Cont::FixedVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
+        void* imguiTextureID = nullptr;
     };
 
     struct GUIRenderTarget
@@ -138,7 +146,6 @@ namespace DEngine::Gfx::Vk
     struct GUIData
     {
         vk::RenderPass renderPass{};
-        vk::Sampler viewportSampler = vk::Sampler{};
         GUIRenderTarget renderTarget{};
         vk::CommandPool cmdPool{};
         // Has length of resource sets
@@ -147,8 +154,8 @@ namespace DEngine::Gfx::Vk
 
     struct APIData
     {
-        bool (*createVkSurfacePFN)(u64 vkInstance, void* userData, u64* vkSurface) = nullptr;
-        void* createVkSurfaceUserData = nullptr;
+        Gfx::ILog* logger = nullptr;
+        Gfx::IWsi* wsiInterface = nullptr;
 
         InstanceDispatch instance{};
         DebugUtilsDispatch debugUtils{};
@@ -156,7 +163,7 @@ namespace DEngine::Gfx::Vk
         vk::DebugUtilsMessengerEXT debugMessenger{};
         Vk::DeviceDispatch device{};
 
-        Gfx::ILog* logger = nullptr;
+        
 
         PhysDeviceInfo physDevice{};
         SurfaceInfo surface{};
@@ -173,7 +180,7 @@ namespace DEngine::Gfx::Vk
 
         // The main renderpass for rendering the 3D stuff
         vk::RenderPass gfxRenderPass{};
-        Cont::FixedVector<GfxRenderTarget, Gfx::Constants::maxViewportCount> viewportRenderTargets{};
+        Cont::FixedVector<GfxViewportData, Gfx::Constants::maxViewportCount> viewportDatas{};
 
         vk::PipelineLayout testPipelineLayout{};
         vk::Pipeline testPipeline{};

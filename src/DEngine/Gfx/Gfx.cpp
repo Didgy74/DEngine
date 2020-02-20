@@ -1,5 +1,5 @@
 #include "DEngine/Gfx/Gfx.hpp"
-#include "DEngine/Gfx/VkInterface.hpp"
+#include "VkInterface.hpp"
 
 #include "DEngine/Utility.hpp"
 
@@ -9,28 +9,26 @@ using namespace DEngine;
 
 Cont::Opt<Gfx::Data> DEngine::Gfx::Initialize(const InitInfo& initInfo)
 {
-	DENGINE_GFX_ASSERT(initInfo.createVkSurfaceUserData != nullptr);
-	DENGINE_GFX_ASSERT(initInfo.createVkSurfacePFN != nullptr);
-
 	Gfx::Data returnVal{};
 
-	returnVal.iLog = initInfo.iLog;
+	returnVal.iLog = initInfo.optional_iLog;
+	returnVal.iWsi = initInfo.iWsi;
 
-	if (initInfo.iLog)
-		initInfo.iLog->log("Logger test");
+	if (initInfo.optional_iLog)
+		initInfo.optional_iLog->log("Logger test");
 
 	Vk::InitializeBackend(returnVal, initInfo, returnVal.apiDataBuffer);
 
 	return Cont::Opt<Gfx::Data>(Util::move(returnVal));
 }
 
-void DEngine::Gfx::Draw(Data& data)
+void DEngine::Gfx::Data::Draw(Draw_Params const& params)
 {
-	Vk::Draw(data, data.apiDataBuffer);
+	Vk::Draw(*this, params, apiDataBuffer);
 
 	// Resize event is handled, we reset it.
-	data.resizeEvent = false;
-	data.rebuildVkSurface = false;
+	resizeEvent = false;
+	rebuildVkSurface = false;
 }
 
 DEngine::Gfx::ViewportRef DEngine::Gfx::Data::NewViewport()

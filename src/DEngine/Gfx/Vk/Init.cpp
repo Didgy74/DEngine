@@ -1,8 +1,8 @@
 #include "Init.hpp"
-#include "StaticDispatcher.hpp"
 
 #include "DEngine/Gfx/Assert.hpp"
 
+#include "ImGui/imgui_impl_vulkan.h"
 
 #include <string>
 
@@ -604,7 +604,7 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
         vk::DebugUtilsObjectNameInfoEXT nameInfo{};
         nameInfo.objectHandle = (u64)(VkSwapchainKHR)swapchain.handle;
         nameInfo.objectType = swapchain.handle.objectType;
-        std::string objectName = std::string("Swapchain #0") + std::to_string(0);
+        std::string objectName = std::string("Swapchain #") + std::to_string(0);
         nameInfo.pObjectName = objectName.data();
         debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
     }
@@ -628,7 +628,7 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
             vk::DebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.objectHandle = (u64)(VkImage)swapchain.images[i];
             nameInfo.objectType = swapchain.images[i].objectType;
-            std::string objectName = std::string("Swapchain #0 - Image #0") + std::to_string(i);
+            std::string objectName = std::string("Swapchain #0 - Image #") + std::to_string(i);
             nameInfo.pObjectName = objectName.data();
             debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
         }
@@ -644,7 +644,7 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
         vk::DebugUtilsObjectNameInfoEXT nameInfo{};
         nameInfo.objectHandle = (u64)(VkCommandPool)swapchain.cmdPool;
         nameInfo.objectType = swapchain.cmdPool.objectType;
-        std::string objectName = std::string("Swapchain #00 - Copy image CmdPool");
+        std::string objectName = std::string("Swapchain #0 - Copy image CmdPool");
         nameInfo.pObjectName = objectName.data();
         debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
     }
@@ -739,7 +739,7 @@ void DEngine::Gfx::Vk::Init::RecreateSwapchain(
         vk::DebugUtilsObjectNameInfoEXT nameInfo{};
         nameInfo.objectHandle = (u64)(VkSwapchainKHR)swapchain.handle;
         nameInfo.objectType = swapchain.handle.objectType;
-        std::string objectName = std::string("Swapchain #0") + std::to_string(swapchain.uid);
+        std::string objectName = std::string("Swapchain #0");
         nameInfo.pObjectName = objectName.data();
         debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
     }
@@ -757,7 +757,7 @@ void DEngine::Gfx::Vk::Init::RecreateSwapchain(
             vk::DebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.objectHandle = (u64)(VkImage)swapchain.images[i];
             nameInfo.objectType = swapchain.images[i].objectType;
-            std::string objectName = std::string("Swapchain #0") + std::to_string(swapchain.uid) + "- Image #0" + std::to_string(i);
+            std::string objectName = std::string("Swapchain #0") + "- Image #0" + std::to_string(i);
             nameInfo.pObjectName = objectName.data();
             debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
         }
@@ -1164,6 +1164,83 @@ void DEngine::Gfx::Vk::Init::RecreateGUIRenderTarget(
     }
 }
 
+DEngine::Gfx::Vk::GUIData DEngine::Gfx::Vk::Init::CreateGUIData(
+    DeviceDispatch const& device,
+    vk::Format swapchainFormat,
+    u8 resourceSetCount,
+    vk::Extent2D swapchainDimensions,
+    vk::Queue vkQueue,
+    DebugUtilsDispatch const* debugUtils)
+{
+    vk::Result vkResult{};
+    GUIData returnVal{};
+
+    // Create the renderpass
+    {
+        vk::AttachmentDescription colorAttachment{};
+        colorAttachment.initialLayout = vk::ImageLayout::eTransferSrcOptimal;
+        colorAttachment.finalLayout = vk::ImageLayout::eTransferSrcOptimal;
+        colorAttachment.format = swapchainFormat;
+        colorAttachment.samples = vk::SampleCountFlagBits::e1;
+        colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+        colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
+        colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+        colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+        vk::AttachmentDescription attachments[1] = { colorAttachment };
+        vk::AttachmentReference colorAttachmentRef{};
+        colorAttachmentRef.attachment = 0;
+        colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
+        vk::SubpassDescription subpassDescription{};
+        subpassDescription.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+        subpassDescription.colorAttachmentCount = 1;
+        subpassDescription.pColorAttachments = &colorAttachmentRef;
+        // Set up render pass
+        vk::RenderPassCreateInfo createInfo{};
+        createInfo.attachmentCount = 1;
+        createInfo.pAttachments = attachments;
+        createInfo.subpassCount = 1;
+        createInfo.pSubpasses = &subpassDescription;
+
+        returnVal.renderPass = device.createRenderPass(createInfo);
+        if (debugUtils != nullptr)
+        {
+            vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+            nameInfo.objectHandle = (u64)(VkRenderPass)returnVal.renderPass;
+            nameInfo.objectType = returnVal.renderPass.objectType;
+            nameInfo.pObjectName = "GUI RenderPass";
+            debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+        }
+    }
+
+    // Create the commandbuffers
+    {
+        vk::CommandPoolCreateInfo cmdPoolInfo{};
+        cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+        returnVal.cmdPool = device.createCommandPool(cmdPoolInfo);
+        if (debugUtils != nullptr)
+        {
+            vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+            nameInfo.objectHandle = (u64)(VkCommandPool)returnVal.cmdPool;
+            nameInfo.objectType = returnVal.cmdPool.objectType;
+            nameInfo.pObjectName = "GUI CmdPool";
+            debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+        }
+
+        vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
+        cmdBufferAllocInfo.commandPool = returnVal.cmdPool;
+        cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
+        cmdBufferAllocInfo.commandBufferCount = resourceSetCount;
+        returnVal.cmdBuffers.resize(cmdBufferAllocInfo.commandBufferCount);
+        vkResult = device.allocateCommandBuffers(&cmdBufferAllocInfo, returnVal.cmdBuffers.data());
+        if (vkResult != vk::Result::eSuccess)
+            throw std::runtime_error("Vulkan: Unable to allocate command cmdBuffers for GUI rendering.");
+    }
+
+    returnVal.renderTarget = CreateGUIRenderTarget(device, vkQueue, swapchainDimensions, swapchainFormat, returnVal.renderPass, debugUtils);
+
+    return returnVal;
+}
+
 void DEngine::Gfx::Vk::Init::RecordSwapchainCmdBuffers(
     DeviceDispatch const& device,
     SwapchainData const& swapchainData,
@@ -1378,6 +1455,235 @@ void DEngine::Gfx::Vk::Init::TransitionGfxImage(
     device.destroyCommandPool(cmdPool);
 }
 
+DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewport(
+    DeviceDispatch const& device,
+    u8 viewportID,
+    u32 deviceLocalMemType,
+    vk::Extent2D viewportSize,
+    vk::RenderPass renderPass,
+    vk::Queue queue,
+    bool useEditorPipeline,
+    DebugUtilsDispatch const* debugUtils)
+{
+    vk::Result vkResult{};
+
+    GfxRenderTarget returnVal{};
+    returnVal.extent = viewportSize;
+
+    // First we make a temp image that has max size, so we won't have to re-allocate memory later when resizing this image.
+    vk::ImageCreateInfo imageInfo{};
+    imageInfo.arrayLayers = 1;
+    imageInfo.extent = vk::Extent3D{ viewportSize.width, viewportSize.height, 1 };
+    imageInfo.format = vk::Format::eR8G8B8A8Srgb;
+    imageInfo.imageType = vk::ImageType::e2D;
+    imageInfo.initialLayout = vk::ImageLayout::eUndefined;
+    imageInfo.mipLevels = 1;
+    imageInfo.samples = vk::SampleCountFlagBits::e1;
+    imageInfo.sharingMode = vk::SharingMode::eExclusive;
+    imageInfo.tiling = vk::ImageTiling::eOptimal;
+    imageInfo.usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc;
+    if (useEditorPipeline)
+    {
+        // We want to sample from the image to show it in the editor.
+        imageInfo.usage |= vk::ImageUsageFlagBits::eSampled;
+    }
+
+    returnVal.img = device.createImage(imageInfo);
+    if (debugUtils)
+    {
+        vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+        nameInfo.objectHandle = (u64)(VkImage)returnVal.img;
+        nameInfo.objectType = returnVal.img.objectType;
+        std::string name = std::string("Graphics viewport #") + std::to_string(viewportID) + " - Image";
+        nameInfo.pObjectName = name.data();
+        debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+    }
+
+
+    vk::MemoryRequirements memReqs = device.getImageMemoryRequirements(returnVal.img);
+
+    vk::MemoryAllocateInfo allocInfo{};
+    allocInfo.allocationSize = memReqs.size;
+    allocInfo.memoryTypeIndex = deviceLocalMemType;
+
+    vk::DeviceMemory memory = device.allocateMemory(allocInfo);
+    returnVal.memory = memory;
+    returnVal.memorySize = allocInfo.allocationSize;
+    if (debugUtils)
+    {
+        vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+        nameInfo.objectHandle = (u64)(VkDeviceMemory)returnVal.memory;
+        nameInfo.objectType = returnVal.memory.objectType;
+        std::string name = std::string("Graphics viewport #") + std::to_string(viewportID) + " - Memory";
+        nameInfo.pObjectName = name.data();
+        debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+    }
+
+    device.bindImageMemory(returnVal.img, memory, 0);
+
+    // We have to transition this image
+    TransitionGfxImage(device, returnVal.img, queue, useEditorPipeline);
+
+    // Make the image view
+    vk::ImageViewCreateInfo imgViewInfo{};
+    imgViewInfo.components.r = vk::ComponentSwizzle::eIdentity;
+    imgViewInfo.components.g = vk::ComponentSwizzle::eIdentity;
+    imgViewInfo.components.b = vk::ComponentSwizzle::eIdentity;
+    imgViewInfo.components.a = vk::ComponentSwizzle::eIdentity;
+    imgViewInfo.format = vk::Format::eR8G8B8A8Srgb;
+    imgViewInfo.image = returnVal.img;
+    imgViewInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+    imgViewInfo.subresourceRange.baseArrayLayer = 0;
+    imgViewInfo.subresourceRange.baseMipLevel = 0;
+    imgViewInfo.subresourceRange.layerCount = 1;
+    imgViewInfo.subresourceRange.levelCount = 1;
+    imgViewInfo.viewType = vk::ImageViewType::e2D;
+
+    returnVal.imgView = device.createImageView(imgViewInfo);
+    if (debugUtils)
+    {
+        vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+        nameInfo.objectHandle = (u64)(VkImageView)returnVal.imgView;
+        nameInfo.objectType = returnVal.imgView.objectType;
+        std::string name = std::string("Graphics viewport #") + std::to_string(viewportID) + " - Image View";
+        nameInfo.pObjectName = name.data();
+        debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+    }
+
+    vk::FramebufferCreateInfo fbInfo{};
+    fbInfo.attachmentCount = 1;
+    fbInfo.pAttachments = &returnVal.imgView;
+    fbInfo.height = viewportSize.height;
+    fbInfo.layers = 1;
+    fbInfo.renderPass = renderPass;
+    fbInfo.width = viewportSize.width;
+    returnVal.framebuffer = device.createFramebuffer(fbInfo);
+    if (debugUtils)
+    {
+        vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+        nameInfo.objectHandle = (u64)(VkFramebuffer)returnVal.framebuffer;
+        nameInfo.objectType = returnVal.framebuffer.objectType;
+        std::string name = std::string("Graphics viewport #") + std::to_string(viewportID) + " - Framebuffer";
+        nameInfo.pObjectName = name.data();
+        debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+    }
+
+    return returnVal;
+}
+
+void DEngine::Gfx::Vk::Init::ResizeGfxViewport(
+    DevDispatch const& device,
+    vk::Queue queue,
+    vk::RenderPass renderPass,
+    u8 viewportID,
+    void* imguiTextureID,
+    vk::Extent2D newSize,
+    bool useEditorPipeline,
+    GfxRenderTarget& viewportRef,
+    DebugUtilsDispatch const* debugUtils)
+{
+    if (newSize == viewportRef.extent)
+        return;
+
+    viewportRef.extent = newSize;
+
+    device.destroyFramebuffer(viewportRef.framebuffer);
+    device.destroyImageView(viewportRef.imgView);
+    device.destroyImage(viewportRef.img);
+
+    vk::ImageCreateInfo imageInfo{};
+    imageInfo.arrayLayers = 1;
+    imageInfo.extent = vk::Extent3D{ newSize.width, newSize.height, 1 };
+    imageInfo.format = vk::Format::eR8G8B8A8Srgb;
+    imageInfo.imageType = vk::ImageType::e2D;
+    imageInfo.initialLayout = vk::ImageLayout::eUndefined;
+    imageInfo.mipLevels = 1;
+    imageInfo.samples = vk::SampleCountFlagBits::e1;
+    imageInfo.sharingMode = vk::SharingMode::eExclusive;
+    imageInfo.tiling = vk::ImageTiling::eOptimal;
+    imageInfo.usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc;
+    if (useEditorPipeline)
+    {
+        // We want to sample from the image to show it in the editor.
+        imageInfo.usage |= vk::ImageUsageFlagBits::eSampled;
+    }
+
+    viewportRef.img = device.createImage(imageInfo);
+    if (debugUtils)
+    {
+        vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+        nameInfo.objectHandle = (u64)(VkImage)viewportRef.img;
+        nameInfo.objectType = viewportRef.img.objectType;
+        std::string name = std::string("Graphics viewport #") + std::to_string(viewportID) + " - Image";
+        nameInfo.pObjectName = name.data();
+        debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+    }
+
+    vk::MemoryRequirements memReqs = device.getImageMemoryRequirements(viewportRef.img);
+    // Re-allocate if we need a larger buffer
+    if (memReqs.size > viewportRef.memorySize)
+    {
+        device.freeMemory(viewportRef.memory);
+
+        vk::MemoryAllocateInfo allocInfo{};
+        allocInfo.allocationSize = memReqs.size;
+        allocInfo.memoryTypeIndex = viewportRef.memoryTypeIndex;
+
+        viewportRef.memory = device.allocateMemory(allocInfo);
+        viewportRef.memorySize = memReqs.size;
+    }
+
+    device.bindImageMemory(viewportRef.img, viewportRef.memory, 0);
+
+    TransitionGfxImage(device, viewportRef.img, queue, useEditorPipeline);
+
+    vk::ImageViewCreateInfo imgViewInfo{};
+    imgViewInfo.components.r = vk::ComponentSwizzle::eIdentity;
+    imgViewInfo.components.g = vk::ComponentSwizzle::eIdentity;
+    imgViewInfo.components.b = vk::ComponentSwizzle::eIdentity;
+    imgViewInfo.components.a = vk::ComponentSwizzle::eIdentity;
+    imgViewInfo.format = vk::Format::eR8G8B8A8Srgb;
+    imgViewInfo.image = viewportRef.img;
+    imgViewInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+    imgViewInfo.subresourceRange.baseArrayLayer = 0;
+    imgViewInfo.subresourceRange.baseMipLevel = 0;
+    imgViewInfo.subresourceRange.layerCount = 1;
+    imgViewInfo.subresourceRange.levelCount = 1;
+    imgViewInfo.viewType = vk::ImageViewType::e2D;
+
+    viewportRef.imgView = device.createImageView(imgViewInfo);
+    if (debugUtils)
+    {
+        vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+        nameInfo.objectHandle = (u64)(VkImageView)viewportRef.imgView;
+        nameInfo.objectType = viewportRef.imgView.objectType;
+        std::string name = std::string("Graphics viewport #") + std::to_string(viewportID) + " - Image View";
+        nameInfo.pObjectName = name.data();
+        debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+    }
+
+    if (useEditorPipeline)
+        ImGui_ImplVulkan_OverwriteTexture(imguiTextureID, (VkImageView)viewportRef.imgView, (VkImageLayout)vk::ImageLayout::eShaderReadOnlyOptimal);
+
+    vk::FramebufferCreateInfo fbInfo{};
+    fbInfo.attachmentCount = 1;
+    fbInfo.pAttachments = &viewportRef.imgView;
+    fbInfo.height = newSize.height;
+    fbInfo.layers = 1;
+    fbInfo.renderPass = renderPass;
+    fbInfo.width = newSize.width;
+    viewportRef.framebuffer = device.createFramebuffer(fbInfo);
+    if (debugUtils)
+    {
+        vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+        nameInfo.objectHandle = (u64)(VkFramebuffer)viewportRef.framebuffer;
+        nameInfo.objectType = viewportRef.framebuffer.objectType;
+        std::string name = std::string("Graphics viewport #") + std::to_string(viewportID) + " - Framebuffer";
+        nameInfo.pObjectName = name.data();
+        debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+    }
+}
+
 namespace DEngine::Gfx::Vk
 {
     void imguiCheckVkResult(VkResult result)
@@ -1387,15 +1693,16 @@ namespace DEngine::Gfx::Vk
     }
 }
 
-#include "imgui.h"
-#include "imgui_impl_vulkan.h"
+#include "ImGui/imgui.h"
+#include "ImGui/imgui_impl_vulkan.h"
 
-void DEngine::Gfx::Vk::Init::InitializeImGui(APIData& apiData, PFN_vkGetInstanceProcAddr instanceProcAddr)
+void DEngine::Gfx::Vk::Init::InitializeImGui(
+    APIData& apiData, 
+    DevDispatch const& device,
+    PFN_vkGetInstanceProcAddr instanceProcAddr, 
+    DebugUtilsDispatch const* debugUtils)
 {
     vk::Result vkResult{};
-
-    // Initialize the static dispatching bullshit
-    initStaticDispatcher(static_cast<VkInstance>(apiData.instance.handle), instanceProcAddr);
 
     // Create the descriptor pool for ImGui to use
     VkDescriptorPoolSize pool_sizes[] =
@@ -1417,7 +1724,17 @@ void DEngine::Gfx::Vk::Init::InitializeImGui(APIData& apiData, PFN_vkGetInstance
     poolInfo.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
     poolInfo.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
     poolInfo.pPoolSizes = (vk::DescriptorPoolSize const*)pool_sizes;
-    vk::DescriptorPool imguiDescrPool = apiData.device.createDescriptorPool(poolInfo);
+    vk::DescriptorPool imguiDescrPool = device.createDescriptorPool(poolInfo);
+    if (debugUtils)
+    {
+        char const* name = "Dear ImGui - Descriptor Pool";
+
+        vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+        nameInfo.objectHandle = (u64)(VkDescriptorPool)imguiDescrPool;
+        nameInfo.objectType = imguiDescrPool.objectType;
+        nameInfo.pObjectName = name;
+        debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+    }
 
     ImGui_ImplVulkan_InitInfo imguiInfo = {};
     imguiInfo.Instance = static_cast<VkInstance>(apiData.instance.handle);
@@ -1432,40 +1749,43 @@ void DEngine::Gfx::Vk::Init::InitializeImGui(APIData& apiData, PFN_vkGetInstance
     imguiInfo.ImageCount = 2;
     imguiInfo.CheckVkResultFn = &Vk::imguiCheckVkResult;
     imguiInfo.MSAASamples = static_cast<VkSampleCountFlagBits>(vk::SampleCountFlagBits::e1);
+    imguiInfo.pfnVkGetInstanceProcAddr = instanceProcAddr;
+    if (debugUtils)
+        imguiInfo.useDebugUtils = true;
 
     bool imguiInitSuccess = ImGui_ImplVulkan_Init(&imguiInfo, static_cast<VkRenderPass>(apiData.guiData.renderPass));
     if (!imguiInitSuccess)
         throw std::runtime_error("Could not initialize the ImGui Vulkan stuff.");
 
     vk::CommandPoolCreateInfo cmdPoolInfo{};
-    vk::CommandPool cmdPool = apiData.device.createCommandPool(cmdPoolInfo);
+    vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
 
     vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
     cmdBufferAllocInfo.commandBufferCount = 1;
     cmdBufferAllocInfo.commandPool = cmdPool;
     cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
     vk::CommandBuffer cmdBuffer{};
-    vkResult = apiData.device.allocateCommandBuffers(&cmdBufferAllocInfo, &cmdBuffer);
+    vkResult = device.allocateCommandBuffers(&cmdBufferAllocInfo, &cmdBuffer);
     if (vkResult != vk::Result::eSuccess)
         throw std::runtime_error("Unable to allocate command buffer when initializing ImGui font texture");
 
     vk::CommandBufferBeginInfo beginInfo{};
     beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
-    apiData.device.beginCommandBuffer(cmdBuffer, beginInfo);
+    device.beginCommandBuffer(cmdBuffer, beginInfo);
 
     ImGui_ImplVulkan_CreateFontsTexture(static_cast<VkCommandBuffer>(cmdBuffer));
 
-    apiData.device.endCommandBuffer(cmdBuffer);
+    device.endCommandBuffer(cmdBuffer);
 
     vk::Fence tempFence = apiData.device.createFence({});
     vk::SubmitInfo submitInfo{};
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &cmdBuffer;
-    apiData.device.queueSubmit(apiData.renderQueue, { submitInfo }, tempFence);
+    device.queueSubmit(apiData.renderQueue, { submitInfo }, tempFence);
     vkResult = apiData.device.waitForFences({ tempFence }, true, std::numeric_limits<std::uint64_t>::max());
     if (vkResult != vk::Result::eSuccess)
         throw std::runtime_error("Vulkan: Could not wait for fence after submitting ImGui create-fonts cmdBuffer.");
-    apiData.device.destroyFence(tempFence);
-    apiData.device.destroyCommandPool(cmdPool);
+    device.destroyFence(tempFence);
+    device.destroyCommandPool(cmdPool);
     ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
