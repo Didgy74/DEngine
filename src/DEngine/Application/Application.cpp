@@ -15,6 +15,8 @@ namespace DEngine::Application::detail
 	SDL_Window* mainWindow = nullptr;
 	bool isMinimized = false;
 	bool shouldShutdown = false;
+	bool isRestored = false;
+	bool resizeEvent = false;
 }
 
 bool DEngine::Application::detail::Initialize()
@@ -48,7 +50,7 @@ bool DEngine::Application::detail::Initialize()
 	assert(detail::mainWindow != nullptr);
 	if constexpr (targetOSType == Platform::Desktop)
 	{
-		SDL_SetWindowMinimumSize(detail::mainWindow, 1280, 720);
+		SDL_SetWindowMinimumSize(detail::mainWindow, 800, 600);
 	}
 
 	return true;
@@ -63,6 +65,8 @@ void DEngine::Application::detail::ImgGui_Initialize()
 void DEngine::Application::detail::ProcessEvents()
 {
 	shouldShutdown = false;
+	isRestored = false;
+	resizeEvent = false;
 
 	SDL_Event event{};
 	while (SDL_PollEvent(&event))
@@ -77,7 +81,7 @@ void DEngine::Application::detail::ProcessEvents()
 			if (event.window.event == SDL_WindowEventID::SDL_WINDOWEVENT_RESIZED)
 			{
 				Log("Resize event");
-				//rendererData.resizeEvent = true;
+				resizeEvent = true;
 			}
 			else if (event.window.event == SDL_WindowEventID::SDL_WINDOWEVENT_MINIMIZED)
 			{
@@ -88,6 +92,7 @@ void DEngine::Application::detail::ProcessEvents()
 			{
 				Log("Window restored event");
 				isMinimized = false;
+				isRestored = true;
 			}
 		}
 	}
@@ -101,6 +106,16 @@ bool DEngine::Application::detail::ShouldShutdown()
 bool DEngine::Application::detail::IsMinimized()
 {
 	return isMinimized;
+}
+
+bool DEngine::Application::detail::IsRestored()
+{
+	return isRestored;
+}
+
+bool DEngine::Application::detail::ResizeEvent()
+{
+	return resizeEvent;
 }
 
 void DEngine::Application::detail::ImGui_NewFrame()
@@ -121,9 +136,9 @@ DEngine::Cont::FixedVector<char const*, 5> DEngine::Application::detail::GetRequ
 		throw std::runtime_error("DEngine::Application: Unable to grab required Vulkan instance extensions.");
 
 	Cont::FixedVector<char const*, 5> ptrs{};
-	ptrs.resize(count);
+	ptrs.Resize(count);
 
-	SDL_Vulkan_GetInstanceExtensions(detail::mainWindow, &count, ptrs.data());
+	SDL_Vulkan_GetInstanceExtensions(detail::mainWindow, &count, ptrs.Data());
 
 	return ptrs;
 }

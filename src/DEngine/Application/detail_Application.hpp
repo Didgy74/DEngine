@@ -1,7 +1,7 @@
 #pragma once
 
 #include "DEngine/Application/Application.hpp"
-#include "DEngine/Int.hpp"
+#include "DEngine/FixedWidthTypes.hpp"
 #include "Dengine/Containers/FixedVector.hpp"
 
 namespace DEngine::Application::detail
@@ -12,6 +12,8 @@ namespace DEngine::Application::detail
 
 	bool ShouldShutdown();
 	bool IsMinimized();
+	bool IsRestored();
+	bool ResizeEvent();
 
 	void ImgGui_Initialize();
 	void ImGui_NewFrame();

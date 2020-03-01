@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DEngine/Int.hpp"
+#include "DEngine/FixedWidthTypes.hpp"
 
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan.hpp>
@@ -24,7 +24,7 @@ namespace DEngine::Gfx::Vk::Constants
 	constexpr vk::PresentModeKHR preferredPresentMode = vk::PresentModeKHR::eFifo;
 	constexpr u32 maxAvailableSurfaceFormats = 25;
 	constexpr u32 maxSwapchainLength = 4;
-	constexpr u32 preferredSwapchainLength = 3;
+	constexpr u32 preferredSwapchainLength = 2;
 
 	constexpr std::string_view preferredValidationLayer
 	{

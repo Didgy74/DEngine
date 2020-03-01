@@ -25,13 +25,9 @@ Cont::Opt<Gfx::Data> DEngine::Gfx::Initialize(const InitInfo& initInfo)
 void DEngine::Gfx::Data::Draw(Draw_Params const& params)
 {
 	Vk::Draw(*this, params, apiDataBuffer);
-
-	// Resize event is handled, we reset it.
-	resizeEvent = false;
-	rebuildVkSurface = false;
 }
 
-DEngine::Gfx::ViewportRef DEngine::Gfx::Data::NewViewport()
+DEngine::Gfx::ViewportRef DEngine::Gfx::Data::NewViewport(u8 id)
 {
 	ViewportRef returnVal{};
 	

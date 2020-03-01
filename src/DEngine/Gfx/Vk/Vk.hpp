@@ -3,186 +3,192 @@
 #include "VulkanIncluder.hpp"
 #include "DynamicDispatch.hpp"
 #include "Constants.hpp"
+#include "DeletionQueue.hpp"
+#include "QueueData.hpp"
+
+#include "vk_mem_alloc.h"
 
 #include "DEngine/Gfx/Gfx.hpp"
 
-#include "DEngine/Int.hpp"
-#include "DEngine/Containers/Array.hpp"
+#include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/FixedVector.hpp"
-#include "DEngine/Containers/Optional.hpp"
+#include "DEngine/Containers/Array.hpp"
+#include "DEngine/Containers/Pair.hpp"
 
 namespace DEngine::Gfx::Vk
 {
-    template<typename T>
-    [[nodiscard]] inline constexpr bool isValidIndex(T in) = delete;
-    template<>
-    [[nodiscard]] inline constexpr bool isValidIndex<std::uint32_t>(std::uint32_t in) { return in != static_cast<std::uint32_t>(-1); }
-    template<>
-    [[nodiscard]] inline constexpr bool isValidIndex<std::uint64_t>(std::uint64_t in) { return in != static_cast<std::uint64_t>(-1); }
+	constexpr u32 invalidIndex = static_cast<std::uint32_t>(-1);
+	
+	template<typename T>
+	[[nodiscard]] inline constexpr bool IsValidIndex(T in) = delete;
+	template<>
+	[[nodiscard]] inline constexpr bool IsValidIndex<std::uint32_t>(std::uint32_t in) { return in != static_cast<std::uint32_t>(-1); }
+	template<>
+	[[nodiscard]] inline constexpr bool IsValidIndex<std::uint64_t>(std::uint64_t in) { return in != static_cast<std::uint64_t>(-1); }
+   
 
-    struct QueueInfo
-    {
-        static constexpr u32 invalidIndex = static_cast<u32>(-1);
+	struct MemoryTypes
+	{
+		static constexpr u32 invalidIndex = static_cast<u32>(-1);
 
-        struct Queue
-        {
-            vk::Queue handle = nullptr;
-            u32 familyIndex = invalidIndex;
-            u32 queueIndex = invalidIndex;
-        };
+		u32 deviceLocal = invalidIndex;
+		u32 hostVisible = invalidIndex;
+		u32 deviceLocalAndHostVisible = invalidIndex;
 
-        Queue graphics{};
-        Queue transfer{};
+		inline bool unifiedMemory() const { return deviceLocal == hostVisible && deviceLocal != invalidIndex && hostVisible != invalidIndex; }
+	};
 
-        inline bool dedicatedTransfer() const
-        {
-            return transfer.familyIndex != invalidIndex && transfer.familyIndex != graphics.familyIndex;
-        }
-    };
+	struct PhysDeviceInfo
+	{
+		vk::PhysicalDevice handle = nullptr;
+		vk::PhysicalDeviceProperties properties{};
+		vk::PhysicalDeviceMemoryProperties memProperties{};
+		vk::SampleCountFlagBits maxFramebufferSamples{};
+		QueueIndices queueIndices{};
+		MemoryTypes memInfo{};
+	};
 
-    struct MemoryTypes
-    {
-        static constexpr u32 invalidIndex = static_cast<u32>(-1);
+	struct SurfaceInfo
+	{
+	public:
+		vk::SurfaceKHR handle{};
+		vk::SurfaceCapabilitiesKHR capabilities{};
+		vk::CompositeAlphaFlagBitsKHR compositeAlphaFlag = {};
 
-        u32 deviceLocal = invalidIndex;
-        u32 hostVisible = invalidIndex;
-        u32 deviceLocalAndHostVisible = invalidIndex;
+		Cont::FixedVector<vk::PresentModeKHR, Constants::maxAvailablePresentModes> supportedPresentModes;
+		Cont::FixedVector<vk::SurfaceFormatKHR, Constants::maxAvailableSurfaceFormats> supportedSurfaceFormats;
+	};
 
-        inline bool unifiedMemory() const { return deviceLocal == hostVisible && deviceLocal != invalidIndex && hostVisible != invalidIndex; }
-    };
+	struct SwapchainSettings
+	{
+		vk::SurfaceKHR surface{};
+		vk::SurfaceCapabilitiesKHR capabilities{};
+		vk::PresentModeKHR presentMode{};
+		vk::SurfaceFormatKHR surfaceFormat{};
+		vk::SurfaceTransformFlagBitsKHR transform = {};
+		vk::CompositeAlphaFlagBitsKHR compositeAlphaFlag = {};
+		vk::Extent2D extents{};
+		u32 numImages{};
+	};
 
-    struct PhysDeviceInfo
-    {
-        vk::PhysicalDevice handle = nullptr;
-        vk::PhysicalDeviceProperties properties{};
-        vk::PhysicalDeviceMemoryProperties memProperties{};
-        vk::SampleCountFlagBits maxFramebufferSamples{};
-        QueueInfo preferredQueues{};
-        MemoryTypes memInfo{};
-    };
+	struct SwapchainData
+	{
+		vk::SwapchainKHR handle{};
+		std::uint8_t uid = 0;
 
-    struct SurfaceInfo
-    {
-    public:
-        vk::SurfaceKHR handle{};
-        vk::SurfaceCapabilitiesKHR capabilities{};
-        vk::CompositeAlphaFlagBitsKHR compositeAlphaFlag = {};
+		vk::Extent2D extents{};
+		vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
+		vk::SurfaceFormatKHR surfaceFormat{};
 
-        Cont::FixedVector<vk::PresentModeKHR, Constants::maxAvailablePresentModes> supportedPresentModes;
-        Cont::FixedVector<vk::SurfaceFormatKHR, Constants::maxAvailableSurfaceFormats> supportedSurfaceFormats;
-    };
+		Cont::FixedVector<vk::Image, Constants::maxSwapchainLength> images{};
 
-    struct SwapchainSettings
-    {
-        vk::SurfaceKHR surface{};
-        vk::SurfaceCapabilitiesKHR capabilities{};
-        vk::PresentModeKHR presentMode{};
-        vk::SurfaceFormatKHR surfaceFormat{};
-        vk::SurfaceTransformFlagBitsKHR transform = {};
-        vk::CompositeAlphaFlagBitsKHR compositeAlphaFlag = {};
-        vk::Extent2D extents{};
-        u32 numImages{};
-    };
+		vk::CommandPool cmdPool{};
+		Cont::FixedVector<vk::CommandBuffer, Constants::maxSwapchainLength> cmdBuffers{};
+		vk::Semaphore imageAvailableSemaphore{};
+	};
 
-    struct FencedCmdBuffer
-    {
-        vk::CommandBuffer handle{};
-        vk::Fence fence{};
-    };
+	struct Device
+	{
+		vk::Device handle{};
+		vk::PhysicalDevice physDeviceHandle{};
+	};
 
-    struct SwapchainData
-    {
-        vk::SwapchainKHR handle{};
-        std::uint8_t uid = 0;
+	struct GfxRenderTarget
+	{
+		VmaAllocation vmaAllocation{};
 
-        vk::Extent2D extents{};
-        vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
-        vk::SurfaceFormatKHR surfaceFormat{};
+		vk::Extent2D extent{};
+		vk::Image img{};
+		vk::ImageView imgView{};
+		vk::Framebuffer framebuffer{};
+	};
 
-        Cont::FixedVector<vk::Image, Constants::maxSwapchainLength> images{};
+	struct ViewportVkData
+	{
+		bool inUse = false;
+		GfxRenderTarget renderTarget{};
+		vk::CommandPool cmdPool{};
+		Cont::FixedVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
+		void* imguiTextureID = nullptr;
+	};
 
-        vk::CommandPool cmdPool{};
-        Cont::FixedVector<vk::CommandBuffer, Constants::maxSwapchainLength> cmdBuffers{};
-        vk::Semaphore imageAvailableSemaphore{};
-    };
+	struct GUIRenderTarget
+	{
+		vk::Extent2D extent{};
+		vk::Format format{};
+		VmaAllocation vmaAllocation{};
+		vk::Image img{};
+		vk::ImageView imgView{};
+		vk::Framebuffer framebuffer{};
+	};
 
-    struct Device
-    {
-        vk::Device handle{};
-        vk::PhysicalDevice physDeviceHandle{};
-    };
+	struct GUIData
+	{
+		vk::RenderPass renderPass{};
+		GUIRenderTarget renderTarget{};
+		vk::CommandPool cmdPool{};
+		// Has length of resource sets
+		Cont::FixedVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
+	};
 
-    struct GfxRenderTarget
-    {
-        vk::Extent2D extent{};
-        vk::DeviceMemory memory{};
-        vk::DeviceSize memorySize{};
-        u8 memoryTypeIndex{};
-        vk::Image img{};
-        vk::ImageView imgView{};
-        vk::Framebuffer framebuffer{};
-    };
+	// Everything here is thread-safe to use and access!!
+	struct GlobUtils
+	{
+		InstanceDispatch instance{};
 
-    struct GfxViewportData
-    {
-        u8 viewportID = 255;
-        GfxRenderTarget renderTarget{};
-        vk::CommandPool cmdPool{};
-        Cont::FixedVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
-        void* imguiTextureID = nullptr;
-    };
+		DebugUtilsDispatch debugUtils{};
+		vk::DebugUtilsMessengerEXT debugMessenger{};
+		bool UsingDebugUtils() const {
+			return debugUtils.raw.vkCmdBeginDebugUtilsLabelEXT != nullptr;
+		}
+		DebugUtilsDispatch const* DebugUtilsPtr() const {
+			return debugUtils.raw.vkCmdBeginDebugUtilsLabelEXT != nullptr ? &debugUtils : nullptr;
+		}
 
-    struct GUIRenderTarget
-    {
-        vk::Extent2D extent{};
-        vk::Format format{};
-        vk::DeviceMemory memory{};
-        vk::DeviceSize memorySize{};
-        vk::Image img{};
-        vk::ImageView imgView{};
-        vk::Framebuffer framebuffer{};
-    };
+		PhysDeviceInfo physDevice{};
 
-    struct GUIData
-    {
-        vk::RenderPass renderPass{};
-        GUIRenderTarget renderTarget{};
-        vk::CommandPool cmdPool{};
-        // Has length of resource sets
-        Cont::FixedVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
-    };
+		DeviceDispatch device{};
 
-    struct APIData
-    {
-        Gfx::ILog* logger = nullptr;
-        Gfx::IWsi* wsiInterface = nullptr;
+		QueueData queues{};
 
-        InstanceDispatch instance{};
-        DebugUtilsDispatch debugUtils{};
-        DebugUtilsDispatch const* DebugUtilsPtr() const { return debugUtils.raw.vkCmdBeginDebugUtilsLabelEXT != nullptr ? &debugUtils : nullptr; }
-        vk::DebugUtilsMessengerEXT debugMessenger{};
-        Vk::DeviceDispatch device{};
+		VmaAllocator vma{};
 
-        
+		DeletionQueue deletionQueue{};
 
-        PhysDeviceInfo physDevice{};
-        SurfaceInfo surface{};
-        SwapchainData swapchain{};
+		u8 resourceSetCount = 0;
 
-        vk::Queue renderQueue{};
+		bool useEditorPipeline = false;
+		vk::RenderPass guiRenderPass{};
 
-        std::uint8_t resourceSetCount = 0;
-        std::uint8_t currentResourceSet = 0;
+		vk::RenderPass gfxRenderPass{};
+	};
 
-        Cont::FixedVector<vk::Fence, Constants::maxResourceSets> mainFences{};
+	struct APIData
+	{
+		Gfx::ILog* logger = nullptr;
+		Gfx::IWsi* wsiInterface = nullptr;
 
-        GUIData guiData{};
+		SurfaceInfo surface{};
+		SwapchainData swapchain{};
 
-        // The main renderpass for rendering the 3D stuff
-        vk::RenderPass gfxRenderPass{};
-        Cont::FixedVector<GfxViewportData, Gfx::Constants::maxViewportCount> viewportDatas{};
+		u8 currentResourceSet = 0;
 
-        vk::PipelineLayout testPipelineLayout{};
-        vk::Pipeline testPipeline{};
-    };
+		Cont::FixedVector<vk::Fence, Constants::maxResourceSets> mainFences{};
+
+		GUIData guiData{};
+
+		// The main renderpass for rendering the 3D stuff
+		Cont::Array<ViewportVkData, Gfx::Constants::maxViewportCount> viewportDatas{};
+
+		GlobUtils globUtils{};
+
+
+		vk::DescriptorSetLayout test_cameraDescrLayout{};
+		Cont::FixedVector<vk::DescriptorSet, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> test_cameraDescrSets{};
+		void* test_mappedMem = nullptr;
+		u32 test_camUboOffset = 0;
+
+		vk::PipelineLayout testPipelineLayout{};
+		vk::Pipeline testPipeline{};
+	};
 }

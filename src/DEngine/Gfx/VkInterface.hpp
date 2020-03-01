@@ -2,7 +2,7 @@
 
 #include "DEngine/Gfx/Gfx.hpp"
 
-#include "DEngine/Int.hpp"
+#include "DEngine/FixedWidthTypes.hpp"
 
 namespace DEngine::Gfx::Vk
 {

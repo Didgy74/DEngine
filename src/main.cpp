@@ -1,11 +1,14 @@
 
 #include "ImGui/imgui.h"
+#include "ImGui/imgui_impl_sdl.h"
 
 #include "DEngine/Application/Application.hpp"
 #include "DEngine/Application/detail_Application.hpp"
 
 #include "DEngine/Gfx/Gfx.hpp"
-#include "Dengine/Int.hpp"
+#include "Dengine/FixedWidthTypes.hpp"
+
+#include "DEngine/Math/Vector/Vector.hpp"
 
 #include <optional>
 #include <utility>
@@ -55,63 +58,105 @@ namespace DEngine
 	{
 		struct ViewportData
 		{
-			DEngine::u8 id = 0;
+			bool initialized = false;
+			u8 id = 0;
+			bool visible = false;
 			ImTextureID imguiTextureID = nullptr;
-			DEngine::u32 width = 0;
-			DEngine::u32 height = 0;
+			u32 width = 0;
+			u32 height = 0;
+			u32 renderWidth = 0;
+			u32 renderHeight = 0;
 			bool currentlyResizing = false;
-			bool doneResizing = false;
 		};
 
 		std::vector<ViewportData> viewportData{};
 	};
 
-	void RenderImGuiStuff(EditorData& editorData)
+	void RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 	{
 		App::detail::ImGui_NewFrame();
-
 		ImGui::NewFrame();
+
 		static bool testShowWindow = true;
 		ImGui::ShowDemoWindow(nullptr);
-		static bool yo = true;
-		static bool yo2 = true;
 
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(7.5f, 7.5f));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
-		for (auto& item : editorData.viewportData)
+
+		if (ImGui::Begin("Testerrr", nullptr))
 		{
-			
-			
+			if (ImGui::Button("New viewport!"))
+			{
+				EditorData::ViewportData newViewport{};
+				newViewport.id = (u8)editorData.viewportData.size();
+				editorData.viewportData.push_back(newViewport);
+			}
+		}
+		ImGui::End();
 
-			std::string name = std::string("Viewport #") + std::to_string(item.id);
 
-			ImGui::SetNextWindowSize({ 250, 250 }, ImGuiCond_Once);
+		for (auto& virtualViewport : editorData.viewportData)
+		{
+			std::string name = std::string("Viewport #") + std::to_string(virtualViewport.id);
+
+			ImGui::SetNextWindowSize({ 250, 250 }, ImGuiCond_FirstUseEver);
+			ImGui::SetNextWindowSizeConstraints({ 100, 100 }, { 8192, 8192 });
 			ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar;
 			if (ImGui::Begin(name.data(), nullptr, windowFlags))
 			{
-				ImVec2 size = ImGui::GetContentRegionAvail();
-
-				if (item.currentlyResizing)
+				ImVec2 newSize = ImGui::GetContentRegionAvail();
+				newSize.x -= 25;
+				newSize.y -= 25;
+				if (!virtualViewport.initialized)
 				{
-					if ((u32)size.x == item.width && (u32)size.y == item.height)
-						item.doneResizing = true;
+					Gfx::ViewportRef newGfxVirtualViewport = gfx.NewViewport(virtualViewport.id);
+					virtualViewport.imguiTextureID = newGfxVirtualViewport.ImGuiTexID();
+					virtualViewport.width = (u32)newSize.x;
+					virtualViewport.height = (u32)newSize.y;
+					virtualViewport.renderWidth = (u32)newSize.x;
+					virtualViewport.renderHeight = (u32)newSize.y;
+					virtualViewport.initialized = true;
 				}
-				else
-					item.doneResizing = false;
-				if ((u32)size.x != item.width || (u32)size.y != item.height)
+
+
+				virtualViewport.visible = true;
+
 				{
-					item.currentlyResizing = true;
+					// Manage the resizing of the viewport.
+					if (newSize.x != virtualViewport.width || newSize.y != virtualViewport.height)
+						virtualViewport.currentlyResizing = true;
+					if (virtualViewport.currentlyResizing && newSize.x == virtualViewport.width && newSize.y == virtualViewport.height)
+					{
+						virtualViewport.renderWidth = (u32)newSize.x;
+						virtualViewport.renderHeight = (u32)newSize.y;
+						virtualViewport.currentlyResizing = false;
+					}
+					virtualViewport.width = (u32)newSize.x;
+					virtualViewport.height = (u32)newSize.y;
 				}
-				else
-					item.currentlyResizing = false;
 
-				item.width = (u32)size.x;
-				item.height = (u32)size.y;
 
-				ImGui::Image(item.imguiTextureID, size);
+				ImGui::Image(virtualViewport.imguiTextureID, newSize);
+
+				/*
+				if (ImGui::IsItemHovered())
+				{
+					ImVec2 absoluteMousePos = ImGui::GetMousePos();
+					ImVec2 windowPos = ImGui::GetWindowPos();
+
+					ImVec2 test = { absoluteMousePos.x - windowPos.x, absoluteMousePos.y - windowPos.y };
+
+					std::cout << test.x << " " << test.y << std::endl;
+				}
+				*/
+
+			}
+			else
+			{
+				virtualViewport.visible = false;
 			}
 			ImGui::End();
 		}
@@ -122,6 +167,8 @@ namespace DEngine
 		ImGui::PopStyleVar();
 		ImGui::PopStyleVar();
 
+
+		ImGui::EndFrame();
 		ImGui::Render();
 	}
 }
@@ -142,23 +189,21 @@ int main(int argc, char** argv)
 		ImGuiIO& imguiIO = ImGui::GetIO();
 		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_DockingEnable;
 		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_IsTouchScreen;
+		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_ViewportsEnable;
 
 		ImGui::StyleColorsDark();
 		
 		App::detail::ImgGui_Initialize();
 	}
 
+	// Initialize the renderer
 	auto requiredInstanceExtensions = App::detail::GetRequiredVulkanInstanceExtensions();
-
-
 	GfxLogger gfxLogger{};
 	GfxWsiInterfacer gfxWsiInterface{};
-
 	Gfx::InitInfo rendererInitInfo{};
 	rendererInitInfo.iWsi = &gfxWsiInterface;
 	rendererInitInfo.optional_iLog = &gfxLogger;
-	rendererInitInfo.requiredVkInstanceExtensions = requiredInstanceExtensions.span();
-
+	rendererInitInfo.requiredVkInstanceExtensions = requiredInstanceExtensions.ToSpan();
 	Cont::Optional<Gfx::Data> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
 	if (!rendererDataOpt.hasValue())
 	{
@@ -169,40 +214,42 @@ int main(int argc, char** argv)
 
 	
 
-	Gfx::ViewportRef viewportA = rendererData.NewViewport();
-	EditorData::ViewportData a{};
-	a.id = viewportA.GetViewportID();
-	a.imguiTextureID = viewportA.GetImGuiTexID();
-	editorData.viewportData.push_back(a);
 
-	Gfx::ViewportRef viewportB = rendererData.NewViewport();
-	EditorData::ViewportData b{};
-	b.id = viewportB.GetViewportID();
-	b.imguiTextureID = viewportB.GetImGuiTexID();
-	editorData.viewportData.push_back(b);
+
 
 	while (App::detail::ProcessEvents(), !App::detail::ShouldShutdown())
 	{
-		if (!App::detail::IsMinimized())
+		RenderImGuiStuff(editorData, rendererData);
+
+		Gfx::Draw_Params params{};
+		params.presentMainWindow = !App::detail::IsMinimized();
+
+		for (auto const& item : editorData.viewportData)
 		{
-			RenderImGuiStuff(editorData);
-
-			Gfx::Draw_Params params{};
-
-			for (auto const& item : editorData.viewportData)
+			if (item.visible)
 			{
-				if (item.doneResizing)
-				{
-					Gfx::ViewportResizeEvent resizeEvent{};
-					resizeEvent.viewportID = item.id;
-					resizeEvent.width = item.width;
-					resizeEvent.height = item.height;
-					params.viewportResizeEvents.pushBack(resizeEvent);
-				}
-			}
+				Gfx::ViewportUpdateData viewportData{};
+				viewportData.id = item.id;
+				viewportData.width = item.renderWidth;
+				viewportData.height = item.renderHeight;
+				viewportData.transform = Math::Mat4::Identity();
 
-			rendererData.Draw(params);
+				params.viewports.PushBack(viewportData);
+			}
 		}
+
+
+		if (App::detail::ResizeEvent())
+			params.resizeEvent = true;
+
+		rendererData.Draw(params);
+		// Update and Render additional Platform Windows
+		if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			ImGui::UpdatePlatformWindows();
+			ImGui::RenderPlatformWindowsDefault();
+		}
+
 	}
 
 

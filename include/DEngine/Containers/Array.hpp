@@ -1,6 +1,7 @@
 #pragma once
 
-#include "DEngine/Int.hpp"
+#include "DEngine/FixedWidthTypes.hpp"
+#include "DEngine/Containers/Span.hpp"
 
 #include "DEngine/Containers/Assert.hpp"
 
@@ -13,66 +14,98 @@ namespace DEngine::Containers
 		// Please don't use this field directly
 		T m_dataBuffer[length] = {};
 
-		inline constexpr void fill(const T& value) noexcept;
+		
 
-		[[nodiscard]] inline constexpr uSize size() const noexcept;
+		[[nodiscard]] inline constexpr uSize Size() const noexcept;
 
-		[[nodiscard]] inline constexpr T* data() noexcept;
+		[[nodiscard]] inline constexpr T* Data() noexcept;
+		[[nodiscard]] inline constexpr T const* Data() const noexcept;
 
-		[[nodiscard]] inline constexpr const T* data() const noexcept;
+		[[nodiscard]] inline constexpr Span<T> ToSpan() noexcept;
+		[[nodiscard]] inline constexpr Span<T const> ToSpan() const noexcept;
 
+		[[nodiscard]] T& At(uSize i);
+		[[nodiscard]] T const& At(uSize i) const;
 		[[nodiscard]] inline constexpr T& operator[](uSize i) noexcept;
+		[[nodiscard]] inline constexpr T const& operator[](uSize i) const noexcept;
 
-		[[nodiscard]] inline constexpr const T& operator[](uSize i) const noexcept;
+		inline constexpr void Fill(const T& value) noexcept;
 
 		[[nodiscard]] inline constexpr T* begin() noexcept;
 
-		[[nodiscard]] inline constexpr const T* begin() const noexcept;
+		[[nodiscard]] inline constexpr T const* begin() const noexcept;
 
 		[[nodiscard]] inline constexpr T* end() noexcept;
 
-		[[nodiscard]] inline constexpr const T* end() const noexcept;
+		[[nodiscard]] inline constexpr T const* end() const noexcept;
 	};
 
 	template<typename T, uSize length>
-	inline constexpr uSize Array<T, length>::size() const noexcept
+	inline constexpr uSize Array<T, length>::Size() const noexcept
 	{
 		return length;
 	}
 
 	template<typename T, uSize length>
-	inline constexpr T* Array<T, length>::data() noexcept
+	inline constexpr T* Array<T, length>::Data() noexcept
 	{
 		return m_dataBuffer;
 	}
 
 	template<typename T, uSize length>
-	inline constexpr const T* Array<T, length>::data() const noexcept
+	inline constexpr T const* Array<T, length>::Data() const noexcept
 	{
 		return m_dataBuffer;
 	}
 
 	template<typename T, uSize length>
-	inline constexpr void Array<T, length>::fill(const T& value) noexcept
+	inline constexpr Span<T> Array<T, length>::ToSpan() noexcept
 	{
-		for (auto& item : (*this))
-		{
-			item = value;
-		}
+		return Span<T>(m_dataBuffer, length);
+	}
+
+	template<typename T, uSize length>
+	inline constexpr Span<T const> Array<T, length>::ToSpan() const noexcept
+	{
+		return Span<T const>(m_dataBuffer, length);
+	}
+
+	template<typename T, uSize length>
+	T& Array<T, length>::At(uSize i)
+	{
+		if (i >= length)
+			throw std::out_of_range("Attempted to .At() an Array with an index out of bounds.");
+		return m_dataBuffer[i];
+	}
+
+	template<typename T, uSize length>
+	T const& Array<T, length>::At(uSize i) const
+	{
+		if (i >= length)
+			throw std::out_of_range("Attempted to .At() an Array with an index out of bounds.");
+		return m_dataBuffer[i];
 	}
 
 	template<typename T, uSize length>
 	inline constexpr T& Array<T, length>::operator[](uSize i) noexcept
 	{
-		DENGINE_CONTAINERS_ASSERT_MSG(i < length, "DEngine Array subscript out of range.");
-		return m_dataBuffer[i];
+		return At(i);
 	}
 
 	template<typename T, uSize length>
 	inline constexpr const T& Array<T, length>::operator[](uSize i) const noexcept
 	{
-		DENGINE_CONTAINERS_ASSERT_MSG(i < length, "DEngine Array subscript out of range.");
-		return m_dataBuffer[i];
+		return At(i);
+	}
+
+
+	template<typename T, uSize length>
+	inline constexpr void Array<T, length>::Fill(const T& value) noexcept
+	{
+		for (auto& item : (*this))
+		{
+			item = value;
+		}
 	}
 
 	template<typename T, uSize length>

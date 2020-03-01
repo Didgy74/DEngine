@@ -1,9 +1,12 @@
 #pragma once
 
-#include "DEngine/Int.hpp"
+#include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Span.hpp"
 #include "DEngine/Containers/Optional.hpp"
 #include "DEngine/Containers/FixedVector.hpp"
+
+#include "DEngine/Math/Matrix/Matrix.hpp"
+#include "DEngine/Math/Common.hpp"
 
 namespace DEngine::Gfx
 {
@@ -18,27 +21,28 @@ namespace DEngine::Gfx
 	class ViewportRef;
 	struct Draw_Params;
 
-	struct ViewportResizeEvent
+	struct ViewportUpdateData
 	{
-		u8 viewportID = 255;
+		u8 id = 255;
 		u32 width = 0;
 		u32 height = 0;
+		Math::Mat4 transform{};
 	};
 
 	struct Draw_Params
 	{
-		Cont::FixedVector<ViewportResizeEvent, 10> viewportResizeEvents{};
+		bool presentMainWindow = false;
+		bool resizeEvent = false;
+		
+		Cont::FixedVector<ViewportUpdateData, 10> viewports = {};
 	};
 
 	class Data
 	{
 	public:
-		Data(Data&&) noexcept = default;;
+		Data(Data&&) noexcept = default;
 
-		bool resizeEvent = false;
-		bool rebuildVkSurface = false;
-
-		ViewportRef NewViewport();
+		ViewportRef NewViewport(u8 id);
 		u8 GetViewportCount();
 
 		void Draw(Draw_Params const& params);
@@ -89,8 +93,8 @@ namespace DEngine::Gfx
 	class ViewportRef
 	{
 	public:
-		u8 GetViewportID() const { return viewportID; }
-		void* GetImGuiTexID() const { return imguiTexID; }
+		u8 ViewportID() const { return viewportID; }
+		void* ImGuiTexID() const { return imguiTexID; }
 
 	private:
 		ViewportRef() = default;

@@ -78,7 +78,7 @@ struct ImGui_ImplVulkanH_WindowRenderBuffers
 };
 
 // For multi-viewport support:
-// Helper structure we store in the void* RenderUserData field of each ImGuiViewport to easily retrieve our backend data.
+// Helper structure we store in the void* RenderUserData field of each ImGuiViewport to easily retrieve our backend Data.
 struct ImGuiViewportDataVulkan
 {
     bool                                    WindowOwned;
@@ -249,7 +249,7 @@ void ImGui_ImplVulkan_InitDebugUtilsDispatcher(VkInstance instance, PFN_vkGetIns
     g_DebugUtilsDispatcher.vkSetDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)getProcAddr(instance, "vkSetDebugUtilsObjectNameEXT");
 }
 
-// Vulkan data
+// Vulkan Data
 static ImGui_ImplVulkan_InitInfo g_VulkanInitInfo = {};
 static VkRenderPass             g_RenderPass = VK_NULL_HANDLE;
 static VkDeviceSize             g_BufferMemoryAlignment = 256;
@@ -259,7 +259,7 @@ static VkPipelineLayout         g_PipelineLayout = VK_NULL_HANDLE;
 static VkDescriptorSet          g_DescriptorSet = VK_NULL_HANDLE;
 static VkPipeline               g_Pipeline = VK_NULL_HANDLE;
 
-// Font data
+// Font Data
 static VkSampler                g_FontSampler = VK_NULL_HANDLE;
 static VkDeviceMemory           g_FontMemory = VK_NULL_HANDLE;
 static VkImage                  g_FontImage = VK_NULL_HANDLE;
@@ -564,7 +564,7 @@ void ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer comm
         }
     }
 
-    // Upload vertex/index data into a single contiguous GPU buffer
+    // Upload vertex/index Data into a single contiguous GPU buffer
     {
         ImDrawVert* vtx_dst = NULL;
         ImDrawIdx* idx_dst = NULL;
@@ -1199,10 +1199,10 @@ void ImGui_ImplVulkan_Shutdown()
     // First destroy objects in all viewports
     ImGui_ImplVulkan_DestroyDeviceObjects();
 
-    // Manually delete main viewport render data in-case we haven't initialized for viewports
+    // Manually delete main viewport render Data in-case we haven't initialized for viewports
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-    if (ImGuiViewportDataVulkan* data = (ImGuiViewportDataVulkan*)main_viewport->RendererUserData)
-        IM_DELETE(data);
+    if (ImGuiViewportDataVulkan* Data = (ImGuiViewportDataVulkan*)main_viewport->RendererUserData)
+        IM_DELETE(Data);
     main_viewport->RendererUserData = NULL;
 
     // Clean up windows
@@ -1265,7 +1265,8 @@ ImTextureID ImGui_ImplVulkan_AddTexture(VkImageView image_view, VkImageLayout im
 
     imgui_descrSets.insert({ id, descriptor_set });
 
-    // Update the Descriptor Set:
+    // Update the Descriptor Set if we have an image to point
+    if (image_view != 0)
     {
         VkDescriptorImageInfo desc_image[1] = {};
         //desc_image[0].sampler = g_FontSampler;
@@ -1282,7 +1283,6 @@ ImTextureID ImGui_ImplVulkan_AddTexture(VkImageView image_view, VkImageLayout im
 
     return reinterpret_cast<void*>(static_cast<std::size_t>(id));
 }
-
 
 void ImGui_ImplVulkan_OverwriteTexture(ImTextureID tex_id, VkImageView image_view, VkImageLayout image_layout)
 {
@@ -1456,7 +1456,7 @@ int ImGui_ImplVulkanH_GetMinImageCountFromPresentMode(VkPresentModeKHR present_m
     return 1;
 }
 
-// Also destroy old swap chain and in-flight frames data, if any.
+// Also destroy old swap chain and in-flight frames Data, if any.
 void ImGui_ImplVulkanH_CreateWindowSwapChain(VkPhysicalDevice physical_device, VkDevice device, ImGui_ImplVulkanH_Window* wd, const VkAllocationCallbacks* allocator, int w, int h, uint32_t min_image_count)
 {
     VkResult err;
@@ -1689,8 +1689,8 @@ void ImGui_ImplVulkanH_DestroyAllViewportsRenderBuffers(VkDevice device, const V
 {
     ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
     for (int n = 0; n < platform_io.Viewports.Size; n++)
-        if (ImGuiViewportDataVulkan* data = (ImGuiViewportDataVulkan*)platform_io.Viewports[n]->RendererUserData)
-            ImGui_ImplVulkanH_DestroyWindowRenderBuffers(device, &data->RenderBuffers, allocator);
+        if (ImGuiViewportDataVulkan* Data = (ImGuiViewportDataVulkan*)platform_io.Viewports[n]->RendererUserData)
+            ImGui_ImplVulkanH_DestroyWindowRenderBuffers(device, &Data->RenderBuffers, allocator);
 }
 
 //--------------------------------------------------------------------------------------------------------
@@ -1701,9 +1701,9 @@ void ImGui_ImplVulkanH_DestroyAllViewportsRenderBuffers(VkDevice device, const V
 
 static void ImGui_ImplVulkan_CreateWindow(ImGuiViewport* viewport)
 {
-    ImGuiViewportDataVulkan* data = IM_NEW(ImGuiViewportDataVulkan)();
-    viewport->RendererUserData = data;
-    ImGui_ImplVulkanH_Window* wd = &data->Window;
+    ImGuiViewportDataVulkan* Data = IM_NEW(ImGuiViewportDataVulkan)();
+    viewport->RendererUserData = Data;
+    ImGui_ImplVulkanH_Window* wd = &Data->Window;
     ImGui_ImplVulkan_InitInfo* v = &g_VulkanInitInfo;
 
     // Create surface
@@ -1734,37 +1734,37 @@ static void ImGui_ImplVulkan_CreateWindow(ImGuiViewport* viewport)
     // Create SwapChain, RenderPass, Framebuffer, etc.
     wd->ClearEnable = (viewport->Flags & ImGuiViewportFlags_NoRendererClear) ? false : true;
     ImGui_ImplVulkanH_CreateWindow(v->Instance, v->PhysicalDevice, v->Device, wd, v->QueueFamily, v->Allocator, (int)viewport->Size.x, (int)viewport->Size.y, v->MinImageCount);
-    data->WindowOwned = true;
+    Data->WindowOwned = true;
 }
 
 static void ImGui_ImplVulkan_DestroyWindow(ImGuiViewport* viewport)
 {
-    // The main viewport (owned by the application) will always have RendererUserData == NULL since we didn't create the data for it.
-    if (ImGuiViewportDataVulkan* data = (ImGuiViewportDataVulkan*)viewport->RendererUserData)
+    // The main viewport (owned by the application) will always have RendererUserData == NULL since we didn't create the Data for it.
+    if (ImGuiViewportDataVulkan* Data = (ImGuiViewportDataVulkan*)viewport->RendererUserData)
     {
         ImGui_ImplVulkan_InitInfo* v = &g_VulkanInitInfo;
-        if (data->WindowOwned)
-            ImGui_ImplVulkanH_DestroyWindow(v->Instance, v->Device, &data->Window, v->Allocator);
-        ImGui_ImplVulkanH_DestroyWindowRenderBuffers(v->Device, &data->RenderBuffers, v->Allocator);
-        IM_DELETE(data);
+        if (Data->WindowOwned)
+            ImGui_ImplVulkanH_DestroyWindow(v->Instance, v->Device, &Data->Window, v->Allocator);
+        ImGui_ImplVulkanH_DestroyWindowRenderBuffers(v->Device, &Data->RenderBuffers, v->Allocator);
+        IM_DELETE(Data);
     }
     viewport->RendererUserData = NULL;
 }
 
 static void ImGui_ImplVulkan_SetWindowSize(ImGuiViewport* viewport, ImVec2 size)
 {
-    ImGuiViewportDataVulkan* data = (ImGuiViewportDataVulkan*)viewport->RendererUserData;
-    if (data == NULL) // This is NULL for the main viewport (which is left to the user/app to handle)
+    ImGuiViewportDataVulkan* Data = (ImGuiViewportDataVulkan*)viewport->RendererUserData;
+    if (Data == NULL) // This is NULL for the main viewport (which is left to the user/app to handle)
         return;
     ImGui_ImplVulkan_InitInfo* v = &g_VulkanInitInfo;
-    data->Window.ClearEnable = (viewport->Flags & ImGuiViewportFlags_NoRendererClear) ? false : true;
-    ImGui_ImplVulkanH_CreateWindow(v->Instance, v->PhysicalDevice, v->Device, &data->Window, v->QueueFamily, v->Allocator, (int)size.x, (int)size.y, v->MinImageCount);
+    Data->Window.ClearEnable = (viewport->Flags & ImGuiViewportFlags_NoRendererClear) ? false : true;
+    ImGui_ImplVulkanH_CreateWindow(v->Instance, v->PhysicalDevice, v->Device, &Data->Window, v->QueueFamily, v->Allocator, (int)size.x, (int)size.y, v->MinImageCount);
 }
 
 static void ImGui_ImplVulkan_RenderWindow(ImGuiViewport* viewport, void*)
 {
-    ImGuiViewportDataVulkan* data = (ImGuiViewportDataVulkan*)viewport->RendererUserData;
-    ImGui_ImplVulkanH_Window* wd = &data->Window;
+    ImGuiViewportDataVulkan* Data = (ImGuiViewportDataVulkan*)viewport->RendererUserData;
+    ImGui_ImplVulkanH_Window* wd = &Data->Window;
     ImGui_ImplVulkan_InitInfo* v = &g_VulkanInitInfo;
     VkResult err;
 
@@ -1836,8 +1836,8 @@ static void ImGui_ImplVulkan_RenderWindow(ImGuiViewport* viewport, void*)
 
 static void ImGui_ImplVulkan_SwapBuffers(ImGuiViewport* viewport, void*)
 {
-    ImGuiViewportDataVulkan* data = (ImGuiViewportDataVulkan*)viewport->RendererUserData;
-    ImGui_ImplVulkanH_Window* wd = &data->Window;
+    ImGuiViewportDataVulkan* Data = (ImGuiViewportDataVulkan*)viewport->RendererUserData;
+    ImGui_ImplVulkanH_Window* wd = &Data->Window;
     ImGui_ImplVulkan_InitInfo* v = &g_VulkanInitInfo;
 
     VkResult err;

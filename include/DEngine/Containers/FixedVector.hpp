@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DEngine/Int.hpp"
+#include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Span.hpp"
 
 #include <stdexcept>
@@ -26,24 +26,24 @@ namespace DEngine::Containers
         FixedVector(uSize length);
         ~FixedVector();
 
-        [[nodiscard]] constexpr Span<T> span() noexcept;
-        [[nodiscard]] constexpr Span<T const> span() const noexcept;
+        [[nodiscard]] constexpr Span<T> ToSpan() noexcept;
+        [[nodiscard]] constexpr Span<T const> ToSpan() const noexcept;
         constexpr operator Span<T>() noexcept;
         constexpr operator Span<T const>() noexcept;
 
-        [[nodiscard]] T* data();
-        [[nodiscard]] T const* data() const;
-        [[nodiscard]] constexpr uSize maxSize() const;
-        [[nodiscard]] uSize size() const;
+        [[nodiscard]] T* Data();
+        [[nodiscard]] T const* Data() const;
+        [[nodiscard]] constexpr uSize Capacity() const;
+        [[nodiscard]] uSize Size() const;
 
-        void resize(uSize newSize);
-        bool canPushBack() const noexcept;
-        void pushBack(T const& in);
-        void pushBack(T&& in);
+        void Clear();
+        void Resize(uSize newSize);
+        bool CanPushBack() const noexcept;
+        void PushBack(T const& in);
+        void PushBack(T&& in);
 
-        [[nodiscard]] T& at(uSize i);
-        [[nodiscard]] T const& at(uSize i) const;
-
+        [[nodiscard]] T& At(uSize i);
+        [[nodiscard]] T const& At(uSize i) const;
         [[nodiscard]] T& operator[](uSize i);
         [[nodiscard]] T const& operator[](uSize i) const;
 
@@ -73,18 +73,17 @@ namespace DEngine::Containers
     template<typename T, uSize maxLength>
     FixedVector<T, maxLength>::~FixedVector()
     {
-        for (uSize i = m_size; i > 0; i -= 1)
-            m_values[i - 1].~T();
+        Clear();
     }
 
     template<typename T, uSize maxLength>
-    constexpr Span<T> FixedVector<T, maxLength>::span() noexcept
+    constexpr Span<T> FixedVector<T, maxLength>::ToSpan() noexcept
     {
         return Span<T>(reinterpret_cast<T*>(m_dataBuffer), m_size);
     }
 
     template<typename T, uSize maxLength>
-    constexpr Span<T const> FixedVector<T, maxLength>::span() const noexcept
+    constexpr Span<T const> FixedVector<T, maxLength>::ToSpan() const noexcept
     {
         return Span<T const>(reinterpret_cast<T const*>(m_dataBuffer), m_size);
     }
@@ -92,46 +91,60 @@ namespace DEngine::Containers
     template<typename T, uSize maxLength>
     constexpr FixedVector<T, maxLength>::operator Span<T>() noexcept
     {
-        return span();
+        return ToSpan();
     }
 
     template<typename T, uSize maxLength>
     constexpr FixedVector<T, maxLength>::operator Span<T const>() noexcept
     {
-        return span();
+        return ToSpan();
     }
 
     template<typename T, uSize maxLength>
-    T* FixedVector<T, maxLength>::data()
+    T* FixedVector<T, maxLength>::Data()
     {
         return reinterpret_cast<T*>(m_dataBuffer);
     }
 
     template<typename T, uSize maxLength>
-    T const* FixedVector<T, maxLength>::data() const
+    T const* FixedVector<T, maxLength>::Data() const
     {
         return reinterpret_cast<T const*>(m_dataBuffer);
     }
 
     template<typename T, uSize maxLength>
-    constexpr uSize FixedVector<T, maxLength>::maxSize() const
+    constexpr uSize FixedVector<T, maxLength>::Capacity() const
     {
         return maxLength;
     }
 
     template<typename T, uSize maxLength>
-    uSize FixedVector<T, maxLength>::size() const
+    uSize FixedVector<T, maxLength>::Size() const
     {
         return m_size;
     }
 
     template<typename T, uSize maxLength>
-    void FixedVector<T, maxLength>::resize(uSize newSize)
+    void FixedVector<T, maxLength>::Clear()
+    {
+        for (uSize i = m_size; i > 0; i -= 1)
+            m_values[i - 1].~T();
+        m_size = 0;
+    }
+
+    template<typename T, uSize maxLength>
+    void FixedVector<T, maxLength>::Resize(uSize newSize)
     {
         if (m_size >= maxLength)
             throw std::out_of_range("Attempted to .resize() a FixedVector beyond what it can maximally hold.");
         if (newSize > m_size)
-            new(m_dataBuffer + sizeof(T) * m_size) T[newSize - m_size];
+        {
+            for (uSize i = m_size; i < newSize; i += 1)
+            {
+                new(m_dataBuffer + sizeof(T) * i) T();
+            }
+            
+        }
         else
         {
             for (uSize i = m_size - 1; i >= newSize; i -= 1)
@@ -141,59 +154,55 @@ namespace DEngine::Containers
     }
 
     template<typename T, uSize maxLength>
-    bool FixedVector<T, maxLength>::canPushBack() const noexcept
+    bool FixedVector<T, maxLength>::CanPushBack() const noexcept
     {
         return m_size < maxLength;
     }
 
     template<typename T, uSize maxLength>
-    void FixedVector<T, maxLength>::pushBack(T const& in)
+    void FixedVector<T, maxLength>::PushBack(T const& in)
     {
-        if (!canPushBack())
-            throw std::out_of_range("Attempted to .pushBack() a FixedVector when it is already at max capacity.");
+        if (!CanPushBack())
+            throw std::out_of_range("Attempted to .PushBack() a FixedVector when it is already at max capacity.");
         new(m_dataBuffer + sizeof(T) * m_size) T(in);
         m_size += 1;
     }
 
     template<typename T, uSize maxLength>
-    void FixedVector<T, maxLength>::pushBack(T&& in)
+    void FixedVector<T, maxLength>::PushBack(T&& in)
     {
-        if (!canPushBack())
-            throw std::out_of_range("Attempted to .pushBack() a FixedVector when it is already at max capacity.");
+        if (!CanPushBack())
+            throw std::out_of_range("Attempted to .PushBack() a FixedVector when it is already at max capacity.");
         new(m_dataBuffer + sizeof(T) * m_size) T(static_cast<T&&>(in));
         m_size += 1;
     }
 
     template<typename T, uSize maxLength>
-    T& FixedVector<T, maxLength>::at(uSize i)
+    T& FixedVector<T, maxLength>::At(uSize i)
     {
         if (i >= m_size)
-            throw std::out_of_range("Attempted to .at() a FixedVector with an index out of bounds.");
+            throw std::out_of_range("Attempted to .At() a FixedVector with an index out of bounds.");
         return *(reinterpret_cast<T*>(m_dataBuffer) + i);
     }
 
     template<typename T, uSize maxLength>
-    T const& FixedVector<T, maxLength>::at(uSize i) const
+    T const& FixedVector<T, maxLength>::At(uSize i) const
     {
         if (i >= m_size)
-            throw std::out_of_range("Attempted to .at() a FixedVector with an index out of bounds.");
-        return *(reinterpret_cast<T*>(m_dataBuffer) + i);
+            throw std::out_of_range("Attempted to .At() a FixedVector with an index out of bounds.");
+        return *(reinterpret_cast<T const*>(m_dataBuffer) + i);
     }
 
     template<typename T, uSize maxLength>
     T& FixedVector<T, maxLength>::operator[](uSize i)
     {
-        if (i >= m_size)
-            throw std::out_of_range("Attempted to .at() a FixedVector with an index out of bounds.");
-        return *(reinterpret_cast<T*>(m_dataBuffer) + i);
+        return At(i);
     }
 
     template<typename T, uSize maxLength>
     T const& FixedVector<T, maxLength>::operator[](uSize i) const
     {
-        if (i >= m_size)
-            throw std::out_of_range("Attempted to .at() a FixedVector with an index out of bounds.");
-        return *(reinterpret_cast<T const*>(m_dataBuffer) + i);
+        return At(i);
     }
 
     template<typename T, uSize maxLength>
@@ -231,4 +240,10 @@ namespace DEngine::Containers
         else
             return reinterpret_cast<T const*>(m_dataBuffer + sizeof(T) * m_size);
     }
+}
+
+
+namespace DEngine
+{
+    namespace Cont = Containers;
 }

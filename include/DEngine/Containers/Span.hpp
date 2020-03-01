@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DEngine/Int.hpp"
+#include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Assert.hpp"
 
 #include <stdexcept>
@@ -17,17 +17,17 @@ namespace DEngine::Containers
 	public:
 		inline constexpr Span() noexcept = default;
 
-		inline constexpr Span(T* data, uSize size) noexcept;
+		inline constexpr Span(T* Data, uSize size) noexcept;
 
-		[[nodiscard]] inline constexpr Span<T const> constSpan() const noexcept;
+		[[nodiscard]] inline constexpr Span<T const> ConstSpan() const noexcept;
 		inline constexpr operator Span<T const>() const noexcept;
 
-		[[nodiscard]] inline T* data() const noexcept;
+		[[nodiscard]] inline T* Data() const noexcept;
 
-		[[nodiscard]] inline uSize size() const noexcept;
+		[[nodiscard]] inline uSize Size() const noexcept;
 
-		[[nodiscard]] inline T& at(uSize i);
-		[[nodiscard]] inline T const& at(uSize i) const;
+		[[nodiscard]] inline T& At(uSize i);
+		[[nodiscard]] inline T const& At(uSize i) const;
 
 		[[nodiscard]] inline T& operator[](uSize i) noexcept;
 		[[nodiscard]] inline T const& operator[](uSize i) const noexcept;
@@ -39,13 +39,13 @@ namespace DEngine::Containers
 	};
 
 	template<typename T>
-	inline constexpr Span<T>::Span(T* data, uSize size) noexcept :
-		m_dataBuffer(data),
+	inline constexpr Span<T>::Span(T* Data, uSize size) noexcept :
+		m_dataBuffer(Data),
 		m_size(size)
 	{}
 
 	template<typename T>
-	inline constexpr Span<T const> Span<T>::constSpan() const noexcept
+	inline constexpr Span<T const> Span<T>::ConstSpan() const noexcept
 	{
 		return Span<T const>(m_dataBuffer, m_size);
 	}
@@ -53,49 +53,47 @@ namespace DEngine::Containers
 	template<typename T>
 	inline constexpr Span<T>::operator Span<T const>() const noexcept
 	{
-		return constSpan();
+		return ConstSpan();
 	}
 
 	template<typename T>
-	inline T* Span<T>::data() const noexcept
+	inline T* Span<T>::Data() const noexcept
 	{
 		return m_dataBuffer;
 	}
 
 	template<typename T>
-	inline uSize Span<T>::size() const noexcept
+	inline uSize Span<T>::Size() const noexcept
 	{
 		return m_size;
 	}
 
 	template<typename T>
-	inline T& Span<T>::at(uSize i)
+	inline T& Span<T>::At(uSize i)
 	{
 		if (i >= m_size)
-			throw std::out_of_range("Called .at() on Span object with index out of bounds.");
+			throw std::out_of_range("Tried to .At() a Span with index out of bounds.");
 		return m_dataBuffer[i];
 	}
 
 	template<typename T>
-	inline T const& Span<T>::at(uSize i) const
+	inline T const& Span<T>::At(uSize i) const
 	{
 		if (i >= m_size)
-			throw std::out_of_range("Called .at() on Span object with index out of bounds.");
+			throw std::out_of_range("Tried to .At() a Span with index out of bounds.");
 		return m_dataBuffer[i];
 	}
 
 	template<typename T>
 	inline T& Span<T>::operator[](uSize i) noexcept
 	{
-		DENGINE_CONTAINERS_ASSERT_MSG(i < m_size, "Span subscript out of range.");
-		return m_dataBuffer[i];
+		return At(i);
 	}
 
 	template<typename T>
 	inline T const& Span<T>::operator[](uSize i) const noexcept
 	{
-		DENGINE_CONTAINERS_ASSERT_MSG(i < m_size, "Span subscript out of range.");
-		return m_dataBuffer[i];
+		return At(i);
 	}
 
 	template<typename T>

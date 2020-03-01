@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DEngine/Int.hpp"
+#include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Utility.hpp"
 #include "DEngine/Containers/Assert.hpp"
 
