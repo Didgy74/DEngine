@@ -17,18 +17,15 @@ namespace DEngine::Math
 	template<typename T>
 	struct Vector<2, T>
 	{
-		using ValueType = T;
-		static constexpr uSize dimCount = 2;
-
 		T x = {};
 		T y = {};
 
-		[[nodiscard]] constexpr Vector<3, T> AsVec3(const T& zValue = T()) const
+		[[nodiscard]] constexpr Vector<3, T> AsVec3(T const& zValue = T()) const
 		{
 			return Vector<3, T>{ x, y, zValue };
 		}
 
-		[[nodiscard]] constexpr Vector<4, T> AsVec4(const T& zValue = T(), const T& wValue = T()) const
+		[[nodiscard]] constexpr Vector<4, T> AsVec4(T const& zValue = T(), T const& wValue = T()) const
 		{
 			return Vector<4, T>{ x, y, zValue, wValue };
 		}
@@ -36,25 +33,6 @@ namespace DEngine::Math
 		[[nodiscard]] constexpr T& At(uSize index)
 		{
 			return const_cast<T&>(std::as_const(*this).At(index)); 
-		}
-
-		[[nodiscard]] constexpr const T& At(uSize index) const
-		{
-#if defined( _MSC_VER )
-			__assume(index < dimCount);
-#endif
-			assert(index < dimCount);
-			switch (index)
-			{
-			case 0:
-				return x;
-			case 1:
-				return y;
-			default:
-#if defined( _MSC_VER )
-				__assume(0);
-#endif
-			}
 		}
 
 		[[nodiscard]] static constexpr T Dot(const Vector<2, T>& lhs, const Vector<2, T>& rhs)
@@ -70,53 +48,6 @@ namespace DEngine::Math
 		[[nodiscard]] constexpr const T* GetData() const
 		{
 			return &x;
-		}
-
-		[[nodiscard]] auto GetNormalized() const -> Vector<2, typename std::conditional<std::is_integral<T>::value, float, T>::type>
-		{
-			using ReturnValueType = typename std::conditional<std::is_integral<T>::value, float, T>::type;
-			const auto& magnitude = Magnitude();
-			return Vector<2, ReturnValueType>{ x / magnitude, y / magnitude };
-		}
-
-		[[nodiscard]] auto Magnitude() const -> typename std::conditional<std::is_integral<T>::value, float, T>::type
-		{
-			if constexpr (std::is_integral<T>::value)
-				return Sqrt(float((x * x) + (y * y)));
-			else
-				return Sqrt((x * x) + (y * y));
-		}
-
-		[[nodiscard]] constexpr T MagnitudeSqrd() const
-		{
-			return (x * x) + (y * y);
-		}
-
-		void Normalize()
-		{
-			static_assert(std::is_floating_point<T>::value, "Cannot normalize an integral vector.");
-			const auto& magnitude = Magnitude();
-			x /= magnitude;
-			y /= magnitude;
-		}
-
-		[[nodiscard]] std::string ToString() const
-		{
-			std::ostringstream stream;
-
-			if constexpr (std::is_floating_point<T>::value)
-			{
-				stream.flags(std::ios::fixed);
-				stream.precision(4);
-			}
-			
-			stream << '(';
-			if constexpr (std::is_same<char, T>::value || std::is_same<unsigned char, T>::value)
-				stream << +x << ", " << +y;
-			else
-				stream << x << ", " << y;
-			stream << ')';
-			return stream.str();
 		}
 
 		[[nodiscard]] static constexpr Vector<2, T> SingleValue(const T& input)

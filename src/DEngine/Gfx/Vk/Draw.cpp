@@ -161,7 +161,7 @@ namespace DEngine::Gfx::Vk
 			descrSet,
 			{});
 		globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, apiData.testPipeline);
-		globUtils.device.cmdDraw(cmdBuffer, 3, 1, 0, 0);
+		globUtils.device.cmdDraw(cmdBuffer, 4, 1, 0, 0);
 
 		globUtils.device.cmdEndRenderPass(cmdBuffer);
 

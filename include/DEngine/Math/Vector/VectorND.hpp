@@ -46,51 +46,6 @@ namespace DEngine::Math
 			return Data.Data();
 		}
 
-		[[nodiscard]] auto GetNormalized() const -> Vector<length, typename std::conditional<std::is_integral<T>::value, float, T>::type>
-		{
-			using ReturnValueType = typename std::conditional<std::is_integral<T>::value, float, T>::type;
-			const auto& magnitude = Magnitude();
-			Vector<length, ReturnValueType> temp;
-			for (size_t i = 0; i < length; i++)
-				temp[i] = Data[i] / magnitude;
-			return temp;
-		}
-
-		[[nodiscard]] auto Magnitude() const -> typename std::conditional<std::is_integral<T>::value, float, T>::type
-		{
-			if constexpr (std::is_integral<T>::value)
-			{
-				T sumSqrd = T(0);
-				for (size_t i = 0; i < length; i++)
-				{
-					const T& temp = Data[i];
-					sumSqrd = temp * temp;
-				}
-				return Sqrt(float(sumSqrd));
-			}
-			else
-			{
-				T sumSqrd = T(0);
-				for (size_t i = 0; i < length; i++)
-				{
-					const T& temp = Data[i];
-					sumSqrd = temp * temp;
-				}
-				return Sqrt(sumSqrd);
-			}
-		}
-
-		[[nodiscard]] constexpr T MagnitudeSqrd() const
-		{
-			T sumSqrd = T(0);
-			for (size_t i = 0; i < length; i++)
-			{
-				const T& temp = Data[i];
-				sumSqrd = temp * temp;
-			}
-			return sumSqrd;
-		}
-
 		void Normalize()
 		{
 			static_assert(std::is_floating_point<T>::value, "Cannot normalize an integral vector.");

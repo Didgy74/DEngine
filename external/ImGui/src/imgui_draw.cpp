@@ -77,9 +77,9 @@ Index of this file:
 #pragma GCC diagnostic ignored "-Wpragmas"                  // warning: unknown option after '#pragma GCC diagnostic' kind
 #pragma GCC diagnostic ignored "-Wunused-function"          // warning: 'xxxx' defined but not used
 #pragma GCC diagnostic ignored "-Wdouble-promotion"         // warning: implicit conversion from 'float' to 'double' when passing argument to function
-#pragma GCC diagnostic ignored "-Wconversion"               // warning: conversion to 'xxxx' from 'xxxx' may alter its value
+#pragma GCC diagnostic ignored "-Wconversion"               // warning: conversion to 'xxxx' from 'xxxx' may alter its Value
 #pragma GCC diagnostic ignored "-Wstack-protector"          // warning: stack protector not protecting local variables: variable length buffer
-#pragma GCC diagnostic ignored "-Wclass-memaccess"          // [__GNUC__ >= 8] warning: 'memset/memcpy' clearing/writing an object of type 'xxxx' with no trivial copy-assignment; use assignment or value-initialization instead
+#pragma GCC diagnostic ignored "-Wclass-memaccess"          // [__GNUC__ >= 8] warning: 'memset/memcpy' clearing/writing an object of type 'xxxx' with no trivial copy-assignment; use assignment or Value-initialization instead
 #endif
 
 //-------------------------------------------------------------------------
@@ -1117,7 +1117,7 @@ void ImDrawList::AddCircle(const ImVec2& center, float radius, ImU32 col, int nu
         // Automatic segment count
         const int radius_idx = (int)radius - 1;
         if (radius_idx < IM_ARRAYSIZE(_Data->CircleSegmentCounts))
-            num_segments = _Data->CircleSegmentCounts[radius_idx]; // Use cached value
+            num_segments = _Data->CircleSegmentCounts[radius_idx]; // Use cached Value
         else
             num_segments = IM_DRAWLIST_CIRCLE_AUTO_SEGMENT_CALC(radius, _Data->CircleSegmentMaxError);
     }
@@ -1147,7 +1147,7 @@ void ImDrawList::AddCircleFilled(const ImVec2& center, float radius, ImU32 col, 
         // Automatic segment count
         const int radius_idx = (int)radius - 1;
         if (radius_idx < IM_ARRAYSIZE(_Data->CircleSegmentCounts))
-            num_segments = _Data->CircleSegmentCounts[radius_idx]; // Use cached value
+            num_segments = _Data->CircleSegmentCounts[radius_idx]; // Use cached Value
         else
             num_segments = IM_DRAWLIST_CIRCLE_AUTO_SEGMENT_CALC(radius, _Data->CircleSegmentMaxError);
     }
@@ -3221,7 +3221,7 @@ void ImGui::RenderRectFilledRangeH(ImDrawList* draw_list, const ImRect& rect, Im
     const float inv_rounding = 1.0f / rounding;
     const float arc0_b = ImAcos01(1.0f - (p0.x - rect.Min.x) * inv_rounding);
     const float arc0_e = ImAcos01(1.0f - (p1.x - rect.Min.x) * inv_rounding);
-    const float half_pi = IM_PI * 0.5f; // We will == compare to this because we know this is the exact value ImAcos01 can return.
+    const float half_pi = IM_PI * 0.5f; // We will == compare to this because we know this is the exact Value ImAcos01 can return.
     const float x0 = ImMax(p0.x, rect.Min.x + rounding);
     if (arc0_b == arc0_e)
     {

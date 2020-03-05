@@ -24,6 +24,7 @@
 #pragma once
 
 #include "ImGui/imgui.h"
+#define VK_NO_PROTOTYPES
 #include <vulkan/vulkan.h>
 
 // Initialization data, for ImGui_ImplVulkan_Init()

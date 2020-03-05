@@ -41,8 +41,10 @@ namespace DEngine::Gfx::Vk
 
             static void Initialize(
                 DevDispatch const& device,
+                u8 queueType,
                 u32 familyIndex,
                 u32 queueIndex,
+                DebugUtilsDispatch const* debugUtils,
                 SafeQueue& queue);
 
         private:
@@ -62,6 +64,7 @@ namespace DEngine::Gfx::Vk
         static void Initialize(
             DevDispatch const& device,
             QueueIndices indices,
+            DebugUtilsDispatch const* debugUtils,
             QueueData& queueData);
     };
 }

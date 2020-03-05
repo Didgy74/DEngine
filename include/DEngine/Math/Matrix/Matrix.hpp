@@ -61,40 +61,24 @@ namespace DEngine::Math
 	template<uSize width, uSize height, typename T>
 	constexpr T& Matrix<width, height, T>::At(uSize i)
 	{
-#if defined( _MSC_VER )
-		__assume(i < width * height);
-#endif
-		assert(i < width * height);
 		return data[i];
 	}
 
 	template<uSize width, uSize height, typename T>
 	constexpr T const& Matrix<width, height, T>::At(uSize i) const
 	{
-#if defined( _MSC_VER )
-		__assume(i < width * height);
-#endif
-		assert(i < width * height);
 		return data[i];
 	}
 
 	template<uSize width, uSize height, typename T>
 	constexpr T& Matrix<width, height, T>::At(uSize x, uSize y)
 	{
-#if defined( _MSC_VER )
-		__assume(x < width && y < height);
-#endif
-		assert(x < width && y < height);
 		return data[x * height + y];
 	}
 
 	template<uSize width, uSize height, typename T>
 	constexpr T const& Matrix<width, height, T>::At(uSize x, uSize y) const
 	{
-#if defined( _MSC_VER )
-		__assume(x < width && y < height);
-#endif
-		assert(x < width && y < height);
 		return data[x * height + y];
 	}
 

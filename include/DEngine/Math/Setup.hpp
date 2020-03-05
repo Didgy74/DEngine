@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Math
+namespace DEngine::Math
 {
 	enum class AngleUnit : unsigned char
 	{

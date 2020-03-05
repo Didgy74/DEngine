@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DEngine/Application/Application.hpp"
+#include "DEngine/Application.hpp"
 #include "DEngine/FixedWidthTypes.hpp"
 #include "Dengine/Containers/FixedVector.hpp"
 

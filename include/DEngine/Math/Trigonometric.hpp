@@ -1,14 +1,15 @@
 #pragma once
 
-#include "Setup.hpp"
-#include "Constant.hpp"
+#include "DEngine/FixedWidthTypes.hpp"
+#include "DEngine/Math/Setup.hpp"
+#include "DEngine/Math/Constant.hpp"
 
 #include <cmath>
 
-namespace Math
+namespace DEngine::Math
 {	
 	template<AngleUnit angleUnit = Setup::defaultAngleUnit>
-	[[nodiscard]] auto Sin(float input)
+	[[nodiscard]] f32 Sin(f32 input)
 	{
 		if constexpr (angleUnit == AngleUnit::Radians)
 			return std::sin(input);
@@ -17,7 +18,7 @@ namespace Math
 	}
 
 	template<AngleUnit angleUnit = Setup::defaultAngleUnit>
-	[[nodiscard]] auto Cos(float input)
+	[[nodiscard]] f32 Cos(f32 input)
 	{
 		if constexpr (angleUnit == AngleUnit::Radians)
 			return std::cos(input);
@@ -26,7 +27,7 @@ namespace Math
 	}
 
 	template<AngleUnit angleUnit = Setup::defaultAngleUnit>
-	[[nodiscard]] auto Tan(float input)
+	[[nodiscard]] f32 Tan(f32 input)
 	{
 		if constexpr (angleUnit == AngleUnit::Radians)
 			return std::tan(input);

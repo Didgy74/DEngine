@@ -3,8 +3,6 @@
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Span.hpp"
 
-#include "DEngine/Containers/Assert.hpp"
-
 namespace DEngine::Containers
 {
 	template<typename T, uSize length>
@@ -103,9 +101,7 @@ namespace DEngine::Containers
 	inline constexpr void Array<T, length>::Fill(const T& value) noexcept
 	{
 		for (auto& item : (*this))
-		{
 			item = value;
-		}
 	}
 
 	template<typename T, uSize length>

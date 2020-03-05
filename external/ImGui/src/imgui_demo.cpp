@@ -103,7 +103,7 @@ Index of this file:
 #pragma GCC diagnostic ignored "-Wint-to-pointer-cast"          // warning: cast to pointer from integer of different Size
 #pragma GCC diagnostic ignored "-Wformat-security"              // warning : format string is not a string literal (potentially insecure)
 #pragma GCC diagnostic ignored "-Wdouble-promotion"             // warning: implicit conversion from 'float' to 'double' when passing argument to function
-#pragma GCC diagnostic ignored "-Wconversion"                   // warning: conversion to 'xxxx' from 'xxxx' may alter its value
+#pragma GCC diagnostic ignored "-Wconversion"                   // warning: conversion to 'xxxx' from 'xxxx' may alter its Value
 #pragma GCC diagnostic ignored "-Wmisleading-indentation"       // [__GNUC__ >= 6] warning: this 'if' clause does not guard this statement      // GCC 6.0+ only. See #883 on GitHub.
 #endif
 
@@ -174,7 +174,7 @@ void ImGui::ShowUserGuide()
     ImGuiIO& io = ImGui::GetIO();
     ImGui::BulletText("Double-click on title bar to collapse window.");
     ImGui::BulletText("Click and drag on lower corner to resize window\n(double-click to auto fit window to its contents).");
-    ImGui::BulletText("CTRL+Click on a slider or drag box to input value as text.");
+    ImGui::BulletText("CTRL+Click on a slider or drag box to input Value as text.");
     ImGui::BulletText("TAB/SHIFT+TAB to cycle through keyboard editable fields.");
     if (io.FontAllowUserScaling)
         ImGui::BulletText("CTRL+Mouse Wheel to zoom window contents.");
@@ -300,7 +300,7 @@ void ImGui::ShowDemoWindow(bool* p_open)
 
     // Most "big" widgets share a common width settings by default.
     //ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.65f);    // Use 2/3 of the space for widgets and 1/3 for labels (default)
-    ImGui::PushItemWidth(ImGui::GetFontSize() * -12);           // Use fixed width for labels (by passing a negative value), the rest goes to widgets. We choose a width proportional to our font Size.
+    ImGui::PushItemWidth(ImGui::GetFontSize() * -12);           // Use fixed width for labels (by passing a negative Value), the rest goes to widgets. We choose a width proportional to our font Size.
 
     // Menu Bar
     if (ImGui::BeginMenuBar())
@@ -599,7 +599,7 @@ static void ShowDemoWindowWidgets()
 
             static float f1 = 1.e10f;
             ImGui::InputFloat("input scientific", &f1, 0.0f, 0.0f, "%e");
-            ImGui::SameLine(); HelpMarker("You can input value using the scientific notation,\n  e.g. \"1e+8\" becomes \"100000000\".\n");
+            ImGui::SameLine(); HelpMarker("You can input Value using the scientific notation,\n  e.g. \"1e+8\" becomes \"100000000\".\n");
 
             static float vec4a[4] = { 0.10f, 0.20f, 0.30f, 0.44f };
             ImGui::InputFloat3("input float3", vec4a);
@@ -608,7 +608,7 @@ static void ShowDemoWindowWidgets()
         {
             static int i1 = 50, i2 = 42;
             ImGui::DragInt("drag int", &i1, 1);
-            ImGui::SameLine(); HelpMarker("Click and drag to edit value.\nHold SHIFT/ALT for faster/slower edit.\nDouble-click or CTRL+click to input value.");
+            ImGui::SameLine(); HelpMarker("Click and drag to edit Value.\nHold SHIFT/ALT for faster/slower edit.\nDouble-click or CTRL+click to input Value.");
 
             ImGui::DragInt("drag int 0..100", &i2, 1, 0, 100, "%d%%");
 
@@ -620,7 +620,7 @@ static void ShowDemoWindowWidgets()
         {
             static int i1=0;
             ImGui::SliderInt("slider int", &i1, -1, 3);
-            ImGui::SameLine(); HelpMarker("CTRL+click to input value.");
+            ImGui::SameLine(); HelpMarker("CTRL+click to input Value.");
 
             static float f1=0.123f, f2=0.0f;
             ImGui::SliderFloat("slider float", &f1, 0.0f, 1.0f, "ratio = %.3f");
@@ -644,7 +644,7 @@ static void ShowDemoWindowWidgets()
             static float col1[3] = { 1.0f,0.0f,0.2f };
             static float col2[4] = { 0.4f,0.7f,0.0f,0.5f };
             ImGui::ColorEdit3("color 1", col1);
-            ImGui::SameLine(); HelpMarker("Click on the colored square to open a color picker.\nClick and hold to use drag and drop.\nRight-click on the colored square to show options.\nCTRL+click on individual component to input value.\n");
+            ImGui::SameLine(); HelpMarker("Click on the colored square to open a color picker.\nClick and hold to use drag and drop.\nRight-click on the colored square to show options.\nCTRL+click on individual component to input Value.\n");
 
             ImGui::ColorEdit4("color 2", col2);
         }
@@ -856,7 +856,7 @@ static void ShowDemoWindowWidgets()
         ImGui::TextWrapped("Below we are displaying the font texture (which is the only texture we have access to in this demo). Use the 'ImTextureID' type as storage to pass pointers or identifier to your own texture Data. Hover the texture for a zoomed view!");
 
         // Here we are grabbing the font texture because that's the only one we have access to inside the demo code.
-        // Remember that ImTextureID is just storage for whatever you want it to be, it is essentially a value that will be passed to the render function inside the ImDrawCmd structure.
+        // Remember that ImTextureID is just storage for whatever you want it to be, it is essentially a Value that will be passed to the render function inside the ImDrawCmd structure.
         // If you use one of the default imgui_impl_XXXX.cpp renderer, they all have comments at the top of their file to specify what they expect to be stored in ImTextureID.
         // (for example, the imgui_impl_dx11.cpp renderer expect a 'ID3D11ShaderResourceView*' pointer. The imgui_impl_opengl3.cpp renderer expect a GLuint OpenGL texture identifier etc.)
         // If you decided that ImTextureID = MyEngineTexture*, then you can pass your MyEngineTexture* pointers to ImGui::Image(), and gather width/height through your own functions, etc.
@@ -1172,7 +1172,7 @@ static void ShowDemoWindowWidgets()
         }
 
         // Plots can display overlay texts
-        // (in this example, we will display an average value)
+        // (in this example, we will display an average Value)
         {
             float average = 0.0f;
             for (int n = 0; n < IM_ARRAYSIZE(values); n++)
@@ -1241,7 +1241,7 @@ static void ShowDemoWindowWidgets()
         ImGuiColorEditFlags misc_flags = (hdr ? ImGuiColorEditFlags_HDR : 0) | (drag_and_drop ? 0 : ImGuiColorEditFlags_NoDragDrop) | (alpha_half_preview ? ImGuiColorEditFlags_AlphaPreviewHalf : (alpha_preview ? ImGuiColorEditFlags_AlphaPreview : 0)) | (options_menu ? 0 : ImGuiColorEditFlags_NoOptions);
 
         ImGui::Text("Color widget:");
-        ImGui::SameLine(); HelpMarker("Click on the colored square to open a color picker.\nCTRL+click on individual component to input value.\n");
+        ImGui::SameLine(); HelpMarker("Click on the colored square to open a color picker.\nCTRL+click on individual component to input Value.\n");
         ImGui::ColorEdit3("MyColor##1", (float*)&color, misc_flags);
 
         ImGui::Text("Color widget HSV with Alpha:");
@@ -1371,7 +1371,7 @@ static void ShowDemoWindowWidgets()
         static ImVec4 color_stored_as_hsv(0.23f, 1.0f, 1.0f, 1.0f);
         ImGui::Spacing();
         ImGui::Text("HSV encoded colors");
-        ImGui::SameLine(); HelpMarker("By default, colors are given to ColorEdit and ColorPicker in RGB, but ImGuiColorEditFlags_InputHSV allows you to store colors as HSV and pass them to ColorEdit and ColorPicker as HSV. This comes with the added benefit that you can manipulate hue values with the picker even when saturation or value are zero.");
+        ImGui::SameLine(); HelpMarker("By default, colors are given to ColorEdit and ColorPicker in RGB, but ImGuiColorEditFlags_InputHSV allows you to store colors as HSV and pass them to ColorEdit and ColorPicker as HSV. This comes with the added benefit that you can manipulate hue values with the picker even when saturation or Value are zero.");
         ImGui::Text("Color widget with InputHSV:");
         ImGui::ColorEdit4("HSV shown as RGB##1", (float*)&color_stored_as_hsv, ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_InputHSV | ImGuiColorEditFlags_Float);
         ImGui::ColorEdit4("HSV shown as HSV##1", (float*)&color_stored_as_hsv, ImGuiColorEditFlags_DisplayHSV | ImGuiColorEditFlags_InputHSV | ImGuiColorEditFlags_Float);
@@ -1396,11 +1396,11 @@ static void ShowDemoWindowWidgets()
         // and passing all arguments by address.
         // This is the reason the test code below creates local variables to hold "zero" "one" etc. for each types.
         // In practice, if you frequently use a given type that is not covered by the normal API entry points, you can wrap it
-        // yourself inside a 1 line function which can take typed argument as value instead of void*, and then pass their address
+        // yourself inside a 1 line function which can take typed argument as Value instead of void*, and then pass their address
         // to the generic function. For example:
-        //   bool MySliderU64(const char *label, u64* value, u64 min = 0, u64 max = 0, const char* format = "%lld")
+        //   bool MySliderU64(const char *label, u64* Value, u64 min = 0, u64 max = 0, const char* format = "%lld")
         //   {
-        //      return SliderScalar(label, ImGuiDataType_U64, value, &min, &max, format);
+        //      return SliderScalar(label, ImGuiDataType_U64, Value, &min, &max, format);
         //   }
 
         // Limits (as helper variables that we can take the address of)
@@ -1436,7 +1436,7 @@ static void ShowDemoWindowWidgets()
         const float drag_speed = 0.2f;
         static bool drag_clamp = false;
         ImGui::Text("Drags:");
-        ImGui::Checkbox("Clamp integers to 0..50", &drag_clamp); ImGui::SameLine(); HelpMarker("As with every widgets in dear imgui, we never modify values unless there is a user interaction.\nYou can override the clamping limits by using CTRL+Click to input a value.");
+        ImGui::Checkbox("Clamp integers to 0..50", &drag_clamp); ImGui::SameLine(); HelpMarker("As with every widgets in dear imgui, we never modify values unless there is a user interaction.\nYou can override the clamping limits by using CTRL+Click to input a Value.");
         ImGui::DragScalar("drag s8",        ImGuiDataType_S8,     &s8_v,  drag_speed, drag_clamp ? &s8_zero  : NULL, drag_clamp ? &s8_fifty  : NULL);
         ImGui::DragScalar("drag u8",        ImGuiDataType_U8,     &u8_v,  drag_speed, drag_clamp ? &u8_zero  : NULL, drag_clamp ? &u8_fifty  : NULL, "%u ms");
         ImGui::DragScalar("drag s16",       ImGuiDataType_S16,    &s16_v, drag_speed, drag_clamp ? &s16_zero : NULL, drag_clamp ? &s16_fifty : NULL);
@@ -1713,12 +1713,12 @@ static void ShowDemoWindowWidgets()
         if (item_type == 11){ ret = ImGui::TreeNodeEx("ITEM: TreeNode w/ ImGuiTreeNodeFlags_OpenOnDoubleClick", ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_NoTreePushOnOpen); } // Testing tree node with ImGuiButtonFlags_PressedOnDoubleClick button policy.
         if (item_type == 12){ const char* items[] = { "Apple", "Banana", "Cherry", "Kiwi" }; static int current = 1; ret = ImGui::ListBox("ITEM: ListBox", &current, items, IM_ARRAYSIZE(items), IM_ARRAYSIZE(items)); }
 
-        // Display the value of IsItemHovered() and other common item state functions.
+        // Display the Value of IsItemHovered() and other common item state functions.
         // Note that the ImGuiHoveredFlags_XXX flags can be combined.
         // Because BulletText is an item itself and that would affect the output of IsItemXXX functions,
         // we query every state in a single call to avoid storing them and to simplify the code
         ImGui::BulletText(
-            "Return value = %d\n"
+            "Return Value = %d\n"
             "IsItemFocused() = %d\n"
             "IsItemHovered() = %d\n"
             "IsItemHovered(_AllowWhenBlockedByPopup) = %d\n"
@@ -2714,7 +2714,7 @@ static void ShowDemoWindowPopups()
                 ImGui::OpenPopup("Stacked 2");
 
             // Also demonstrate passing a bool* to BeginPopupModal(), this will create a regular close button which will close the popup.
-            // Note that the visibility state of popups is owned by imgui, so the input value of the bool actually doesn't matter here.
+            // Note that the visibility state of popups is owned by imgui, so the input Value of the bool actually doesn't matter here.
             bool dummy_open = true;
             if (ImGui::BeginPopupModal("Stacked 2", &dummy_open))
             {
@@ -3372,7 +3372,7 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
 
     // Simplified Settings
     if (ImGui::SliderFloat("FrameRounding", &style.FrameRounding, 0.0f, 12.0f, "%.0f"))
-        style.GrabRounding = style.FrameRounding; // Make GrabRounding always the same value as FrameRounding
+        style.GrabRounding = style.FrameRounding; // Make GrabRounding always the same Value as FrameRounding
     { bool window_border = (style.WindowBorderSize > 0.0f); if (ImGui::Checkbox("WindowBorder", &window_border)) style.WindowBorderSize = window_border ? 1.0f : 0.0f; }
     ImGui::SameLine();
     { bool frame_border = (style.FrameBorderSize > 0.0f); if (ImGui::Checkbox("FrameBorder", &frame_border)) style.FrameBorderSize = frame_border ? 1.0f : 0.0f; }
@@ -4289,9 +4289,9 @@ static void ShowExampleAppPropertyEditor(bool* p_open)
                         ImGui::NextColumn();
                         ImGui::SetNextItemWidth(-1);
                         if (i >= 5)
-                            ImGui::InputFloat("##value", &dummy_members[i], 1.0f);
+                            ImGui::InputFloat("##Value", &dummy_members[i], 1.0f);
                         else
-                            ImGui::DragFloat("##value", &dummy_members[i], 0.01f);
+                            ImGui::DragFloat("##Value", &dummy_members[i], 0.01f);
                         ImGui::NextColumn();
                     }
                     ImGui::PopID();

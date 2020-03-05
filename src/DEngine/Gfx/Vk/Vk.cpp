@@ -106,7 +106,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	vk::Device deviceHandle = Init::CreateDevice(instance, globUtils.physDevice);
 	globUtils.device.copy(DeviceDispatch::Build(deviceHandle, deviceProcAddr));
 
-	QueueData::Initialize(globUtils.device, globUtils.physDevice.queueIndices, globUtils.queues);
+	QueueData::Initialize(globUtils.device, globUtils.physDevice.queueIndices, globUtils.DebugUtilsPtr(), globUtils.queues);
 
 	apiData.globUtils.vma = Init::InitializeVMA(instance, globUtils.device, globUtils.physDevice, globUtils.DebugUtilsPtr());
 	apiData.globUtils.deletionQueue.Initialize(apiData.globUtils.device, apiData.globUtils.resourceSetCount);
@@ -333,6 +333,7 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	rasterizer.polygonMode = vk::PolygonMode::eFill;
 	rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
 	rasterizer.rasterizerDiscardEnable = 0;
+	rasterizer.cullMode = vk::CullModeFlagBits::eNone;
 
 	vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
 	depthStencilInfo.depthTestEnable = 0;

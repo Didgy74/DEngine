@@ -20,26 +20,32 @@ namespace DEngine::Containers
 		};
 		
 	public:
-		inline Optional() = default;
+		inline Optional();
 
-		inline Optional(const T& value);
+		inline Optional(T const& value);
 
 		inline Optional(T&& value);
 
 		inline ~Optional();
 
-		[[nodiscard]] inline bool hasValue() const;
+		[[nodiscard]] inline bool HasValue() const;
 
-		[[nodiscard]] inline const T& value() const;
+		[[nodiscard]] inline T const& Value() const;
 
-		[[nodiscard]] inline T& value();
+		[[nodiscard]] inline T& Value();
 	};
 
 	template<typename T>
 	using Opt = Optional<T>;
 
 	template<typename T>
-	inline Optional<T>::Optional(const T& value) :
+	inline Optional<T>::Optional() :
+		m_hasValue(false)
+	{
+	}
+
+	template<typename T>
+	inline Optional<T>::Optional(T const& value) :
 		m_hasValue(true)
 	{
 		new(m_valueBuffer) T(value);
@@ -60,24 +66,24 @@ namespace DEngine::Containers
 	}
 
 	template<typename T>
-	inline bool Optional<T>::hasValue() const
+	inline bool Optional<T>::HasValue() const
 	{
 		return m_hasValue;
 	}
 
 	template<typename T>
-	inline const T& Optional<T>::value() const
+	inline T const& Optional<T>::Value() const
 	{
 		if (m_hasValue == false)
-			throw std::runtime_error("Tried to deference Optional-variable without value.");
+			throw std::runtime_error("Tried to deference Optional-variable without Value.");
 		return m_value;
 	}
 
 	template<typename T>
-	inline T& Optional<T>::value()
+	inline T& Optional<T>::Value()
 	{
 		if (m_hasValue == false)
-			throw std::runtime_error("Tried to deference Optional-variable without value.");
+			throw std::runtime_error("Tried to deference Optional-variable without Value.");
 		return m_value;
 	}
 }

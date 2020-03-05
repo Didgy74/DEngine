@@ -2,173 +2,127 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 
-#include <cmath>
-#include <algorithm>
-
-#include <type_traits>
-
-#if defined( _MSC_VER )
-#	include <intrin.h>
-#endif
-
 namespace DEngine::Math
 {
-	template<typename T>
-	[[nodiscard]] auto Abs(T input)
+	[[nodiscard]] inline f32 Abs(f32 input)
 	{
-		static_assert(std::is_arithmetic_v<T>, "Input of Math::Abs must be of numeric type.");
 		return std::abs(input);
 	}
 	
-	template<typename T>
-	[[nodiscard]] auto Ceil(T input)
+	[[nodiscard]] inline f32 Ceil(f32 input)
 	{
-		static_assert(std::is_arithmetic_v<T>, "Input of Math::Ceil must be of numeric type.");
 		return std::ceil(input);
 	}
 
-	template<typename T>
-	[[nodiscard]] constexpr auto CeilToNearestMultiple(T value, T multiple)
+	[[nodiscard]] constexpr uSize CeilToNearestMultiple(uSize value, uSize multiple)
 	{
-		static_assert(std::is_integral_v<T> && std::is_unsigned_v<T>, "Input of Math::CeilToNearestMultiple must be of unsigned integral type.");
 		if (value < multiple)
 			return multiple;
 		else
 		{
 			const auto delta = value % multiple;
-			if (delta == T(0))
+			if (delta == 0)
 				return value; 
 			else
 				return value - delta + multiple;
 		}
 	}
 
-	[[nodiscard]] inline uint16_t CeilToNearestPowerOf2(u16 in)
+	[[nodiscard]] inline u16 CeilToNearestPowerOf2(u16 in)
 	{
-		constexpr uint16_t bitSize = uint16_t(sizeof(uint16_t) * 8);
-#ifdef _MSC_VER
-		return uint16_t(1) << (bitSize - __lzcnt16(in));
-#else
-#error not supported
-#endif
+		constexpr u16 bitSize = u16(sizeof(u16) * 8);
+		//return u16(1) << (bitSize - __lzcnt16(in));
 	}
 
-	[[nodiscard]] inline uint32_t CeilToNearestPowerOf2(uint32_t in)
+	[[nodiscard]] inline u32 CeilToNearestPowerOf2(u32 in)
 	{
-		constexpr uint32_t bitSize = uint32_t(sizeof(uint32_t) * 8);
-#ifdef _MSC_VER
-		return uint32_t(1) << (bitSize - __lzcnt(in));
-#endif
+		constexpr u32 bitSize = u32(sizeof(u32) * 8);
 	}
 
-	[[nodiscard]] inline uint64_t CeilToNearestPowerOf2(uint64_t in)
+	[[nodiscard]] inline u64 CeilToNearestPowerOf2(u64 in)
 	{
-		constexpr uint64_t bitSize = uint64_t(sizeof(uint64_t) * 8);
-#ifdef _MSC_VER
-		return uint64_t(1) << (bitSize - __lzcnt64(in));
-#endif
+		constexpr u64 bitSize = u64(sizeof(u64) * 8);
 	}
 
-	template<typename T>
-	[[nodiscard]] constexpr auto Clamp(T value, T min, T max) -> T
+	[[nodiscard]] constexpr u8 Clamp(u8 value, u8 min, u8 max)
 	{
-		static_assert(std::is_arithmetic_v<T>, "Input of " __FUNCTION__ " requires type T to be an arithmetic type.");
-		return std::clamp(value, min, max);
+		if (value > max)
+			return max;
+		else if (value < min)
+			return min;
+		else
+			return value;
 	}
 
-	template<typename T>
-	[[nodiscard]] auto Floor(T input)
+	[[nodiscard]] inline f32 Floor(f32 input)
 	{
-		static_assert(std::is_arithmetic_v<T>, "Input of " __FUNCTION__ " must be of numeric type.");
 		return std::floor(input);
 	}
 
-	[[nodiscard]] inline float Hypot(float x, float y)
+	[[nodiscard]] constexpr f32 Lerp(f32 a, f32 b, f32 delta)
 	{
-		return hypotf(x, y);
+		return (b - a) * delta + a;
 	}
 
-	[[nodiscard]] inline double Hypot(float x, float y, float z)
-	{
-		return std::hypot(x, y, z);
-	}
-
-	[[nodiscard]] inline double Hypot(double x, double y)
-	{
-		return hypotl(x, y);
-	}
-
-	[[nodiscard]] inline double Hypot(double x, double y, double z)
-	{
-		return std::hypot(x, y, z);
-	}
-
-	template<typename T1, typename T2, typename T3>
-	[[nodiscard]] constexpr auto Lerp(T1 input1, T2 input2, T3 delta)
-	{
-		static_assert(std::is_arithmetic_v<T1> && std::is_arithmetic_v<T2> && std::is_arithmetic_v<T3>, "Input of Math::Lerp must be of numeric type.");
-		using ReturnType = std::common_type_t<T1, T2, T3>;
-		if constexpr (std::is_same_v<ReturnType, decltype((input2 - input1) * delta + input1)>)
-			return (input2 - input1) * delta + input1;
-		else
-			return static_cast<std::make_signed_t<ReturnType>>((input2 - input1) * delta + input1);
-	}
-
-	template<typename T>
-	[[nodiscard]] auto Log(T in)
+	[[nodiscard]] inline f32 Log(f32 in)
 	{
 		return std::log(in);
 	}
 
-	template<typename T>
-	[[nodiscard]] constexpr T Min(T a, T b)
-	{
-		static_assert(std::is_arithmetic<T>::value , "Error. Argument of " __FUNCTION__ " must be arithmetic types.");
-		return std::min(a, b);
-	}
+	[[nodiscard]] constexpr i8 Min(i8 a, i8 b) { return a < b ? a : b; }
+	[[nodiscard]] constexpr i16 Min(i16 a, i16 b) { return a < b ? a : b; }
+	[[nodiscard]] constexpr i32 Min(i32 a, i32 b) { return a < b ? a : b; }
+	[[nodiscard]] constexpr i64 Min(i64 a, i64 b) { return a < b ? a : b; }
+	[[nodiscard]] constexpr u8 Min(u8 a, u8 b) { return a < b ? a : b; }
+	[[nodiscard]] constexpr u16 Min(u16 a, u16 b) { return a < b ? a : b; }
+	[[nodiscard]] constexpr u32 Min(u32 a, u32 b) { return a < b ? a : b; }
+	[[nodiscard]] constexpr u64 Min(u64 a, u64 b) { return a < b ? a : b; }
+	[[nodiscard]] constexpr f32 Min(f32 a, f32 b) { return a < b ? a : b; }
+	[[nodiscard]] constexpr f64 Min(f64 a, f64 b) { return a < b ? a : b; }
 
-	template<typename T>
-	[[nodiscard]] constexpr auto Max(T a, T b)
-	{
-		static_assert(std::is_arithmetic<T>::value, "Error. Argument of " __FUNCTION__ " must be arithmetic types.");
-		return std::max(a, b);
-	}
+	[[nodiscard]] constexpr i8 Max(i8 a, i8 b) { return a > b ? a : b; }
+	[[nodiscard]] constexpr i16 Max(i16 a, i16 b) { return a > b ? a : b; }
+	[[nodiscard]] constexpr i32 Max(i32 a, i32 b) { return a > b ? a : b; }
+	[[nodiscard]] constexpr i64 Max(i64 a, i64 b) { return a > b ? a : b; }
+	[[nodiscard]] constexpr u8 Max(u8 a, u8 b) { return a > b ? a : b; }
+	[[nodiscard]] constexpr u16 Max(u16 a, u16 b) { return a > b ? a : b; }
+	[[nodiscard]] constexpr u32 Max(u32 a, u32 b) { return a > b ? a : b; }
+	[[nodiscard]] constexpr u64 Max(u64 a, u64 b) { return a > b ? a : b; }
+	[[nodiscard]] constexpr f32 Max(f32 a, f32 b) { return a > b ? a : b; }
+	[[nodiscard]] constexpr f64 Max(f64 a, f64 b) { return a > b ? a : b; }
 
-	template<typename T1, typename T2>
-	[[nodiscard]] auto Pow(T1 coefficient, T2 exponent)
+	[[nodiscard]] inline f32 Pow(f32 coefficient, f32 exponent)
 	{
-		static_assert(std::is_arithmetic_v<T1> && std::is_arithmetic_v<T2>, "Input of Math::Pow must be of numeric type.");
 		return std::pow(coefficient, exponent);
 	}
 
-	template<typename T>
-	[[nodiscard]] auto Round(T input)
+	[[nodiscard]] inline f32 Round(f32 input)
 	{
-		static_assert(std::is_arithmetic_v<T>, "Input of Math::Round must be of numeric type.");
 		return std::round(input);
 	}
 
-	template<typename T>
-	[[nodiscard]] constexpr auto Sqrd(T input)
+	[[nodiscard]] constexpr f32 Sqrd(f32 input)
 	{
-		static_assert(std::is_arithmetic_v<T>, "Input of Math::Sqrd must be of numeric type.");
 		return input * input;
 	}
 
-	[[nodiscard]] inline float Sqrt(float input)
+	[[nodiscard]] constexpr f64 Sqrd(f64 input)
 	{
-		return sqrtf(input);
+		return input * input;
 	}
 
-	[[nodiscard]] inline double Sqrt(double input)
+	[[nodiscard]] inline f32 Sqrt(f32 input)
 	{
-		return sqrtl(input);
+		return std::sqrt(input);
 	}
 
-	template<typename T>
-	[[nodiscard]] auto Truncate(T input)
+	[[nodiscard]] inline f64 Sqrt(f64 input)
 	{
-		static_assert(std::is_arithmetic_v<T>, "Input of Math::Truncate must be of numeric type.");
+		return std::sqrt(input);
+	}
+
+	[[nodiscard]] inline f32 Truncate(f32 input)
+	{
 		return std::trunc(input);
 	}
 }
