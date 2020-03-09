@@ -2,13 +2,15 @@
 #define DENGINE_INPUT_RAW_BUTTON_COUNT
 #include "DEngine/InputRaw.hpp"
 
+#include <iostream>
+
 namespace DEngine::Input::Raw
 {
 	static Cont::Array<bool, uSize(Button::COUNT)> buttonValues{};
 	static Cont::Array<EventType, uSize(Button::COUNT)> buttonEvents{};
 
-	static Cont::Array<u16, 2> mousePosition{};
-	static Cont::Array<i16, 2> mouseDelta{};
+	static Cont::Array<u32, 2> mousePosition{};
+	static Cont::Array<i32, 2> mouseDelta{};
 }
 
 bool DEngine::Input::Raw::GetValue(Button input)
@@ -21,7 +23,7 @@ DEngine::Input::EventType DEngine::Input::Raw::GetEventType(Button input)
 	return buttonEvents[uSize(input)];
 }
 
-DEngine::Cont::Array<DEngine::i16, 2> DEngine::Input::Raw::GetMouseDelta()
+DEngine::Cont::Array<DEngine::i32, 2> DEngine::Input::Raw::GetMouseDelta()
 {
 	return mouseDelta;
 }
@@ -40,10 +42,9 @@ void DEngine::Input::Core::UpdateKey(Raw::Button button, bool buttonValue)
 	Raw::buttonEvents[index] = ToEventType(buttonValue);
 }
 
-void DEngine::Input::Core::UpdateMouseInfo(u16 posX, u16 posY)
+void DEngine::Input::Core::UpdateMouseInfo(u32 posX, u32 posY, i32 deltaX, i32 deltaY)
 {
-	Raw::mouseDelta[0] = i16(posX) - i16(Raw::mousePosition[0]);
-	Raw::mouseDelta[1] = i16(posY) - i16(Raw::mousePosition[1]);
+	Raw::mouseDelta = { deltaX, deltaY };
 	Raw::mousePosition = { posX, posY };
 }
 

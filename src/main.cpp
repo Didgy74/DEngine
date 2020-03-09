@@ -113,9 +113,6 @@ int main(int argc, char** argv)
 	}
 	Gfx::Data rendererData = std::move(rendererDataOpt.Value());
 
-	
-
-
 
 	while (true)
 	{
@@ -132,26 +129,26 @@ int main(int argc, char** argv)
 		Gfx::Draw_Params params{};
 		params.presentMainWindow = !App::detail::IsMinimized();
 
-		for (auto const& item : editorData.viewports)
+		for (auto const& [vpID, viewport] : editorData.viewports)
 		{
-			if (item.visible)
+			if (viewport.visible && !viewport.paused)
 			{
 				Gfx::ViewportUpdateData viewportData{};
-				viewportData.id = item.id;
-				viewportData.width = item.renderWidth;
-				viewportData.height = item.renderHeight;
+				viewportData.id = viewport.gfxViewportRef.ViewportID();
+				viewportData.width = viewport.renderWidth;
+				viewportData.height = viewport.renderHeight;
 
 
 				f32 aspectRatio = (f32)viewportData.width / viewportData.height;
 
 				Editor::Camera const* camPtr = nullptr;
-				if (item.cameraID == 255)
-					camPtr = &item.camera;
+				if (viewport.cameraID == Editor::Viewport::invalidCamID)
+					camPtr = &viewport.camera;
 				else
 				{
-					for (auto const& camera : editorData.cameras)
+					for (auto const& [camID, camera] : editorData.cameras)
 					{
-						if (camera.id == item.cameraID)
+						if (camID == viewport.cameraID)
 						{
 							camPtr = &camera;
 							break;
@@ -174,7 +171,7 @@ int main(int argc, char** argv)
 				
 				viewportData.transform = camMat;
 
-				params.viewports.PushBack(viewportData);
+				params.viewportUpdates.PushBack(viewportData);
 			}
 		}
 

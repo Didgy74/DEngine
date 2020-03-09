@@ -124,6 +124,6 @@ namespace DEngine::Gfx::Vk::Init
 
 	[[nodiscard]] GfxRenderTarget InitializeGfxViewport(
 		GlobUtils const& globUtils,
-		u8 viewportID,
+		uSize viewportID,
 		vk::Extent2D viewportSize);
 }

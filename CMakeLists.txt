@@ -26,6 +26,8 @@ set(CMAKE_CXX_STANDARD 17)
 
 	add_executable(${PROJECT_NAME} ${DENGINE_SRC_FILES})
 
+	#target_sources(${PROJECT_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include/DEngine/Containers/Span.natvis")
+
 	# Remove data folder from target binary directory
 	add_custom_command(
 		TARGET ${PROJECT_NAME} POST_BUILD

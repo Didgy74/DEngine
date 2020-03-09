@@ -15,6 +15,8 @@
 #include "DEngine/Containers/Array.hpp"
 #include "DEngine/Containers/Pair.hpp"
 
+#include <vector>
+
 namespace DEngine::Gfx::Vk
 {
 	constexpr u32 invalidIndex = static_cast<std::uint32_t>(-1);
@@ -25,7 +27,6 @@ namespace DEngine::Gfx::Vk
 	[[nodiscard]] inline constexpr bool IsValidIndex<std::uint32_t>(std::uint32_t in) { return in != static_cast<std::uint32_t>(-1); }
 	template<>
 	[[nodiscard]] inline constexpr bool IsValidIndex<std::uint64_t>(std::uint64_t in) { return in != static_cast<std::uint64_t>(-1); }
-   
 
 	struct MemoryTypes
 	{
@@ -105,7 +106,6 @@ namespace DEngine::Gfx::Vk
 
 	struct ViewportVkData
 	{
-		bool inUse = false;
 		GfxRenderTarget renderTarget{};
 		vk::CommandPool cmdPool{};
 		Cont::FixedVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
@@ -129,6 +129,13 @@ namespace DEngine::Gfx::Vk
 		vk::CommandPool cmdPool{};
 		// Has length of resource sets
 		Cont::FixedVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
+	};
+
+	struct ViewportManager
+	{
+		std::mutex viewportDataLock{};
+		uSize viewportIDTracker = 0;
+		std::vector<Cont::Pair<uSize, ViewportVkData>> viewportDatas{};
 	};
 
 	// Everything here is thread-safe to use and access!!
@@ -171,17 +178,15 @@ namespace DEngine::Gfx::Vk
 		SurfaceInfo surface{};
 		SwapchainData swapchain{};
 
-		u8 currentResourceSet = 0;
+		u8 currentInFlightFrame = 0;
 
 		Cont::FixedVector<vk::Fence, Constants::maxResourceSets> mainFences{};
 
 		GUIData guiData{};
 
-		// The main renderpass for rendering the 3D stuff
-		Cont::Array<ViewportVkData, Gfx::Constants::maxViewportCount> viewportDatas{};
-
 		GlobUtils globUtils{};
 
+		ViewportManager viewportManager{};
 
 		vk::DescriptorSetLayout test_cameraDescrLayout{};
 		Cont::FixedVector<vk::DescriptorSet, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> test_cameraDescrSets{};

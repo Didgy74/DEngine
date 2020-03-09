@@ -24,7 +24,6 @@
 #pragma once
 
 #include "ImGui/imgui.h"
-#define VK_NO_PROTOTYPES
 #include <vulkan/vulkan.h>
 
 // Initialization data, for ImGui_ImplVulkan_Init()
@@ -57,9 +56,12 @@ IMGUI_IMPL_API bool     ImGui_ImplVulkan_CreateFontsTexture(VkCommandBuffer comm
 IMGUI_IMPL_API void     ImGui_ImplVulkan_DestroyFontUploadObjects();
 IMGUI_IMPL_API void     ImGui_ImplVulkan_SetMinImageCount(uint32_t min_image_count); // To override MinImageCount after initialization (e.g. if swap chain is recreated)
 
+// Thread safe
 IMGUI_IMPL_API ImTextureID ImGui_ImplVulkan_AddTexture(VkImageView image_view, VkImageLayout image_layout);
+// Thread safe
 IMGUI_IMPL_API void ImGui_ImplVulkan_OverwriteTexture(ImTextureID tex_id, VkImageView image_view, VkImageLayout image_layout);
-
+// Thread safe
+IMGUI_IMPL_API void ImGui_ImplVulkan_RemoveTexture(ImTextureID tex_id);
 
 //-------------------------------------------------------------------------
 // Internal / Miscellaneous Vulkan Helpers

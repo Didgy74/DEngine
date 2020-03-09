@@ -16,36 +16,66 @@
 
 namespace DEngine::Gfx::Vk
 {
-	void NewViewport(void* apiDataBuffer, u8& viewportID, void*& imguiTexID)
-	{
-		vk::Result vkResult{};
-		APIData& apiData = *reinterpret_cast<APIData*>(apiDataBuffer);
-
-		// Find next available viewport ID
-		for (uSize i = 0; i < apiData.viewportDatas.Size(); i += 1)
-		{
-			ViewportVkData& vpData = apiData.viewportDatas[i];
-			if (!vpData.inUse)
-			{
-				viewportID = (u8)i;
-				break;
-			}
-		}
-
-		ViewportVkData viewportData{};
-
-		imguiTexID = ImGui_ImplVulkan_AddTexture(VkImageView(), VkImageLayout());
-
-		viewportData.imguiTextureID = imguiTexID;
-		viewportData.inUse = true;
-
-		apiData.viewportDatas[viewportID] = std::move(viewportData);
-	}
-
 	namespace Init
 	{
 		void Test(APIData& apiData);
 	}
+
+	void DeleteViewport(void* apiDataBuffer, uSize id)
+	{
+		vk::Result vkResult{};
+		APIData& apiData = *reinterpret_cast<APIData*>(apiDataBuffer);
+
+		std::lock_guard viewportDataLockGuard{ apiData.viewportManager.viewportDataLock };
+
+		// Find index to remove
+		uSize indexToRemove = static_cast<uSize>(-1);
+		for (uSize i = 0; i < apiData.viewportManager.viewportDatas.size(); i += 1)
+		{
+			auto const& item = apiData.viewportManager.viewportDatas[i];
+			if (item.a == id)
+			{
+				indexToRemove = i;
+				break;
+			}
+		}
+		DENGINE_GFX_ASSERT(indexToRemove != static_cast<uSize>(-1));
+
+		ViewportVkData const& viewport = apiData.viewportManager.viewportDatas[indexToRemove].b;
+		char buffer[DeletionQueue::jobBufferSize] = {};
+		std::memcpy(buffer, &viewport, sizeof(viewport));
+		DeletionQueue::CallbackPFN callback = [](GlobUtils const& globUtils, char const(&buffer)[DeletionQueue::jobBufferSize])
+		{
+			ViewportVkData data{};
+			std::memcpy(&data, buffer, sizeof(data));
+
+			globUtils.device.destroyCommandPool(data.cmdPool);
+			ImGui_ImplVulkan_RemoveTexture(data.imguiTextureID);
+			globUtils.device.destroyFramebuffer(data.renderTarget.framebuffer);
+			globUtils.device.destroyImageView(data.renderTarget.imgView);
+			vmaDestroyImage(globUtils.vma, (VkImage)data.renderTarget.img, data.renderTarget.vmaAllocation);
+		};
+
+		apiData.globUtils.deletionQueue.Destroy(callback, buffer);
+
+		apiData.viewportManager.viewportDatas.erase(apiData.viewportManager.viewportDatas.begin() + indexToRemove);
+	}
+}
+
+void DEngine::Gfx::Vk::NewViewport(void* apiDataBuffer, uSize& viewportID, void*& imguiTexID)
+{
+	vk::Result vkResult{};
+	APIData& apiData = *reinterpret_cast<APIData*>(apiDataBuffer);
+
+	std::lock_guard viewportDataLockGuard{ apiData.viewportManager.viewportDataLock };
+
+	ViewportVkData viewportData{};
+	viewportData.imguiTextureID = ImGui_ImplVulkan_AddTexture(VkImageView(), VkImageLayout());
+
+	viewportID = apiData.viewportManager.viewportIDTracker;
+	imguiTexID = viewportData.imguiTextureID;
+	apiData.viewportManager.viewportDatas.push_back({ apiData.viewportManager.viewportIDTracker, viewportData });
+	apiData.viewportManager.viewportIDTracker += 1;
 }
 
 bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo, void*& apiDataBuffer)
@@ -60,10 +90,8 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	apiData.wsiInterface = initInfo.iWsi;
 
 	globUtils.resourceSetCount = 2;
-	apiData.currentResourceSet = 0;
+	apiData.currentInFlightFrame = 0;
 	globUtils.useEditorPipeline = true;
-
-
 
 	PFN_vkGetInstanceProcAddr instanceProcAddr = Vk::loadInstanceProcAddressPFN();
 
@@ -109,7 +137,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	QueueData::Initialize(globUtils.device, globUtils.physDevice.queueIndices, globUtils.DebugUtilsPtr(), globUtils.queues);
 
 	apiData.globUtils.vma = Init::InitializeVMA(instance, globUtils.device, globUtils.physDevice, globUtils.DebugUtilsPtr());
-	apiData.globUtils.deletionQueue.Initialize(apiData.globUtils.device, apiData.globUtils.resourceSetCount);
+	apiData.globUtils.deletionQueue.Initialize(apiData.globUtils, apiData.globUtils.resourceSetCount);
 
 	// Build our swapchain on our device
 	apiData.swapchain = Init::CreateSwapchain(

@@ -72,14 +72,14 @@ namespace DEngine::Gfx::Vk::Init
 
 
 		VmaAllocatorCreateInfo vmaInfo{};
-		vmaInfo.device = device.handle;
+		vmaInfo.device = (VkDevice)device.handle;
 		vmaInfo.flags = 0;
 		vmaInfo.frameInUseCount = 0;
-		vmaInfo.instance = instance.handle;
+		vmaInfo.instance = (VkInstance)instance.handle;
 		vmaInfo.pAllocationCallbacks = nullptr;
 		vmaInfo.pDeviceMemoryCallbacks = debugUtils ? &callbacks : nullptr;
 		vmaInfo.pHeapSizeLimit = nullptr;
-		vmaInfo.physicalDevice = physDevice.handle;
+		vmaInfo.physicalDevice = (VkPhysicalDevice)physDevice.handle;
 		vmaInfo.pRecordSettings = nullptr;
 		vmaInfo.preferredLargeHeapBlockSize = 0; // This is default
 		vmaInfo.pVulkanFunctions = &vmaDispatch;

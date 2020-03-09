@@ -23,7 +23,7 @@ namespace DEngine::Gfx
 
 	struct ViewportUpdateData
 	{
-		u8 id = 255;
+		uSize id = static_cast<uSize>(-1);
 		u32 width = 0;
 		u32 height = 0;
 		Math::Mat4 transform{};
@@ -34,7 +34,7 @@ namespace DEngine::Gfx
 		bool presentMainWindow = false;
 		bool resizeEvent = false;
 		
-		Cont::FixedVector<ViewportUpdateData, 10> viewports = {};
+		Cont::FixedVector<ViewportUpdateData, 10> viewportUpdates = {};
 	};
 
 	class Data
@@ -42,8 +42,9 @@ namespace DEngine::Gfx
 	public:
 		Data(Data&&) noexcept = default;
 
-		ViewportRef NewViewport(u8 id);
-		u8 GetViewportCount();
+		ViewportRef NewViewport();
+		void DeleteViewport(uSize viewportID);
+		uSize GetViewportCount();
 
 		void Draw(Draw_Params const& params);
 
@@ -93,12 +94,14 @@ namespace DEngine::Gfx
 	class ViewportRef
 	{
 	public:
-		u8 ViewportID() const { return viewportID; }
-		void* ImGuiTexID() const { return imguiTexID; }
+		ViewportRef() = default;
+
+		[[nodiscard]] bool IsValid() const { return viewportID != 255; }
+		[[nodiscard]] uSize ViewportID() const { return viewportID; }
+		[[nodiscard]] void* ImGuiTexID() const { return imguiTexID; }
 
 	private:
-		ViewportRef() = default;
-		u8 viewportID = 255;
+		uSize viewportID = static_cast<uSize>(-1);
 		void* imguiTexID = nullptr;
 
 		friend class Data;

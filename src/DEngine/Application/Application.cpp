@@ -104,7 +104,8 @@ void DEngine::Application::detail::ProcessEvents()
 		}
 		else if (event.type == SDL_EventType::SDL_MOUSEMOTION)
 		{
-			Input::Core::UpdateMouseInfo(event.motion.x, event.motion.y);
+			Input::Core::UpdateMouseInfo(event.motion.x, event.motion.y, event.motion.xrel, event.motion.yrel);
+			std::cout << event.motion.xrel << " , " << event.motion.yrel << std::endl;
 		}
 		else if (event.type == SDL_EventType::SDL_MOUSEBUTTONDOWN)
 		{
@@ -145,6 +146,13 @@ void DEngine::Application::detail::ImGui_NewFrame()
 void DEngine::Application::Log(char const* msg)
 {
 	SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "DENGINE GFX ERROR: %s\n", msg);
+}
+
+void DEngine::Application::SetRelativeMouseMode(bool enabled)
+{
+	int errorCode = SDL_SetRelativeMouseMode(static_cast<SDL_bool>(enabled));
+	if (errorCode != 0)
+		throw std::runtime_error("Failedto set relative mouse mode");
 }
 
 DEngine::Cont::FixedVector<char const*, 5> DEngine::Application::detail::GetRequiredVulkanInstanceExtensions()

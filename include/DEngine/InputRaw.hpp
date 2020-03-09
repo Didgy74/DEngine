@@ -15,13 +15,13 @@ namespace DEngine::Input
 
 		EventType GetEventType(Button input);
 
-		Cont::Array<i16, 2> GetMouseDelta();
+		Cont::Array<i32, 2> GetMouseDelta();
 	}
 
 	namespace Core
 	{
 		void UpdateKey(Raw::Button button, bool buttonValue);
-		void UpdateMouseInfo(u16 posX, u16 posY);
+		void UpdateMouseInfo(u32 posX, u32 posY, i32 deltaX, i32 deltaY);
 		void TickStart();
 	}
 }

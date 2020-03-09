@@ -11,13 +11,13 @@ namespace DEngine::Containers
 	class Span
 	{
 	private:
-		T* m_dataBuffer = nullptr;
+		T* m_data = nullptr;
 		uSize m_size = 0;
 
 	public:
 		inline constexpr Span() noexcept = default;
 
-		inline constexpr Span(T* Data, uSize size) noexcept;
+		inline constexpr Span(T* data, uSize size) noexcept;
 
 		[[nodiscard]] inline constexpr Span<T const> ConstSpan() const noexcept;
 		inline constexpr operator Span<T const>() const noexcept;
@@ -29,8 +29,8 @@ namespace DEngine::Containers
 		[[nodiscard]] inline T& At(uSize i);
 		[[nodiscard]] inline T const& At(uSize i) const;
 
-		[[nodiscard]] inline T& operator[](uSize i) noexcept;
-		[[nodiscard]] inline T const& operator[](uSize i) const noexcept;
+		[[nodiscard]] inline T& operator[](uSize i);
+		[[nodiscard]] inline T const& operator[](uSize i) const;
 
 		[[nodiscard]] inline T* begin() noexcept;
 		[[nodiscard]] inline T const* begin() const noexcept;
@@ -39,15 +39,15 @@ namespace DEngine::Containers
 	};
 
 	template<typename T>
-	inline constexpr Span<T>::Span(T* Data, uSize size) noexcept :
-		m_dataBuffer(Data),
+	inline constexpr Span<T>::Span(T* data, uSize size) noexcept :
+		m_data(data),
 		m_size(size)
 	{}
 
 	template<typename T>
 	inline constexpr Span<T const> Span<T>::ConstSpan() const noexcept
 	{
-		return Span<T const>(m_dataBuffer, m_size);
+		return Span<T const>(m_data, m_size);
 	}
 
 	template<typename T>
@@ -59,7 +59,7 @@ namespace DEngine::Containers
 	template<typename T>
 	inline T* Span<T>::Data() const noexcept
 	{
-		return m_dataBuffer;
+		return m_data;
 	}
 
 	template<typename T>
@@ -73,7 +73,7 @@ namespace DEngine::Containers
 	{
 		if (i >= m_size)
 			throw std::out_of_range("Tried to .At() a Span with index out of bounds.");
-		return m_dataBuffer[i];
+		return m_data[i];
 	}
 
 	template<typename T>
@@ -81,17 +81,17 @@ namespace DEngine::Containers
 	{
 		if (i >= m_size)
 			throw std::out_of_range("Tried to .At() a Span with index out of bounds.");
-		return m_dataBuffer[i];
+		return m_data[i];
 	}
 
 	template<typename T>
-	inline T& Span<T>::operator[](uSize i) noexcept
+	inline T& Span<T>::operator[](uSize i)
 	{
 		return At(i);
 	}
 
 	template<typename T>
-	inline T const& Span<T>::operator[](uSize i) const noexcept
+	inline T const& Span<T>::operator[](uSize i) const
 	{
 		return At(i);
 	}
@@ -99,25 +99,25 @@ namespace DEngine::Containers
 	template<typename T>
 	inline T* Span<T>::begin() noexcept
 	{
-		return m_dataBuffer;
+		return m_data;
 	}
 
 	template<typename T>
 	inline T const* Span<T>::begin() const noexcept
 	{
-		return m_dataBuffer;
+		return m_data;
 	}
 
 	template<typename T>
 	inline T* Span<T>::end() noexcept
 	{
-		return m_dataBuffer + m_size;
+		return m_data + m_size;
 	}
 
 	template<typename T>
 	inline T const* Span<T>::end() const noexcept
 	{
-		return m_dataBuffer + m_size;
+		return m_data + m_size;
 	}
 }
 

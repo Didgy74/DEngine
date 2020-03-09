@@ -49,7 +49,7 @@
 #include "ImGui/imgui_impl_sdl.h"
 
 // SDL
-// (the multi-viewports feature requires SDL features supported from SDL 2.0.4+. SDL 2.0.5+ is highly recommended)
+// (the multi-viewportManager feature requires SDL features supported from SDL 2.0.4+. SDL 2.0.5+ is highly recommended)
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
 #if defined(__APPLE__)
@@ -167,7 +167,7 @@ static bool ImGui_ImplSDL2_Init(SDL_Window* window, void* sdl_gl_context)
     ImGuiIO& io = ImGui::GetIO();
     io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;       // We can honor GetMouseCursor() values (optional)
 #if SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE
-    io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports;  // We can create multi-viewports on the Platform side (optional)
+    io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports;  // We can create multi-viewportManager on the Platform side (optional)
 #endif
     io.BackendPlatformName = "imgui_impl_sdl";
 
@@ -226,7 +226,7 @@ static bool ImGui_ImplSDL2_Init(SDL_Window* window, void* sdl_gl_context)
     // Update monitors
     ImGui_ImplSDL2_UpdateMonitors();
 
-    // We need SDL_CaptureMouse(), SDL_GetGlobalMouseState() from SDL 2.0.4+ to support multiple viewports.
+    // We need SDL_CaptureMouse(), SDL_GetGlobalMouseState() from SDL 2.0.4+ to support multiple viewportManager.
     // We left the call to ImGui_ImplSDL2_InitPlatformInterface() outside of #ifdef to avoid unused-function warnings.
     if ((io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) && (io.BackendFlags & ImGuiBackendFlags_PlatformHasViewports))
         ImGui_ImplSDL2_InitPlatformInterface(window, sdl_gl_context);
@@ -471,7 +471,7 @@ void ImGui_ImplSDL2_NewFrame(SDL_Window* window)
 
 //--------------------------------------------------------------------------------------------------------
 // MULTI-VIEWPORT / PLATFORM INTERFACE SUPPORT
-// This is an _advanced_ and _optional_ feature, allowing the back-end to create and handle multiple viewports simultaneously.
+// This is an _advanced_ and _optional_ feature, allowing the back-end to create and handle multiple viewportManager simultaneously.
 // If you are new to dear imgui or creating a new binding for dear imgui, it is recommended that you completely ignore this section first..
 //--------------------------------------------------------------------------------------------------------
 
@@ -699,7 +699,7 @@ static void ImGui_ImplSDL2_InitPlatformInterface(SDL_Window* window, void* sdl_g
 #endif
 
     // Register main window handle (which is owned by the main application, not by us)
-    // This is mostly for simplicity and consistency, so that our code (e.g. mouse handling etc.) can use same logic for main and secondary viewports.
+    // This is mostly for simplicity and consistency, so that our code (e.g. mouse handling etc.) can use same logic for main and secondary viewportManager.
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
     ImGuiViewportDataSDL2* Data = IM_NEW(ImGuiViewportDataSDL2)();
     Data->Window = window;

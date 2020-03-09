@@ -404,12 +404,12 @@ void ImGui::ShowDemoWindow(bool* p_open)
             }
 
             ImGui::CheckboxFlags("io.ConfigFlags: ViewportsEnable", (unsigned int *)&io.ConfigFlags, ImGuiConfigFlags_ViewportsEnable);
-            ImGui::SameLine(); HelpMarker("[beta] Enable beta multi-viewports support. See ImGuiPlatformIO for details.");
+            ImGui::SameLine(); HelpMarker("[beta] Enable beta multi-viewportManager support. See ImGuiPlatformIO for details.");
             if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
             {
                 ImGui::Indent();
                 ImGui::Checkbox("io.ConfigViewportsNoAutoMerge", &io.ConfigViewportsNoAutoMerge);
-                ImGui::SameLine(); HelpMarker("Set to make all floating imgui windows always create their own viewport. Otherwise, they are merged into the main host viewports when overlapping it.");
+                ImGui::SameLine(); HelpMarker("Set to make all floating imgui windows always create their own viewport. Otherwise, they are merged into the main host viewportManager when overlapping it.");
                 ImGui::Checkbox("io.ConfigViewportsNoTaskBarIcon", &io.ConfigViewportsNoTaskBarIcon);
                 ImGui::SameLine(); HelpMarker("Toggling this at runtime is normally unsupported (most platform back-ends won't refresh the task bar icon state right away).");
                 ImGui::Checkbox("io.ConfigViewportsNoDecoration", &io.ConfigViewportsNoDecoration);

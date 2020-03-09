@@ -27,12 +27,16 @@ void DEngine::Gfx::Data::Draw(Draw_Params const& params)
 	Vk::Draw(*this, params, apiDataBuffer);
 }
 
-DEngine::Gfx::ViewportRef DEngine::Gfx::Data::NewViewport(u8 id)
+DEngine::Gfx::ViewportRef DEngine::Gfx::Data::NewViewport()
 {
 	ViewportRef returnVal{};
 	
-
 	Vk::NewViewport(this->apiDataBuffer, returnVal.viewportID, returnVal.imguiTexID);
 
 	return returnVal;
+}
+
+void DEngine::Gfx::Data::DeleteViewport(uSize viewportID)
+{
+	Vk::DeleteViewport(this->apiDataBuffer, viewportID);
 }

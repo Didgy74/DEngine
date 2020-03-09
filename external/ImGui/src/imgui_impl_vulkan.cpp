@@ -52,6 +52,8 @@
 
 #include <unordered_map>
 #include <stdexcept>
+#include <mutex>
+std::mutex g_ImGui_descrSetLock{};
 // We start at 1 becuase we want 0 to be an error.
 std::uint32_t imgui_imgID = 1;
 std::unordered_map<std::uint32_t, VkDescriptorSet> imgui_descrSets{};
@@ -82,8 +84,8 @@ struct ImGui_ImplVulkanH_WindowRenderBuffers
 struct ImGuiViewportDataVulkan
 {
     bool                                    WindowOwned;
-    ImGui_ImplVulkanH_Window                Window;             // Used by secondary viewports only
-    ImGui_ImplVulkanH_WindowRenderBuffers   RenderBuffers;      // Used by all viewports
+    ImGui_ImplVulkanH_Window                Window;             // Used by secondary viewportManager only
+    ImGui_ImplVulkanH_WindowRenderBuffers   RenderBuffers;      // Used by all viewportManager
 
     ImGuiViewportDataVulkan() { WindowOwned = false; memset(&RenderBuffers, 0, sizeof(RenderBuffers)); }
     ~ImGuiViewportDataVulkan() { }
@@ -144,6 +146,7 @@ struct ImGui_ImplVulkan_Dispatcher
     PFN_vkEndCommandBuffer vkEndCommandBuffer = nullptr;
     PFN_vkFlushMappedMemoryRanges vkFlushMappedMemoryRanges = nullptr;
     PFN_vkFreeCommandBuffers vkFreeCommandBuffers = nullptr;
+    PFN_vkFreeDescriptorSets vkFreeDescriptorSets = nullptr;
     PFN_vkFreeMemory vkFreeMemory = nullptr;
     PFN_vkGetBufferMemoryRequirements vkGetBufferMemoryRequirements = nullptr;
     PFN_vkGetImageMemoryRequirements vkGetImageMemoryRequirements = nullptr;
@@ -218,6 +221,7 @@ void ImGui_ImplVulkan_InitDispatcher(VkInstance instance, PFN_vkGetInstanceProcA
     g_Dispatcher.vkEndCommandBuffer = (PFN_vkEndCommandBuffer)getProcAddr(instance, "vkEndCommandBuffer");
     g_Dispatcher.vkFlushMappedMemoryRanges = (PFN_vkFlushMappedMemoryRanges)getProcAddr(instance, "vkFlushMappedMemoryRanges");
     g_Dispatcher.vkFreeCommandBuffers = (PFN_vkFreeCommandBuffers)getProcAddr(instance, "vkFreeCommandBuffers");
+    g_Dispatcher.vkFreeDescriptorSets = (PFN_vkFreeDescriptorSets)getProcAddr(instance, "vkFreeDescriptorSets");
     g_Dispatcher.vkFreeMemory = (PFN_vkFreeMemory)getProcAddr(instance, "vkFreeMemory");
     g_Dispatcher.vkGetBufferMemoryRequirements = (PFN_vkGetBufferMemoryRequirements)getProcAddr(instance, "vkGetBufferMemoryRequirements");
     g_Dispatcher.vkGetImageMemoryRequirements = (PFN_vkGetImageMemoryRequirements)getProcAddr(instance, "vkGetImageMemoryRequirements");
@@ -529,14 +533,14 @@ void ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer comm
             char const* name = "Dear ImGui - Vertex buffer";
             VkDebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(rb->VertexBuffer);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&rb->VertexBuffer);
             nameInfo.objectType = VK_OBJECT_TYPE_BUFFER;
             nameInfo.pObjectName = name;
 
             g_DebugUtilsDispatcher.vkSetDebugUtilsObjectNameEXT(v->Device, &nameInfo);
 
             name = "Dear ImGui - Vertex buffer memory";
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(rb->VertexBufferMemory);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&rb->VertexBufferMemory);
             nameInfo.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
             nameInfo.pObjectName = name;
             g_DebugUtilsDispatcher.vkSetDebugUtilsObjectNameEXT(v->Device, &nameInfo);
@@ -550,14 +554,14 @@ void ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer comm
             char const* name = "Dear ImGui - Index buffer";
             VkDebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(rb->IndexBuffer);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&rb->IndexBuffer);
             nameInfo.objectType = VK_OBJECT_TYPE_BUFFER;
             nameInfo.pObjectName = name;
 
             g_DebugUtilsDispatcher.vkSetDebugUtilsObjectNameEXT(v->Device, &nameInfo);
 
             name = "Dear ImGui - Index buffer memory";
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(rb->IndexBufferMemory);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&rb->IndexBufferMemory);
             nameInfo.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
             nameInfo.pObjectName = name;
             g_DebugUtilsDispatcher.vkSetDebugUtilsObjectNameEXT(v->Device, &nameInfo);
@@ -597,7 +601,7 @@ void ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer comm
     ImGui_ImplVulkan_SetupRenderState(draw_data, command_buffer, rb, fb_width, fb_height);
 
     // Will project scissor/clipping rectangles into framebuffer space
-    ImVec2 clip_off = draw_data->DisplayPos;         // (0,0) unless using multi-viewports
+    ImVec2 clip_off = draw_data->DisplayPos;         // (0,0) unless using multi-viewportManager
     ImVec2 clip_scale = draw_data->FramebufferScale; // (1,1) unless using retina display which are often (2,2)
 
     // Render command lists
@@ -696,7 +700,7 @@ bool ImGui_ImplVulkan_CreateFontsTexture(VkCommandBuffer command_buffer)
 
             VkDebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(g_FontImage);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&g_FontImage);
             nameInfo.objectType = VK_OBJECT_TYPE_IMAGE;
             nameInfo.pObjectName = name;
 
@@ -718,7 +722,7 @@ bool ImGui_ImplVulkan_CreateFontsTexture(VkCommandBuffer command_buffer)
 
             VkDebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(g_FontMemory);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&g_FontMemory);
             nameInfo.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
             nameInfo.pObjectName = name;
 
@@ -748,7 +752,7 @@ bool ImGui_ImplVulkan_CreateFontsTexture(VkCommandBuffer command_buffer)
 
             VkDebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(g_FontView);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&g_FontView);
             nameInfo.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
             nameInfo.pObjectName = name;
 
@@ -878,7 +882,7 @@ bool ImGui_ImplVulkan_CreateDeviceObjects()
 
             VkDebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(vert_module);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&vert_module);
             nameInfo.objectType = VK_OBJECT_TYPE_SHADER_MODULE;
             nameInfo.pObjectName = name;
 
@@ -898,7 +902,7 @@ bool ImGui_ImplVulkan_CreateDeviceObjects()
 
             VkDebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(frag_module);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&frag_module);
             nameInfo.objectType = VK_OBJECT_TYPE_SHADER_MODULE;
             nameInfo.pObjectName = name;
 
@@ -928,7 +932,7 @@ bool ImGui_ImplVulkan_CreateDeviceObjects()
 
             VkDebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(g_FontSampler);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&g_FontSampler);
             nameInfo.objectType = VK_OBJECT_TYPE_SAMPLER;
             nameInfo.pObjectName = name;
 
@@ -957,7 +961,7 @@ bool ImGui_ImplVulkan_CreateDeviceObjects()
 
             VkDebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(g_DescriptorSetLayout);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&g_DescriptorSetLayout);
             nameInfo.objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT;
             nameInfo.pObjectName = name;
 
@@ -1001,7 +1005,7 @@ bool ImGui_ImplVulkan_CreateDeviceObjects()
 
             VkDebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(g_PipelineLayout);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&g_PipelineLayout);
             nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
             nameInfo.pObjectName = name;
 
@@ -1115,7 +1119,7 @@ bool ImGui_ImplVulkan_CreateDeviceObjects()
 
         VkDebugUtilsObjectNameInfoEXT nameInfo{};
         nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-        nameInfo.objectHandle = reinterpret_cast<uint64_t>(g_Pipeline);
+        nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&g_Pipeline);
         nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
         nameInfo.pObjectName = name;
 
@@ -1164,7 +1168,7 @@ bool    ImGui_ImplVulkan_Init(ImGui_ImplVulkan_InitInfo* info, VkRenderPass rend
     ImGuiIO& io = ImGui::GetIO();
     io.BackendRendererName = "imgui_impl_vulkan";
     io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;  // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
-    io.BackendFlags |= ImGuiBackendFlags_RendererHasViewports;  // We can create multi-viewports on the Renderer side (optional)
+    io.BackendFlags |= ImGuiBackendFlags_RendererHasViewports;  // We can create multi-viewportManager on the Renderer side (optional)
 
     IM_ASSERT(info->Instance != VK_NULL_HANDLE);
     IM_ASSERT(info->PhysicalDevice != VK_NULL_HANDLE);
@@ -1196,10 +1200,10 @@ bool    ImGui_ImplVulkan_Init(ImGui_ImplVulkan_InitInfo* info, VkRenderPass rend
 
 void ImGui_ImplVulkan_Shutdown()
 {
-    // First destroy objects in all viewports
+    // First destroy objects in all viewportManager
     ImGui_ImplVulkan_DestroyDeviceObjects();
 
-    // Manually delete main viewport render Data in-case we haven't initialized for viewports
+    // Manually delete main viewport render Data in-case we haven't initialized for viewportManager
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
     if (ImGuiViewportDataVulkan* Data = (ImGuiViewportDataVulkan*)main_viewport->RendererUserData)
         IM_DELETE(Data);
@@ -1236,6 +1240,8 @@ ImTextureID ImGui_ImplVulkan_AddTexture(VkImageView image_view, VkImageLayout im
     ImGui_ImplVulkan_InitInfo* v = &g_VulkanInitInfo;
     VkDescriptorSet descriptor_set = 0;
 
+    std::lock_guard lockGuard{ g_ImGui_descrSetLock };
+
     std::uint32_t id = imgui_imgID;
     imgui_imgID += 1;
 
@@ -1255,7 +1261,7 @@ ImTextureID ImGui_ImplVulkan_AddTexture(VkImageView image_view, VkImageLayout im
 
             VkDebugUtilsObjectNameInfoEXT nameInfo{};
             nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            nameInfo.objectHandle = reinterpret_cast<uint64_t>(descriptor_set);
+            nameInfo.objectHandle = *reinterpret_cast<uint64_t*>(&descriptor_set);
             nameInfo.objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET;
             nameInfo.pObjectName = name.data();
 
@@ -1289,12 +1295,14 @@ void ImGui_ImplVulkan_OverwriteTexture(ImTextureID tex_id, VkImageView image_vie
     VkResult err{};
     ImGui_ImplVulkan_InitInfo* v = &g_VulkanInitInfo;
 
+    std::lock_guard lock_guard{ g_ImGui_descrSetLock };
+
     VkDescriptorSet descr_set = 0;
     try
     {
         descr_set = imgui_descrSets.at(static_cast<uint32_t>(reinterpret_cast<size_t>(tex_id)));
     }
-    catch (std::out_of_range& e)
+    catch (std::out_of_range&)
     {
         IM_ASSERT(false && "Dear ImGui - Vulkan: Failed to grab a VkDescriptorSet for this ImTextureID.");
     }
@@ -1313,6 +1321,28 @@ void ImGui_ImplVulkan_OverwriteTexture(ImTextureID tex_id, VkImageView image_vie
         write_desc[0].pImageInfo = desc_image;
         g_Dispatcher.vkUpdateDescriptorSets(v->Device, 1, write_desc, 0, NULL);
     }
+}
+
+void ImGui_ImplVulkan_RemoveTexture(ImTextureID tex_id)
+{
+    VkResult err{};
+    ImGui_ImplVulkan_InitInfo* v = &g_VulkanInitInfo;
+
+    std::lock_guard lock_guard{ g_ImGui_descrSetLock };
+
+    VkDescriptorSet descrSet = 0;
+    try
+    {
+        descrSet = imgui_descrSets.at(static_cast<uint32_t>(reinterpret_cast<size_t>(tex_id)));
+    }
+    catch (std::out_of_range&)
+    {
+        IM_ASSERT(false && "Dear ImGui - Vulkan: Failed to grab a VkDescriptorSet for this ImTextureID.");
+    }
+
+    g_Dispatcher.vkFreeDescriptorSets(v->Device, v->DescriptorPool, 1, &descrSet);
+
+    imgui_descrSets.erase(static_cast<uint32_t>(reinterpret_cast<size_t>(tex_id)));
 }
 
 //-------------------------------------------------------------------------
@@ -1695,7 +1725,7 @@ void ImGui_ImplVulkanH_DestroyAllViewportsRenderBuffers(VkDevice device, const V
 
 //--------------------------------------------------------------------------------------------------------
 // MULTI-VIEWPORT / PLATFORM INTERFACE SUPPORT
-// This is an _advanced_ and _optional_ feature, allowing the back-end to create and handle multiple viewports simultaneously.
+// This is an _advanced_ and _optional_ feature, allowing the back-end to create and handle multiple viewportManager simultaneously.
 // If you are new to dear imgui or creating a new binding for dear imgui, it is recommended that you completely ignore this section first..
 //--------------------------------------------------------------------------------------------------------
 

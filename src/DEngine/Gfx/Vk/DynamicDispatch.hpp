@@ -683,7 +683,7 @@ namespace DEngine::Gfx::Vk
 			bool waitAll, 
 			std::uint64_t timeout) const
 		{
-			return handle.waitForFences(fences, waitAll, timeout, raw);
+			return handle.waitForFences(fences, static_cast<VkBool32>(waitAll), timeout, raw);
 		}
 
 		void waitQueueIdle(vk::Queue queue) const

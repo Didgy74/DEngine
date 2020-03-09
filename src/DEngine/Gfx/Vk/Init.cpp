@@ -1333,7 +1333,7 @@ void DEngine::Gfx::Vk::Init::TransitionGfxImage(
 
 DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewport(
 	GlobUtils const& globUtils,
-	u8 viewportID,
+	uSize viewportID,
 	vk::Extent2D viewportSize)
 {
 	vk::Result vkResult{};

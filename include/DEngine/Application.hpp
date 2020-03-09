@@ -29,6 +29,8 @@ namespace DEngine::Application
 #endif
 
 	void Log(char const* msg);
+
+	void SetRelativeMouseMode(bool enabled);
 }
 
 namespace DEngine

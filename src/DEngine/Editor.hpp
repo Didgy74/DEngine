@@ -2,6 +2,7 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Array.hpp"
+#include "DEngine/Containers/Pair.hpp"
 #include "DEngine/Gfx/Gfx.hpp"
 
 #include "DEngine/Math/Vector/Vector.hpp"
@@ -26,40 +27,40 @@ namespace DEngine::Editor
 		static constexpr f32 defaultZFar = 10000.f;
 		static constexpr ProjectionMode defaultProjectionMode = ProjectionMode::Perspective;
 
-
 		Math::Vec3D position{};
 		Math::UnitQuat rotation{};
 		f32 fov = defaultFovY;
 		f32 orthographicWidth = defaultOrtographicWidth;
 		f32 zNear = defaultZNear;
 		f32 zFar = defaultZFar;
-		ProjectionMode projectionMode = ProjectionMode::Perspective;
+		ProjectionMode projectionMode = defaultProjectionMode;
+	};
 
-		u8 id = 255;
+	struct Viewport
+	{
+		bool initialized = false;
+		bool visible = false;
+		bool paused = false;
+		// Currently in free look
+		bool currentlyControlling = false;
+		u32 width = 0;
+		u32 height = 0;
+		u32 renderWidth = 0;
+		u32 renderHeight = 0;
+		bool currentlyResizing = false;
+
+		Gfx::ViewportRef gfxViewportRef{};
+
+		uSize cameraID = invalidCamID;
+		static constexpr uSize invalidCamID = static_cast<uSize>(-1);
+		Camera camera{};
 	};
 
 	struct EditorData
 	{
-		struct Viewport
-		{
-			bool initialized = false;
-			u8 id = 0;
-			bool visible = false;
-			void* imguiTextureID = nullptr;
-			u32 width = 0;
-			u32 height = 0;
-			u32 renderWidth = 0;
-			u32 renderHeight = 0;
-			bool currentlyResizing = false;
+		std::vector<Cont::Pair<uSize, Viewport>> viewports{};
 
-			u8 cameraID = 0;
-
-			Camera camera{};
-		};
-
-		std::vector<Viewport> viewports{};
-
-		std::vector<Camera> cameras{};
+		std::vector<Cont::Pair<uSize,Camera>> cameras{};
 	};
 
 	void RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx);
