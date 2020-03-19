@@ -1,10 +1,7 @@
 #pragma once
 
 #include "DEngine/FixedWidthTypes.hpp"
-
 #include "DEngine/Math/Common.hpp"
-
-#include <type_traits>
 
 namespace DEngine::Math
 {
@@ -17,8 +14,8 @@ namespace DEngine::Math
 	template<typename T>
 	struct Vector<2, T>
 	{
-		T x = {};
-		T y = {};
+		T x;
+		T y;
 
 		[[nodiscard]] constexpr Vector<3, T> AsVec3(T const& zValue = T()) const
 		{
@@ -28,11 +25,6 @@ namespace DEngine::Math
 		[[nodiscard]] constexpr Vector<4, T> AsVec4(T const& zValue = T(), T const& wValue = T()) const
 		{
 			return Vector<4, T>{ x, y, zValue, wValue };
-		}
-
-		[[nodiscard]] constexpr T& At(uSize index)
-		{
-			return const_cast<T&>(std::as_const(*this).At(index)); 
 		}
 
 		[[nodiscard]] static constexpr T Dot(const Vector<2, T>& lhs, const Vector<2, T>& rhs)
@@ -116,34 +108,6 @@ namespace DEngine::Math
 		[[nodiscard]] constexpr bool operator!=(const Vector<2, T>& rhs) const
 		{
 			return x != rhs.x || y != rhs.y;
-		}
-		[[nodiscard]] constexpr T& operator[](size_t index) { return const_cast<T&>(std::as_const(*this)[index]); }
-		[[nodiscard]] constexpr const T& operator[](size_t index) const
-		{
-#if defined( _MSC_VER )
-			__assume(index < dimCount);
-#endif
-			assert(index < dimCount);
-			switch (index)
-			{
-			case 0:
-				return x;
-			case 1:
-				return y;
-			default:
-#if defined( _MSC_VER )
-				__assume(0);
-#elif defined( __GNUC__ )
-				__builtin_unreachable();
-#endif
-			}
-		}
-		template<typename U>
-		[[nodiscard]] constexpr explicit operator Vector<2, U>() const
-		{
-			static_assert(std::is_convertible<T, U>::value, "Can't convert to this type.");
-
-			return Vector<2, U>{static_cast<U>(x), static_cast<U>(y)};
 		}
 	};
 

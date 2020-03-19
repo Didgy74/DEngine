@@ -57,8 +57,8 @@ namespace DEngine::Gfx::Vk
 }
 
 DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVkInstance(
-	Cont::Span<char const*> const requiredExtensions,
-	bool const enableLayers,
+	Cont::Span<char const*> requiredExtensions,
+	bool enableLayers,
 	BaseDispatch const& baseDispatch,
 	ILog* logger)
 {
@@ -66,15 +66,11 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 	CreateVkInstance_Return returnValue{};
 
 	// Build what extensions we are going to use
-	Cont::FixedVector<const char*, Constants::maxRequiredInstanceExtensions> totalRequiredExtensions;
-	if (requiredExtensions.Size() > totalRequiredExtensions.Capacity())
-	{
-		logger->log("Application requires more instance extensions than is maximally allocated during Vulkan instance creation. Increase it in the backend.");
-		std::abort();
-	}
+	std::vector<char const*> totalRequiredExtensions;
+	totalRequiredExtensions.reserve(requiredExtensions.Size());
 	// First copy all required instance extensions
 	for (uSize i = 0; i < requiredExtensions.Size(); i++)
-		totalRequiredExtensions.PushBack(requiredExtensions[i]);
+		totalRequiredExtensions.push_back(requiredExtensions[i]);
 
 	// Next add extensions required by renderer, don't add duplicates
 	for (const char* requiredExtension : Constants::requiredInstanceExtensions)
@@ -90,12 +86,7 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 		}
 		if (extensionAlreadyPresent == false)
 		{
-			if (totalRequiredExtensions.CanPushBack() == false)
-			{
-				logger->log("Could not fit all required instance extensions in allocated memory during Vulkan instance creation. Increase it in the backend.");
-				std::abort();
-			}
-			totalRequiredExtensions.PushBack(requiredExtension);
+			totalRequiredExtensions.push_back(requiredExtension);
 		}
 	}
 
@@ -134,16 +125,14 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 			vkResult = baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, nullptr);
 			if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 				throw std::runtime_error("Failed to enumerate instance layer properties during Vulkan instance creation.");
-			Cont::FixedVector<vk::LayerProperties, Constants::maxAvailableInstanceLayers> availableLayers;
-			if (availableLayerCount > availableLayers.Capacity())
-				throw std::runtime_error("Could not fit available layers in allocated memory during Vulkan instance creation.");
-			availableLayers.Resize(availableLayerCount);
-			baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, availableLayers.Data());
+			std::vector<vk::LayerProperties> availableLayers;
+			availableLayers.resize(availableLayerCount);
+			baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data());
 
 			bool layerIsAvailable = false;
 			for (const auto& availableLayer : availableLayers)
 			{
-				char const* wantedLayerName = Constants::preferredValidationLayer.data();
+				char const* wantedLayerName = Constants::preferredValidationLayer;
 				char const* availableLayerName = availableLayer.layerName;
 				if (std::strcmp(wantedLayerName, availableLayerName) == 0)
 				{
@@ -155,19 +144,23 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 			{
 				// If the layer is available, we check if it implements VK_EXT_debug_utils
 				u32 layerExtensionCount = 0;
-				vkResult = baseDispatch.enumerateInstanceExtensionProperties(Constants::preferredValidationLayer.data(), &layerExtensionCount, nullptr);
+				vkResult = baseDispatch.enumerateInstanceExtensionProperties(
+					Constants::preferredValidationLayer, 
+					&layerExtensionCount, 
+					nullptr);
 				if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 					throw std::runtime_error("Vulkan: Unable to enumerate available instance extension properties.");
-				Cont::FixedVector<vk::ExtensionProperties, Constants::maxAvailableLayerExtensions> availableExtensions;
-				if (layerExtensionCount > availableExtensions.Capacity())
-					throw std::runtime_error("Vulkan: Unable to load layer's extensions into allocated memory.");
-				availableExtensions.Resize(layerExtensionCount);
-				baseDispatch.enumerateInstanceExtensionProperties(Constants::preferredValidationLayer.data(), &layerExtensionCount, availableExtensions.Data());
+				std::vector<vk::ExtensionProperties> availableExtensions;
+				availableExtensions.resize(layerExtensionCount);
+				baseDispatch.enumerateInstanceExtensionProperties(
+					Constants::preferredValidationLayer, 
+					&layerExtensionCount, 
+					availableExtensions.data());
 
 				bool debugUtilsIsAvailable = false;
 				for (auto const& availableLayerExtension : availableExtensions)
 				{
-					if (std::strcmp(availableLayerExtension.extensionName, Constants::debugUtilsExtensionName.data()) == 0)
+					if (std::strcmp(availableLayerExtension.extensionName, Constants::debugUtilsExtensionName) == 0)
 					{
 						debugUtilsIsAvailable = true;
 						break;
@@ -178,12 +171,8 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 				{
 					// Debug utils and the Khronos validation layer is available.
 					// Push them onto the vectors
-					if (!totalRequiredExtensions.CanPushBack())
-						throw std::runtime_error("Vulkan: Unable to push debug-utils on extensions to use, fixed-vector too small.");
-					totalRequiredExtensions.PushBack(Constants::debugUtilsExtensionName.data());
-					if (!layersToUse.CanPushBack())
-						throw std::runtime_error("Vulkan: Unable to push Khronos validation layer onto layers to use, fixed-vector too small.");
-					layersToUse.PushBack(Constants::preferredValidationLayer.data());
+					totalRequiredExtensions.push_back(Constants::debugUtilsExtensionName);
+					layersToUse.PushBack(Constants::preferredValidationLayer);
 
 					returnValue.debugUtilsEnabled = true;
 				}
@@ -192,8 +181,8 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 	}
 
 	vk::InstanceCreateInfo instanceInfo{};
-	instanceInfo.enabledExtensionCount = (u32)totalRequiredExtensions.Size();
-	instanceInfo.ppEnabledExtensionNames = totalRequiredExtensions.Data();
+	instanceInfo.enabledExtensionCount = (u32)totalRequiredExtensions.size();
+	instanceInfo.ppEnabledExtensionNames = totalRequiredExtensions.data();
 	instanceInfo.enabledLayerCount = (u32)layersToUse.Size();
 	instanceInfo.ppEnabledLayerNames = layersToUse.Data();
 
@@ -248,11 +237,9 @@ DEngine::Gfx::Vk::PhysDeviceInfo DEngine::Gfx::Vk::Init::LoadPhysDevice(
 		throw std::runtime_error("Vulkan: Unable to enumerate physical devices.");
 	if (physicalDeviceCount == 0)
 		throw std::runtime_error("Vulkan: Host machine has no Vulkan-capable devices.");
-	Cont::FixedVector<vk::PhysicalDevice, Constants::maxAvailablePhysicalDevices> physDevices;
-	if (physicalDeviceCount > physDevices.Capacity())
-		throw std::out_of_range("Vulkan: Could not fit all Vulkan physical physDevice handles in allocated memory during Vulkan physDevice creation.");
-	physDevices.Resize(physicalDeviceCount);
-	instance.enumeratePhysicalDevices(&physicalDeviceCount, physDevices.Data());
+	std::vector<vk::PhysicalDevice> physDevices;
+	physDevices.resize(physicalDeviceCount);
+	instance.enumeratePhysicalDevices(&physicalDeviceCount, physDevices.data());
 
 	// For now we just select the first physDevice we find.
 	physDevice.handle = physDevices[0];
@@ -260,11 +247,12 @@ DEngine::Gfx::Vk::PhysDeviceInfo DEngine::Gfx::Vk::Init::LoadPhysDevice(
 	// Find preferred queues
 	u32 queueFamilyPropertyCount = 0;
 	instance.getPhysicalDeviceQueueFamilyProperties(physDevice.handle, &queueFamilyPropertyCount, nullptr);
-	Cont::FixedVector<vk::QueueFamilyProperties, Constants::maxAvailableQueueFamilies> availableQueueFamilies;
-	if (queueFamilyPropertyCount > availableQueueFamilies.Capacity())
-		throw std::runtime_error("Failed to fit all VkQueueFamilyProperties inside allocated memory during Vulkan initialization.");
-	availableQueueFamilies.Resize(queueFamilyPropertyCount);
-	instance.getPhysicalDeviceQueueFamilyProperties(physDevice.handle, &queueFamilyPropertyCount, availableQueueFamilies.Data());
+	std::vector<vk::QueueFamilyProperties> availableQueueFamilies;
+	availableQueueFamilies.resize(queueFamilyPropertyCount);
+	instance.getPhysicalDeviceQueueFamilyProperties(
+		physDevice.handle, 
+		&queueFamilyPropertyCount, 
+		availableQueueFamilies.data());
 
 	// Find graphics queue
 	for (u32 i = 0; i < queueFamilyPropertyCount; i++)
@@ -366,29 +354,31 @@ DEngine::Gfx::Vk::SurfaceInfo DEngine::Gfx::Vk::Init::BuildSurfaceInfo(
 		logger->log("Vulkan: Unable to query present modes for Vulkan surface.");
 		std::abort();
 	}
-	if (presentModeCount > returnVal.supportedPresentModes.Capacity())
-	{
-		logger->log("Vulkan: Unable to fit all supported present modes in allocated memory.");
-		std::abort();
-	}
-	returnVal.supportedPresentModes.Resize(presentModeCount);
-	instance.getPhysicalDeviceSurfacePresentModesKHR(physDevice, surface, &presentModeCount, returnVal.supportedPresentModes.Data());
+	returnVal.supportedPresentModes.resize(presentModeCount);
+	instance.getPhysicalDeviceSurfacePresentModesKHR(
+		physDevice, 
+		surface, 
+		&presentModeCount, 
+		returnVal.supportedPresentModes.data());
 
 	// Grab surface formats
 	u32 surfaceFormatCount = 0;
-	vkResult = instance.getPhysicalDeviceSurfaceFormatsKHR(physDevice, surface, &surfaceFormatCount, (vk::SurfaceFormatKHR*)nullptr);
+	vkResult = instance.getPhysicalDeviceSurfaceFormatsKHR(
+		physDevice, 
+		surface, 
+		&surfaceFormatCount, 
+		nullptr);
 	if ((vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete) || surfaceFormatCount == 0)
 	{
 		logger->log("Vulkan: Unable to query surface formats for Vulkan surface.");
 		std::abort();
 	}
-	if (surfaceFormatCount > returnVal.supportedSurfaceFormats.Capacity())
-	{
-		logger->log("Vulkan: Unable to fit all supported surface formats in allocated memory.");
-		std::abort();
-	}
-	returnVal.supportedSurfaceFormats.Resize(surfaceFormatCount);
-	instance.getPhysicalDeviceSurfaceFormatsKHR(physDevice, surface, &surfaceFormatCount, returnVal.supportedSurfaceFormats.Data());
+	returnVal.supportedSurfaceFormats.resize(surfaceFormatCount);
+	instance.getPhysicalDeviceSurfaceFormatsKHR(
+		physDevice, 
+		surface, 
+		&surfaceFormatCount, 
+		returnVal.supportedSurfaceFormats.data());
 
 	if (returnVal.capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::eOpaque)
 		returnVal.compositeAlphaFlag = vk::CompositeAlphaFlagBitsKHR::eOpaque;
@@ -426,8 +416,6 @@ DEngine::Gfx::Vk::SwapchainSettings DEngine::Gfx::Vk::Init::BuildSwapchainSettin
 	SurfaceInfo const& surfaceInfo,
 	ILog* logger)
 {
-	vk::Result vkResult{};
-
 	SwapchainSettings settings{};
 	settings.surface = surfaceInfo.handle;
 	settings.capabilities = surfaceInfo.capabilities;
@@ -647,7 +635,7 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 		throw std::runtime_error("Unable to grab swapchainData images from VkSwapchainKHR object.");
 	DENGINE_GFX_ASSERT(swapchainImageCount != 0);
 	DENGINE_GFX_ASSERT(swapchainImageCount == settings.numImages);
-	if (swapchainImageCount >= swapchain.images.Capacity())
+	if (swapchainImageCount > swapchain.images.Capacity())
 		throw std::runtime_error("Unable to fit swapchainData image handles in allocated memory.");
 	swapchain.images.Resize(swapchainImageCount);
 	device.getSwapchainImagesKHR(swapchain.handle, &swapchainImageCount, swapchain.images.Data());

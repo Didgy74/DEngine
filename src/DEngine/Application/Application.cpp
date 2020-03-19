@@ -35,7 +35,7 @@ bool DEngine::Application::detail::Initialize()
 	// Setup window
 	Uint32 sdlWindowFlags = 0;
 	sdlWindowFlags |= SDL_WINDOW_VULKAN;
-	sdlWindowFlags |= SDL_WINDOW_ALLOW_HIGHDPI;
+	//sdlWindowFlags |= SDL_WINDOW_ALLOW_HIGHDPI;
 	sdlWindowFlags |= SDL_WINDOW_RESIZABLE;
 	int windowWidth = 0;
 	int windowHeight = 0;

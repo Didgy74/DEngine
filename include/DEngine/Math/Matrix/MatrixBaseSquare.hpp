@@ -28,7 +28,7 @@ namespace DEngine::Math
 					i8 factor = (!(x % 2)) * 2 - 1;
 					for (uSize y = 0; y < width; y += 1)
 					{
-						newMatrix.At(y, x) = factor * GetMinor(x, y).GetDeterminant();
+						newMatrix.At(y, x) = factor * this->GetMinor(x, y).GetDeterminant();
 						factor = -factor;
 					}
 				}
@@ -44,16 +44,16 @@ namespace DEngine::Math
 					for (size_t x = 0; x < width; x += 1)
 					{
 						factor = -factor;
-						if (data[x * width] == T(0))
+						if (this->data[x * width] == T(0))
 							continue;
-						determinant += factor * data[x * width] * GetMinor(x, 0).GetDeterminant();
+						determinant += factor * this->data[x * width] * this->GetMinor(x, 0).GetDeterminant();
 					}
 					return determinant;
 				}
 				else if constexpr (width == 2)
-					return data[0] * data[width + 1] - data[width] * data[1];
+					return this->data[0] * this->data[width + 1] - this->data[width] * this->data[1];
 				else if constexpr (width == 1)
-					return data[0];
+					return this->data[0];
 				else
 					return 1;
 			}
@@ -63,7 +63,7 @@ namespace DEngine::Math
 				Math::Matrix<width, width, T> adjugate = GetAdjugate();
 				T determinant = T();
 				for (size_t x = 0; x < width; x += 1)
-					determinant += data[x * width] * adjugate.At(0, x);
+					determinant += this->data[x * width] * adjugate.At(0, x);
 				if (!(determinant == T()))
 				{
 					for (size_t i = 0; i < width * width; i += 1)
@@ -79,7 +79,7 @@ namespace DEngine::Math
 				for (size_t x = 1; x < width; x += 1)
 				{
 					for (size_t y = 0; y < x; y += 1)
-						std::swap(data[x * width + y], data[y * width + x]);
+						std::swap(this->data[x * width + y], this->data[y * width + x]);
 				}
 			}
 

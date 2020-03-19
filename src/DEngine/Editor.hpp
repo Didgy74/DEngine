@@ -63,5 +63,6 @@ namespace DEngine::Editor
 		std::vector<Cont::Pair<uSize,Camera>> cameras{};
 	};
 
+	EditorData Initialize();
 	void RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx);
 }

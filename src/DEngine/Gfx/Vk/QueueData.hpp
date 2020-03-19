@@ -35,9 +35,9 @@ namespace DEngine::Gfx::Vk
             [[nodiscard]] u32 Index() const { return m_queueIndex; }
             [[nodiscard]] vk::Queue Handle() const { return m_handle; }
             
-            [[nodiscard]] void submit(vk::ArrayProxy<vk::SubmitInfo const> submits, vk::Fence fence) const;
+            void submit(vk::ArrayProxy<vk::SubmitInfo const> submits, vk::Fence fence) const;
             [[nodiscard]] vk::Result presentKHR(vk::PresentInfoKHR const& presentInfo) const;
-            [[nodiscard]] void waitIdle() const;
+            void waitIdle() const;
 
             static void Initialize(
                 DevDispatch const& device,

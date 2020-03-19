@@ -7,15 +7,12 @@ namespace DEngine::Math
 	template<uSize length, typename T>
 	struct Vector;
 
-	using Vector4D = Vector<4, float>;
+	using Vector4D = Vector<4, f32>;
 	using Vector4DInt = Vector<4, i32>;
 
 	template<typename T>
 	struct Vector<4, T>
 	{
-		using ValueType = T;
-		static constexpr uSize dimCount = 4;
-
 		T x;
 		T y;
 		T z;
@@ -30,17 +27,8 @@ namespace DEngine::Math
 			return Vector<3, T>{ x, y, z };
 		}
 
-		[[nodiscard]] constexpr T& At(size_t index)
+		[[nodiscard]] constexpr T& At(uSize index)
 		{
-			return const_cast<T&>(std::as_const(*this).At(index));
-		}
-
-		[[nodiscard]] constexpr const T& At(size_t index) const
-		{
-#if defined( _MSC_VER )
-			__assume(index < dimCount);
-#endif
-			assert(index < dimCount);
 			switch (index)
 			{
 			case 0:
@@ -52,11 +40,24 @@ namespace DEngine::Math
 			case 3:
 				return w;
 			default:
-#if defined( _MSC_VER )
-				__assume(0);
-#elif defined( __GNUC__ )
-				__builtin_unreachable();
-#endif
+				return *((T*)0);
+			}
+		}
+
+		[[nodiscard]] constexpr T const& At(uSize index) const
+		{
+			switch (index)
+			{
+			case 0:
+				return x;
+			case 1:
+				return y;
+			case 2:
+				return z;
+			case 3:
+				return w;
+			default:
+				return *((T const*)0);
 			}
 		}
 
@@ -103,25 +104,6 @@ namespace DEngine::Math
 			y /= magnitude;
 			z /= magnitude;
 			w /= magnitude;
-		}
-
-		[[nodiscard]] std::string ToString() const
-		{
-			std::ostringstream stream;
-
-			if constexpr (std::is_floating_point<T>::value)
-			{
-				stream.flags(std::ios::fixed);
-				stream.precision(4);
-			}
-
-			stream << '(';
-			if constexpr (std::is_same<char, T>::value || std::is_same<unsigned char, T>::value)
-				stream << +x << ", " << +y << ", " << +z << ", " << +w;
-			else
-				stream << x << ", " << y << ", " << z << ", " << w;
-			stream << ')';
-			return stream.str();
 		}
 
 		[[nodiscard]] static constexpr Vector<4, T> SingleValue(const T& input)
@@ -182,14 +164,22 @@ namespace DEngine::Math
 		}
 		[[nodiscard]] constexpr T& operator[](size_t index)
 		{
-			return const_cast<T&>(std::as_const(*this)[index]);
+						switch (index)
+			{
+			case 0:
+				return x;
+			case 1:
+				return y;
+			case 2:
+				return z;
+			case 3:
+				return w;
+			default:
+				return *((T*)0);
+			}
 		}
 		[[nodiscard]] constexpr const T& operator[](size_t index) const
 		{
-#if defined( _MSC_VER )
-			__assume(index < dimCount);
-#endif
-			assert(index < dimCount);
 			switch (index)
 			{
 			case 0:
@@ -198,19 +188,11 @@ namespace DEngine::Math
 				return y;
 			case 2:
 				return z;
+			case 3:
+				return w;
 			default:
-#if defined( _MSC_VER )
-				__assume(0);
-#elif defined( __GNUC__ )
-				__builtin_unreachable();
-#endif
+				return *((T*)0);
 			}
-		}
-		template<typename U>
-		[[nodiscard]] constexpr explicit operator Vector<4, U>() const
-		{
-			static_assert(std::is_convertible<T, U>::value, "Can't convert to this type.");
-			return Vector<4, U>{ static_cast<U>(x), static_cast<U>(y), static_cast<U>(z), static_cast<U>(w) };
 		}
 	};
 

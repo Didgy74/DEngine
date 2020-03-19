@@ -7,9 +7,9 @@ set(CMAKE_CXX_STANDARD 17)
 # Set DEngine options
 # -------------------
 # START
-	option(DENGINE_GFX_ENABLE_ASSERT "Asserts inside the rendering code" ON)
+	option(DENGINE_GFX_ENABLE_ASSERT "Asserts inside the rendering code" OFF)
 
-	option(DENGINE_CONTAINERS_ENABLE_ASSERT "Asserts inside DEngine containers" ON)
+	option(DENGINE_CONTAINERS_ENABLE_ASSERT "Asserts inside DEngine containers" OFF)
 #
 # END
 #
@@ -20,13 +20,9 @@ set(CMAKE_CXX_STANDARD 17)
 # ------------------------
 # START
 	file(GLOB_RECURSE DENGINE_SRC_FILES 
-		"${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" 
-		"${CMAKE_CURRENT_SOURCE_DIR}/src/*.h" 
-		"${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
+		"${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 	add_executable(${PROJECT_NAME} ${DENGINE_SRC_FILES})
-
-	#target_sources(${PROJECT_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include/DEngine/Containers/Span.natvis")
 
 	# Remove data folder from target binary directory
 	add_custom_command(
@@ -43,7 +39,11 @@ set(CMAKE_CXX_STANDARD 17)
 
 	target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
+	target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
 
+	target_compile_options(${PROJECT_NAME} PRIVATE /WX)
+
+	
 #
 # END
 #
@@ -66,38 +66,15 @@ set(CMAKE_CXX_STANDARD 17)
 #
 
 
-
 # ----------
 # Link Texas
 # ----------
 # START
-	set(TEXAS_ENABLE_EVERYTHING ON)
-	#set(TEXAS_ENABLE_KTX_READ OFF)
-	#set(TEXAS_ENABLE_PNG_READ ON)
-	set(TEXAS_ENABLE_VULKAN_TOOLS ON)
 	#add_subdirectory("Texas")
 	#target_link_libraries(${PROJECT_NAME} PUBLIC Texas)
 #
 # END
 #
-
-
-
-# ----------------------------
-# Include and link ImGui stuff
-# ----------------------------
-# START
-	set(IMGUI_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/ImGui")
-	set(IMGUI_SRC_DIR "${IMGUI_ROOT_DIR}/src")
-	set(IMGUI_INCLUDE_DIR "${IMGUI_ROOT_DIR}/include")
-	file(GLOB_RECURSE IMGUI_SOURCE_FILES "${IMGUI_SRC_DIR}/*.cpp" "${IMGUI_SRC_DIR}/*.h" "${IMGUI_SRC_DIR}/*.hpp")
-	target_sources(${PROJECT_NAME} PRIVATE ${IMGUI_SOURCE_FILES})
-
-	target_include_directories(${PROJECT_NAME} PRIVATE ${IMGUI_INCLUDE_DIR})
-#
-# END
-#
-
 
 # -----------------------
 # Link external libraries
@@ -107,26 +84,48 @@ set(CMAKE_CXX_STANDARD 17)
 		set(SDL2_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/SDL2/Windows")
 	endif()
 	find_package(SDL2 REQUIRED)
-	target_link_libraries(${PROJECT_NAME} PUBLIC SDL2)
+	target_link_libraries(${PROJECT_NAME} PRIVATE SDL2)
 
 	find_package(Vulkan REQUIRED)
-	target_include_directories(${PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
-	#target_link_libraries(${DENGINE_TARGET_NAME} PRIVATE Vulkan::Vulkan)
+	target_include_directories(${PROJECT_NAME} PRIVATE ${Vulkan_INCLUDE_DIRS})
+#
+# END
+#
+
+# ----------------------------
+# Include and link ImGui stuff
+# ----------------------------
+# START
+	set(IMGUI_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/ImGui")
+	set(IMGUI_SRC_DIR "${IMGUI_ROOT_DIR}/src")
+	set(IMGUI_INCLUDE_DIR "${IMGUI_ROOT_DIR}/include")
+	file(GLOB_RECURSE IMGUI_SOURCE_FILES "${IMGUI_SRC_DIR}/*.cpp" )
+	set(IMGUI_LIB_NAME IMGUI_LIB)
+	add_library(${IMGUI_LIB_NAME} ${IMGUI_SOURCE_FILES})
+	target_include_directories(${IMGUI_LIB_NAME} PUBLIC ${IMGUI_INCLUDE_DIR})
+	target_link_libraries(${IMGUI_LIB_NAME} PRIVATE SDL2)
+	target_include_directories(${IMGUI_LIB_NAME} PRIVATE ${Vulkan_INCLUDE_DIRS})
+	target_compile_options(${IMGUI_LIB_NAME} PRIVATE /w)
+
+	target_link_libraries(${PROJECT_NAME} PRIVATE ${IMGUI_LIB_NAME})
 #
 # END
 #
 
 
+
+
+
 # SDL2 binaries
 if(WIN32)
 	set(SDL2_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/external/SDL2/Windows")
-    if(MSVC)
+	if(MSVC)
 		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
 			set(SDL2_BINDIR "${SDL2_FOLDER}/MSVC x86")
 		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
 			set(SDL2_BINDIR "${SDL2_FOLDER}/MSVC x64")
 		endif()
-    elseif(MINGW)
+	elseif(MINGW)
 		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
 			set(SDL2_BINDIR "${SDL2_FOLDER}/MinGW/x86/bin")	
 		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
@@ -136,7 +135,7 @@ if(WIN32)
 		message(FATAL_ERROR "Platform not supported. Couldn't link GLEW.")
 	endif()
 	set(SDL2_BINNAME "SDL2.dll")
-    set(SDL2_BINARY "${SDL2_BINDIR}/${SDL2_BINNAME}")
+	set(SDL2_BINARY "${SDL2_BINDIR}/${SDL2_BINNAME}")
 	add_custom_command(
 		TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different

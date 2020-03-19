@@ -61,37 +61,37 @@ namespace DEngine::Math
 	template<uSize width, uSize height, typename T>
 	constexpr T& Matrix<width, height, T>::At(uSize i)
 	{
-		return data[i];
+		return this->data[i];
 	}
 
 	template<uSize width, uSize height, typename T>
 	constexpr T const& Matrix<width, height, T>::At(uSize i) const
 	{
-		return data[i];
+		return this->data[i];
 	}
 
 	template<uSize width, uSize height, typename T>
 	constexpr T& Matrix<width, height, T>::At(uSize x, uSize y)
 	{
-		return data[x * height + y];
+		return this->data[x * height + y];
 	}
 
 	template<uSize width, uSize height, typename T>
 	constexpr T const& Matrix<width, height, T>::At(uSize x, uSize y) const
 	{
-		return data[x * height + y];
+		return this->data[x * height + y];
 	}
 
 	template<uSize width, uSize height, typename T>
 	constexpr T* Matrix<width, height, T>::Data()
 	{
-		return data;
+		return this->data;
 	}
 
 	template<uSize width, uSize height, typename T>
 	constexpr T const* Matrix<width, height, T>::Data() const
 	{
-		return data;
+		return this->data;
 	}
 
 	template<uSize width, uSize height, typename T>
@@ -135,7 +135,7 @@ namespace DEngine::Math
 	{
 		Matrix<width, height, T> newMatrix{};
 		for (uSize i = 0; i < width * height; i += 1)
-			newMatrix.data[i] = data[i] + rhs.data[i];
+			newMatrix.data[i] = this->data[i] + rhs.data[i];
 		return newMatrix;
 	}
 
@@ -143,7 +143,7 @@ namespace DEngine::Math
 	constexpr Matrix<width, height, T>& Matrix<width, height, T>::operator+=(Matrix<width, height, T> const& rhs)
 	{
 		for (uSize i = 0; i < width * height; i += 1)
-			Data[i] += rhs.data[i];
+			this->data[i] += rhs.data[i];
 		return *this;
 	}
 
@@ -152,7 +152,7 @@ namespace DEngine::Math
 	{
 		Matrix<width, height, T> newMatrix{};
 		for (uSize i = 0; i < width * height; i += 1)
-			newMatrix.data[i] = data[i] - rhs.data[i];
+			newMatrix.data[i] = this->data[i] - rhs.data[i];
 		return newMatrix;
 	}
 
@@ -160,7 +160,7 @@ namespace DEngine::Math
 	constexpr Matrix<width, height, T>& Matrix<width, height, T>::operator-=(Matrix<width, height, T> const& rhs)
 	{
 		for (uSize i = 0; i < width * height; i += 1)
-			data[i] -= rhs.data[i];
+			this->data[i] -= rhs.data[i];
 		return *this;
 	}
 
@@ -169,7 +169,7 @@ namespace DEngine::Math
 	{
 		Matrix<width, height, T> newMatrix{};
 		for (uSize i = 0; i < width * height; i += 1)
-			newMatrix.data[i] = -data[i];
+			newMatrix.data[i] = -this->data[i];
 		return newMatrix;
 	}
 
@@ -195,7 +195,7 @@ namespace DEngine::Math
 	constexpr Vector<height, T> Matrix<width, height, T>::operator*(Vector<width, T> const& right) const
 	{
 		Vector<height, T> newVector{};
-		for (uSizet y = 0; y < height; y += 1)
+		for (uSize y = 0; y < height; y += 1)
 		{
 			T dot{};
 			for (uSize i = 0; i < width; i += 1)
@@ -209,7 +209,7 @@ namespace DEngine::Math
 	constexpr Matrix<width, height, T>& Matrix<width, height, T>::operator*=(T const& right)
 	{
 		for (uSize i = 0; i < width * height; i += 1)
-			data[i] *= right;
+			this->data[i] *= right;
 		return *this;
 	}
 
@@ -218,7 +218,7 @@ namespace DEngine::Math
 	{
 		for (uSize i = 0; i < width * height; i += 1)
 		{
-			if (Data[i] != right.data[i])
+			if (this->data[i] != right.data[i])
 				return false;
 		}
 		return true;
@@ -229,7 +229,7 @@ namespace DEngine::Math
 	{
 		for (uSize i = 0; i < width * height; i += 1)
 		{
-			if (data[i] != right.data[i])
+			if (this->data[i] != right.data[i])
 				return true;
 		}
 		return false;

@@ -1,7 +1,7 @@
 add_library(SDL2 INTERFACE)
 
-set(SDL2_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/../include")
-target_include_directories(SDL2 INTERFACE ${SDL2_INCLUDE_DIRS})
+set(SDL2_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/../include")
+target_include_directories(SDL2 INTERFACE ${SDL2_INCLUDE_DIR})
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 	if(${CMAKE_SIZEOF_VOID_P} MATCHES 8)

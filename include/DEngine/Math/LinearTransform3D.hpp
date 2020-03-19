@@ -254,15 +254,15 @@ DEngine::Math::Mat3 DEngine::Math::LinearTransform3D::Rotate(Vec3D const& angles
 template<DEngine::Math::AngleUnit angleUnit>
 DEngine::Math::Mat3 DEngine::Math::LinearTransform3D::Rotate(Vec3D const& axisInput, f32 amount)
 {
-	Vec3D axis = axisInput.GetNormalized();
+	Vec3D axis = axisInput.Normalized();
 	const float cos = Cos<angleUnit>(amount);
 	const float sin = Sin<angleUnit>(amount);
-	return Matrix3x3
+	return Mat3
 	{
 		cos + Sqrd(axis.x)*(1 - cos), axis.x*axis.y*(1 - cos) - axis.z*sin, axis.x*axis.z*(1 - cos) + axis.y*sin,
 		axis.y*axis.x*(1 - cos) + axis.z*sin, cos + Sqrd(axis.y)*(1 - cos), axis.y*axis.z*(1 - cos) - axis.x*sin,
 		axis.z*axis.x*(1 - cos) - axis.y*sin, axis.z*axis.y*(1 - cos) + axis.x*sin, cos + Sqrd(axis.z)*(1 - cos)
-	}.GetTransposed();
+	}.Transposed();
 }
 
 template<typename T>

@@ -1298,14 +1298,7 @@ void ImGui_ImplVulkan_OverwriteTexture(ImTextureID tex_id, VkImageView image_vie
     std::lock_guard lock_guard{ g_ImGui_descrSetLock };
 
     VkDescriptorSet descr_set = 0;
-    try
-    {
-        descr_set = imgui_descrSets.at(static_cast<uint32_t>(reinterpret_cast<size_t>(tex_id)));
-    }
-    catch (std::out_of_range&)
-    {
-        IM_ASSERT(false && "Dear ImGui - Vulkan: Failed to grab a VkDescriptorSet for this ImTextureID.");
-    }
+    descr_set = imgui_descrSets.at(static_cast<uint32_t>(reinterpret_cast<size_t>(tex_id)));
 
     // Update the Descriptor Set:
     {
@@ -1331,14 +1324,7 @@ void ImGui_ImplVulkan_RemoveTexture(ImTextureID tex_id)
     std::lock_guard lock_guard{ g_ImGui_descrSetLock };
 
     VkDescriptorSet descrSet = 0;
-    try
-    {
-        descrSet = imgui_descrSets.at(static_cast<uint32_t>(reinterpret_cast<size_t>(tex_id)));
-    }
-    catch (std::out_of_range&)
-    {
-        IM_ASSERT(false && "Dear ImGui - Vulkan: Failed to grab a VkDescriptorSet for this ImTextureID.");
-    }
+    descrSet = imgui_descrSets.at(static_cast<uint32_t>(reinterpret_cast<size_t>(tex_id)));
 
     g_Dispatcher.vkFreeDescriptorSets(v->Device, v->DescriptorPool, 1, &descrSet);
 

@@ -56,8 +56,8 @@ namespace DEngine::Gfx::Vk
 		vk::SurfaceCapabilitiesKHR capabilities{};
 		vk::CompositeAlphaFlagBitsKHR compositeAlphaFlag = {};
 
-		Cont::FixedVector<vk::PresentModeKHR, Constants::maxAvailablePresentModes> supportedPresentModes;
-		Cont::FixedVector<vk::SurfaceFormatKHR, Constants::maxAvailableSurfaceFormats> supportedSurfaceFormats;
+		std::vector<vk::PresentModeKHR> supportedPresentModes;
+		std::vector<vk::SurfaceFormatKHR> supportedSurfaceFormats;
 	};
 
 	struct SwapchainSettings
@@ -160,7 +160,7 @@ namespace DEngine::Gfx::Vk
 
 		VmaAllocator vma{};
 
-		DeletionQueue deletionQueue{};
+		DeletionQueue deletionQueue;
 
 		u8 resourceSetCount = 0;
 
@@ -172,6 +172,8 @@ namespace DEngine::Gfx::Vk
 
 	struct APIData
 	{
+		inline APIData() noexcept;
+
 		Gfx::ILog* logger = nullptr;
 		Gfx::IWsi* wsiInterface = nullptr;
 
@@ -196,4 +198,9 @@ namespace DEngine::Gfx::Vk
 		vk::PipelineLayout testPipelineLayout{};
 		vk::Pipeline testPipeline{};
 	};
+}
+
+inline DEngine::Gfx::Vk::APIData::APIData() noexcept
+{
+
 }

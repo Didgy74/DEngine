@@ -22,18 +22,18 @@ namespace DEngine::Gfx::Vk
 		using CallbackPFN = void(*)(GlobUtils const& globUtils, char const(&buffer)[jobBufferSize]);
 
 		// Do NOT call this, only if you're initializing the entire shit
-		inline void Initialize(GlobUtils const& globUtils, u8 resourceSetCount)
+		inline void Initialize(GlobUtils const& globUtilsIn, u8 resourceSetCountIn)
 		{
 			currentResourceSetIndex = 0;
-			this->globUtils = &globUtils;
-			this->resourceSetCount = resourceSetCount;
+			this->globUtils = &globUtilsIn;
+			this->resourceSetCount = resourceSetCountIn;
 
-			jobQueues.Resize(resourceSetCount);
+			jobQueues.Resize(resourceSetCountIn);
 			for (auto& item : jobQueues)
 				item.reserve(25);
 			tempQueue.reserve(25);
 
-			fencedJobQueues.Resize(resourceSetCount);
+			fencedJobQueues.Resize(resourceSetCountIn);
 			for (auto& item : fencedJobQueues)
 				item.reserve(25);
 		}
@@ -110,11 +110,11 @@ namespace DEngine::Gfx::Vk
 		mutable Cont::FixedVector<std::vector<FencedJob>, Constants::maxResourceSets> fencedJobQueues{};
 
 		template<typename T>
-		static void DestroyVulkanHppHandle(GlobUtils const& globUtils, char const(&buffer)[jobBufferSize])
+		static inline void DestroyVulkanHppHandle(GlobUtils const& globUtils, char const(&buffer)[jobBufferSize])
 		{
 			T objectHandle{};
 			std::memcpy(&objectHandle, buffer, sizeof(T));
-			globUtils.device.handle.destroy(objectHandle, nullptr, globUtils.device.raw);
+			//globUtils.device.handle.destroy(objectHandle, nullptr, globUtils.device.raw);
 		}
 	};
 }

@@ -9,7 +9,7 @@
 #include "DEngine/Editor.hpp"
 
 #include "DEngine/Gfx/Gfx.hpp"
-#include "Dengine/FixedWidthTypes.hpp"
+#include "DEngine/FixedWidthTypes.hpp"
 
 #include "DEngine/Math/Vector/Vector.hpp"
 #include "DEngine/Math/UnitQuaternion.hpp"
@@ -80,7 +80,6 @@ int main(int argc, char** argv)
 	Time::Initialize();
 	App::detail::Initialize();
 
-	Editor::EditorData editorData{};
 	{
 		// Initialize ImGui stuff
 		IMGUI_CHECKVERSION();
@@ -91,10 +90,11 @@ int main(int argc, char** argv)
 		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_IsTouchScreen;
 		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_ViewportsEnable;
 
-		ImGui::StyleColorsDark();
+		//ImGui::StyleColorsDark();
 		
 		App::detail::ImgGui_Initialize();
 	}
+	Editor::EditorData editorData = Editor::Initialize();
 
 
 	// Initialize the renderer
@@ -124,7 +124,7 @@ int main(int argc, char** argv)
 		App::detail::ImGui_NewFrame();
 
 
-		RenderImGuiStuff(editorData, rendererData);
+		Editor::RenderImGuiStuff(editorData, rendererData);
 
 		Gfx::Draw_Params params{};
 		params.presentMainWindow = !App::detail::IsMinimized();

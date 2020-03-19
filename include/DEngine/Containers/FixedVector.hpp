@@ -14,8 +14,7 @@ namespace DEngine::Containers
     private:
         union
         {
-            alignas(T) unsigned char m_dataBuffer[sizeof(T) * maxLength] = {};
-            // Mostly used to let debuggers see the contents
+            alignas(T) char m_unused = 0;
             T m_values[maxLength];
         };
         
@@ -56,7 +55,7 @@ namespace DEngine::Containers
     template<typename T, uSize maxLength>
     FixedVector<T, maxLength>::FixedVector() :
         m_size(0),
-        m_dataBuffer()
+        m_unused()
     {
 
     }
@@ -67,7 +66,7 @@ namespace DEngine::Containers
     {
         if (length > maxLength)
             throw std::out_of_range("Attempted to create a FixedVector with length higher than maxSize().");
-        new(m_dataBuffer) T[length];
+        new(m_values) T[length];
     }
 
     template<typename T, uSize maxLength>
@@ -79,13 +78,13 @@ namespace DEngine::Containers
     template<typename T, uSize maxLength>
     constexpr Span<T> FixedVector<T, maxLength>::ToSpan() noexcept
     {
-        return Span<T>(reinterpret_cast<T*>(m_dataBuffer), m_size);
+        return Span<T>(m_values, m_size);
     }
 
     template<typename T, uSize maxLength>
     constexpr Span<T const> FixedVector<T, maxLength>::ToSpan() const noexcept
     {
-        return Span<T const>(reinterpret_cast<T const*>(m_dataBuffer), m_size);
+        return Span<T const>(m_values, m_size);
     }
 
     template<typename T, uSize maxLength>
@@ -103,13 +102,13 @@ namespace DEngine::Containers
     template<typename T, uSize maxLength>
     T* FixedVector<T, maxLength>::Data()
     {
-        return reinterpret_cast<T*>(m_dataBuffer);
+        return m_values;
     }
 
     template<typename T, uSize maxLength>
     T const* FixedVector<T, maxLength>::Data() const
     {
-        return reinterpret_cast<T const*>(m_dataBuffer);
+        return m_values;
     }
 
     template<typename T, uSize maxLength>
@@ -140,15 +139,12 @@ namespace DEngine::Containers
         if (newSize > m_size)
         {
             for (uSize i = m_size; i < newSize; i += 1)
-            {
-                new(m_dataBuffer + sizeof(T) * i) T();
-            }
-            
+                new(m_values + i) T();
         }
         else
         {
             for (uSize i = m_size - 1; i >= newSize; i -= 1)
-                (reinterpret_cast<T*>(m_dataBuffer) + i)->~T();
+                m_values[i].~T();
         }
         m_size = newSize;
     }
@@ -164,7 +160,7 @@ namespace DEngine::Containers
     {
         if (!CanPushBack())
             throw std::out_of_range("Attempted to .PushBack() a FixedVector when it is already at max capacity.");
-        new(m_dataBuffer + sizeof(T) * m_size) T(in);
+        new(m_values + m_size) T(in);
         m_size += 1;
     }
 
@@ -173,7 +169,7 @@ namespace DEngine::Containers
     {
         if (!CanPushBack())
             throw std::out_of_range("Attempted to .PushBack() a FixedVector when it is already at max capacity.");
-        new(m_dataBuffer + sizeof(T) * m_size) T(static_cast<T&&>(in));
+        new(m_values + m_size) T(static_cast<T&&>(in));
         m_size += 1;
     }
 
@@ -182,7 +178,7 @@ namespace DEngine::Containers
     {
         if (i >= m_size)
             throw std::out_of_range("Attempted to .At() a FixedVector with an index out of bounds.");
-        return *(reinterpret_cast<T*>(m_dataBuffer) + i);
+        return m_values[i];
     }
 
     template<typename T, uSize maxLength>
@@ -190,7 +186,7 @@ namespace DEngine::Containers
     {
         if (i >= m_size)
             throw std::out_of_range("Attempted to .At() a FixedVector with an index out of bounds.");
-        return *(reinterpret_cast<T const*>(m_dataBuffer) + i);
+        return m_values[i];
     }
 
     template<typename T, uSize maxLength>
@@ -211,7 +207,7 @@ namespace DEngine::Containers
         if (m_size == 0)
             return nullptr;
         else
-            return reinterpret_cast<T*>(m_dataBuffer);
+            return m_values;
     }
 
     template<typename T, uSize maxLength>
@@ -220,7 +216,7 @@ namespace DEngine::Containers
         if (m_size == 0)
             return nullptr;
         else
-            return reinterpret_cast<T const*>(m_dataBuffer);
+            return m_values;
     }
 
     template<typename T, uSize maxLength>
@@ -229,7 +225,7 @@ namespace DEngine::Containers
         if (m_size == 0)
             return nullptr;
         else
-            return reinterpret_cast<T*>(m_dataBuffer + sizeof(T) * m_size);
+            return m_values + m_size;
     }
 
     template<typename T, uSize maxLength>
@@ -238,7 +234,7 @@ namespace DEngine::Containers
         if (m_size == 0)
             return nullptr;
         else
-            return reinterpret_cast<T const*>(m_dataBuffer + sizeof(T) * m_size);
+            return m_values + m_size;
     }
 }
 

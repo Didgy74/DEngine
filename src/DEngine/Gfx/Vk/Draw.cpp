@@ -19,8 +19,6 @@ namespace DEngine::Gfx::Vk
 		std::uint_least8_t resourceSetIndex,
 		DebugUtilsDispatch const* debugUtils)
 	{
-		vk::Result vkResult{};
-
 		// We need to name the command buffer every time we reset it
 		if (debugUtils)
 		{

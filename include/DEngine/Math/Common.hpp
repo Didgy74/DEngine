@@ -4,15 +4,9 @@
 
 namespace DEngine::Math
 {
-	[[nodiscard]] inline f32 Abs(f32 input)
-	{
-		return std::abs(input);
-	}
+	[[nodiscard]] constexpr f32 Abs(f32 input);
 	
-	[[nodiscard]] inline f32 Ceil(f32 input)
-	{
-		return std::ceil(input);
-	}
+	[[nodiscard]] constexpr f32 Ceil(f32 input);
 
 	[[nodiscard]] constexpr uSize CeilToNearestMultiple(uSize value, uSize multiple)
 	{
@@ -28,22 +22,6 @@ namespace DEngine::Math
 		}
 	}
 
-	[[nodiscard]] inline u16 CeilToNearestPowerOf2(u16 in)
-	{
-		constexpr u16 bitSize = u16(sizeof(u16) * 8);
-		//return u16(1) << (bitSize - __lzcnt16(in));
-	}
-
-	[[nodiscard]] inline u32 CeilToNearestPowerOf2(u32 in)
-	{
-		constexpr u32 bitSize = u32(sizeof(u32) * 8);
-	}
-
-	[[nodiscard]] inline u64 CeilToNearestPowerOf2(u64 in)
-	{
-		constexpr u64 bitSize = u64(sizeof(u64) * 8);
-	}
-
 	[[nodiscard]] constexpr u8 Clamp(u8 value, u8 min, u8 max)
 	{
 		if (value > max)
@@ -54,20 +32,14 @@ namespace DEngine::Math
 			return value;
 	}
 
-	[[nodiscard]] inline f32 Floor(f32 input)
-	{
-		return std::floor(input);
-	}
+	[[nodiscard]] f32 Floor(f32 input);
 
 	[[nodiscard]] constexpr f32 Lerp(f32 a, f32 b, f32 delta)
 	{
 		return (b - a) * delta + a;
 	}
 
-	[[nodiscard]] inline f32 Log(f32 in)
-	{
-		return std::log(in);
-	}
+	[[nodiscard]] f32 Log(f32 in);
 
 	[[nodiscard]] constexpr i8 Min(i8 a, i8 b) { return a < b ? a : b; }
 	[[nodiscard]] constexpr i16 Min(i16 a, i16 b) { return a < b ? a : b; }
@@ -91,15 +63,9 @@ namespace DEngine::Math
 	[[nodiscard]] constexpr f32 Max(f32 a, f32 b) { return a > b ? a : b; }
 	[[nodiscard]] constexpr f64 Max(f64 a, f64 b) { return a > b ? a : b; }
 
-	[[nodiscard]] inline f32 Pow(f32 coefficient, f32 exponent)
-	{
-		return std::pow(coefficient, exponent);
-	}
+	[[nodiscard]] f32 Pow(f32 coefficient, f32 exponent);
 
-	[[nodiscard]] inline f32 Round(f32 input)
-	{
-		return std::round(input);
-	}
+	[[nodiscard]] f32 Round(f32 input);
 
 	[[nodiscard]] constexpr f32 Sqrd(f32 input)
 	{
@@ -111,18 +77,14 @@ namespace DEngine::Math
 		return input * input;
 	}
 
-	[[nodiscard]] inline f32 Sqrt(f32 input)
-	{
-		return std::sqrt(input);
-	}
+	[[nodiscard]] f32 Sqrt(f32 input);
 
-	[[nodiscard]] inline f64 Sqrt(f64 input)
-	{
-		return std::sqrt(input);
-	}
+	[[nodiscard]] f64 Sqrt(f64 input);
 
-	[[nodiscard]] inline f32 Truncate(f32 input)
-	{
-		return std::trunc(input);
-	}
+	[[nodiscard]] f32 Truncate(f32 input);
+}
+
+constexpr DEngine::f32 DEngine::Math::Abs(f32 input)
+{
+	return input < 0.f ? -input : input;
 }

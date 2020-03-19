@@ -97,7 +97,11 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 
 	BaseDispatch baseDispatch = BaseDispatch::Build(instanceProcAddr);
 
-	Init::CreateVkInstance_Return createVkInstanceResult = Init::CreateVkInstance(initInfo.requiredVkInstanceExtensions, true, baseDispatch, apiData.logger);
+	Init::CreateVkInstance_Return createVkInstanceResult = Init::CreateVkInstance(
+		initInfo.requiredVkInstanceExtensions, 
+		true, 
+		baseDispatch, 
+		apiData.logger);
 	InstanceDispatch instance = InstanceDispatch::Build(createVkInstanceResult.instanceHandle, instanceProcAddr);
 	globUtils.instance = instance;
 
@@ -174,14 +178,16 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 
 	// Create the main render stuff
 	apiData.globUtils.gfxRenderPass = Init::BuildMainGfxRenderPass(apiData.globUtils.device, true, apiData.globUtils.DebugUtilsPtr());
-
-
+	
+	
+	
+	
 	// Allocate memory for cameras
 	{
 		vk::DeviceSize elementSize = 64;
 		if (apiData.globUtils.physDevice.properties.limits.minUniformBufferOffsetAlignment > elementSize)
 			elementSize = apiData.globUtils.physDevice.properties.limits.minUniformBufferOffsetAlignment;
-		apiData.test_camUboOffset = elementSize;
+		apiData.test_camUboOffset = (u32)elementSize;
 
 		vk::DeviceSize memSize = elementSize * Constants::maxResourceSets * Gfx::Constants::maxViewportCount;
 		vk::BufferCreateInfo bufferInfo{};
@@ -243,7 +249,8 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 		vkResult = apiData.globUtils.device.allocateDescriptorSets(setAllocInfo, descrSets.Data());
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("DEngine, Vulkan: Unable to allocate descriptor sets for camera-matrices.");
-
+			
+		
 		// Update the descriptor sets to point at the camera-Data
 		{
 
@@ -272,21 +279,22 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 		}
 
 		apiData.test_cameraDescrSets = descrSets;
+		
 	}
+	
 
 	Init::Test(apiData);
-
+	
 
 	return true;
 }
 
-#include <fstream>
-#include "DEngine/Containers/Array.hpp"
-
 #include "SDL2/SDL.h"
+//#include <fstream>
 
 void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 {
+	
 	vk::Result vkResult{};
 
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -294,7 +302,11 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	pipelineLayoutInfo.pSetLayouts = &apiData.test_cameraDescrLayout;
 	apiData.testPipelineLayout = apiData.globUtils.device.createPipelineLayout(pipelineLayoutInfo);
 
-	SDL_RWops* vertFile = SDL_RWFromFile("Data/vert.spv", "rb");
+	//std::ifstream test("data/vert.spv", std::ifstream::binary);
+	//if (test.is_open() == false)
+		//throw std::runtime_error("Could not open vertex shader file");
+
+	SDL_RWops* vertFile = SDL_RWFromFile("data/vert.spv", "rb");
 	if (vertFile == nullptr)
 		throw std::runtime_error("Could not open vertex shader file");
 	Sint64 vertFileLength = SDL_RWsize(vertFile);
@@ -314,7 +326,7 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	vertStageInfo.module = vertModule;
 	vertStageInfo.pName = "main";
 
-	SDL_RWops* fragFile = SDL_RWFromFile("Data/frag.spv", "rb");
+	SDL_RWops* fragFile = SDL_RWFromFile("data/frag.spv", "rb");
 	if (fragFile == nullptr)
 		throw std::runtime_error("Could not open fragment shader file");
 	Sint64 fragFileLength = SDL_RWsize(fragFile);
@@ -404,4 +416,5 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 
 	apiData.globUtils.device.destroyShaderModule(vertModule, nullptr);
 	apiData.globUtils.device.destroyShaderModule(fragModule, nullptr);
+	
 }

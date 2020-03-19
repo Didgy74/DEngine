@@ -2,7 +2,7 @@
 
 #include "DEngine/Application.hpp"
 #include "DEngine/FixedWidthTypes.hpp"
-#include "Dengine/Containers/FixedVector.hpp"
+#include "DEngine/Containers/FixedVector.hpp"
 
 namespace DEngine::Application::detail
 {

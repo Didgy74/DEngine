@@ -10,23 +10,14 @@
 
 namespace DEngine::Gfx::Vk::Constants
 {
-	constexpr u32 maxResourceSets = 3;
-	constexpr u32 preferredResourceSetCount = 2;
+	constexpr u32 maxResourceSets = 4;
+	constexpr u32 preferredResourceSetCount = 3;
 
-	constexpr u32 maxRequiredInstanceExtensions = 20;
-	constexpr u32 maxAvailableInstanceExtensions = 20;
-	constexpr u32 maxAvailableInstanceLayers = 20;
-	constexpr u32 maxAvailableLayerExtensions = 10;
-	constexpr u32 maxAvailablePhysicalDevices = 20;
-	constexpr u32 maxAvailableQueueFamilies = 10;
-
-	constexpr u32 maxAvailablePresentModes = 10;
 	constexpr vk::PresentModeKHR preferredPresentMode = vk::PresentModeKHR::eFifo;
-	constexpr u32 maxAvailableSurfaceFormats = 25;
 	constexpr u32 maxSwapchainLength = 4;
-	constexpr u32 preferredSwapchainLength = 2;
+	constexpr u32 preferredSwapchainLength = 3;
 
-	constexpr std::string_view preferredValidationLayer
+	constexpr char const* preferredValidationLayer
 	{
 		"VK_LAYER_KHRONOS_validation"
 	};
@@ -37,7 +28,7 @@ namespace DEngine::Gfx::Vk::Constants
 	};
 
 	constexpr bool enableDebugUtils = true;
-	constexpr std::string_view debugUtilsExtensionName{ "VK_EXT_debug_utils" };
+	constexpr char const* debugUtilsExtensionName{ "VK_EXT_debug_utils" };
 
 	constexpr std::array<const char*, 1> requiredDeviceExtensions
 	{
