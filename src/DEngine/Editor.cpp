@@ -217,7 +217,7 @@ namespace DEngine::Editor
 
 			auto delta = Input::Raw::GetMouseDelta();
 			
-			f32 sensitivity = 1.25f;
+			f32 sensitivity = 0.75f;
 			i32 amountX = delta[0];
 #pragma warning( suppress : 6011 )
 			// Apply left and right rotation
@@ -229,9 +229,9 @@ namespace DEngine::Editor
 			Math::Vec3D forward = Math::LinTran3D::ForwardVector(cam->rotation);
 			float dot = Math::Vec3D::Dot(forward, Math::Vec3D::Up());
 			if (dot <= -0.99f)
-				amountY = Math::Max(0, amountY);
-			else if (dot >= 0.99f)
 				amountY = Math::Min(0, amountY);
+			else if (dot >= 0.99f)
+				amountY = Math::Max(0, amountY);
 
 			// Apply up and down rotation
 			Math::Vec3D right = Math::LinTran3D::RightVector(cam->rotation);
@@ -356,7 +356,8 @@ DEngine::Editor::EditorData DEngine::Editor::Initialize()
 
 	SetImGuiStyle();
 
-
+	returnVal.deltaTimePoint = std::chrono::steady_clock::now();
+	returnVal.displayedDeltaTime = "0.016";
 	
 
 	return {};
@@ -409,6 +410,31 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 		{
 
 		}
+
+		if (ImGui::MenuItem("     ", nullptr, nullptr, false))
+		{
+
+		}
+
+		ImGui::Separator();
+
+		if (ImGui::MenuItem("Delta:", nullptr, nullptr, false))
+		{
+
+		}
+
+		auto now = std::chrono::steady_clock::now();
+		if (std::chrono::duration<float>(now - editorData.deltaTimePoint).count() >= editorData.deltaTimeRefreshTime)
+		{
+			editorData.displayedDeltaTime = std::to_string(Time::Delta());
+			editorData.deltaTimePoint = now;
+		}
+
+		if (ImGui::MenuItem(editorData.displayedDeltaTime.c_str(), nullptr, nullptr, false))
+		{
+
+		}
+
 		ImGui::EndMenuBar();
 	}
 

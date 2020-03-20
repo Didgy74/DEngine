@@ -11,6 +11,7 @@
 #include "ImGui/imgui.h"
 
 #include <vector>
+#include <chrono>
 
 namespace DEngine::Editor
 {
@@ -65,6 +66,10 @@ namespace DEngine::Editor
 		std::vector<Cont::Pair<uSize,Camera>> cameras{};
 
 		ImGuiID dockSpaceID = 0;
+
+		std::chrono::steady_clock::time_point deltaTimePoint{};
+		std::string displayedDeltaTime{};
+		float deltaTimeRefreshTime = 0.25f;
 	};
 
 	EditorData Initialize();
