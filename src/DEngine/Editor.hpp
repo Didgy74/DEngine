@@ -8,6 +8,8 @@
 #include "DEngine/Math/Vector/Vector.hpp"
 #include "DEngine/Math/UnitQuaternion.hpp"
 
+#include "ImGui/imgui.h"
+
 #include <vector>
 
 namespace DEngine::Editor
@@ -61,6 +63,8 @@ namespace DEngine::Editor
 		std::vector<Cont::Pair<uSize, Viewport>> viewports{};
 
 		std::vector<Cont::Pair<uSize,Camera>> cameras{};
+
+		ImGuiID dockSpaceID = 0;
 	};
 
 	EditorData Initialize();

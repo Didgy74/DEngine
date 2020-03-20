@@ -78,7 +78,7 @@ void DEngine::Application::detail::ProcessEvents()
 		{
 			shouldShutdown = true;
 		}
-		else if (event.type == SDL_EventType::SDL_WINDOWEVENT && event.window.windowID == SDL_GetWindowID(detail::mainWindow))
+		else if (event.type == SDL_EventType::SDL_WINDOWEVENT && event.window.windowID)
 		{
 			if (event.window.event == SDL_WindowEventID::SDL_WINDOWEVENT_RESIZED)
 			{
@@ -105,7 +105,6 @@ void DEngine::Application::detail::ProcessEvents()
 		else if (event.type == SDL_EventType::SDL_MOUSEMOTION)
 		{
 			Input::Core::UpdateMouseInfo(event.motion.x, event.motion.y, event.motion.xrel, event.motion.yrel);
-			std::cout << event.motion.xrel << " , " << event.motion.yrel << std::endl;
 		}
 		else if (event.type == SDL_EventType::SDL_MOUSEBUTTONDOWN)
 		{
@@ -150,9 +149,10 @@ void DEngine::Application::Log(char const* msg)
 
 void DEngine::Application::SetRelativeMouseMode(bool enabled)
 {
-	int errorCode = SDL_SetRelativeMouseMode(static_cast<SDL_bool>(enabled));
-	if (errorCode != 0)
-		throw std::runtime_error("Failedto set relative mouse mode");
+	//std::cout << "Set mouse mode: " << enabled << std::endl;
+	//int errorCode = SDL_SetRelativeMouseMode(static_cast<SDL_bool>(enabled));
+	//if (errorCode != 0)
+		//throw std::runtime_error("Failedto set relative mouse mode");
 }
 
 DEngine::Cont::FixedVector<char const*, 5> DEngine::Application::detail::GetRequiredVulkanInstanceExtensions()

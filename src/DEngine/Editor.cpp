@@ -13,6 +13,9 @@ namespace DEngine::Editor
 {
 	static void DrawViewportManager(EditorData& editorData)
 	{
+		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
+
 		if (ImGui::Begin("Testerrr", nullptr))
 		{
 			if (ImGui::Button("New viewport!"))
@@ -61,7 +64,8 @@ namespace DEngine::Editor
 
 	static void DrawCameraManager(EditorData& editorData)
 	{
-		ImGui::SetNextWindowSize({ 250, 250 }, ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
 		ImGuiWindowFlags windowFlags = 0;
 		windowFlags |= ImGuiWindowFlags_::ImGuiWindowFlags_NoResize;
 		if (ImGui::Begin("List of cameras"))
@@ -191,7 +195,7 @@ namespace DEngine::Editor
 		{
 			if (virtualViewport.currentlyControlling == false)
 			{
-				//Application::SetRelativeMouseMode(true);
+				Application::SetRelativeMouseMode(true);
 				virtualViewport.currentlyControlling = true;
 			}
 				
@@ -213,7 +217,7 @@ namespace DEngine::Editor
 
 			auto delta = Input::Raw::GetMouseDelta();
 			
-			f32 sensitivity = 0.1f;
+			f32 sensitivity = 1.25f;
 			i32 amountX = delta[0];
 #pragma warning( suppress : 6011 )
 			// Apply left and right rotation
@@ -252,7 +256,7 @@ namespace DEngine::Editor
 		{
 			if (virtualViewport.currentlyControlling == true)
 			{
-				//Application::SetRelativeMouseMode(false);
+				Application::SetRelativeMouseMode(false);
 				virtualViewport.currentlyControlling = false;
 			}
 		}
@@ -289,8 +293,9 @@ namespace DEngine::Editor
 
 			bool windowIsOpen = true;
 
+			ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
 			ImGui::SetNextWindowSize({ 250, 250 }, ImGuiCond_FirstUseEver);
-			ImGui::SetNextWindowSizeConstraints({ 100, 100 }, { 8192, 8192 });
+			ImGui::SetNextWindowSizeConstraints({ 200, 200 }, { 8192, 8192 });
 			ImGuiWindowFlags windowFlags = 0;
 			windowFlags |= ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse;
 			windowFlags |= ImGuiWindowFlags_::ImGuiWindowFlags_NoScrollbar;
@@ -347,7 +352,12 @@ namespace DEngine::Editor
 
 DEngine::Editor::EditorData DEngine::Editor::Initialize()
 {
+	EditorData returnVal{};
+
 	SetImGuiStyle();
+
+
+	
 
 	return {};
 }
@@ -356,9 +366,59 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 {
 	ImGui::NewFrame();
 
-	static bool testShowWindow = true;
+	if (Time::TickCount() == 1)
+	{
+		editorData.dockSpaceID = ImGui::GetID("test");
+	}
 
+	ImGuiDockNodeFlags dockspaceFlags = 0;
+	//dockspaceFlags = ImGuiDockNodeFlags_PassthruCentralNode;
+
+	// We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
+	// because it would be confusing to have two docking targets within each others.
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+	ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(viewport->Pos);
+	ImGui::SetNextWindowSize(viewport->Size);
+	ImGui::SetNextWindowViewport(viewport->ID);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+	// When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background 
+	// and handle the pass-thru hole, so we ask Begin() to not render a background.
+	if (dockspaceFlags & ImGuiDockNodeFlags_PassthruCentralNode)
+		window_flags |= ImGuiWindowFlags_NoBackground;
+
+	// Important: note that we proceed even if Begin() returns false (aka window is collapsed).
+	// This is because we want to keep our DockSpace() active. If a DockSpace() is inactive,
+	// all active windows docked into it will lose their parent and become undocked.
+	// We cannot preserve the docking relationship between an active window and an inactive docking, otherwise
+	// any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	//bool test = false;
+	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
+	ImGui::PopStyleVar(3);
+
+	ImGui::DockSpace(editorData.dockSpaceID, ImVec2(0.0f, 0.0f), dockspaceFlags);
+
+	if (ImGui::BeginMenuBar())
+	{
+		if (ImGui::MenuItem("File", nullptr, nullptr, true))
+		{
+
+		}
+		ImGui::EndMenuBar();
+	}
+
+	ImGui::End();
+
+
+	static bool testShowWindow = true;
 	ImGui::ShowDemoWindow(nullptr);
+
+
 	DrawViewportManager(editorData);
 	DrawCameraManager(editorData);
 	DrawVirtualViewports(editorData, gfx);
@@ -370,6 +430,8 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 
 static void DEngine::Editor::SetImGuiStyle()
 {
+	ImGuiIO& io = ImGui::GetIO();
+	io.FontGlobalScale = 4.f;
 	ImGuiStyle* style = &ImGui::GetStyle();
 
 	ImVec4* colors = style->Colors;

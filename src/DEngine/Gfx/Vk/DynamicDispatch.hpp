@@ -809,7 +809,7 @@ namespace DEngine::Gfx::Vk
 		}
 		vk::Result queuePresentKHR(vk::Queue queue, vk::PresentInfoKHR const& presentInfo) const
 		{
-			return queue.presentKHR(presentInfo, swapchain_raw);
+			return queue.presentKHR(&presentInfo, swapchain_raw);
 		}
 
 	};

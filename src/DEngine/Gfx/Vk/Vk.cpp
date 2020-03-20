@@ -140,7 +140,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 
 	QueueData::Initialize(globUtils.device, globUtils.physDevice.queueIndices, globUtils.DebugUtilsPtr(), globUtils.queues);
 
-	apiData.globUtils.vma = Init::InitializeVMA(instance, globUtils.device, globUtils.physDevice, globUtils.DebugUtilsPtr());
+	Init::InitializeVMA(globUtils, globUtils.DebugUtilsPtr());
 	apiData.globUtils.deletionQueue.Initialize(apiData.globUtils, apiData.globUtils.resourceSetCount);
 
 	// Build our swapchain on our device

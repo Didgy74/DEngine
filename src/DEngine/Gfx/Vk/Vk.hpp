@@ -159,6 +159,8 @@ namespace DEngine::Gfx::Vk
 		QueueData queues{};
 
 		VmaAllocator vma{};
+		std::mutex vma_idTracker_lock{};
+		u64 vma_idTracker = 0;
 
 		DeletionQueue deletionQueue;
 

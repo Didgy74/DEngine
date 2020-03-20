@@ -32,10 +32,8 @@ namespace DEngine::Gfx::Vk::Init
 		InstanceDispatch const& instance,
 		PhysDeviceInfo const& physDevice);
 
-	[[nodiscard]] VmaAllocator InitializeVMA(
-		InstanceDispatch const& instance,
-		DevDispatch const& device,
-		PhysDeviceInfo const& physDevice,
+	void InitializeVMA(
+		GlobUtils& globUtils,
 		DebugUtilsDispatch const* debugUtils);
 
 	[[nodiscard]] Cont::FixedVector<vk::Fence, Constants::maxResourceSets> CreateMainFences(

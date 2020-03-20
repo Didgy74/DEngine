@@ -41,7 +41,9 @@ set(CMAKE_CXX_STANDARD 17)
 
 	target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
 
-	target_compile_options(${PROJECT_NAME} PRIVATE /WX)
+	if (MSVC)
+		target_compile_options(${PROJECT_NAME} PRIVATE /WX)
+	endif()
 
 	
 #
@@ -105,7 +107,9 @@ set(CMAKE_CXX_STANDARD 17)
 	target_include_directories(${IMGUI_LIB_NAME} PUBLIC ${IMGUI_INCLUDE_DIR})
 	target_link_libraries(${IMGUI_LIB_NAME} PRIVATE SDL2)
 	target_include_directories(${IMGUI_LIB_NAME} PRIVATE ${Vulkan_INCLUDE_DIRS})
-	target_compile_options(${IMGUI_LIB_NAME} PRIVATE /w)
+	if (MSVC)
+		target_compile_options(${IMGUI_LIB_NAME} PRIVATE /w)
+	endif()
 
 	target_link_libraries(${PROJECT_NAME} PRIVATE ${IMGUI_LIB_NAME})
 #

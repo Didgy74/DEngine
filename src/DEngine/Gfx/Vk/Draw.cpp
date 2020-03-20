@@ -84,12 +84,18 @@ namespace DEngine::Gfx::Vk
 			presentInfo.pImageIndices = &nextSwapchainImgIndex;
 			vkResult = apiData.globUtils.queues.graphics.presentKHR(presentInfo);
 			if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eSuboptimalKHR)
-				throw std::runtime_error("Vulkan: Queue presentation submit failed.");
+			{
+				std::cout << "DEngine, Vulkan: Encountered bad present result." << std::endl;
+			}
 		}
 		else if (imageIndexOpt.result == vk::Result::eSuboptimalKHR)
-			throw std::runtime_error("Vulkan: Encountered suboptimal surface.");
+		{
+			std::cout << "DEngine, Vulkan: Encountered suboptimal image-acquire result." << std::endl;
+		}
 		else
-			throw std::runtime_error("Vulkan: vkAcquireNextImageKHR failed.");
+		{
+			std::cout << "DEngine, Vulkan: Encountered bad image-acquire result." << std::endl;
+		}
 	}
 
 	struct RecordGraphicsCmdBuffer_Params
