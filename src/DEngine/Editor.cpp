@@ -1,5 +1,4 @@
 #include "Editor.hpp"
-#include "DEngine/InputRaw.hpp"
 #include "DEngine/Time.hpp"
 #include "DEngine/Math/LinearTransform3D.hpp"
 
@@ -191,9 +190,9 @@ namespace DEngine::Editor
 	{
 		ImGui::Image(virtualViewport.gfxViewportRef.ImGuiTexID(), widgetSize);
 
-		if (!virtualViewport.paused && ImGui::IsItemHovered() && Input::Raw::GetValue(Input::Raw::Button::RightMouse))
+		if (!virtualViewport.paused && ImGui::IsItemHovered() && App::ButtonValue(App::Button::RightMouse))
 		{
-			if (virtualViewport.currentlyControlling == false)
+			if (App::ButtonEvent(App::Button::RightMouse) == App::InputEvent::Pressed)
 			{
 				Application::SetRelativeMouseMode(true);
 				virtualViewport.currentlyControlling = true;
@@ -215,7 +214,7 @@ namespace DEngine::Editor
 			}
 			assert(cam != nullptr);
 
-			auto delta = Input::Raw::GetMouseDelta();
+			auto delta = App::MouseDelta();
 			
 			f32 sensitivity = 0.75f;
 			i32 amountX = delta[0];
@@ -239,17 +238,17 @@ namespace DEngine::Editor
 
 			// Handle camera movement
 			f32 moveSpeed = 5.f;
-			if (Input::Raw::GetValue(Input::Raw::Button::W))
+			if (App::ButtonValue(App::Button::W))
 				cam->position -= moveSpeed * Math::LinTran3D::ForwardVector(cam->rotation) * Time::Delta();
-			if (Input::Raw::GetValue(Input::Raw::Button::S))
+			if (App::ButtonValue(App::Button::S))
 				cam->position += moveSpeed * Math::LinTran3D::ForwardVector(cam->rotation) * Time::Delta();
-			if (Input::Raw::GetValue(Input::Raw::Button::D))
+			if (App::ButtonValue(App::Button::D))
 				cam->position += moveSpeed * Math::LinTran3D::RightVector(cam->rotation) * Time::Delta();
-			if (Input::Raw::GetValue(Input::Raw::Button::A))
+			if (App::ButtonValue(App::Button::A))
 				cam->position -= moveSpeed * Math::LinTran3D::RightVector(cam->rotation) * Time::Delta();
-			if (Input::Raw::GetValue(Input::Raw::Button::Space))
+			if (App::ButtonValue(App::Button::Space))
 				cam->position.y -= moveSpeed * Time::Delta();
-			if (Input::Raw::GetValue(Input::Raw::Button::LeftCtrl))
+			if (App::ButtonValue(App::Button::LeftCtrl))
 				cam->position.y += moveSpeed * Time::Delta();
 		}
 		else

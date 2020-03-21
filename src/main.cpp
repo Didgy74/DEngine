@@ -4,7 +4,6 @@
 
 #include "DEngine/Application.hpp"
 #include "DEngine/Application/detail_Application.hpp"
-#include "DEngine/InputRaw.hpp"
 #include "DEngine/Time.hpp"
 #include "DEngine/Editor.hpp"
 
@@ -78,7 +77,12 @@ int main(int argc, char** argv)
 	using namespace DEngine;
 
 	Time::Initialize();
-	App::detail::Initialize();
+	bool success = App::detail::Initialize();
+	if (!success)
+	{
+		std::cout << "Failed to initialize Application system." << std::endl;
+		std::abort();
+	}
 
 	{
 		// Initialize ImGui stuff
@@ -118,12 +122,10 @@ int main(int argc, char** argv)
 	while (true)
 	{
 		Time::TickStart();
-		Input::Core::TickStart();
 		App::detail::ProcessEvents();
 		if (App::detail::ShouldShutdown())
 			break;
 		App::detail::ImGui_NewFrame();
-
 
 		Editor::RenderImGuiStuff(editorData, rendererData);
 

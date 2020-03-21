@@ -6,18 +6,18 @@
 
 namespace DEngine::Application::detail
 {
-	bool Initialize();
+	[[nodiscard]] bool Initialize();
 
 	void ProcessEvents();
 
-	bool ShouldShutdown();
-	bool IsMinimized();
-	bool IsRestored();
-	bool ResizeEvent();
+	[[nodiscard]] bool ShouldShutdown();
+	[[nodiscard]] bool IsMinimized();
+	[[nodiscard]] bool IsRestored();
+	[[nodiscard]] bool ResizeEvent();
 
 	void ImgGui_Initialize();
 	void ImGui_NewFrame();
 
-	Cont::FixedVector<char const*, 5> GetRequiredVulkanInstanceExtensions();
-	bool CreateVkSurface(u64 vkInstance, void const* vkAllocationCallbacks, void* userData, u64* vkSurface);
+	[[nodiscard]] Cont::FixedVector<char const*, 5> GetRequiredVulkanInstanceExtensions();
+	[[nodiscard]] bool CreateVkSurface(u64 vkInstance, void const* vkAllocationCallbacks, void* userData, u64* vkSurface);
 }
