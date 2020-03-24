@@ -126,11 +126,11 @@ void DEngine::Application::detail::ProcessEvents()
 		else if (event.type == SDL_EventType::SDL_KEYDOWN)
 		{
 			if (event.key.repeat == 0)
-				detail::UpdateButton(SDLKeyboardKeyToRawButton(event.key.keysym.scancode), true, now);
+				detail::UpdateButton(SDLKeyboardKeyToRawButton(event.key.keysym.sym), true, now);
 		}
 		else if (event.type == SDL_EventType::SDL_KEYUP)
 		{
-			detail::UpdateButton(SDLKeyboardKeyToRawButton(event.key.keysym.scancode), false, now);
+			detail::UpdateButton(SDLKeyboardKeyToRawButton(event.key.keysym.sym), false, now);
 		}
 		else if (event.type == SDL_EventType::SDL_MOUSEMOTION)
 		{
@@ -288,83 +288,89 @@ DEngine::Application::Button DEngine::Application::detail::SDLMouseKeyToRawButto
 		return Button::LeftMouse;
 	case SDL_BUTTON_RIGHT:
 		return Button::RightMouse;
-	default:
-		return Button::Undefined;
 	}
+
+	return Button::Undefined;
 }
 
 DEngine::Application::Button DEngine::Application::detail::SDLKeyboardKeyToRawButton(i32 input)
 {
 	switch (input)
 	{
-	case SDL_SCANCODE_SPACE:
+	case SDLK_ESCAPE:
+		return Button::Escape;
+
+	case SDLK_AC_BACK:
+		return Button::Back;
+
+	case SDLK_SPACE:
 		return Button::Space;
 
-	case SDL_SCANCODE_LCTRL:
+	case SDLK_LCTRL:
 		return Button::LeftCtrl;
 
-	case SDL_SCANCODE_UP:
+	case SDLK_UP:
 		return Button::Up;
-	case SDL_SCANCODE_DOWN:
+	case SDLK_DOWN:
 		return Button::Down;
-	case SDL_SCANCODE_LEFT:
+	case SDLK_LEFT:
 		return Button::Left;
-	case SDL_SCANCODE_RIGHT:
+	case SDLK_RIGHT:
 		return Button::Right;
 
-	case SDL_SCANCODE_A:
+	case SDLK_a:
 		return Button::A;
-	case SDL_SCANCODE_B:
+	case SDLK_b:
 		return Button::B;
-	case SDL_SCANCODE_C:
+	case SDLK_c:
 		return Button::C;
-	case SDL_SCANCODE_D:
+	case SDLK_d:
 		return Button::D;
-	case SDL_SCANCODE_E:
+	case SDLK_e:
 		return Button::E;
-	case SDL_SCANCODE_F:
+	case SDLK_f:
 		return Button::F;
-	case SDL_SCANCODE_G:
+	case SDLK_g:
 		return Button::G;
-	case SDL_SCANCODE_H:
+	case SDLK_h:
 		return Button::H;
-	case SDL_SCANCODE_I:
+	case SDLK_i:
 		return Button::I;
-	case SDL_SCANCODE_J:
+	case SDLK_j:
 		return Button::J;
-	case SDL_SCANCODE_K:
+	case SDLK_k:
 		return Button::K;
-	case SDL_SCANCODE_L:
+	case SDLK_l:
 		return Button::L;
-	case SDL_SCANCODE_M:
+	case SDLK_m:
 		return Button::M;
-	case SDL_SCANCODE_N:
+	case SDLK_n:
 		return Button::N;
-	case SDL_SCANCODE_O:
+	case SDLK_o:
 		return Button::O;
-	case SDL_SCANCODE_P:
+	case SDLK_p:
 		return Button::P;
-	case SDL_SCANCODE_Q:
+	case SDLK_q:
 		return Button::Q;
-	case SDL_SCANCODE_R:
+	case SDLK_r:
 		return Button::R;
-	case SDL_SCANCODE_S:
+	case SDLK_s:
 		return Button::S;
-	case SDL_SCANCODE_T:
+	case SDLK_t:
 		return Button::T;
-	case SDL_SCANCODE_U:
+	case SDLK_u:
 		return Button::U;
-	case SDL_SCANCODE_V:
+	case SDLK_v:
 		return Button::V;
-	case SDL_SCANCODE_W:
+	case SDLK_w:
 		return Button::W;
-	case SDL_SCANCODE_X:
+	case SDLK_x:
 		return Button::X;
-	case SDL_SCANCODE_Y:
+	case SDLK_y:
 		return Button::Y;
-	case SDL_SCANCODE_Z:
+	case SDLK_z:
 		return Button::Z;
-	default:
-		return Button::Undefined;
 	}
+
+	return Button::Undefined;
 }

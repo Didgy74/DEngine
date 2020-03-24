@@ -48,7 +48,7 @@ namespace DEngine::Application
 	constexpr Platform targetOSType = Platform::Mobile;
 #elif defined(__GNUC__)
 	constexpr OS targetOS = OS::Linux;
-	constexpr targetOSType = Platform::Desktop;
+	constexpr Platform targetOSType = Platform::Desktop;
 #else
 #error Error. DEngine::Application does not support this platform/compiler
 #endif
@@ -66,10 +66,13 @@ enum class DEngine::Application::Button : DEngine::u16
 	Undefined,
 	A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
 	Up, Down, Left, Right,
+	Escape,
 	Space,
 	LeftCtrl,
 	LeftMouse,
 	RightMouse,
+
+	Back,
 #ifdef DENGINE_APPLICATION_BUTTON_COUNT
 	COUNT
 #endif

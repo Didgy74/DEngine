@@ -8,6 +8,25 @@
 
 namespace DEngine::Gfx::Vk::Init
 {
+	static VKAPI_ATTR void VKAPI_CALL AllocCallbackForVMA(VmaAllocator allocator,
+		 uint32_t memoryType,
+		 VkDeviceMemory memory,
+		 VkDeviceSize size,
+		 void* pUserData)
+	{
+		GlobUtils& globUtils = *reinterpret_cast<GlobUtils*>(pUserData);
+
+		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+		nameInfo.objectHandle = (u64)memory;
+		nameInfo.objectType = vk::ObjectType::eDeviceMemory;
+		std::lock_guard lock(globUtils.vma_idTracker_lock);
+		std::string name = std::string("VMA DeviceMemory #") + std::to_string(globUtils.vma_idTracker);
+		globUtils.vma_idTracker += 1;
+		nameInfo.pObjectName = name.data();
+
+		globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+	}
+
 	void InitializeVMA(
 		GlobUtils& globUtils,
 		DebugUtilsDispatch const* debugUtils)
@@ -16,25 +35,7 @@ namespace DEngine::Gfx::Vk::Init
 
 		VmaDeviceMemoryCallbacks callbacks{};
 		callbacks.pUserData = &globUtils;
-		callbacks.pfnAllocate = [](
-			VmaAllocator allocator,
-			uint32_t memoryType,
-			VkDeviceMemory memory,
-			VkDeviceSize size,
-			void* pUserData)
-		{
-			GlobUtils& globUtils = *reinterpret_cast<GlobUtils*>(pUserData);
-
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)memory;
-			nameInfo.objectType = vk::ObjectType::eDeviceMemory;
-			std::lock_guard lock(globUtils.vma_idTracker_lock);
-			std::string name = std::string("VMA DeviceMemory #") + std::to_string(globUtils.vma_idTracker);
-			globUtils.vma_idTracker += 1;
-			nameInfo.pObjectName = name.data();
-
-			globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
-		};
+		callbacks.pfnAllocate = &AllocCallbackForVMA;
 
 		InstanceDispatch const& instance = globUtils.instance;
 		DevDispatch const& device = globUtils.device;

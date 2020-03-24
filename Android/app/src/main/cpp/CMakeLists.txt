@@ -3,42 +3,54 @@ cmake_minimum_required(VERSION 3.10)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../..")
+# ------------------------
+# Make the main executable
+# ------------------------
+# START
+    set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../..")
 
-file(GLOB_RECURSE DENGINE_SRC_FILES
-        "${DENGINE_ROOT_DIR}/src/*.cpp"
-        "${DENGINE_ROOT_DIR}/src/*.hpp"
-        "${DENGINE_ROOT_DIR}/include/*.hpp")
+    file(GLOB_RECURSE DENGINE_SRC_FILES
+            "${DENGINE_ROOT_DIR}/src/*.cpp")
 
-set(DENGINE_INCLUDE_DIR "${DENGINE_ROOT_DIR}/include")
+    set(DENGINE_INCLUDE_DIRS "${DENGINE_ROOT_DIR}/include")
 
-set(LIB_NAME "main")
-add_library(${LIB_NAME} SHARED ${DENGINE_SRC_FILES})
+    add_library(main SHARED ${DENGINE_SRC_FILES})
 
-target_include_directories(${LIB_NAME} PUBLIC ${DENGINE_INCLUDE_DIR})
+    target_include_directories(main PUBLIC ${DENGINE_INCLUDE_DIRS})
+#
+# END
+#
 
-set(VULKAN_INCLUDE_DIR "C:/VulkanSDK/1.2.131.1/Include")
-target_include_directories(${LIB_NAME} PUBLIC ${VULKAN_INCLUDE_DIR})
+# -----------------------
+# Link SDL and vulkan-headers
+# -----------------------
+# START
+    set(VULKAN_INCLUDE_DIRS "${DENGINE_ROOT_DIR}/external/Vulkan-Headers/include")
+    target_include_directories(main PUBLIC ${VULKAN_INCLUDE_DIRS})
 
-set(SDL2_INCLUDE_DIR "${DENGINE_ROOT_DIR}/external/SDL2/include")
-target_include_directories(${LIB_NAME} PUBLIC ${SDL2_INCLUDE_DIR})
+    set(SDL2_INCLUDE_DIRS "${DENGINE_ROOT_DIR}/external/SDL2/include")
+    target_include_directories(main PUBLIC ${SDL2_INCLUDE_DIRS})
 
-set(SDL2_LIBRARIES
-        "${DENGINE_ROOT_DIR}/Android/app/src/main/jni/${CMAKE_ANDROID_ARCH_ABI}/libSDL2.so"
-        "${DENGINE_ROOT_DIR}/Android/app/src/main/jni/${CMAKE_ANDROID_ARCH_ABI}/libhidapi.so")
-target_link_libraries(${LIB_NAME} PUBLIC ${SDL2_LIBRARIES})
+    set(SDL2_LIBRARIES
+            "${DENGINE_ROOT_DIR}/Android/app/src/main/jni/${CMAKE_ANDROID_ARCH_ABI}/libSDL2.so"
+            "${DENGINE_ROOT_DIR}/Android/app/src/main/jni/${CMAKE_ANDROID_ARCH_ABI}/libhidapi.so")
+    target_link_libraries(main PUBLIC ${SDL2_LIBRARIES})
+#
+# END
+#
+
 
 # ----------------------------
 # Include and link ImGui stuff
 # ----------------------------
 # START
-set(IMGUI_ROOT_DIR "${DENGINE_ROOT_DIR}/external/ImGui")
-set(IMGUI_SRC_DIR "${IMGUI_ROOT_DIR}/src")
-set(IMGUI_INCLUDE_DIR "${IMGUI_ROOT_DIR}/include")
-file(GLOB_RECURSE IMGUI_SOURCE_FILES "${IMGUI_SRC_DIR}/*.cpp" "${IMGUI_SRC_DIR}/*.h" "${IMGUI_SRC_DIR}/*.hpp")
-target_sources(${LIB_NAME} PRIVATE ${IMGUI_SOURCE_FILES})
+    set(IMGUI_ROOT_DIR "${DENGINE_ROOT_DIR}/external/ImGui")
+    set(IMGUI_SRC_DIR "${IMGUI_ROOT_DIR}/src")
+    set(IMGUI_INCLUDE_DIRS "${IMGUI_ROOT_DIR}/include")
+    file(GLOB_RECURSE IMGUI_SOURCE_FILES "${IMGUI_SRC_DIR}/*.cpp")
+    target_sources(main PRIVATE ${IMGUI_SOURCE_FILES})
 
-target_include_directories(${LIB_NAME} PRIVATE ${IMGUI_INCLUDE_DIR})
+    target_include_directories(main PRIVATE ${IMGUI_INCLUDE_DIRS})
 #
 # END
 #

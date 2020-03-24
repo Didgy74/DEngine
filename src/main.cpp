@@ -142,13 +142,12 @@ int main(int argc, char** argv)
 				viewportData.height = viewport.renderHeight;
 
 
-				f32 aspectRatio = (f32)viewportData.width / viewportData.height;
+				f32 aspectRatio = (f32)viewport.width / viewport.height;
 
-				Editor::Camera const* camPtr = nullptr;
-				if (viewport.cameraID == Editor::Viewport::invalidCamID)
-					camPtr = &viewport.camera;
-				else
+				Editor::Camera const* camPtr = &viewport.camera;
+				if (viewport.cameraID != Editor::Viewport::invalidCamID)
 				{
+					camPtr = nullptr;
 					for (auto const& [camID, camera] : editorData.cameras)
 					{
 						if (camID == viewport.cameraID)
@@ -157,16 +156,12 @@ int main(int argc, char** argv)
 							break;
 						}
 					}
+					assert(camPtr != nullptr);
 				}
+#pragma warning( suppress : 6011 )
 				Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(camPtr->rotation);
 				
 				camMat = Math::LinTran3D::Translate(camPtr->position) * camMat;
-
-				Math::Mat4 test = Math::Mat4::Identity();
-				test.At(2, 2) = -test.At(2, 2);
-				test.At(0, 0) = -test.At(0, 0);
-				//camMat = test * camMat;
-
 
 				camMat = camMat.GetInverse().Value();
 

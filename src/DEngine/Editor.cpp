@@ -172,7 +172,6 @@ namespace DEngine::Editor
 			{
 				if (ImGui::MenuItem("Paused", nullptr, &viewport.paused))
 				{
-					//viewport.paused = !viewport.paused;
 				}
 
 				ImGui::EndMenu();
@@ -183,165 +182,194 @@ namespace DEngine::Editor
 	}
 
 	// This also handles camera controls
-	static void DrawViewportWidget(
-		Viewport& virtualViewport,
-		ImVec2 widgetSize,
-		Cont::Span<Cont::Pair<uSize, Camera>> cameras)
+	static void InitializeVirtualViewport(
+		Viewport& viewport,
+		ImVec2 currentSize,
+		Gfx::Data& gfx);
+	static void HandleVirtualViewportResizing(
+		Viewport& viewport,
+		ImVec2 currentSize);
+	static void HandleViewportCameraMovement(
+		Camera& cam);
+	static void DrawAllVirtualViewports(EditorData& editorData, Gfx::Data& gfx);
+	static void DrawVirtualViewportContent(
+		EditorData& editorData,
+		Gfx::Data& gfx,
+		uSize viewportID,
+		Viewport& viewport)
 	{
-		ImGui::Image(virtualViewport.gfxViewportRef.ImGuiTexID(), widgetSize);
+		viewport.visible = true;
+		RenderVirtualViewport_MenuBar(viewport, { editorData.cameras.data(), editorData.cameras.size() });
 
-		if (!virtualViewport.paused && ImGui::IsItemHovered() && App::ButtonValue(App::Button::RightMouse))
+		ImVec2 currentSize = ImGui::GetContentRegionAvail();
+		if (!viewport.initialized)
+			InitializeVirtualViewport(viewport, currentSize, gfx);
+		HandleVirtualViewportResizing(viewport, currentSize);
+
+		ImGui::Image(viewport.gfxViewportRef.ImGuiTexID(), currentSize);
+
+		bool viewportIsHovered = ImGui::IsItemHovered();
+
+		if (viewportIsHovered)
 		{
-			if (App::ButtonEvent(App::Button::RightMouse) == App::InputEvent::Pressed)
+			if (App::ButtonDuration(App::Button::LeftMouse) > editorData.viewportFullscreenHoldTime)
 			{
-				Application::SetRelativeMouseMode(true);
-				virtualViewport.currentlyControlling = true;
+				editorData.insideFullscreenViewport = true;
+				editorData.fullscreenViewportID = viewportID;
 			}
-				
-			Camera* cam = nullptr;
-			if (virtualViewport.cameraID == Viewport::invalidCamID)
-				cam = &virtualViewport.camera;
-			else
-			{
-				for (auto& [camID, camera] : cameras)
-				{
-					if (camID == virtualViewport.cameraID)
-					{
-						cam = &camera;
-						break;
-					}
-				}
-			}
-			assert(cam != nullptr);
 
-			auto delta = App::MouseDelta();
-			
-			f32 sensitivity = 0.75f;
-			i32 amountX = delta[0];
+			if (App::ButtonValue(App::Button::RightMouse))
+			{
+				Camera* cam = &viewport.camera;
+				if (viewport.cameraID != Viewport::invalidCamID)
+				{
+					cam = nullptr;
+					// Find the camera
+					for (auto& [camID, camera] : editorData.cameras)
+					{
+						if (camID == viewport.cameraID)
+						{
+							cam = &camera;
+							break;
+						}
+					}
+					assert(cam != nullptr);
+				}
 #pragma warning( suppress : 6011 )
-			// Apply left and right rotation
-			cam->rotation = Math::UnitQuat::FromVector(Math::Vec3D::Up(), -sensitivity * amountX) * cam->rotation;
-
-			i32 amountY = delta[1];
-
-			// Limit rotation up and down
-			Math::Vec3D forward = Math::LinTran3D::ForwardVector(cam->rotation);
-			float dot = Math::Vec3D::Dot(forward, Math::Vec3D::Up());
-			if (dot <= -0.99f)
-				amountY = Math::Min(0, amountY);
-			else if (dot >= 0.99f)
-				amountY = Math::Max(0, amountY);
-
-			// Apply up and down rotation
-			Math::Vec3D right = Math::LinTran3D::RightVector(cam->rotation);
-			cam->rotation = Math::UnitQuat::FromVector(right, sensitivity * amountY) * cam->rotation;
-
-			// Handle camera movement
-			f32 moveSpeed = 5.f;
-			if (App::ButtonValue(App::Button::W))
-				cam->position -= moveSpeed * Math::LinTran3D::ForwardVector(cam->rotation) * Time::Delta();
-			if (App::ButtonValue(App::Button::S))
-				cam->position += moveSpeed * Math::LinTran3D::ForwardVector(cam->rotation) * Time::Delta();
-			if (App::ButtonValue(App::Button::D))
-				cam->position += moveSpeed * Math::LinTran3D::RightVector(cam->rotation) * Time::Delta();
-			if (App::ButtonValue(App::Button::A))
-				cam->position -= moveSpeed * Math::LinTran3D::RightVector(cam->rotation) * Time::Delta();
-			if (App::ButtonValue(App::Button::Space))
-				cam->position.y -= moveSpeed * Time::Delta();
-			if (App::ButtonValue(App::Button::LeftCtrl))
-				cam->position.y += moveSpeed * Time::Delta();
-		}
-		else
-		{
-			if (virtualViewport.currentlyControlling == true)
-			{
-				Application::SetRelativeMouseMode(false);
-				virtualViewport.currentlyControlling = false;
+				HandleViewportCameraMovement(*cam);
 			}
 		}
 	}
+}
 
-	static void DrawVirtualViewports(EditorData& editorData, Gfx::Data& gfx)
+// This also handles camera controls
+static void  DEngine::Editor::InitializeVirtualViewport(
+	Viewport& viewport,
+	ImVec2 currentSize,
+	Gfx::Data& gfx)
+{
+	Gfx::ViewportRef newGfxVirtualViewport = gfx.NewViewport();
+	viewport.gfxViewportRef = newGfxVirtualViewport;
+	viewport.width = (u32)currentSize.x;
+	viewport.height = (u32)currentSize.y;
+	viewport.renderWidth = (u32)currentSize.x;
+	viewport.renderHeight = (u32)currentSize.y;
+	viewport.initialized = true;
+}
+
+static void DEngine::Editor::HandleVirtualViewportResizing(
+	Viewport& viewport,
+	ImVec2 currentSize)
+{
+	// Manage the resizing of the viewport.
+	if (currentSize.x != viewport.width || currentSize.y != viewport.height)
+		viewport.currentlyResizing = true;
+	if (viewport.currentlyResizing && currentSize.x == viewport.width && currentSize.y == viewport.height)
 	{
-		// We use signed integer because of the way we remove the viewport.
-		for (iSize i = 0; i < (iSize)editorData.viewports.size(); i += 1)
+		viewport.renderWidth = (u32)currentSize.x;
+		viewport.renderHeight = (u32)currentSize.y;
+		viewport.currentlyResizing = false;
+	}
+	viewport.width = (u32)currentSize.x;
+	viewport.height = (u32)currentSize.y;
+}
+
+static void DEngine::Editor::HandleViewportCameraMovement(
+	Camera& cam)
+{
+	auto delta = App::MouseDelta();
+
+	f32 sensitivity = 0.75f;
+	i32 amountX = delta[0];
+	// Apply left and right rotation
+	cam.rotation = Math::UnitQuat::FromVector(Math::Vec3D::Up(), -sensitivity * amountX) * cam.rotation;
+
+	i32 amountY = delta[1];
+
+	// Limit rotation up and down
+	Math::Vec3D forward = Math::LinTran3D::ForwardVector(cam.rotation);
+	float dot = Math::Vec3D::Dot(forward, Math::Vec3D::Up());
+	if (dot <= -0.99f)
+		amountY = Math::Min(0, amountY);
+	else if (dot >= 0.99f)
+		amountY = Math::Max(0, amountY);
+
+	// Apply up and down rotation
+	Math::Vec3D right = Math::LinTran3D::RightVector(cam.rotation);
+	cam.rotation = Math::UnitQuat::FromVector(right, sensitivity * amountY) * cam.rotation;
+
+	// Handle camera movement
+	f32 moveSpeed = 5.f;
+	if (App::ButtonValue(App::Button::W))
+		cam.position -= moveSpeed * Math::LinTran3D::ForwardVector(cam.rotation) * Time::Delta();
+	if (App::ButtonValue(App::Button::S))
+		cam.position += moveSpeed * Math::LinTran3D::ForwardVector(cam.rotation) * Time::Delta();
+	if (App::ButtonValue(App::Button::D))
+		cam.position += moveSpeed * Math::LinTran3D::RightVector(cam.rotation) * Time::Delta();
+	if (App::ButtonValue(App::Button::A))
+		cam.position -= moveSpeed * Math::LinTran3D::RightVector(cam.rotation) * Time::Delta();
+	if (App::ButtonValue(App::Button::Space))
+		cam.position.y -= moveSpeed * Time::Delta();
+	if (App::ButtonValue(App::Button::LeftCtrl))
+		cam.position.y += moveSpeed * Time::Delta();
+}
+
+static void DEngine::Editor::DrawAllVirtualViewports(EditorData& editorData, Gfx::Data& gfx)
+{
+	// We use signed integer because of the way we remove the viewport.
+	for (iSize i = 0; i < (iSize)editorData.viewports.size(); i += 1)
+	{
+		auto const& viewportID = editorData.viewports[i].a;
+		auto& virtualViewport = editorData.viewports[i].b;
+
+		// Check that our selected camera still exists.
+		// If it no longer exists, fallback to the standard one.
+		if (virtualViewport.cameraID != Viewport::invalidCamID)
 		{
-			auto const& viewportID = editorData.viewports[i].a;
-			auto& virtualViewport = editorData.viewports[i].b;
-
-			virtualViewport.visible = false;
-
-			// Check that our selected camera still exists
-			if (virtualViewport.cameraID != Viewport::invalidCamID)
+			bool camFound = false;
+			for (auto const& [camID, cam] : editorData.cameras)
 			{
-				bool camFound = false;
-				for (auto const& [camID, cam] : editorData.cameras)
+				if (camID == virtualViewport.cameraID)
 				{
-					if (camID == virtualViewport.cameraID)
-					{
-						camFound = true;
-						break;
-					}
+					camFound = true;
+					break;
 				}
-				if (!camFound)
-					virtualViewport.cameraID = Viewport::invalidCamID;
 			}
+			if (!camFound)
+				virtualViewport.cameraID = Viewport::invalidCamID;
+		}
+			
+		bool windowIsOpen = true;
+		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize({ 250, 250 }, ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSizeConstraints({ 200, 200 }, { 8192, 8192 });
+		ImGuiWindowFlags windowFlags = 0;
+		windowFlags |= ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse;
+		windowFlags |= ImGuiWindowFlags_::ImGuiWindowFlags_NoScrollbar;
+		windowFlags |= ImGuiWindowFlags_::ImGuiWindowFlags_MenuBar;
+		std::string name = std::string("Viewport #") + std::to_string(viewportID);
+		if (ImGui::Begin(name.data(), &windowIsOpen, windowFlags))
+		{
+			DrawVirtualViewportContent(
+				editorData,
+				gfx,
+				viewportID,
+				virtualViewport);
+		}
+		ImGui::End();
 
 
-			std::string name = std::string("Viewport #") + std::to_string(viewportID);
-
-			bool windowIsOpen = true;
-
-			ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
-			ImGui::SetNextWindowSize({ 250, 250 }, ImGuiCond_FirstUseEver);
-			ImGui::SetNextWindowSizeConstraints({ 200, 200 }, { 8192, 8192 });
-			ImGuiWindowFlags windowFlags = 0;
-			windowFlags |= ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse;
-			windowFlags |= ImGuiWindowFlags_::ImGuiWindowFlags_NoScrollbar;
-			windowFlags |= ImGuiWindowFlags_::ImGuiWindowFlags_MenuBar;
-			if (ImGui::Begin(name.data(), &windowIsOpen, windowFlags))
-			{
-				virtualViewport.visible = true;
-				RenderVirtualViewport_MenuBar(virtualViewport, { editorData.cameras.data(), editorData.cameras.size() });
-
-				ImVec2 newSize = ImGui::GetContentRegionAvail();
-				if (!virtualViewport.initialized)
-				{
-					Gfx::ViewportRef newGfxVirtualViewport = gfx.NewViewport();
-					virtualViewport.gfxViewportRef = newGfxVirtualViewport;
-					virtualViewport.width = (u32)newSize.x;
-					virtualViewport.height = (u32)newSize.y;
-					virtualViewport.renderWidth = (u32)newSize.x;
-					virtualViewport.renderHeight = (u32)newSize.y;
-					virtualViewport.initialized = true;
-				}
-				{
-					// Manage the resizing of the viewport.
-					if (newSize.x != virtualViewport.width || newSize.y != virtualViewport.height)
-						virtualViewport.currentlyResizing = true;
-					if (virtualViewport.currentlyResizing && newSize.x == virtualViewport.width && newSize.y == virtualViewport.height)
-					{
-						virtualViewport.renderWidth = (u32)newSize.x;
-						virtualViewport.renderHeight = (u32)newSize.y;
-						virtualViewport.currentlyResizing = false;
-					}
-					virtualViewport.width = (u32)newSize.x;
-					virtualViewport.height = (u32)newSize.y;
-				}
-
-				DrawViewportWidget(virtualViewport, newSize, { editorData.cameras.data(), editorData.cameras.size() });
-			}
-			ImGui::End();
-
-			// The window was closed this frame
-			if (!windowIsOpen)
-			{
-				gfx.DeleteViewport(virtualViewport.gfxViewportRef.ViewportID());
-				editorData.viewports.erase(editorData.viewports.begin() + i);
-				i--;
-			}
+		
+		// The window was closed this frame
+		if (!windowIsOpen)
+		{
+			gfx.DeleteViewport(virtualViewport.gfxViewportRef.ViewportID());
+			editorData.viewports.erase(editorData.viewports.begin() + i);
+			i--;
 		}
 	}
+
+
 }
 
 namespace DEngine::Editor
@@ -370,41 +398,11 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 	{
 		editorData.dockSpaceID = ImGui::GetID("test");
 	}
-
-	ImGuiDockNodeFlags dockspaceFlags = 0;
-	//dockspaceFlags = ImGuiDockNodeFlags_PassthruCentralNode;
-
-	// We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
-	// because it would be confusing to have two docking targets within each others.
-	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
-	ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(viewport->Pos);
-	ImGui::SetNextWindowSize(viewport->Size);
-	ImGui::SetNextWindowViewport(viewport->ID);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-
-	// When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background 
-	// and handle the pass-thru hole, so we ask Begin() to not render a background.
-	if (dockspaceFlags & ImGuiDockNodeFlags_PassthruCentralNode)
-		window_flags |= ImGuiWindowFlags_NoBackground;
-
-	// Important: note that we proceed even if Begin() returns false (aka window is collapsed).
-	// This is because we want to keep our DockSpace() active. If a DockSpace() is inactive,
-	// all active windows docked into it will lose their parent and become undocked.
-	// We cannot preserve the docking relationship between an active window and an inactive docking, otherwise
-	// any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-	//bool test = false;
-	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
-	ImGui::PopStyleVar(3);
-
-	ImGui::DockSpace(editorData.dockSpaceID, ImVec2(0.0f, 0.0f), dockspaceFlags);
-
-	if (ImGui::BeginMenuBar())
+	
+	if (ImGui::BeginMainMenuBar())
 	{
+		editorData.mainMenuBarSize = ImGui::GetWindowSize();
+
 		if (ImGui::MenuItem("File", nullptr, nullptr, true))
 		{
 
@@ -434,19 +432,154 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 
 		}
 
-		ImGui::EndMenuBar();
+		ImGui::EndMainMenuBar();
 	}
+	
+
+	ImGuiDockNodeFlags dockspaceFlags = 0;
+	//dockspaceFlags = ImGuiDockNodeFlags_PassthruCentralNode;
+
+	// We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
+	// because it would be confusing to have two docking targets within each others.
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+	ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(viewport->Pos);
+	ImGui::SetNextWindowSize(viewport->Size);
+	ImGui::SetNextWindowViewport(viewport->ID);
+	//ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	//ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+	// When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background 
+	// and handle the pass-thru hole, so we ask Begin() to not render a background.
+	if (dockspaceFlags & ImGuiDockNodeFlags_PassthruCentralNode)
+		window_flags |= ImGuiWindowFlags_NoBackground;
+
+	// Important: note that we proceed even if Begin() returns false (aka window is collapsed).
+	// This is because we want to keep our DockSpace() active. If a DockSpace() is inactive,
+	// all active windows docked into it will lose their parent and become undocked.
+	// We cannot preserve the docking relationship between an active window and an inactive docking, otherwise
+	// any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
+	//ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	//bool test = false;
+	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
+	//ImGui::PopStyleVar(3);
+
+	ImGui::DockSpace(editorData.dockSpaceID, ImVec2(0.0f, 0.0f), dockspaceFlags);
+
+
 
 	ImGui::End();
 
-
 	static bool testShowWindow = true;
-	ImGui::ShowDemoWindow(nullptr);
+	if (testShowWindow)
+	{
+		ImGui::ShowDemoWindow(&testShowWindow);
+	}
+	
+
+	if (!editorData.insideFullscreenViewport)
+	{
+		DrawViewportManager(editorData);
+		DrawCameraManager(editorData);
+		DrawAllVirtualViewports(editorData, gfx);
+	}
+	else
+	{
+		bool windowIsOpen = true;
+		ImGuiViewport* mainImguiViewport = ImGui::GetMainViewport();
+		
+		ImVec2 windowSize = mainImguiViewport->Size;
+		windowSize.y -= editorData.mainMenuBarSize.y;
+
+		ImGui::SetNextWindowSize(windowSize, ImGuiCond_Always);
+		ImGui::SetNextWindowPos({ 0, editorData.mainMenuBarSize.y }, ImGuiCond_Always);
+		ImGui::SetNextWindowFocus();
+		ImGuiWindowFlags windowFlags = 0;
+		windowFlags |= ImGuiWindowFlags_NoCollapse;
+		windowFlags |= ImGuiWindowFlags_NoScrollbar;
+		windowFlags |= ImGuiWindowFlags_NoResize;
+		windowFlags |= ImGuiWindowFlags_NoMove;
+		windowFlags |= ImGuiWindowFlags_NoTitleBar;
+		if (ImGui::Begin("Testtestest", &windowIsOpen, windowFlags))
+		{
+			Viewport* vp = nullptr;
+			for (auto& item : editorData.viewports)
+			{
+				if (item.a == editorData.fullscreenViewportID)
+				{
+					vp = &item.b;
+					break;
+				}
+			}
+			assert(vp != nullptr);
+			vp->visible = true;
 
 
-	DrawViewportManager(editorData);
-	DrawCameraManager(editorData);
-	DrawVirtualViewports(editorData, gfx);
+			ImVec2 imgSize = ImGui::GetContentRegionAvail();
+
+			HandleVirtualViewportResizing(*vp, imgSize);
+
+			ImVec2 imgPos = ImGui::GetCursorPos();
+
+			ImGui::Image(vp->gfxViewportRef.ImGuiTexID(), imgSize);
+
+			if (ImGui::IsItemHovered())
+			{
+				Viewport& viewport = *vp;
+				Camera* camPtr = &viewport.camera;
+				if (viewport.cameraID != Viewport::invalidCamID)
+				{
+					camPtr = nullptr;
+					// Find the camera
+					for (auto& [camID, camera] : editorData.cameras)
+					{
+						if (camID == viewport.cameraID)
+						{
+							camPtr = &camera;
+							break;
+						}
+					}
+					assert(camPtr != nullptr);
+				}
+#pragma warning( suppress : 6011 )
+				Camera& cam = *camPtr;
+				if (App::ButtonValue(App::Button::RightMouse))
+					HandleViewportCameraMovement(cam);
+
+				if (App::ButtonValue(App::Button::LeftMouse))
+				{
+					ImVec2 windowPos = ImGui::GetWindowPos();
+					ImVec2 mousePos = ImGui::GetMousePos();
+					mousePos.x -= imgPos.x + windowPos.x;
+					mousePos.y -= imgPos.y + windowPos.y;
+					Math::Vec2D mousePosNormalized = { (f32)mousePos.x / (f32)imgSize.x, (f32)mousePos.y / (f32)imgSize.y };
+					mousePosNormalized.x -= 0.5f;
+					mousePosNormalized.y -= 0.5f;
+					mousePosNormalized *= 2.f;
+					mousePosNormalized.y = -mousePosNormalized.y;
+
+					//std::cout << mousePosNormalized.x << ", " << mousePosNormalized.y << std::endl;
+					//std::cout << mousePos.x << ", " << mousePos.y << std::endl;
+					//std::cout << imgSize.x << ", " << imgSize.y << std::endl;
+
+
+					f32 moveSpeed = 5.f;
+					cam.position -= moveSpeed * Math::LinTran3D::ForwardVector(cam.rotation) * Time::Delta() * mousePosNormalized.y;
+					cam.position += moveSpeed * Math::LinTran3D::RightVector(cam.rotation) * Time::Delta() * mousePosNormalized.x;
+				}
+
+			}
+		}
+		ImGui::End();
+
+		if (App::ButtonEvent(App::Button::Escape) == App::InputEvent::Pressed)
+		{
+			editorData.insideFullscreenViewport = false;
+			editorData.fullscreenViewportID = EditorData::invalidViewportID;
+		}
+	}
 
 
 	ImGui::EndFrame();

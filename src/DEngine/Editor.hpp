@@ -54,22 +54,29 @@ namespace DEngine::Editor
 
 		Gfx::ViewportRef gfxViewportRef{};
 
-		uSize cameraID = invalidCamID;
 		static constexpr uSize invalidCamID = static_cast<uSize>(-1);
+		uSize cameraID = invalidCamID;
 		Camera camera{};
 	};
 
 	struct EditorData
 	{
 		std::vector<Cont::Pair<uSize, Viewport>> viewports{};
+		static constexpr uSize invalidViewportID = static_cast<uSize>(-1);
 
 		std::vector<Cont::Pair<uSize,Camera>> cameras{};
 
 		ImGuiID dockSpaceID = 0;
 
+		ImVec2 mainMenuBarSize{};
+
 		std::chrono::steady_clock::time_point deltaTimePoint{};
 		std::string displayedDeltaTime{};
 		float deltaTimeRefreshTime = 0.25f;
+
+		float viewportFullscreenHoldTime = 1.f;
+		bool insideFullscreenViewport = false;
+		uSize fullscreenViewportID = invalidViewportID;
 	};
 
 	EditorData Initialize();
