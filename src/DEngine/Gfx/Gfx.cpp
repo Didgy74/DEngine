@@ -7,7 +7,7 @@
 
 using namespace DEngine;
 
-Cont::Opt<Gfx::Data> DEngine::Gfx::Initialize(const InitInfo& initInfo)
+Std::Opt<Gfx::Data> DEngine::Gfx::Initialize(const InitInfo& initInfo)
 {
 	Gfx::Data returnVal{};
 
@@ -19,7 +19,7 @@ Cont::Opt<Gfx::Data> DEngine::Gfx::Initialize(const InitInfo& initInfo)
 
 	Vk::InitializeBackend(returnVal, initInfo, returnVal.apiDataBuffer);
 
-	return Cont::Opt<Gfx::Data>(Util::move(returnVal));
+	return Std::Opt<Gfx::Data>(Util::move(returnVal));
 }
 
 void DEngine::Gfx::Data::Draw(Draw_Params const& params)

@@ -14,7 +14,7 @@ namespace DEngine::Gfx::Vk::Init
 		bool debugUtilsEnabled = false;
 	};
 	[[nodiscard]] CreateVkInstance_Return CreateVkInstance(
-		Cont::Span<char const*> requiredExtensions,
+		Std::Span<char const*> requiredExtensions,
 		bool enableLayers,
 		BaseDispatch const& baseDispatch,
 		ILog* logger);
@@ -36,7 +36,7 @@ namespace DEngine::Gfx::Vk::Init
 		GlobUtils& globUtils,
 		DebugUtilsDispatch const* debugUtils);
 
-	[[nodiscard]] Cont::FixedVector<vk::Fence, Constants::maxResourceSets> CreateMainFences(
+	[[nodiscard]] Std::StaticVector<vk::Fence, Constants::maxResourceSets> CreateMainFences(
 		DevDispatch const& device,
 		u8 resourceSetCount,
 		DebugUtilsDispatch const* debugUtils);
@@ -75,7 +75,7 @@ namespace DEngine::Gfx::Vk::Init
 		DeviceDispatch const& device,
 		DeletionQueue const& deletionQueue,
 		QueueData const& queues,
-		Cont::Span<const vk::Image> images);
+		Std::Span<const vk::Image> images);
 
 	void RecordSwapchainCmdBuffers(
 		DeviceDispatch const& device,

@@ -11,7 +11,7 @@
 #include "DEngine/Gfx/Gfx.hpp"
 
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/FixedVector.hpp"
+#include "DEngine/Containers/StaticVector.hpp"
 #include "DEngine/Containers/Array.hpp"
 #include "DEngine/Containers/Pair.hpp"
 
@@ -81,10 +81,10 @@ namespace DEngine::Gfx::Vk
 		vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
 		vk::SurfaceFormatKHR surfaceFormat{};
 
-		Cont::FixedVector<vk::Image, Constants::maxSwapchainLength> images{};
+		Std::StaticVector<vk::Image, Constants::maxSwapchainLength> images{};
 
 		vk::CommandPool cmdPool{};
-		Cont::FixedVector<vk::CommandBuffer, Constants::maxSwapchainLength> cmdBuffers{};
+		Std::StaticVector<vk::CommandBuffer, Constants::maxSwapchainLength> cmdBuffers{};
 		vk::Semaphore imageAvailableSemaphore{};
 	};
 
@@ -108,7 +108,7 @@ namespace DEngine::Gfx::Vk
 	{
 		GfxRenderTarget renderTarget{};
 		vk::CommandPool cmdPool{};
-		Cont::FixedVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
+		Std::StaticVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
 		void* imguiTextureID = nullptr;
 	};
 
@@ -128,14 +128,14 @@ namespace DEngine::Gfx::Vk
 		GUIRenderTarget renderTarget{};
 		vk::CommandPool cmdPool{};
 		// Has length of resource sets
-		Cont::FixedVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
+		Std::StaticVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
 	};
 
 	struct ViewportManager
 	{
 		std::mutex viewportDataLock{};
 		uSize viewportIDTracker = 0;
-		std::vector<Cont::Pair<uSize, ViewportVkData>> viewportDatas{};
+		std::vector<Std::Pair<uSize, ViewportVkData>> viewportDatas{};
 	};
 
 	// Everything here is thread-safe to use and access!!
@@ -184,7 +184,7 @@ namespace DEngine::Gfx::Vk
 
 		u8 currentInFlightFrame = 0;
 
-		Cont::FixedVector<vk::Fence, Constants::maxResourceSets> mainFences{};
+		Std::StaticVector<vk::Fence, Constants::maxResourceSets> mainFences{};
 
 		GUIData guiData{};
 
@@ -193,7 +193,7 @@ namespace DEngine::Gfx::Vk
 		ViewportManager viewportManager{};
 
 		vk::DescriptorSetLayout test_cameraDescrLayout{};
-		Cont::FixedVector<vk::DescriptorSet, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> test_cameraDescrSets{};
+		Std::StaticVector<vk::DescriptorSet, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> test_cameraDescrSets{};
 		void* test_mappedMem = nullptr;
 		u32 test_camUboOffset = 0;
 

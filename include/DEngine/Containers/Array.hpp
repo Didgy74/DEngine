@@ -3,7 +3,7 @@
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Span.hpp"
 
-namespace DEngine::Containers
+namespace DEngine::Std
 {
 	template<typename T, uSize length>
 	class Array
@@ -128,9 +128,3 @@ namespace DEngine::Containers
 		return m_unused + length;
 	}
 }
-
-namespace DEngine
-{
-	namespace Cont = Containers;
-}
-

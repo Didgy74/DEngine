@@ -3,7 +3,7 @@
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Span.hpp"
 #include "DEngine/Containers/Optional.hpp"
-#include "DEngine/Containers/FixedVector.hpp"
+#include "DEngine/Containers/StaticVector.hpp"
 
 #include "DEngine/Math/Matrix/Matrix.hpp"
 #include "DEngine/Math/Common.hpp"
@@ -34,7 +34,7 @@ namespace DEngine::Gfx
 		bool presentMainWindow = false;
 		bool resizeEvent = false;
 		
-		Cont::FixedVector<ViewportUpdateData, 10> viewportUpdates = {};
+		Std::StaticVector<ViewportUpdateData, 10> viewportUpdates = {};
 	};
 
 	class Data
@@ -57,7 +57,7 @@ namespace DEngine::Gfx
 
 		void* apiDataBuffer{};
 
-		friend Cont::Opt<Data> Initialize(const InitInfo& initInfo);
+		friend Std::Opt<Data> Initialize(const InitInfo& initInfo);
 	};
 
 	struct InitInfo
@@ -67,7 +67,7 @@ namespace DEngine::Gfx
 
 		ILog* optional_iLog = nullptr;
 		IWsi* iWsi = nullptr;
-		Cont::Span<char const*> requiredVkInstanceExtensions{};
+		Std::Span<char const*> requiredVkInstanceExtensions{};
 	};
 
 	class ILog
@@ -108,5 +108,5 @@ namespace DEngine::Gfx
 	};
 
 	
-	Cont::Opt<Data> Initialize(const InitInfo& initInfo);
+	Std::Opt<Data> Initialize(const InitInfo& initInfo);
 }

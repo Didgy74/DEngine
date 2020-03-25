@@ -2,7 +2,7 @@
 
 #include "DEngine/Application.hpp"
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/FixedVector.hpp"
+#include "DEngine/Containers/StaticVector.hpp"
 
 namespace DEngine::Application::detail
 {
@@ -18,6 +18,6 @@ namespace DEngine::Application::detail
 	void ImgGui_Initialize();
 	void ImGui_NewFrame();
 
-	Cont::FixedVector<char const*, 5> GetRequiredVulkanInstanceExtensions();
+	Std::StaticVector<char const*, 5> GetRequiredVulkanInstanceExtensions();
 	bool CreateVkSurface(u64 vkInstance, void const* vkAllocationCallbacks, void* userData, u64* vkSurface);
 }

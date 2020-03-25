@@ -1,10 +1,8 @@
 
 #include "ImGui/imgui.h"
-#include "ImGui/imgui_impl_sdl.h"
 
 #include "DEngine/Application.hpp"
 #include "DEngine/Application/detail_Application.hpp"
-#include "DEngine/InputRaw.hpp"
 #include "DEngine/Time.hpp"
 #include "DEngine/Editor.hpp"
 
@@ -72,7 +70,7 @@ public:
 	}
 };
 
-#include "SDL2/SDL_main.h"
+
 int main(int argc, char** argv)
 {
 	using namespace DEngine;
@@ -106,7 +104,7 @@ int main(int argc, char** argv)
 	rendererInitInfo.iWsi = &gfxWsiInterface;
 	rendererInitInfo.optional_iLog = &gfxLogger;
 	rendererInitInfo.requiredVkInstanceExtensions = requiredInstanceExtensions.ToSpan();
-	Cont::Optional<Gfx::Data> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
+	Std::Optional<Gfx::Data> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
 	if (!rendererDataOpt.HasValue())
 	{
 		std::cout << "Could not initialize renderer." << std::endl;
@@ -118,7 +116,6 @@ int main(int argc, char** argv)
 	while (true)
 	{
 		Time::TickStart();
-		Input::Core::TickStart();
 		App::detail::ProcessEvents();
 		if (App::detail::ShouldShutdown())
 			break;
@@ -181,12 +178,6 @@ int main(int argc, char** argv)
 			params.resizeEvent = true;
 
 		rendererData.Draw(params);
-		// Update and Render additional Platform Windows
-		if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-		{
-			ImGui::UpdatePlatformWindows();
-			ImGui::RenderPlatformWindowsDefault();
-		}
 
 	}
 

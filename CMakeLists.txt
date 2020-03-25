@@ -83,10 +83,11 @@ set(CMAKE_CXX_STANDARD 17)
 # -----------------------
 # START
 	if(WIN32)
-		set(SDL2_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/SDL2/Windows")
+		set(glfw3_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/glfw3")
 	endif()
-	find_package(SDL2 REQUIRED)
-	target_link_libraries(${PROJECT_NAME} PRIVATE SDL2)
+	# GLFW3
+	find_package(glfw3 REQUIRED)
+	target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
 
 	find_package(Vulkan REQUIRED)
 	target_include_directories(${PROJECT_NAME} PRIVATE ${Vulkan_INCLUDE_DIRS})
@@ -102,48 +103,38 @@ set(CMAKE_CXX_STANDARD 17)
 	set(IMGUI_SRC_DIR "${IMGUI_ROOT_DIR}/src")
 	set(IMGUI_INCLUDE_DIR "${IMGUI_ROOT_DIR}/include")
 	file(GLOB_RECURSE IMGUI_SOURCE_FILES "${IMGUI_SRC_DIR}/*.cpp" )
-	set(IMGUI_LIB_NAME IMGUI_LIB)
-	add_library(${IMGUI_LIB_NAME} ${IMGUI_SOURCE_FILES})
-	target_include_directories(${IMGUI_LIB_NAME} PUBLIC ${IMGUI_INCLUDE_DIR})
-	target_link_libraries(${IMGUI_LIB_NAME} PRIVATE SDL2)
-	target_include_directories(${IMGUI_LIB_NAME} PRIVATE ${Vulkan_INCLUDE_DIRS})
+	add_library(IMGUI_LIB ${IMGUI_SOURCE_FILES})
+	target_include_directories(IMGUI_LIB PUBLIC ${IMGUI_INCLUDE_DIR})
+	target_link_libraries(IMGUI_LIB PUBLIC glfw)
+	target_include_directories(IMGUI_LIB PRIVATE ${Vulkan_INCLUDE_DIRS})
 	if (MSVC)
-		target_compile_options(${IMGUI_LIB_NAME} PRIVATE /w)
+		target_compile_options(IMGUI_LIB PRIVATE /w)
 	endif()
 
-	target_link_libraries(${PROJECT_NAME} PRIVATE ${IMGUI_LIB_NAME})
+	target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI_LIB)
 #
 # END
 #
 
 
-
-
-
-# SDL2 binaries
+# GLFW3 binaries
 if(WIN32)
-	set(SDL2_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/external/SDL2/Windows")
-	if(MSVC)
+	set(GLFW3_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/external/GLFW3")
+    if(MSVC)
 		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
-			set(SDL2_BINDIR "${SDL2_FOLDER}/MSVC x86")
+			set(GLFW3_BINDIR "${GLFW3_FOLDER}/MSVC x86")
 		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
-			set(SDL2_BINDIR "${SDL2_FOLDER}/MSVC x64")
-		endif()
-	elseif(MINGW)
-		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
-			set(SDL2_BINDIR "${SDL2_FOLDER}/MinGW/x86/bin")	
-		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
-			set(SDL2_BINDIR "${SDL2_FOLDER}/MinGW/x64/bin")
+			set(GLFW3_BINDIR "${GLFW3_FOLDER}/MSVC x64")
 		endif()
 	else()
-		message(FATAL_ERROR "Platform not supported. Couldn't link GLEW.")
+		message(FATAL_ERROR "Platform not supported. Couldn't link GLFW.")
 	endif()
-	set(SDL2_BINNAME "SDL2.dll")
-	set(SDL2_BINARY "${SDL2_BINDIR}/${SDL2_BINNAME}")
+	set(GLFW3_BINNAME glfw3.dll)
+    set(GLFW3_BINARY "${GLFW3_BINDIR}/${GLFW3_BINNAME}")
 	add_custom_command(
 		TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		"${SDL2_BINARY}"
-		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/${SDL2_BINNAME}"
+		"${GLFW3_BINARY}"
+		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/${GLFW3_BINNAME}"
 		)
 endif()

@@ -201,7 +201,7 @@ namespace DEngine::Gfx::Vk
 	// Assumes that the mutex for viewportmanager is already locked.
 	void HandleVirtualViewportEvents(
 		GlobUtils const& globUtils,
-		Cont::Span<ViewportUpdateData const> viewportUpdates,
+		Std::Span<ViewportUpdateData const> viewportUpdates,
 		ViewportManager& viewportManager)
 	{
 		vk::Result vkResult{};
@@ -377,7 +377,7 @@ void DEngine::Gfx::Vk::Draw(Data& gfxData, Draw_Params const& drawParams, void* 
 		throw std::runtime_error("Vulkan: Failed to wait for cmd buffer fence.");
 	device.resetFences({ apiData.mainFences[currentInFlightIndex] });
 
-	Cont::FixedVector<vk::CommandBuffer, 10> cmdBuffersToSubmit{};
+	Std::StaticVector<vk::CommandBuffer, 10> cmdBuffersToSubmit{};
 
 	for (auto const& viewportUpdate : drawParams.viewportUpdates)
 	{

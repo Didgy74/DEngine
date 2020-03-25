@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <new>
 
-namespace DEngine::Containers
+namespace DEngine::Std
 {
 	template<typename T>
 	class Optional
@@ -86,9 +86,4 @@ namespace DEngine::Containers
 			throw std::runtime_error("Tried to deference Optional-variable without Value.");
 		return m_value;
 	}
-}
-
-namespace DEngine
-{
-	namespace Cont = Containers;
 }

@@ -5,7 +5,7 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Span.hpp"
-#include "DEngine/Containers/FixedVector.hpp"
+#include "DEngine/Containers/StaticVector.hpp"
 
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_vulkan.h"
@@ -234,7 +234,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 		poolInfo.maxSets = Constants::maxResourceSets * Gfx::Constants::maxViewportCount;
 		vk::DescriptorPool descrPool = apiData.globUtils.device.createDescriptorPool(poolInfo);
 
-		Cont::FixedVector<vk::DescriptorSetLayout, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> descrLayouts{};
+		Std::StaticVector<vk::DescriptorSetLayout, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> descrLayouts{};
 		descrLayouts.Resize(descrLayouts.Capacity());
 		for (auto& item : descrLayouts)
 			item = apiData.test_cameraDescrLayout;
@@ -244,7 +244,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 		setAllocInfo.descriptorSetCount = (u32)descrLayouts.Size();
 		setAllocInfo.pSetLayouts = descrLayouts.Data();
 
-		Cont::FixedVector<vk::DescriptorSet, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> descrSets{};
+		Std::StaticVector<vk::DescriptorSet, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> descrSets{};
 		descrSets.Resize(descrSets.Capacity());
 		vkResult = apiData.globUtils.device.allocateDescriptorSets(setAllocInfo, descrSets.Data());
 		if (vkResult != vk::Result::eSuccess)
@@ -254,9 +254,9 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 		// Update the descriptor sets to point at the camera-Data
 		{
 
-			Cont::FixedVector<vk::WriteDescriptorSet, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> descrWrites{};
+			Std::StaticVector<vk::WriteDescriptorSet, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> descrWrites{};
 			descrWrites.Resize(descrWrites.Capacity());
-			Cont::FixedVector<vk::DescriptorBufferInfo, descrWrites.Capacity()> bufferInfos{};
+			Std::StaticVector<vk::DescriptorBufferInfo, descrWrites.Capacity()> bufferInfos{};
 			bufferInfos.Resize(descrWrites.Size());
 
 			for (uSize i = 0; i < descrSets.Size(); i++)
@@ -289,12 +289,11 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	return true;
 }
 
-#include "SDL2/SDL.h"
-//#include <fstream>
+//#include "SDL2/SDL.h"
+#include <fstream>
 
 void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 {
-	
 	vk::Result vkResult{};
 
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -302,20 +301,18 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	pipelineLayoutInfo.pSetLayouts = &apiData.test_cameraDescrLayout;
 	apiData.testPipelineLayout = apiData.globUtils.device.createPipelineLayout(pipelineLayoutInfo);
 
-	//std::ifstream test("data/vert.spv", std::ifstream::binary);
-	//if (test.is_open() == false)
-		//throw std::runtime_error("Could not open vertex shader file");
-
-	SDL_RWops* vertFile = SDL_RWFromFile("data/vert.spv", "rb");
-	if (vertFile == nullptr)
+	std::ifstream vertFile("data/vert.spv", std::ifstream::binary | std::ifstream::ate);
+	if (vertFile.is_open() == false)
 		throw std::runtime_error("Could not open vertex shader file");
-	Sint64 vertFileLength = SDL_RWsize(vertFile);
+
+	auto vertFileLength = vertFile.tellg();
+	vertFile.seekg(0);
 	if (vertFileLength <= 0)
 		throw std::runtime_error("Could not grab Size of vertex shader file");
 	// Create vertex shader module
 	std::vector<u8> vertCode(vertFileLength);
-	SDL_RWread(vertFile, vertCode.data(), 1, vertFileLength);
-	SDL_RWclose(vertFile);
+	vertFile.read((char*)vertCode.data(), vertFileLength);
+	vertFile.close();
 
 	vk::ShaderModuleCreateInfo vertModCreateInfo{};
 	vertModCreateInfo.codeSize = vertCode.size();
@@ -326,15 +323,16 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	vertStageInfo.module = vertModule;
 	vertStageInfo.pName = "main";
 
-	SDL_RWops* fragFile = SDL_RWFromFile("data/frag.spv", "rb");
-	if (fragFile == nullptr)
+	std::ifstream fragFile("data/frag.spv", std::ifstream::binary | std::ifstream::ate);
+	if (fragFile.is_open() == false)
 		throw std::runtime_error("Could not open fragment shader file");
-	Sint64 fragFileLength = SDL_RWsize(fragFile);
+	auto fragFileLength = fragFile.tellg();
+	fragFile.seekg(0);
 	if (fragFileLength <= 0)
 		throw std::runtime_error("Could not grab Size of fragment shader file");
 	std::vector<u8> fragCode(fragFileLength);
-	SDL_RWread(fragFile, fragCode.data(), 1, fragFileLength);
-	SDL_RWclose(fragFile);
+	fragFile.read((char*)fragCode.data(), fragFileLength);
+	fragFile.close();
 
 	vk::ShaderModuleCreateInfo fragModInfo{};
 	fragModInfo.codeSize = fragCode.size();
@@ -345,7 +343,7 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	fragStageInfo.module = fragModule;
 	fragStageInfo.pName = "main";
 
-	Cont::Array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = { vertStageInfo, fragStageInfo };
+	Std::Array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = { vertStageInfo, fragStageInfo };
 
 	vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
 
@@ -416,5 +414,4 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 
 	apiData.globUtils.device.destroyShaderModule(vertModule, nullptr);
 	apiData.globUtils.device.destroyShaderModule(fragModule, nullptr);
-	
 }

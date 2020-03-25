@@ -57,7 +57,7 @@ namespace DEngine::Gfx::Vk
 }
 
 DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVkInstance(
-	Cont::Span<char const*> requiredExtensions,
+	Std::Span<char const*> requiredExtensions,
 	bool enableLayers,
 	BaseDispatch const& baseDispatch,
 	ILog* logger)
@@ -115,7 +115,7 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 	}
 
 	// Add Khronos validation layer if both it and debug_utils is available
-	Cont::FixedVector<const char*, 5> layersToUse{};
+	Std::StaticVector<const char*, 5> layersToUse{};
 	if constexpr (Constants::enableDebugUtils)
 	{
 		if (enableLayers)
@@ -504,7 +504,7 @@ vk::Device DEngine::Gfx::Vk::Init::CreateDevice(
 
 	// Queue configuration
 	f32 priority[3] = { 1.f, 1.f, 1.f };
-	Cont::FixedVector<vk::DeviceQueueCreateInfo, 10> queueCreateInfos{};
+	Std::StaticVector<vk::DeviceQueueCreateInfo, 10> queueCreateInfos{};
 
 	vk::DeviceQueueCreateInfo tempQueueCreateInfo{};
 
@@ -557,12 +557,12 @@ vk::Device DEngine::Gfx::Vk::Init::CreateDevice(
 	return vkDevice;
 }
 
-DEngine::Cont::FixedVector<vk::Fence, DEngine::Gfx::Vk::Constants::maxResourceSets> DEngine::Gfx::Vk::Init::CreateMainFences(
+DEngine::Std::StaticVector<vk::Fence, DEngine::Gfx::Vk::Constants::maxResourceSets> DEngine::Gfx::Vk::Init::CreateMainFences(
 	DevDispatch const& device, 
 	u8 resourceSetCount,
 	DebugUtilsDispatch const* debugUtils)
 {
-	Cont::FixedVector<vk::Fence, Constants::maxResourceSets> returnVal{};
+	Std::StaticVector<vk::Fence, Constants::maxResourceSets> returnVal{};
 	returnVal.Resize(resourceSetCount);
 
 	for (uSize i = 0; i < returnVal.Size(); i += 1)
@@ -815,7 +815,7 @@ bool DEngine::Gfx::Vk::Init::TransitionSwapchainImages(
 	DeviceDispatch const& device,
 	DeletionQueue const& deletionQueue,
 	QueueData const& queues,
-	Cont::Span<const vk::Image> images)
+	Std::Span<const vk::Image> images)
 {
 	vk::Result vkResult{};
 

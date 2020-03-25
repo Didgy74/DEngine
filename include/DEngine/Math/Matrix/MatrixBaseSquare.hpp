@@ -58,7 +58,7 @@ namespace DEngine::Math
 					return 1;
 			}
 
-			[[nodiscard]] constexpr Cont::Optional<Math::Matrix<width, width, T>> GetInverse() const
+			[[nodiscard]] constexpr Std::Optional<Math::Matrix<width, width, T>> GetInverse() const
 			{
 				Math::Matrix<width, width, T> adjugate = GetAdjugate();
 				T determinant = T();

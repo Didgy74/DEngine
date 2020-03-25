@@ -5,7 +5,7 @@
 
 #include <stdexcept>
 
-namespace DEngine::Containers
+namespace DEngine::Std
 {
 	template<typename T>
 	class Span
@@ -120,9 +120,3 @@ namespace DEngine::Containers
 		return m_data + m_size;
 	}
 }
-
-namespace DEngine
-{
-	namespace Cont = Containers;
-}
-

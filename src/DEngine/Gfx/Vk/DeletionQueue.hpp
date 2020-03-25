@@ -5,7 +5,7 @@
 #include "DynamicDispatch.hpp"
 
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/FixedVector.hpp"
+#include "DEngine/Containers/StaticVector.hpp"
 
 #include <vector>
 #include <mutex>
@@ -100,14 +100,14 @@ namespace DEngine::Gfx::Vk
 			CallbackPFN callback = nullptr;
 			alignas(std::max_align_t) char buffer[jobBufferSize] = {};
 		};
-		mutable Cont::FixedVector<std::vector<Job>, Constants::maxResourceSets> jobQueues{};
+		mutable Std::StaticVector<std::vector<Job>, Constants::maxResourceSets> jobQueues{};
 		mutable std::vector<Job> tempQueue{};
 		struct FencedJob
 		{
 			Job job{};
 			vk::Fence fence{};
 		};
-		mutable Cont::FixedVector<std::vector<FencedJob>, Constants::maxResourceSets> fencedJobQueues{};
+		mutable Std::StaticVector<std::vector<FencedJob>, Constants::maxResourceSets> fencedJobQueues{};
 
 		template<typename T>
 		static inline void DestroyVulkanHppHandle(GlobUtils const& globUtils, char const(&buffer)[jobBufferSize])

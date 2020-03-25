@@ -1,6 +1,6 @@
 #pragma once
 
-namespace DEngine::Containers
+namespace DEngine::Std
 {
 	template<typename T, typename U>
 	struct Pair
@@ -8,10 +8,4 @@ namespace DEngine::Containers
 		T a{};
 		U b{};
 	};
-}
-
-
-namespace DEngine
-{
-	namespace Cont = Containers;
 }
