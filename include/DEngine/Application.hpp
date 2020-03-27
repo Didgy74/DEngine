@@ -2,6 +2,7 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Array.hpp"
+#include "DEngine/Containers/StaticVector.hpp"
 
 namespace DEngine::Application
 {
@@ -9,12 +10,28 @@ namespace DEngine::Application
 	enum class Platform : u8;
 
 	enum class Button : u16;
-	enum class InputEvent : u8;
+	enum class KeyEventType : u8;
 	bool ButtonValue(Button input);
-	InputEvent ButtonEvent(Button input);
+	KeyEventType ButtonEvent(Button input);
 	f32 ButtonDuration(Button input);
 	Std::Array<i32, 2> MouseDelta();
 	Std::Array<u32, 2> MousePosition();
+
+	enum class TouchEventType : u8
+	{
+		Unchanged,
+		Down,
+		Up,
+		Cancelled
+	};
+	struct TouchInput
+	{
+		uSize id = 0;
+		TouchEventType eventType = TouchEventType::Unchanged;
+		f32 x = 0.f;
+		f32 y = 0.f;
+	};
+	Std::StaticVector<TouchInput, 10> GetTouchInputs();
 
 	void Log(char const* msg);
 
@@ -55,7 +72,7 @@ namespace DEngine::Application
 #endif
 }
 
-enum class DEngine::Application::InputEvent : DEngine::u8
+enum class DEngine::Application::KeyEventType : DEngine::u8
 {
 	Unchanged,
 	Unpressed,

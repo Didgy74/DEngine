@@ -71,7 +71,7 @@ public:
 };
 
 
-int main(int argc, char** argv)
+int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
 

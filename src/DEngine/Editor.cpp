@@ -574,7 +574,7 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 		}
 		ImGui::End();
 
-		if (App::ButtonEvent(App::Button::Escape) == App::InputEvent::Pressed)
+		if (App::ButtonEvent(App::Button::Escape) == App::KeyEventType::Pressed)
 		{
 			editorData.insideFullscreenViewport = false;
 			editorData.fullscreenViewportID = EditorData::invalidViewportID;

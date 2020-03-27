@@ -26,8 +26,7 @@ namespace DEngine::Std
 
 		[[nodiscard]] inline uSize Size() const noexcept;
 
-		[[nodiscard]] inline T& At(uSize i);
-		[[nodiscard]] inline T const& At(uSize i) const;
+		[[nodiscard]] inline T& At(uSize i) const;
 
 		[[nodiscard]] inline T& operator[](uSize i);
 		[[nodiscard]] inline T const& operator[](uSize i) const;
@@ -69,15 +68,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	inline T& Span<T>::At(uSize i)
-	{
-		if (i >= m_size)
-			throw std::out_of_range("Tried to .At() a Span with index out of bounds.");
-		return m_data[i];
-	}
-
-	template<typename T>
-	inline T const& Span<T>::At(uSize i) const
+	inline T& Span<T>::At(uSize i) const
 	{
 		if (i >= m_size)
 			throw std::out_of_range("Tried to .At() a Span with index out of bounds.");

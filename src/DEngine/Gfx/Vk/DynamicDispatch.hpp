@@ -697,7 +697,20 @@ namespace DEngine::Gfx::Vk
 			vk::GraphicsPipelineCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
 		{
-			return handle.createGraphicsPipeline(pipelineCache, createInfo, allocator, raw);
+			vk::ResultValue<vk::Pipeline> temp = handle.createGraphicsPipeline(
+				pipelineCache, 
+				createInfo, 
+				allocator,
+				raw);
+			if (temp.result == vk::Result::eSuccess)
+			{
+				return temp.value;
+			}
+			else
+			{
+				throw std::runtime_error("DEngine, Vulkan: Unable to create graphics pipeline.");
+				return {};
+			}
 		}
 		[[nodiscard]] vk::Result createGraphicsPipelines(
 			vk::PipelineCache pipelineCache,

@@ -1,5 +1,7 @@
 #include "Init.hpp"
 
+#include "vulkan/vulkan.hpp"
+
 #include "DEngine/Gfx/Assert.hpp"
 
 #include "ImGui/imgui_impl_vulkan.h"
@@ -515,7 +517,7 @@ vk::Device DEngine::Gfx::Vk::Init::CreateDevice(
 	queueCreateInfos.PushBack(tempQueueCreateInfo);
 
 	// Add transfer queue if there is a separate one from graphics queue
-	if (physDevice.queueIndices.graphics.familyIndex != invalidIndex)
+	if (physDevice.queueIndices.transfer.familyIndex != invalidIndex)
 	{
 		tempQueueCreateInfo = vk::DeviceQueueCreateInfo{};
 		tempQueueCreateInfo.pQueuePriorities = priority;

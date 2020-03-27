@@ -289,11 +289,10 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	return true;
 }
 
-//#include "SDL2/SDL.h"
-#include <fstream>
 
 void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 {
+	/*
 	vk::Result vkResult{};
 
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -414,4 +413,5 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 
 	apiData.globUtils.device.destroyShaderModule(vertModule, nullptr);
 	apiData.globUtils.device.destroyShaderModule(fragModule, nullptr);
+	 */
 }

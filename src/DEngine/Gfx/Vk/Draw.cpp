@@ -85,16 +85,16 @@ namespace DEngine::Gfx::Vk
 			vkResult = apiData.globUtils.queues.graphics.presentKHR(presentInfo);
 			if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eSuboptimalKHR)
 			{
-				std::cout << "DEngine, Vulkan: Encountered bad present result." << std::endl;
+				apiData.logger->log("DEngine, Vulkan: Encountered bad present result.");
 			}
 		}
 		else if (imageIndexOpt.result == vk::Result::eSuboptimalKHR)
 		{
-			std::cout << "DEngine, Vulkan: Encountered suboptimal image-acquire result." << std::endl;
+			apiData.logger->log("DEngine, Vulkan: Encountered suboptimal image-acquire result.");
 		}
 		else
 		{
-			std::cout << "DEngine, Vulkan: Encountered bad image-acquire result." << std::endl;
+			apiData.logger->log("DEngine, Vulkan: Encountered bad image-acquire result.");
 		}
 	}
 

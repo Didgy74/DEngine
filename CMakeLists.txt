@@ -3,6 +3,8 @@ project(DEngineEditor)
 
 set(CMAKE_CXX_STANDARD 17)
 
+set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+
 # -------------------
 # Set DEngine options
 # -------------------
@@ -19,12 +21,35 @@ set(CMAKE_CXX_STANDARD 17)
 # Make the main executable
 # ------------------------
 # START
-	file(GLOB_RECURSE DENGINE_SRC_FILES 
-		"${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
-
+	set(DENGINE_INCLUDE_DIRS "${DENGINE_ROOT_DIR}/include")
+	set(DENGINE_SRC_FILES 
+		"${DENGINE_ROOT_DIR}/src/main.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Editor.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Time.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Application/Application.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Containers/Assert.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Assert.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Gfx.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/DeletionQueue.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/Draw.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/DynamicDispatch.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/Init.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/QueueData.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/Vk.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/vk_mem_alloc.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Math/Common.cpp"
+		)
+	if (WIN32 OR )
 	add_executable(${PROJECT_NAME} ${DENGINE_SRC_FILES})
+	target_include_directories(${PROJECT_NAME} PRIVATE "${DENGINE_INCLUDE_DIRS}")
 
-	# Remove data folder from target binary directory
+	target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
+
+	if (MSVC)
+		target_compile_options(${PROJECT_NAME} PRIVATE /WX)
+	endif()
+
+		# Remove data folder from target binary directory
 	add_custom_command(
 		TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E remove_directory
@@ -36,16 +61,6 @@ set(CMAKE_CXX_STANDARD 17)
 		COMMAND ${CMAKE_COMMAND} -E copy_directory
 		"${PROJECT_SOURCE_DIR}/data"
 		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/data")
-
-	target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
-
-	target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
-
-	if (MSVC)
-		target_compile_options(${PROJECT_NAME} PRIVATE /WX)
-	endif()
-
-	
 #
 # END
 #
@@ -67,6 +82,8 @@ set(CMAKE_CXX_STANDARD 17)
 # END
 #
 
+	set(VULKAN_INCLUDE_DIRS "${DENGINE_ROOT_DIR}/external/Vulkan-Headers/include")
+	target_include_directories(${PROJECT_NAME} PRIVATE ${VULKAN_INCLUDE_DIRS})
 
 # ----------
 # Link Texas
@@ -82,15 +99,20 @@ set(CMAKE_CXX_STANDARD 17)
 # Link external libraries
 # -----------------------
 # START
+	add_library(DENGINE_APPLICATION STATIC "${DENGINE_ROOT_DIR}/src/DEngine/Application/Application_Desktop.cpp")
+	target_link_libraries(${PROJECT_NAME} PRIVATE DENGINE_APPLICATION)
+	target_include_directories(DENGINE_APPLICATION PRIVATE ${DENGINE_INCLUDE_DIRS})
+	target_include_directories(DENGINE_APPLICATION PRIVATE ${VULKAN_INCLUDE_DIRS})
 	if(WIN32)
 		set(glfw3_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/glfw3")
 	endif()
 	# GLFW3
 	find_package(glfw3 REQUIRED)
-	target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
+	target_link_libraries(DENGINE_APPLICATION PRIVATE glfw)
 
-	find_package(Vulkan REQUIRED)
-	target_include_directories(${PROJECT_NAME} PRIVATE ${Vulkan_INCLUDE_DIRS})
+	
+
+
 #
 # END
 #
@@ -99,14 +121,13 @@ set(CMAKE_CXX_STANDARD 17)
 # Include and link ImGui stuff
 # ----------------------------
 # START
-	set(IMGUI_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/ImGui")
+	set(IMGUI_ROOT_DIR "${DENGINE_ROOT_DIR}/external/ImGui")
 	set(IMGUI_SRC_DIR "${IMGUI_ROOT_DIR}/src")
-	set(IMGUI_INCLUDE_DIR "${IMGUI_ROOT_DIR}/include")
+	set(IMGUI_INCLUDE_DIRS "${IMGUI_ROOT_DIR}/include")
 	file(GLOB_RECURSE IMGUI_SOURCE_FILES "${IMGUI_SRC_DIR}/*.cpp" )
-	add_library(IMGUI_LIB ${IMGUI_SOURCE_FILES})
-	target_include_directories(IMGUI_LIB PUBLIC ${IMGUI_INCLUDE_DIR})
-	target_link_libraries(IMGUI_LIB PUBLIC glfw)
-	target_include_directories(IMGUI_LIB PRIVATE ${Vulkan_INCLUDE_DIRS})
+	add_library(IMGUI_LIB STATIC ${IMGUI_SOURCE_FILES})
+	target_include_directories(IMGUI_LIB PUBLIC ${IMGUI_INCLUDE_DIRS})
+	target_include_directories(IMGUI_LIB PRIVATE ${VULKAN_INCLUDE_DIRS})
 	if (MSVC)
 		target_compile_options(IMGUI_LIB PRIVATE /w)
 	endif()

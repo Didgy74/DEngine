@@ -8,36 +8,37 @@
 
 namespace DEngine::Gfx::Vk::Init
 {
-	void InitializeVMA(
-		GlobUtils& globUtils,
-		DebugUtilsDispatch const* debugUtils)
+	static VKAPI_ATTR void VKAPI_CALL AllocCallbackForVMA(
+		VmaAllocator allocator,
+		uint32_t memoryType,
+		VkDeviceMemory memory,
+		VkDeviceSize size,
+		void *pUserData)
 	{
+		GlobUtils &globUtils = *reinterpret_cast<GlobUtils *>(pUserData);
+
+		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+		nameInfo.objectHandle = (u64) memory;
+		nameInfo.objectType = vk::ObjectType::eDeviceMemory;
+		std::lock_guard lock(globUtils.vma_idTracker_lock);
+		std::string name = std::string("VMA DeviceMemory #") + std::to_string(globUtils.vma_idTracker);
+		globUtils.vma_idTracker += 1;
+		nameInfo.pObjectName = name.data();
+
+		globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+	}
+
+	void InitializeVMA(
+		GlobUtils &globUtils,
+		DebugUtilsDispatch const *debugUtils) {
 		vk::Result vkResult{};
 
 		VmaDeviceMemoryCallbacks callbacks{};
 		callbacks.pUserData = &globUtils;
-		callbacks.pfnAllocate = [](
-			VmaAllocator allocator,
-			uint32_t memoryType,
-			VkDeviceMemory memory,
-			VkDeviceSize size,
-			void* pUserData)
-		{
-			GlobUtils& globUtils = *reinterpret_cast<GlobUtils*>(pUserData);
+		callbacks.pfnAllocate = &AllocCallbackForVMA;
 
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)memory;
-			nameInfo.objectType = vk::ObjectType::eDeviceMemory;
-			std::lock_guard lock(globUtils.vma_idTracker_lock);
-			std::string name = std::string("VMA DeviceMemory #") + std::to_string(globUtils.vma_idTracker);
-			globUtils.vma_idTracker += 1;
-			nameInfo.pObjectName = name.data();
-
-			globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
-		};
-
-		InstanceDispatch const& instance = globUtils.instance;
-		DevDispatch const& device = globUtils.device;
+		InstanceDispatch const &instance = globUtils.instance;
+		DevDispatch const &device = globUtils.device;
 		VmaVulkanFunctions vmaDispatch{};
 		vmaDispatch.vkAllocateMemory = device.raw.vkAllocateMemory;
 		vmaDispatch.vkBindBufferMemory = device.raw.vkBindBufferMemory;
@@ -64,14 +65,14 @@ namespace DEngine::Gfx::Vk::Init
 
 
 		VmaAllocatorCreateInfo vmaInfo{};
-		vmaInfo.device = (VkDevice)device.handle;
+		vmaInfo.device = (VkDevice) device.handle;
 		vmaInfo.flags = 0;
 		vmaInfo.frameInUseCount = 0;
-		vmaInfo.instance = (VkInstance)instance.handle;
+		vmaInfo.instance = (VkInstance) instance.handle;
 		vmaInfo.pAllocationCallbacks = nullptr;
 		vmaInfo.pDeviceMemoryCallbacks = debugUtils ? &callbacks : nullptr;
 		vmaInfo.pHeapSizeLimit = nullptr;
-		vmaInfo.physicalDevice = (VkPhysicalDevice)globUtils.physDevice.handle;
+		vmaInfo.physicalDevice = (VkPhysicalDevice) globUtils.physDevice.handle;
 		vmaInfo.pRecordSettings = nullptr;
 		vmaInfo.preferredLargeHeapBlockSize = 0; // This is default
 		vmaInfo.pVulkanFunctions = &vmaDispatch;
@@ -79,10 +80,11 @@ namespace DEngine::Gfx::Vk::Init
 
 		VmaAllocator returnVal{};
 
-		vkResult = (vk::Result)vmaCreateAllocator(&vmaInfo, &returnVal);
+		vkResult = (vk::Result) vmaCreateAllocator(&vmaInfo, &returnVal);
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("DEngine - Vulkan: Could not initialize VMA.");
 
 		globUtils.vma = returnVal;
 	}
+
 }

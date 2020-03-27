@@ -96,7 +96,6 @@ namespace DEngine::Std
 		return At(i);
 	}
 
-
 	template<typename T, uSize length>
 	inline constexpr void Array<T, length>::Fill(const T& value) noexcept
 	{
