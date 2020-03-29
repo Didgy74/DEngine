@@ -35,11 +35,13 @@ namespace DEngine::Std
         [[nodiscard]] constexpr uSize Capacity() const;
         [[nodiscard]] uSize Size() const;
 
-        void Clear();
-        void Resize(uSize newSize);
         bool CanPushBack() const noexcept;
+        void Clear();
+        void Erase(uSize index);
+        void Insert(uSize index, T&& in);
         void PushBack(T const& in);
         void PushBack(T&& in);
+        void Resize(uSize newSize);
 
         [[nodiscard]] T& At(uSize i);
         [[nodiscard]] T const& At(uSize i) const;
@@ -124,6 +126,12 @@ namespace DEngine::Std
     }
 
     template<typename T, uSize maxLength>
+    bool StaticVector<T, maxLength>::CanPushBack() const noexcept
+    {
+        return m_size < maxLength;
+    }
+
+    template<typename T, uSize maxLength>
     void StaticVector<T, maxLength>::Clear()
     {
         for (uSize i = m_size; i > 0; i -= 1)
@@ -132,27 +140,28 @@ namespace DEngine::Std
     }
 
     template<typename T, uSize maxLength>
-    void StaticVector<T, maxLength>::Resize(uSize newSize)
+    void StaticVector<T, maxLength>::Erase(uSize index)
     {
-        if (m_size >= maxLength)
-            throw std::out_of_range("Attempted to .resize() a StaticVector beyond what it can maximally hold.");
-        if (newSize > m_size)
-        {
-            for (uSize i = m_size; i < newSize; i += 1)
-                new(m_values + i) T();
-        }
-        else
-        {
-            for (uSize i = m_size - 1; i >= newSize; i -= 1)
-                m_values[i].~T();
-        }
-        m_size = newSize;
+        if (index >= m_size)
+            throw std::out_of_range("Attempted to .Erase() a StaticVector with an out-of-bounds index.");
+        m_values[index].~T();
+        for (uSize i = index + 1; i < m_size; i += 1)
+            new(&m_values[i - 1]) T(static_cast<T&&>(m_values[i]));
+        m_size -= 1;
     }
 
     template<typename T, uSize maxLength>
-    bool StaticVector<T, maxLength>::CanPushBack() const noexcept
+    void StaticVector<T, maxLength>::Insert(uSize index, T&& in)
     {
-        return m_size < maxLength;
+        if (index >= m_size)
+            throw std::out_of_range("Attempted to .Insert() a StaticVector at an out-of-bounds index.");
+        else if (!CanPushBack())
+            throw std::out_of_range("Attempted to .Insert() a StaticVector at max capacity.");
+        m_size += 1;
+        // Move elements to one index later
+        for (uSize i = m_size - 1; i > index; i -= 1)
+            new(&m_values[i]) T(static_cast<T&&>(m_values[i - 1]));
+        new(&m_values[index]) T(static_cast<T&&>(in));
     }
 
     template<typename T, uSize maxLength>
@@ -171,6 +180,24 @@ namespace DEngine::Std
             throw std::out_of_range("Attempted to .PushBack() a StaticVector when it is already at max capacity.");
         new(m_values + m_size) T(static_cast<T&&>(in));
         m_size += 1;
+    }
+
+    template<typename T, uSize maxLength>
+    void StaticVector<T, maxLength>::Resize(uSize newSize)
+    {
+        if (m_size >= maxLength)
+            throw std::out_of_range("Attempted to .resize() a StaticVector beyond what it can maximally hold.");
+        if (newSize > m_size)
+        {
+            for (uSize i = m_size; i < newSize; i += 1)
+                new(m_values + i) T();
+        }
+        else
+        {
+            for (uSize i = m_size - 1; i >= newSize; i -= 1)
+                m_values[i].~T();
+        }
+        m_size = newSize;
     }
 
     template<typename T, uSize maxLength>

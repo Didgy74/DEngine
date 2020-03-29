@@ -39,7 +39,6 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/vk_mem_alloc.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Math/Common.cpp"
 		)
-	if (WIN32 OR )
 	add_executable(${PROJECT_NAME} ${DENGINE_SRC_FILES})
 	target_include_directories(${PROJECT_NAME} PRIVATE "${DENGINE_INCLUDE_DIRS}")
 

@@ -3,6 +3,17 @@
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Array.hpp"
 #include "DEngine/Containers/StaticVector.hpp"
+#include "DEngine/Containers/Optional.hpp"
+
+#if defined(_WIN32) || defined(_WIN64)
+#	define DENGINE_OS_WINDOWS
+#elif defined(__ANDROID__)
+#	define DENGINE_OS_ANDROID
+#elif defined(__GNUC__)
+#	define DENGINE_OS_LINUX
+#else
+#	error Error. DEngine does not support this platform/compiler
+#endif
 
 namespace DEngine::Application
 {
@@ -14,28 +25,19 @@ namespace DEngine::Application
 	bool ButtonValue(Button input);
 	KeyEventType ButtonEvent(Button input);
 	f32 ButtonDuration(Button input);
-	Std::Array<i32, 2> MouseDelta();
-	Std::Array<u32, 2> MousePosition();
 
-	enum class TouchEventType : u8
-	{
-		Unchanged,
-		Down,
-		Up,
-		Cancelled
-	};
-	struct TouchInput
-	{
-		uSize id = 0;
-		TouchEventType eventType = TouchEventType::Unchanged;
-		f32 x = 0.f;
-		f32 y = 0.f;
-	};
-	Std::StaticVector<TouchInput, 10> GetTouchInputs();
+	struct MouseData;
+	Std::Opt<MouseData> Mouse();
+
+	enum class TouchEventType : u8;
+	struct TouchInput;
+	Std::StaticVector<TouchInput, 10> TouchInputs();
 
 	void Log(char const* msg);
 
 	void SetRelativeMouseMode(bool enabled);
+
+	class FileStream;
 }
 
 namespace DEngine
@@ -58,17 +60,15 @@ enum class DEngine::Application::Platform : DEngine::u8
 
 namespace DEngine::Application
 {
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(DENGINE_OS_WINDOWS)
 	constexpr OS targetOS = OS::Windows;
 	constexpr Platform targetOSType = Platform::Desktop;
-#elif defined(__ANDROID__)
+#elif defined(DENGINE_OS_ANDROID)
 	constexpr OS targetOS = OS::Android;
 	constexpr Platform targetOSType = Platform::Mobile;
-#elif defined(__GNUC__)
+#elif defined(DENGINE_OS_LINUX)
 	constexpr OS targetOS = OS::Linux;
 	constexpr Platform targetOSType = Platform::Desktop;
-#else
-#error Error. DEngine::Application does not support this platform/compiler
 #endif
 }
 
@@ -103,4 +103,55 @@ enum class DEngine::Application::Button : DEngine::u16
 #ifdef DENGINE_APPLICATION_BUTTON_COUNT
 	COUNT
 #endif
+};
+
+enum class DEngine::App::TouchEventType : DEngine::u8
+{
+	Unchanged,
+	Down,
+	Up,
+	Cancelled,
+	Moved
+};
+
+struct DEngine::Application::MouseData
+{
+	Std::Array<u32, 2> pos{};
+	Std::Array<i32, 2> delta{};
+};
+
+struct DEngine::Application::TouchInput
+{
+	uSize id = 0;
+	TouchEventType eventType = TouchEventType::Unchanged;
+	f32 x = 0.f;
+	f32 y = 0.f;
+};
+
+class DEngine::Application::FileStream
+{
+public:
+	static Std::Opt<FileStream> OpenPath(char const* path);
+
+	enum class SeekOrigin
+	{
+		Current,
+		Start,
+		End
+	};
+	bool Seek(i64 offset, SeekOrigin origin = SeekOrigin::Current);
+	bool Read(char* output, u64 size);
+
+	u64 Tell();
+
+	FileStream(FileStream const&) = delete;
+	FileStream(FileStream&&) noexcept;
+	~FileStream();
+	FileStream& operator=(FileStream const&) = delete;
+	FileStream& operator=(FileStream&&);
+private:
+	// Might not be safe, dunno yet
+	alignas(8) char m_buffer[16] = {};
+
+	constexpr FileStream() noexcept = default;
 };

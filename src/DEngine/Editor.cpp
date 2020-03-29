@@ -132,6 +132,20 @@ namespace DEngine::Editor
 					editorData.cameras.insert(editorData.cameras.begin() + insertionIndex, { id, newCam });
 				}
 			}
+
+			// DEBUG STUFF
+			// Print all touch inputs
+
+			auto inputArray = App::TouchInputs();
+			for (auto& input : inputArray)
+			{
+				std::string str = std::string("ID: ") + std::to_string(input.id);
+				str += std::string(", Event: ");
+
+
+
+				ImGui::Text("%s", str.c_str());
+			}
 		}
 		ImGui::End();
 	}
@@ -212,7 +226,7 @@ namespace DEngine::Editor
 
 		if (viewportIsHovered)
 		{
-			if (App::ButtonDuration(App::Button::LeftMouse) > editorData.viewportFullscreenHoldTime)
+			if (ImGui::GetIO().MouseDownDuration[0] > editorData.viewportFullscreenHoldTime)
 			{
 				editorData.insideFullscreenViewport = true;
 				editorData.fullscreenViewportID = viewportID;
@@ -277,41 +291,45 @@ static void DEngine::Editor::HandleVirtualViewportResizing(
 static void DEngine::Editor::HandleViewportCameraMovement(
 	Camera& cam)
 {
-	auto delta = App::MouseDelta();
+	auto deltaOpt = App::Mouse();
+	if (deltaOpt.HasValue())
+	{
+		auto delta = deltaOpt.Value();
 
-	f32 sensitivity = 0.75f;
-	i32 amountX = delta[0];
-	// Apply left and right rotation
-	cam.rotation = Math::UnitQuat::FromVector(Math::Vec3D::Up(), -sensitivity * amountX) * cam.rotation;
+		f32 sensitivity = 0.75f;
+		i32 amountX = delta.delta[0];
+		// Apply left and right rotation
+		cam.rotation = Math::UnitQuat::FromVector(Math::Vec3D::Up(), -sensitivity * amountX) * cam.rotation;
 
-	i32 amountY = delta[1];
+		i32 amountY = delta.delta[1];
 
-	// Limit rotation up and down
-	Math::Vec3D forward = Math::LinTran3D::ForwardVector(cam.rotation);
-	float dot = Math::Vec3D::Dot(forward, Math::Vec3D::Up());
-	if (dot <= -0.99f)
-		amountY = Math::Min(0, amountY);
-	else if (dot >= 0.99f)
-		amountY = Math::Max(0, amountY);
+		// Limit rotation up and down
+		Math::Vec3D forward = Math::LinTran3D::ForwardVector(cam.rotation);
+		float dot = Math::Vec3D::Dot(forward, Math::Vec3D::Up());
+		if (dot <= -0.99f)
+			amountY = Math::Min(0, amountY);
+		else if (dot >= 0.99f)
+			amountY = Math::Max(0, amountY);
 
-	// Apply up and down rotation
-	Math::Vec3D right = Math::LinTran3D::RightVector(cam.rotation);
-	cam.rotation = Math::UnitQuat::FromVector(right, sensitivity * amountY) * cam.rotation;
+		// Apply up and down rotation
+		Math::Vec3D right = Math::LinTran3D::RightVector(cam.rotation);
+		cam.rotation = Math::UnitQuat::FromVector(right, sensitivity * amountY) * cam.rotation;
 
-	// Handle camera movement
-	f32 moveSpeed = 5.f;
-	if (App::ButtonValue(App::Button::W))
-		cam.position -= moveSpeed * Math::LinTran3D::ForwardVector(cam.rotation) * Time::Delta();
-	if (App::ButtonValue(App::Button::S))
-		cam.position += moveSpeed * Math::LinTran3D::ForwardVector(cam.rotation) * Time::Delta();
-	if (App::ButtonValue(App::Button::D))
-		cam.position += moveSpeed * Math::LinTran3D::RightVector(cam.rotation) * Time::Delta();
-	if (App::ButtonValue(App::Button::A))
-		cam.position -= moveSpeed * Math::LinTran3D::RightVector(cam.rotation) * Time::Delta();
-	if (App::ButtonValue(App::Button::Space))
-		cam.position.y -= moveSpeed * Time::Delta();
-	if (App::ButtonValue(App::Button::LeftCtrl))
-		cam.position.y += moveSpeed * Time::Delta();
+		// Handle camera movement
+		f32 moveSpeed = 5.f;
+		if (App::ButtonValue(App::Button::W))
+			cam.position -= moveSpeed * Math::LinTran3D::ForwardVector(cam.rotation) * Time::Delta();
+		if (App::ButtonValue(App::Button::S))
+			cam.position += moveSpeed * Math::LinTran3D::ForwardVector(cam.rotation) * Time::Delta();
+		if (App::ButtonValue(App::Button::D))
+			cam.position += moveSpeed * Math::LinTran3D::RightVector(cam.rotation) * Time::Delta();
+		if (App::ButtonValue(App::Button::A))
+			cam.position -= moveSpeed * Math::LinTran3D::RightVector(cam.rotation) * Time::Delta();
+		if (App::ButtonValue(App::Button::Space))
+			cam.position.y -= moveSpeed * Time::Delta();
+		if (App::ButtonValue(App::Button::LeftCtrl))
+			cam.position.y += moveSpeed * Time::Delta();
+	}
 }
 
 static void DEngine::Editor::DrawAllVirtualViewports(EditorData& editorData, Gfx::Data& gfx)
@@ -548,7 +566,7 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 				if (App::ButtonValue(App::Button::RightMouse))
 					HandleViewportCameraMovement(cam);
 
-				if (App::ButtonValue(App::Button::LeftMouse))
+				if (ImGui::GetIO().MouseDown[0])
 				{
 					ImVec2 windowPos = ImGui::GetWindowPos();
 					ImVec2 mousePos = ImGui::GetMousePos();
@@ -574,7 +592,8 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 		}
 		ImGui::End();
 
-		if (App::ButtonEvent(App::Button::Escape) == App::KeyEventType::Pressed)
+		if (App::ButtonEvent(App::Button::Escape) == App::KeyEventType::Pressed ||
+			ImGui::GetIO().MouseDownWasDoubleClick[0] == true)
 		{
 			editorData.insideFullscreenViewport = false;
 			editorData.fullscreenViewportID = EditorData::invalidViewportID;

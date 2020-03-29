@@ -6,6 +6,8 @@
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Span.hpp"
 #include "DEngine/Containers/StaticVector.hpp"
+// For file IO
+#include "DEngine/Application.hpp"
 
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_vulkan.h"
@@ -292,7 +294,6 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 
 void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 {
-	/*
 	vk::Result vkResult{};
 
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -300,19 +301,16 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	pipelineLayoutInfo.pSetLayouts = &apiData.test_cameraDescrLayout;
 	apiData.testPipelineLayout = apiData.globUtils.device.createPipelineLayout(pipelineLayoutInfo);
 
-	std::ifstream vertFile("data/vert.spv", std::ifstream::binary | std::ifstream::ate);
-	if (vertFile.is_open() == false)
+	Std::Opt<App::FileStream> vertFileOpt = App::FileStream::OpenPath("data/vert.spv");
+	if (!vertFileOpt.HasValue())
 		throw std::runtime_error("Could not open vertex shader file");
-
-	auto vertFileLength = vertFile.tellg();
-	vertFile.seekg(0);
-	if (vertFileLength <= 0)
-		throw std::runtime_error("Could not grab Size of vertex shader file");
-	// Create vertex shader module
-	std::vector<u8> vertCode(vertFileLength);
-	vertFile.read((char*)vertCode.data(), vertFileLength);
-	vertFile.close();
-
+	App::FileStream& vertFile = vertFileOpt.Value();
+	vertFile.Seek(0, App::FileStream::SeekOrigin::End);
+	u64 vertFileLength = vertFile.Tell();
+	vertFile.Seek(0, App::FileStream::SeekOrigin::Start);
+	std::vector<char> vertCode(vertFileLength);
+	vertFile.Read(vertCode.data(), vertFileLength);
+	
 	vk::ShaderModuleCreateInfo vertModCreateInfo{};
 	vertModCreateInfo.codeSize = vertCode.size();
 	vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
@@ -322,16 +320,15 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	vertStageInfo.module = vertModule;
 	vertStageInfo.pName = "main";
 
-	std::ifstream fragFile("data/frag.spv", std::ifstream::binary | std::ifstream::ate);
-	if (fragFile.is_open() == false)
+	Std::Opt<App::FileStream> fragFileOpt = App::FileStream::OpenPath("data/frag.spv");
+	if (!fragFileOpt.HasValue())
 		throw std::runtime_error("Could not open fragment shader file");
-	auto fragFileLength = fragFile.tellg();
-	fragFile.seekg(0);
-	if (fragFileLength <= 0)
-		throw std::runtime_error("Could not grab Size of fragment shader file");
-	std::vector<u8> fragCode(fragFileLength);
-	fragFile.read((char*)fragCode.data(), fragFileLength);
-	fragFile.close();
+	App::FileStream& fragFile = fragFileOpt.Value();
+	fragFile.Seek(0, App::FileStream::SeekOrigin::End);
+	u64 fragFileLength = fragFile.Tell();
+	fragFile.Seek(0, App::FileStream::SeekOrigin::Start);
+	std::vector<char> fragCode(fragFileLength);
+	fragFile.Read(fragCode.data(), fragFileLength);
 
 	vk::ShaderModuleCreateInfo fragModInfo{};
 	fragModInfo.codeSize = fragCode.size();
@@ -413,5 +410,5 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 
 	apiData.globUtils.device.destroyShaderModule(vertModule, nullptr);
 	apiData.globUtils.device.destroyShaderModule(fragModule, nullptr);
-	 */
+	
 }

@@ -19,7 +19,7 @@ Std::Opt<Gfx::Data> DEngine::Gfx::Initialize(const InitInfo& initInfo)
 
 	Vk::InitializeBackend(returnVal, initInfo, returnVal.apiDataBuffer);
 
-	return Std::Opt<Gfx::Data>(Util::move(returnVal));
+	return Std::Opt<Gfx::Data>(Util::Move(returnVal));
 }
 
 void DEngine::Gfx::Data::Draw(Draw_Params const& params)

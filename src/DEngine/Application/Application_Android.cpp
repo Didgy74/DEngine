@@ -1,4 +1,3 @@
-#include "DEngine/Application.hpp"
 #include "detail_Application.hpp"
 
 #include <android/log.h>
@@ -17,6 +16,8 @@ namespace DEngine::Application::detail
 {
 	static android_app* androidAppPtr = nullptr;
 	static bool androidWindowReady = false;
+
+	static TouchEventType Backend_Android_MotionActionToTouchEventType(int32_t in);
 
 	static void HandleCmdInit(android_app* app, int32_t cmd)
 	{
@@ -80,43 +81,26 @@ namespace DEngine::Application::detail
 	static void HandleMotionEvent(AInputEvent* event)
 	{
 		int32_t inputSource = AInputEvent_getSource(event);
-		if (inputSource == AINPUT_SOURCE_TOUCHSCREEN)
+		if (inputSource != AINPUT_SOURCE_TOUCHSCREEN)
+			return;
+		int32_t motionAction = AMotionEvent_getAction(event);
+		switch (motionAction)
 		{
-			int32_t motionAction = AMotionEvent_getAction(event);
-			switch (motionAction)
-			{
-				case AMOTION_EVENT_ACTION_DOWN:
-					Log("Motion event: Down");
-					break;
-				case AMOTION_EVENT_ACTION_UP:
-					Log("Motion event: Up");
-					break;
-				case AMOTION_EVENT_ACTION_MOVE:
-					Log("Motion event: Move");
-					break;
-				case AMOTION_EVENT_ACTION_CANCEL:
-					Log("Motion event: Cancel");
-					break;
-			}
+			case AMOTION_EVENT_ACTION_UP:
+				Log("Motion event: Up");
+				break;
+		}
 
-			size_t pointerCount = AMotionEvent_getPointerCount(event);
-			std::string pointerCountString = std::string("Pointer count") + std::to_string(pointerCount);
-			Log(pointerCountString.c_str());
+		size_t pointerCount = AMotionEvent_getPointerCount(event);
+		for (size_t i = 0; i < pointerCount; i++)
+		{
+			Application::TouchInput values{};
 
-
-			for (size_t i = 0; i < pointerCount; i++)
-			{
-				int32_t pointerID = AMotionEvent_getPointerId(event, i);
-				std::string pointerCountString = std::string("ID ") + std::to_string(pointerID) + "  ";
-
-				float x = AMotionEvent_getX(event, i);
-				float y = AMotionEvent_getY(event, i);
-
-				pointerCountString += std::to_string(x) + "  ";
-				pointerCountString += std::to_string(y);
-
-				Log(pointerCountString.c_str());
-			}
+			values.id = (uSize)AMotionEvent_getPointerId(event, i);
+			values.x = AMotionEvent_getX(event, i);
+			values.y = AMotionEvent_getY(event, i);
+			values.eventType = Backend_Android_MotionActionToTouchEventType(motionAction);
+			Application::detail::UpdateTouchInput(values);
 		}
 
 	}
@@ -129,10 +113,8 @@ namespace DEngine::Application::detail
 		switch (inputType)
 		{
 			case AINPUT_EVENT_TYPE_KEY:
-				Log("Key event type");
 				break;
 			case AINPUT_EVENT_TYPE_MOTION:
-				Log("Motion event type");
 				HandleMotionEvent(event);
 				break;
 		}
@@ -190,7 +172,6 @@ bool DEngine::Application::detail::Backend_Initialize()
 void DEngine::Application::detail::Backend_ProcessEvents(
 	std::chrono::high_resolution_clock::time_point now)
 {
-
 	int fileDescriptors = 0; // What even is this?
 	android_poll_source* source = nullptr;
 	if (ALooper_pollAll(0, nullptr, &fileDescriptors, (void**)&source) >= 0)
@@ -254,4 +235,124 @@ DEngine::Std::StaticVector<char const*, 5> DEngine::Application::detail::GetRequ
 void DEngine::Application::Log(char const* msg)
 {
 	__android_log_print(ANDROID_LOG_ERROR, "DEngine: ", "%s", msg);
+}
+
+static DEngine::Application::TouchEventType DEngine::Application::detail::Backend_Android_MotionActionToTouchEventType(int32_t in)
+{
+	int32_t test = in & AMOTION_EVENT_ACTION_MASK;
+	switch (test)
+	{
+		case AMOTION_EVENT_ACTION_DOWN:
+		case AMOTION_EVENT_ACTION_POINTER_DOWN:
+			return TouchEventType::Down;
+		case AMOTION_EVENT_ACTION_UP:
+		case AMOTION_EVENT_ACTION_POINTER_UP:
+			return TouchEventType::Up;
+		case AMOTION_EVENT_ACTION_MOVE:
+			return TouchEventType::Moved;
+		case AMOTION_EVENT_ACTION_CANCEL:
+			return TouchEventType::Cancelled;
+	}
+
+	throw std::runtime_error("Unexpected motion-action");
+	return TouchEventType(-1);
+}
+
+//
+// File IO
+//
+
+namespace DEngine::Application::detail
+{
+	struct Backend_FileStreamData
+	{
+		AAsset* file = nullptr;
+		off64_t pos = 0;
+	};
+
+
+}
+
+DEngine::Std::Opt<DEngine::Application::FileStream> DEngine::Application::FileStream::OpenPath(char const* path)
+{
+	static_assert(sizeof(detail::Backend_FileStreamData) <= sizeof(FileStream::m_buffer),
+				  "Error. Cannot fit implementation data in FileStream internal buffer.");
+
+	AAsset* file = AAssetManager_open(detail::androidAppPtr->activity->assetManager, path, AASSET_MODE_RANDOM);
+	if (file == nullptr)
+		return {};
+
+	detail::Backend_FileStreamData implData{};
+	implData.file = file;
+	implData.pos = 0;
+	FileStream stream{};
+	std::memcpy(&stream.m_buffer[0], &implData, sizeof(implData));
+	return Std::Opt<FileStream>(static_cast<FileStream&&>(stream));
+}
+
+bool DEngine::Application::FileStream::Seek(i64 offset, SeekOrigin origin)
+{
+	detail::Backend_FileStreamData implData{};
+	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
+
+	int posixOrigin = 0;
+	switch (origin)
+	{
+		case SeekOrigin::Current:
+			posixOrigin = SEEK_CUR;
+			break;
+		case SeekOrigin::Start:
+			posixOrigin = SEEK_SET;
+			break;
+		case SeekOrigin::End:
+			posixOrigin = SEEK_END;
+			break;
+	}
+	off64_t result = AAsset_seek64(implData.file, (off64_t)offset, posixOrigin);
+	if (result == -1)
+		return false;
+
+	// Update pos of our original buffer
+	implData.pos = result;
+	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
+
+	return true;
+}
+
+bool DEngine::Application::FileStream::Read(char* output, u64 size)
+{
+	detail::Backend_FileStreamData implData{};
+	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
+
+
+	int result = AAsset_read(implData.file, output, (size_t)size);
+	if (result < 0)
+		return false;
+
+	implData.pos += size;
+	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
+
+	return true;
+}
+
+DEngine::u64 DEngine::Application::FileStream::Tell()
+{
+	detail::Backend_FileStreamData implData{};
+	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
+
+	return (u64)implData.pos;
+}
+
+DEngine::Application::FileStream::FileStream(FileStream&& other) noexcept
+{
+	std::memcpy(&m_buffer[0], &other.m_buffer[0], sizeof(detail::Backend_FileStreamData));
+	std::memset(&other.m_buffer[0], 0, sizeof(detail::Backend_FileStreamData));
+}
+
+DEngine::Application::FileStream::~FileStream()
+{
+	detail::Backend_FileStreamData implData{};
+	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
+	if (implData.file != nullptr)
+		AAsset_close(implData.file);
 }

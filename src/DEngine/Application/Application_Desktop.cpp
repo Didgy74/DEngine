@@ -1,4 +1,3 @@
-#include "DEngine/Application.hpp"
 #include "detail_Application.hpp"
 
 #define GLFW_INCLUDE_VULKAN
@@ -14,11 +13,7 @@
 namespace DEngine::Application::detail
 {
 	static GLFWwindow* mainWindow = nullptr;
-	struct WindowData
-	{
-		std::chrono::high_resolution_clock::time_point now = {};
-	};
-	static WindowData mainWindowData{};
+	static std::chrono::high_resolution_clock::time_point tickStartNow{};
 
 	static void Backend_GLFW_ErrorCallback(
 		int error, 
@@ -106,7 +101,14 @@ bool DEngine::Application::detail::Backend_Initialize()
 
 	detail::mainWindowIsInFocus = glfwGetWindowAttrib(detail::mainWindow, GLFW_FOCUSED);
 
-	glfwSetWindowUserPointer(detail::mainWindow, &detail::mainWindowData);
+	detail::hasMouse = true;
+	double mouseXPos = 0;
+	double mouseYPos = 0;
+	glfwGetCursorPos(detail::mainWindow, &mouseXPos, &mouseYPos);
+	detail::mousePosition[0] = (u32)floor(mouseXPos);
+	detail::mousePosition[1] = (u32)floor(mouseYPos);
+
+
 	glfwSetKeyCallback(detail::mainWindow, Backend_GLFW_KeyboardKeyCallback);
 	glfwSetMouseButtonCallback(detail::mainWindow, Backend_GLFW_MouseButtonCallback);
 	glfwSetCursorPosCallback(detail::mainWindow, Backend_GLFW_MousePosCallback);
@@ -123,7 +125,7 @@ bool DEngine::Application::detail::Backend_Initialize()
 void DEngine::Application::detail::Backend_ProcessEvents(
 	std::chrono::high_resolution_clock::time_point now)
 {
-	mainWindowData.now = now;
+	detail::tickStartNow = now;
 
 	glfwPollEvents();
 }
@@ -141,9 +143,7 @@ static void DEngine::Application::detail::Backend_GLFW_KeyboardKeyCallback(
 	else if (action == GLFW_RELEASE)
 		wasPressed = false;
 
-	WindowData const& mainWindowData = *reinterpret_cast<WindowData const*>(glfwGetWindowUserPointer(window));
-
-	detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), wasPressed, mainWindowData.now);
+	detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), wasPressed, detail::tickStartNow);
 }
 
 static void DEngine::Application::detail::Backend_GLFW_MouseButtonCallback(
@@ -161,9 +161,7 @@ static void DEngine::Application::detail::Backend_GLFW_MouseButtonCallback(
 	else if (action == GLFW_RELEASE)
 		wasPressed = false;
 
-	WindowData const& mainWindowData = *reinterpret_cast<WindowData const*>(glfwGetWindowUserPointer(window));
-
-	detail::UpdateButton(Backend_GLFW_MouseButtonToRawButton(button), wasPressed, mainWindowData.now);
+	detail::UpdateButton(Backend_GLFW_MouseButtonToRawButton(button), wasPressed, detail::tickStartNow);
 }
 
 static void DEngine::Application::detail::Backend_GLFW_MousePosCallback(
@@ -171,7 +169,7 @@ static void DEngine::Application::detail::Backend_GLFW_MousePosCallback(
 	double xpos, 
 	double ypos)
 {
-	detail::UpdateMouse((u32)xpos, (u32)ypos);
+	detail::UpdateMouse((u32)floor(xpos), (u32)floor(ypos));
 }
 
 static void DEngine::Application::detail::Backend_GLFW_WindowPosCallback(
@@ -299,4 +297,87 @@ DEngine::Application::Button DEngine::Application::detail::Backend_GLFW_Keyboard
 
 
 	return Button::Undefined;
+}
+
+//
+// File IO
+//
+// Stops the warnings made by MSVC when using "unsafe" CRT fopen functions.
+#ifdef _MSC_VER
+#   define _CRT_SECURE_NO_WARNINGS
+#endif
+#include <cstdio>
+
+DEngine::Std::Opt<DEngine::Application::FileStream> DEngine::Application::FileStream::OpenPath(char const* path)
+{
+	std::FILE* file = std::fopen(path, "rb");
+	if (file == nullptr)
+		return {};
+
+	FileStream stream{};
+	std::memcpy(&stream.m_buffer[0], &file, sizeof(std::FILE*));
+	return Std::Opt<FileStream>(static_cast<FileStream&&>(stream));
+}
+
+bool DEngine::Application::FileStream::Seek(i64 offset, SeekOrigin origin)
+{
+	std::FILE* file = nullptr;
+	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
+
+	int posixOrigin = 0;
+	switch (origin)
+	{
+	case SeekOrigin::Current:
+		posixOrigin = SEEK_CUR;
+		break;
+	case SeekOrigin::Start:
+		posixOrigin = SEEK_SET;
+		break;
+	case SeekOrigin::End:
+		posixOrigin = SEEK_END;
+		break;
+	}
+	int result = fseek(file, (long)offset, posixOrigin);
+	if (result == 0)
+		return true;
+	else
+		return false;
+
+}
+
+bool DEngine::Application::FileStream::Read(char* output, u64 size)
+{
+	std::FILE* file = nullptr;
+	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
+
+	size_t result = fread(output, 1, (size_t)size, file);
+	return result == (size_t)size;
+}
+
+DEngine::u64 DEngine::Application::FileStream::Tell()
+{
+	std::FILE* file = nullptr;
+	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
+
+	long result = ftell(file);
+	if (result == long(-1))
+	{
+		// Handle error
+	}
+	else
+		return (u64)result;
+}
+
+DEngine::Application::FileStream::FileStream(FileStream&& other) noexcept
+{
+	std::memcpy(&m_buffer[0], &other.m_buffer[0], sizeof(std::FILE*));
+	std::memset(&other.m_buffer[0], 0, sizeof(std::FILE*));
+}
+
+DEngine::Application::FileStream::~FileStream()
+{
+	std::FILE* file = nullptr;
+	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
+	if (file != nullptr)
+		std::fclose(file);
 }

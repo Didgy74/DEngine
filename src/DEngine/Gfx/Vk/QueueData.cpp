@@ -24,8 +24,7 @@ namespace DEngine::Gfx::Vk
 	{
 		Graphics,
 		Transfer,
-		Compute,
-		COUNT
+		Compute
 	};
 }
 

@@ -1,7 +1,6 @@
 
 #include "ImGui/imgui.h"
 
-#include "DEngine/Application.hpp"
 #include "DEngine/Application/detail_Application.hpp"
 #include "DEngine/Time.hpp"
 #include "DEngine/Editor.hpp"
@@ -13,26 +12,11 @@
 #include "DEngine/Math/UnitQuaternion.hpp"
 #include "DEngine/Math/LinearTransform3D.hpp"
 
-
 #include <utility>
 #include <iostream>
 #include <vector>
 #include <string>
 #include <sstream>
-
-void PrintMat(DEngine::Math::Mat4 in)
-{
-	std::stringstream stream{};
-
-	stream.precision(2);
-	for (int y = 0; y < 4; y++)
-	{
-		for (int x = 0; x < 4; x++)
-			stream << in.At(x, y) << " ";
-		stream << std::endl;
-	}
-	std::cout << stream.str() << std::endl;
-}
 
 class GfxLogger : public DEngine::Gfx::ILog
 {
@@ -70,7 +54,6 @@ public:
 	}
 };
 
-
 int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
@@ -87,7 +70,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_DockingEnable;
 		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_IsTouchScreen;
 		//if constexpr (App::targetOS == App::OS::Windows)
-			//imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_ViewportsEnable;
+			//imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_ViewportsEnable
 
 		//ImGui::StyleColorsDark();
 		
