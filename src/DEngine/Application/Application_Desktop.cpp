@@ -9,6 +9,8 @@
 #endif
 
 #include <iostream>
+#include <cmath>
+#include <cstring>
 
 namespace DEngine::Application::detail
 {
@@ -105,8 +107,8 @@ bool DEngine::Application::detail::Backend_Initialize()
 	double mouseXPos = 0;
 	double mouseYPos = 0;
 	glfwGetCursorPos(detail::mainWindow, &mouseXPos, &mouseYPos);
-	detail::mousePosition[0] = (u32)floor(mouseXPos);
-	detail::mousePosition[1] = (u32)floor(mouseYPos);
+	detail::mousePosition[0] = (u32)std::floor(mouseXPos);
+	detail::mousePosition[1] = (u32)std::floor(mouseYPos);
 
 
 	glfwSetKeyCallback(detail::mainWindow, Backend_GLFW_KeyboardKeyCallback);
@@ -169,7 +171,7 @@ static void DEngine::Application::detail::Backend_GLFW_MousePosCallback(
 	double xpos, 
 	double ypos)
 {
-	detail::UpdateMouse((u32)floor(xpos), (u32)floor(ypos));
+	detail::UpdateMouse((u32)std::floor(xpos), (u32)std::floor(ypos));
 }
 
 static void DEngine::Application::detail::Backend_GLFW_WindowPosCallback(
@@ -350,7 +352,7 @@ bool DEngine::Application::FileStream::Read(char* output, u64 size)
 	std::FILE* file = nullptr;
 	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
 
-	size_t result = fread(output, 1, (size_t)size, file);
+	size_t result = std::fread(output, 1, (size_t)size, file);
 	return result == (size_t)size;
 }
 
@@ -363,6 +365,7 @@ DEngine::u64 DEngine::Application::FileStream::Tell()
 	if (result == long(-1))
 	{
 		// Handle error
+		return (u64)-1;
 	}
 	else
 		return (u64)result;

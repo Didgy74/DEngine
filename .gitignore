@@ -2,16 +2,13 @@
 # Created by https://www.gitignore.io/api/clion,cmake,visualstudio
 # Edit at https://www.gitignore.io/?templates=clion,cmake,visualstudio
 
-build/
-.vscode/
+build
 .vscode
-android/android.iml
 android/local.properties
 android/.gradle
 android/.idea
 android/app/.cxx
 android/app/build
-android/app/app.iml
 
 
 ### CLion ###

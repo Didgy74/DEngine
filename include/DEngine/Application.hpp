@@ -105,19 +105,19 @@ enum class DEngine::Application::Button : DEngine::u16
 #endif
 };
 
-enum class DEngine::App::TouchEventType : DEngine::u8
+struct DEngine::Application::MouseData
+{
+	Std::Array<u32, 2> pos{};
+	Std::Array<i32, 2> delta{};
+};
+
+enum class DEngine::Application::TouchEventType : DEngine::u8
 {
 	Unchanged,
 	Down,
 	Up,
 	Cancelled,
 	Moved
-};
-
-struct DEngine::Application::MouseData
-{
-	Std::Array<u32, 2> pos{};
-	Std::Array<i32, 2> delta{};
 };
 
 struct DEngine::Application::TouchInput
