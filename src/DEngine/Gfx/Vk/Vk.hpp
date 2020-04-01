@@ -1,12 +1,14 @@
 #pragma once
 
+#include "../APIDataBase.hpp"
+
 #include "VulkanIncluder.hpp"
 #include "DynamicDispatch.hpp"
 #include "Constants.hpp"
 #include "DeletionQueue.hpp"
 #include "QueueData.hpp"
 
-#include "vk_mem_alloc.h"
+#include "VMAIncluder.hpp"
 
 #include "DEngine/Gfx/Gfx.hpp"
 
@@ -110,6 +112,12 @@ namespace DEngine::Gfx::Vk
 		vk::CommandPool cmdPool{};
 		Std::StaticVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
 		void* imguiTextureID = nullptr;
+
+		vk::DescriptorPool cameraDescrPool{};
+		Std::StaticVector<vk::DescriptorSet, Constants::maxResourceSets> camDataDescrSets{};
+		VmaAllocation camVmaAllocation{};
+		vk::Buffer camDataBuffer{};
+		void* mappedMem = nullptr;
 	};
 
 	struct GUIRenderTarget
@@ -133,14 +141,44 @@ namespace DEngine::Gfx::Vk
 
 	struct ViewportManager
 	{
-		std::mutex viewportDataLock{};
+		struct CreateJob
+		{
+			uSize id = static_cast<uSize>(-1);
+			void* imguiTexID = nullptr;
+		};
+
+		// Controls the entire structure.
+		std::mutex mutexLock{};
+
+
 		uSize viewportIDTracker = 0;
-		std::vector<Std::Pair<uSize, ViewportVkData>> viewportDatas{};
+		std::vector<CreateJob> createQueue{};
+
+		// Unsorted vector holding viewport-data and their ID.
+		std::vector<Std::Pair<uSize, ViewportVkData>> viewportData{};
+
+		static constexpr uSize minimumCamDataCapacity = 8;
+		// Thread safe to access
+		vk::DescriptorSetLayout cameraDescrLayout{};
+		// Thread safe to access
+		uSize camElementSize = 0;
+	};
+
+	struct VMA_MemoryTrackingData
+	{
+		DebugUtilsDispatch const* debugUtils = nullptr;
+		vk::Device deviceHandle{};
+		std::mutex vma_idTracker_lock{};
+		u64 vma_idTracker = 0;
 	};
 
 	// Everything here is thread-safe to use and access!!
 	struct GlobUtils
 	{
+		GlobUtils();
+		GlobUtils(GlobUtils const&) = delete;
+		GlobUtils(GlobUtils&&) = delete;
+
 		InstanceDispatch instance{};
 
 		DebugUtilsDispatch debugUtils{};
@@ -153,28 +191,39 @@ namespace DEngine::Gfx::Vk
 		}
 
 		PhysDeviceInfo physDevice{};
-
 		DeviceDispatch device{};
 
 		QueueData queues{};
 
 		VmaAllocator vma{};
-		std::mutex vma_idTracker_lock{};
-		u64 vma_idTracker = 0;
 
 		DeletionQueue deletionQueue;
 
 		u8 resourceSetCount = 0;
+		u8 CurrentResourceSetIndex_Async();
 
 		bool useEditorPipeline = false;
 		vk::RenderPass guiRenderPass{};
 
 		vk::RenderPass gfxRenderPass{};
+
+	private:
+		void SetCurrentResourceSetIndex(u8 index);
+		std::mutex currentResourceSetIndex_Lock{};
+		u8 currentResourceSetIndex_Var{};
+
+		friend struct APIData;
 	};
 
-	struct APIData
+	struct APIData : public APIDataBase
 	{
-		inline APIData() noexcept;
+		APIData();
+		virtual ~APIData() override;
+		virtual void Draw(Data& gfxData, Draw_Params const& drawParams) override;
+		// Thread safe
+		virtual void NewViewport(uSize& viewportID, void*& imguiTexID) override;
+		// Thread safe
+		virtual void DeleteViewport(uSize id) override;
 
 		Gfx::ILog* logger = nullptr;
 		Gfx::IWsi* wsiInterface = nullptr;
@@ -184,6 +233,9 @@ namespace DEngine::Gfx::Vk
 
 		u8 currentInFlightFrame = 0;
 
+		// Do not touch this.
+		VMA_MemoryTrackingData vma_trackingData{};
+
 		Std::StaticVector<vk::Fence, Constants::maxResourceSets> mainFences{};
 
 		GUIData guiData{};
@@ -191,18 +243,9 @@ namespace DEngine::Gfx::Vk
 		GlobUtils globUtils{};
 
 		ViewportManager viewportManager{};
-
-		vk::DescriptorSetLayout test_cameraDescrLayout{};
-		Std::StaticVector<vk::DescriptorSet, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> test_cameraDescrSets{};
-		void* test_mappedMem = nullptr;
-		u32 test_camUboOffset = 0;
+	
 
 		vk::PipelineLayout testPipelineLayout{};
 		vk::Pipeline testPipeline{};
 	};
-}
-
-inline DEngine::Gfx::Vk::APIData::APIData() noexcept
-{
-
 }

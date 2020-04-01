@@ -1,9 +1,8 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
+#include "VulkanIncluder.hpp"
 
-#include <vulkan/vulkan.h>
-#include <vulkan/vulkan.hpp>
+#include "DEngine/FixedWidthTypes.hpp"
 
 #include <array>
 #include <string_view>
@@ -17,7 +16,7 @@ namespace DEngine::Gfx::Vk::Constants
 	constexpr u32 maxSwapchainLength = 4;
 	constexpr u32 preferredSwapchainLength = 3;
 
-	constexpr char const* preferredValidationLayer
+	constexpr char const* khronosLayerName
 	{
 		"VK_LAYER_KHRONOS_validation"
 	};

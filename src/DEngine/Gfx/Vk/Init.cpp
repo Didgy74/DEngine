@@ -1,6 +1,6 @@
 #include "Init.hpp"
 
-#include "vulkan/vulkan.hpp"
+#include "VulkanIncluder.hpp"
 
 #include "DEngine/Gfx/Assert.hpp"
 
@@ -69,7 +69,7 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 
 	// Build what extensions we are going to use
 	std::vector<char const*> totalRequiredExtensions;
-	totalRequiredExtensions.reserve(requiredExtensions.Size());
+	totalRequiredExtensions.reserve(requiredExtensions.Size() + Constants::requiredInstanceExtensions.size());
 	// First copy all required instance extensions
 	for (uSize i = 0; i < requiredExtensions.Size(); i++)
 		totalRequiredExtensions.push_back(requiredExtensions[i]);
@@ -86,42 +86,49 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 				break;
 			}
 		}
-		if (extensionAlreadyPresent == false)
-		{
+		if (!extensionAlreadyPresent)
 			totalRequiredExtensions.push_back(requiredExtension);
-		}
 	}
 
+	// Check if all the required extensions are also available
+	u32 instanceExtensionCount = 0;
+	vkResult = baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr);
+	if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
+		throw std::runtime_error("Vulkan: Unable to enumerate available instance extension properties.");
+	std::vector<vk::ExtensionProperties> availableExtensions(instanceExtensionCount);
+	baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableExtensions.data());
+	for (const char* required : totalRequiredExtensions)
 	{
-		// Check if all the required extensions are also available
-		u32 instanceExtensionCount = 0;
-		vkResult = baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr);
-		if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
-			throw std::runtime_error("Vulkan: Unable to enumerate available instance extension properties.");
-		std::vector<vk::ExtensionProperties> availableExtensions(instanceExtensionCount);
-		baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableExtensions.data());
-		for (const char* required : totalRequiredExtensions)
+		bool requiredExtensionIsAvailable = false;
+		for (const auto& available : availableExtensions)
 		{
-			bool requiredExtensionIsAvailable = false;
-			for (const auto& available : availableExtensions)
+			if (std::strcmp(required, available.extensionName) == 0)
 			{
-				if (std::strcmp(required, available.extensionName) == 0)
-				{
-					requiredExtensionIsAvailable = true;
-					break;
-				}
+				requiredExtensionIsAvailable = true;
+				break;
 			}
-			if (requiredExtensionIsAvailable == false)
-				throw std::runtime_error("Required Vulkan instance extension is not available.");
 		}
+		if (requiredExtensionIsAvailable == false)
+			throw std::runtime_error("Required Vulkan instance extension is not available.");
 	}
 
-	// Add Khronos validation layer if both it and debug_utils is available
 	Std::StaticVector<const char*, 5> layersToUse{};
 	if constexpr (Constants::enableDebugUtils)
 	{
 		if (enableLayers)
 		{
+			// Check if debug utils is available through global list.
+			bool debugUtilsIsAvailable = false;
+			for (const auto& ext : availableExtensions)
+			{
+				if (std::strcmp(ext.extensionName, Constants::debugUtilsExtensionName) == 0)
+				{
+					debugUtilsIsAvailable = true;
+					break;
+				}
+			}
+
+
 			// First check if the Khronos validation layer is present
 			u32 availableLayerCount = 0;
 			vkResult = baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, nullptr);
@@ -130,54 +137,25 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 			std::vector<vk::LayerProperties> availableLayers;
 			availableLayers.resize(availableLayerCount);
 			baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data());
-
 			bool layerIsAvailable = false;
 			for (const auto& availableLayer : availableLayers)
 			{
-				char const* wantedLayerName = Constants::preferredValidationLayer;
+				char const* wantedLayerName = Constants::khronosLayerName;
 				char const* availableLayerName = availableLayer.layerName;
 				if (std::strcmp(wantedLayerName, availableLayerName) == 0)
 				{
 					layerIsAvailable = true;
+					// If the layer is available, we know it implements debug utils.
+					debugUtilsIsAvailable = true;
 					break;
 				}
 			}
-			if (layerIsAvailable == true)
+			if (debugUtilsIsAvailable && layerIsAvailable)
 			{
-				// If the layer is available, we check if it implements VK_EXT_debug_utils
-				u32 layerExtensionCount = 0;
-				vkResult = baseDispatch.enumerateInstanceExtensionProperties(
-					Constants::preferredValidationLayer, 
-					&layerExtensionCount, 
-					nullptr);
-				if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
-					throw std::runtime_error("Vulkan: Unable to enumerate available instance extension properties.");
-				std::vector<vk::ExtensionProperties> availableExtensions;
-				availableExtensions.resize(layerExtensionCount);
-				baseDispatch.enumerateInstanceExtensionProperties(
-					Constants::preferredValidationLayer, 
-					&layerExtensionCount, 
-					availableExtensions.data());
+				totalRequiredExtensions.push_back(Constants::debugUtilsExtensionName);
+				layersToUse.PushBack(Constants::khronosLayerName);
 
-				bool debugUtilsIsAvailable = false;
-				for (auto const& availableLayerExtension : availableExtensions)
-				{
-					if (std::strcmp(availableLayerExtension.extensionName, Constants::debugUtilsExtensionName) == 0)
-					{
-						debugUtilsIsAvailable = true;
-						break;
-					}
-				}
-
-				if (debugUtilsIsAvailable)
-				{
-					// Debug utils and the Khronos validation layer is available.
-					// Push them onto the vectors
-					totalRequiredExtensions.push_back(Constants::debugUtilsExtensionName);
-					layersToUse.PushBack(Constants::preferredValidationLayer);
-
-					returnValue.debugUtilsEnabled = true;
-				}
+				returnValue.debugUtilsEnabled = true;
 			}
 		}
 	}
@@ -490,7 +468,7 @@ vk::Device DEngine::Gfx::Vk::Init::CreateDevice(
 {
 	vk::Result vkResult{};
 
-	// Create logical physDevice
+	// CreateJob logical physDevice
 	vk::DeviceCreateInfo createInfo{};
 
 	// Feature configuration
@@ -557,6 +535,29 @@ vk::Device DEngine::Gfx::Vk::Init::CreateDevice(
 
 	vk::Device vkDevice = instance.createDevice(physDevice.handle, createInfo);
 	return vkDevice;
+}
+
+bool DEngine::Gfx::Vk::Init::InitializeViewportManager(
+	ViewportManager& vpManager,
+	PhysDeviceInfo const& physDevice,
+	DevDispatch const& device)
+{
+	vk::DeviceSize elementSize = 64;
+	if (physDevice.properties.limits.minUniformBufferOffsetAlignment > elementSize)
+		elementSize = physDevice.properties.limits.minUniformBufferOffsetAlignment;
+	vpManager.camElementSize = (uSize)elementSize;
+
+	vk::DescriptorSetLayoutBinding binding{};
+	binding.binding = 0;
+	binding.descriptorCount = 1;
+	binding.descriptorType = vk::DescriptorType::eUniformBuffer;
+	binding.stageFlags = vk::ShaderStageFlagBits::eVertex;
+	vk::DescriptorSetLayoutCreateInfo descrLayoutInfo{};
+	descrLayoutInfo.bindingCount = 1;
+	descrLayoutInfo.pBindings = &binding;
+	vpManager.cameraDescrLayout = device.createDescriptorSetLayout(descrLayoutInfo);
+
+	return true;
 }
 
 DEngine::Std::StaticVector<vk::Fence, DEngine::Gfx::Vk::Constants::maxResourceSets> DEngine::Gfx::Vk::Init::CreateMainFences(
@@ -693,7 +694,10 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 	}
 
 	vk::SemaphoreCreateInfo semaphoreInfo{};
-	swapchain.imageAvailableSemaphore = device.createSemaphore(semaphoreInfo);
+	vk::ResultValue<vk::Semaphore> semaphoreResult = device.createSemaphore(semaphoreInfo);
+	if (semaphoreResult.result != vk::Result::eSuccess)
+		throw std::runtime_error("Unable to make semaphore.");
+	swapchain.imageAvailableSemaphore = semaphoreResult.value;
 	// Give name to the semaphore
 	if (debugUtils != nullptr)
 	{
@@ -1038,7 +1042,7 @@ DEngine::Gfx::Vk::GUIData DEngine::Gfx::Vk::Init::CreateGUIData(
 	vk::Result vkResult{};
 	GUIData returnVal{};
 
-	// Create the renderpass
+	// CreateJob the renderpass
 	{
 		vk::AttachmentDescription colorAttachment{};
 		colorAttachment.initialLayout = vk::ImageLayout::eTransferSrcOptimal;
@@ -1075,7 +1079,7 @@ DEngine::Gfx::Vk::GUIData DEngine::Gfx::Vk::Init::CreateGUIData(
 		}
 	}
 
-	// Create the commandbuffers
+	// CreateJob the commandbuffers
 	{
 		vk::CommandPoolCreateInfo cmdPoolInfo{};
 		cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
@@ -1287,12 +1291,17 @@ void DEngine::Gfx::Vk::Init::TransitionGfxImage(
 		imgBarrier.subresourceRange.layerCount = 1;
 		imgBarrier.subresourceRange.levelCount = 1;
 		imgBarrier.oldLayout = vk::ImageLayout::eUndefined;
+		// If we're in editor mode, we want to sample from the graphics viewport
+		// into the editor's GUI pass.
+		// If we're not in editor mode, we use a render-pass where this
+		// is the image that gets copied onto the swapchain. That render-pass
+		// requires the image to be in transferSrcOptimal layout.
 		if (useEditorPipeline)
 			imgBarrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 		else
 			imgBarrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
 		imgBarrier.srcAccessMask = {};
-		// We want to write to the image as a color-attachment
+		// We want to write to the image as a render-target
 		imgBarrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 
 		vk::PipelineStageFlags srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
@@ -1321,7 +1330,7 @@ void DEngine::Gfx::Vk::Init::TransitionGfxImage(
 	deletionQueue.Destroy(fence, cmdPool);
 }
 
-DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewport(
+DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewportRenderTarget(
 	GlobUtils const& globUtils,
 	uSize viewportID,
 	vk::Extent2D viewportSize)
@@ -1331,7 +1340,6 @@ DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewport(
 	GfxRenderTarget returnVal{};
 	returnVal.extent = viewportSize;
 
-	// First we make a temp image that has max Size, so we won't have to re-allocate memory later when resizing this image.
 	vk::ImageCreateInfo imageInfo{};
 	imageInfo.arrayLayers = 1;
 	imageInfo.extent = vk::Extent3D{ viewportSize.width, viewportSize.height, 1 };
@@ -1350,7 +1358,7 @@ DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewport(
 	}
 
 	VmaAllocationCreateInfo vmaAllocInfo{};
-	vmaAllocInfo.flags = 0;
+	vmaAllocInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 	vmaAllocInfo.memoryTypeBits = 0;
 	vmaAllocInfo.pool = 0;
 	vmaAllocInfo.preferredFlags = 0;
@@ -1453,7 +1461,7 @@ void DEngine::Gfx::Vk::Init::InitializeImGui(
 {
 	vk::Result vkResult{};
 
-	// Create the descriptor pool for ImGui to use
+	// CreateJob the descriptor pool for ImGui to use
 	VkDescriptorPoolSize pool_sizes[] =
 	{
 			{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
@@ -1535,7 +1543,7 @@ void DEngine::Gfx::Vk::Init::InitializeImGui(
 	vkResult = apiData.globUtils.device.waitForFences({ tempFence }, true, std::numeric_limits<std::uint64_t>::max());
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("Vulkan: Could not wait for fence after submitting ImGui create-fonts cmdBuffer.");
-	device.destroyFence(tempFence);
-	device.destroyCommandPool(cmdPool);
+	device.Destroy(tempFence);
+	device.Destroy(cmdPool);
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }

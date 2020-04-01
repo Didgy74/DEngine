@@ -378,7 +378,6 @@ namespace DEngine::Gfx::Vk
 		DeviceDispatch() = default;
 
 		void copy(const DeviceDispatch& in);
-
 		static DeviceDispatch Build(vk::Device vkDevice, PFN_vkGetDeviceProcAddr getProcAddr);
 
 		vk::Device handle{};
@@ -593,6 +592,12 @@ namespace DEngine::Gfx::Vk
 			return handle.createFramebuffer(createInfo, allocator, raw);
 		}
 
+		[[nodiscard]] vk::Result createGraphicsPipelines(
+			vk::PipelineCache pipelineCache,
+			vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> createInfos,
+			vk::Optional<vk::AllocationCallbacks const> allocator,
+			vk::Pipeline* pPipelines) const;
+
 		[[nodiscard]] vk::PipelineLayout createPipelineLayout(
 			vk::PipelineLayoutCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
@@ -607,31 +612,37 @@ namespace DEngine::Gfx::Vk
 			return handle.createSampler(createInfo, allocator, raw);
 		}
 
+		[[nodiscard]] vk::ResultValue<vk::Semaphore> createSemaphore(
+			vk::SemaphoreCreateInfo const& createInfo,
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+
 		[[nodiscard]] vk::ShaderModule createShaderModule(
 			vk::ShaderModuleCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
 		{
 			return handle.createShaderModule(createInfo, allocator, raw);
 		}
-
-		void destroyCommandPool(vk::CommandPool commandPool, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyCommandPool(commandPool, allocator, raw);
-		}
-
-		void destroyFramebuffer(
-			vk::Framebuffer framebuffer,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyFramebuffer(framebuffer, allocator, raw);
-		}
-
-		void destroyShaderModule(
-			vk::ShaderModule shaderModule,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyShaderModule(shaderModule, allocator, raw);
-		}
+		void Destroy(
+			vk::CommandPool in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::Framebuffer in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::Fence in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::Image in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::ImageView in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::RenderPass in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::ShaderModule in,
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
 		void endCommandBuffer(vk::CommandBuffer cmdBuffer) const
 		{
@@ -651,6 +662,8 @@ namespace DEngine::Gfx::Vk
 		{
 			return handle.freeMemory(memory, allocator, raw);
 		}
+
+		[[nodiscard]] vk::Result getFenceStatus(vk::Fence fence) const;
 
 		[[nodiscard]] vk::Queue getQueue(std::uint32_t familyIndex, std::uint32_t queueIndex) const
 		{
@@ -691,37 +704,6 @@ namespace DEngine::Gfx::Vk
 			return queue.waitIdle(raw);
 		}
 
-		// Pipelines
-		[[nodiscard]] vk::Pipeline createGraphicsPipeline(
-			vk::PipelineCache pipelineCache,
-			vk::GraphicsPipelineCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			vk::ResultValue<vk::Pipeline> temp = handle.createGraphicsPipeline(
-				pipelineCache, 
-				createInfo, 
-				allocator,
-				raw);
-			if (temp.result == vk::Result::eSuccess)
-			{
-				return temp.value;
-			}
-			else
-			{
-				throw std::runtime_error("DEngine, Vulkan: Unable to create graphics pipeline.");
-				return {};
-			}
-		}
-		[[nodiscard]] vk::Result createGraphicsPipelines(
-			vk::PipelineCache pipelineCache,
-			std::uint32_t createInfoCount,
-			vk::GraphicsPipelineCreateInfo const* pCreateInfos,
-			vk::Optional<vk::AllocationCallbacks const> allocator,
-			vk::Pipeline* pPipelines) const
-		{
-			return handle.createGraphicsPipelines(pipelineCache, createInfoCount, pCreateInfos, allocator, pPipelines, raw);
-		}
-
 		// Memory requirements
 		[[nodiscard]] vk::MemoryRequirements getBufferMemoryRequirements(vk::Buffer buffer) const
 		{
@@ -735,11 +717,6 @@ namespace DEngine::Gfx::Vk
 
 		// Fences
 
-		void destroyFence(vk::Fence fence, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyFence(fence, allocator, raw);
-		}
-
 		void resetFences(vk::ArrayProxy<vk::Fence const> fences) const
 		{
 			return handle.resetFences(fences, raw);
@@ -752,17 +729,10 @@ namespace DEngine::Gfx::Vk
 		{
 			return handle.createImage(createInfo, allocator, raw);
 		}
-		void destroyImage(vk::Image image, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyImage(image, allocator, raw);
-		}
+
 		vk::ImageView createImageView(vk::ImageViewCreateInfo const& createInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
 		{
 			return handle.createImageView(createInfo, allocator, raw);
-		}
-		void destroyImageView(vk::ImageView image, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyImageView(image, allocator, raw);
 		}
 
 
@@ -774,19 +744,12 @@ namespace DEngine::Gfx::Vk
 		{
 			return handle.createRenderPass(createInfo, allocator, raw);
 		}
-		void destroyRenderPass(vk::RenderPass renderPass, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyRenderPass(renderPass, allocator, raw);
-		}
 
 
 
 
 		// Semaphore
-		vk::Semaphore createSemaphore(vk::SemaphoreCreateInfo const& createInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createSemaphore(createInfo, allocator, raw);
-		}
+
 		void destroySemaphore(vk::Semaphore semaphore, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
 		{
 			return handle.destroySemaphore(semaphore, allocator, raw);

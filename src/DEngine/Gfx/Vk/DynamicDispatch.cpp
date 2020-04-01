@@ -320,3 +320,94 @@ namespace DEngine::Gfx::Vk
         return procAddr;
     }
 }
+
+vk::ResultValue<vk::Semaphore> DEngine::Gfx::Vk::DeviceDispatch::createSemaphore(
+    vk::SemaphoreCreateInfo const& createInfo,
+    vk::Optional<vk::AllocationCallbacks const> allocator) const
+{
+    vk::Semaphore temp{};
+    vk::Result result = static_cast<vk::Result>(raw.vkCreateSemaphore(
+        static_cast<VkDevice>(handle),
+        reinterpret_cast<VkSemaphoreCreateInfo const*>(&createInfo),
+        reinterpret_cast<VkAllocationCallbacks const*>(static_cast<vk::AllocationCallbacks const*>(allocator)),
+        reinterpret_cast<VkSemaphore*>(&temp)));
+    return { result, temp };
+}
+
+vk::Result DEngine::Gfx::Vk::DeviceDispatch::createGraphicsPipelines(
+    vk::PipelineCache pipelineCache,
+    vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> createInfos,
+    vk::Optional<vk::AllocationCallbacks const> allocator,
+    vk::Pipeline* pPipelines) const
+{
+    return static_cast<vk::Result>(raw.vkCreateGraphicsPipelines(
+        static_cast<VkDevice>(handle),
+        static_cast<VkPipelineCache>(pipelineCache),
+        createInfos.size(),
+        reinterpret_cast<VkGraphicsPipelineCreateInfo const*>(createInfos.data()),
+        reinterpret_cast<VkAllocationCallbacks const*>(static_cast<vk::AllocationCallbacks const*>(allocator)),
+        reinterpret_cast<VkPipeline*>(pPipelines)));
+}
+
+#define DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(typeName) \
+    raw.vkDestroy##typeName##( \
+        static_cast<VkDevice>(handle), \
+        static_cast<Vk##typeName##>(in), \
+        reinterpret_cast<VkAllocationCallbacks const*>(static_cast<vk::AllocationCallbacks const*>(allocator))); \
+        
+
+void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
+    vk::CommandPool in,
+    vk::Optional<vk::AllocationCallbacks> allocator) const
+{
+    DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(CommandPool)
+}
+
+void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
+    vk::Fence in, 
+    vk::Optional<vk::AllocationCallbacks> allocator) const
+{
+    DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Fence)
+}
+
+void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
+    vk::Framebuffer in, 
+    vk::Optional<vk::AllocationCallbacks> allocator) const
+{
+    DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Framebuffer)
+}
+
+void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
+    vk::Image in, 
+    vk::Optional<vk::AllocationCallbacks> allocator) const
+{
+    DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Image)
+}
+
+void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
+    vk::ImageView in, 
+    vk::Optional<vk::AllocationCallbacks> allocator) const
+{
+    DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(ImageView)
+}
+
+void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
+    vk::RenderPass in, 
+    vk::Optional<vk::AllocationCallbacks> allocator) const
+{
+    DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(RenderPass)
+}
+
+void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
+    vk::ShaderModule in, 
+    vk::Optional<vk::AllocationCallbacks const> allocator) const
+{
+    DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(ShaderModule)
+}
+
+vk::Result DEngine::Gfx::Vk::DeviceDispatch::getFenceStatus(vk::Fence fence) const
+{
+    return static_cast<vk::Result>(raw.vkGetFenceStatus(
+        static_cast<VkDevice>(handle),
+        static_cast<VkFence>(fence)));
+}

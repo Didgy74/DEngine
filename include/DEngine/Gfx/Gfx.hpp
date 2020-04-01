@@ -10,11 +10,6 @@
 
 namespace DEngine::Gfx
 {
-	namespace Constants
-	{
-		constexpr u8 maxViewportCount = 8;
-	}
-
 	class IWsi;
 	class ILog;
 	struct InitInfo;

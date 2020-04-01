@@ -1,11 +1,15 @@
 #include "DEngine/Gfx/Gfx.hpp"
-#include "VkInterface.hpp"
+#include "APIDataBase.hpp"
 
 #include "DEngine/Utility.hpp"
-
 #include "DEngine/Gfx/Assert.hpp"
 
 using namespace DEngine;
+
+namespace DEngine::Gfx::Vk
+{
+	bool InitializeBackend(Data& gfxData, InitInfo const& initInfo, void*& apiDataBuffer);
+}
 
 Std::Opt<Gfx::Data> DEngine::Gfx::Initialize(const InitInfo& initInfo)
 {
@@ -24,19 +28,19 @@ Std::Opt<Gfx::Data> DEngine::Gfx::Initialize(const InitInfo& initInfo)
 
 void DEngine::Gfx::Data::Draw(Draw_Params const& params)
 {
-	Vk::Draw(*this, params, apiDataBuffer);
+	reinterpret_cast<APIDataBase*>(this->apiDataBuffer)->Draw(*this, params);
 }
 
 DEngine::Gfx::ViewportRef DEngine::Gfx::Data::NewViewport()
 {
 	ViewportRef returnVal{};
 	
-	Vk::NewViewport(this->apiDataBuffer, returnVal.viewportID, returnVal.imguiTexID);
+	reinterpret_cast<APIDataBase*>(this->apiDataBuffer)->NewViewport(returnVal.viewportID, returnVal.imguiTexID);
 
 	return returnVal;
 }
 
 void DEngine::Gfx::Data::DeleteViewport(uSize viewportID)
 {
-	Vk::DeleteViewport(this->apiDataBuffer, viewportID);
+	reinterpret_cast<APIDataBase*>(this->apiDataBuffer)->DeleteViewport(viewportID);
 }

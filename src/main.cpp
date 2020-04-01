@@ -119,8 +119,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 				viewportData.width = viewport.renderWidth;
 				viewportData.height = viewport.renderHeight;
 
-
-				f32 aspectRatio = (f32)viewportData.width / viewportData.height;
+				f32 aspectRatio = (f32)viewport.width / viewport.height;
 
 				Editor::Camera const* camPtr = nullptr;
 				if (viewport.cameraID == Editor::Viewport::invalidCamID)

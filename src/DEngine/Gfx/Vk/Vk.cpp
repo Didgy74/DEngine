@@ -1,5 +1,4 @@
 #include "Vk.hpp"
-#include "../VkInterface.hpp"
 #include "DEngine/Gfx/Assert.hpp"
 #include "Init.hpp"
 
@@ -18,66 +17,64 @@
 
 namespace DEngine::Gfx::Vk
 {
+	bool InitializeBackend(Data& gfxData, InitInfo const& initInfo, void*& apiDataBuffer);
+
 	namespace Init
 	{
 		void Test(APIData& apiData);
 	}
-
-	void DeleteViewport(void* apiDataBuffer, uSize id)
-	{
-		vk::Result vkResult{};
-		APIData& apiData = *reinterpret_cast<APIData*>(apiDataBuffer);
-
-		std::lock_guard viewportDataLockGuard{ apiData.viewportManager.viewportDataLock };
-
-		// Find index to remove
-		uSize indexToRemove = static_cast<uSize>(-1);
-		for (uSize i = 0; i < apiData.viewportManager.viewportDatas.size(); i += 1)
-		{
-			auto const& item = apiData.viewportManager.viewportDatas[i];
-			if (item.a == id)
-			{
-				indexToRemove = i;
-				break;
-			}
-		}
-		DENGINE_GFX_ASSERT(indexToRemove != static_cast<uSize>(-1));
-
-		ViewportVkData const& viewport = apiData.viewportManager.viewportDatas[indexToRemove].b;
-		char buffer[DeletionQueue::jobBufferSize] = {};
-		std::memcpy(buffer, &viewport, sizeof(viewport));
-		DeletionQueue::CallbackPFN callback = [](GlobUtils const& globUtils, char const(&buffer)[DeletionQueue::jobBufferSize])
-		{
-			ViewportVkData data{};
-			std::memcpy(&data, buffer, sizeof(data));
-
-			globUtils.device.destroyCommandPool(data.cmdPool);
-			ImGui_ImplVulkan_RemoveTexture(data.imguiTextureID);
-			globUtils.device.destroyFramebuffer(data.renderTarget.framebuffer);
-			globUtils.device.destroyImageView(data.renderTarget.imgView);
-			vmaDestroyImage(globUtils.vma, (VkImage)data.renderTarget.img, data.renderTarget.vmaAllocation);
-		};
-
-		apiData.globUtils.deletionQueue.Destroy(callback, buffer);
-
-		apiData.viewportManager.viewportDatas.erase(apiData.viewportManager.viewportDatas.begin() + indexToRemove);
-	}
 }
 
-void DEngine::Gfx::Vk::NewViewport(void* apiDataBuffer, uSize& viewportID, void*& imguiTexID)
+DEngine::Gfx::Vk::APIData::APIData()
+{
+}
+
+DEngine::Gfx::Vk::APIData::~APIData()
+{
+}
+
+void DEngine::Gfx::Vk::APIData::NewViewport(uSize& viewportID, void*& imguiTexID)
 {
 	vk::Result vkResult{};
-	APIData& apiData = *reinterpret_cast<APIData*>(apiDataBuffer);
+	APIData& apiData = *this;
 
-	std::lock_guard viewportDataLockGuard{ apiData.viewportManager.viewportDataLock };
+	ViewportManager::CreateJob createJob{};
+	createJob.imguiTexID = ImGui_ImplVulkan_AddTexture(VkImageView(), VkImageLayout());
+	std::lock_guard _{ apiData.viewportManager.mutexLock };
+	createJob.id = apiData.viewportManager.viewportIDTracker;
+	viewportID = createJob.id;
+	imguiTexID = createJob.imguiTexID;
 
-	ViewportVkData viewportData{};
-	viewportData.imguiTextureID = ImGui_ImplVulkan_AddTexture(VkImageView(), VkImageLayout());
-
-	viewportID = apiData.viewportManager.viewportIDTracker;
-	imguiTexID = viewportData.imguiTextureID;
-	apiData.viewportManager.viewportDatas.push_back({ apiData.viewportManager.viewportIDTracker, viewportData });
+	apiData.viewportManager.createQueue.push_back(createJob);
 	apiData.viewportManager.viewportIDTracker += 1;
+}
+
+void DEngine::Gfx::Vk::APIData::DeleteViewport(uSize id)
+{
+	vk::Result vkResult{};
+	APIData& apiData = *this;
+
+	assert(false);
+}
+
+DEngine::Gfx::Vk::GlobUtils::GlobUtils()
+{
+}
+
+DEngine::u8 DEngine::Gfx::Vk::GlobUtils::CurrentResourceSetIndex_Async()
+{
+	u8 index = static_cast<u8>(-1);
+	{
+		std::lock_guard _{ currentResourceSetIndex_Lock };
+		index = currentResourceSetIndex_Var;
+	}
+	return index;
+}
+
+void DEngine::Gfx::Vk::GlobUtils::SetCurrentResourceSetIndex(u8 index)
+{
+	std::lock_guard _{ currentResourceSetIndex_Lock };
+	currentResourceSetIndex_Var = index;
 }
 
 bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo, void*& apiDataBuffer)
@@ -118,7 +115,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	}
 
 	// TODO: I don't think I like this code
-	// Create the VkSurface using the callback
+	// CreateJob the VkSurface using the callback
 	vk::SurfaceKHR surface{};
 	vk::Result surfaceCreateResult = (vk::Result)apiData.wsiInterface->createVkSurface((u64)(VkInstance)instance.handle, nullptr, reinterpret_cast<u64*>(&surface));
 	if (surfaceCreateResult != vk::Result::eSuccess)
@@ -136,14 +133,21 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 
 	PFN_vkGetDeviceProcAddr deviceProcAddr = (PFN_vkGetDeviceProcAddr)instanceProcAddr((VkInstance)instance.handle, "vkGetDeviceProcAddr");
 
-	// Create the device and the dispatch table for it.
+	// CreateJob the device and the dispatch table for it.
 	vk::Device deviceHandle = Init::CreateDevice(instance, globUtils.physDevice);
 	globUtils.device.copy(DeviceDispatch::Build(deviceHandle, deviceProcAddr));
 
+	bool result = Init::InitializeViewportManager(
+		apiData.viewportManager,
+		globUtils.physDevice,
+		globUtils.device);
+
 	QueueData::Initialize(globUtils.device, globUtils.physDevice.queueIndices, globUtils.DebugUtilsPtr(), globUtils.queues);
 
-	Init::InitializeVMA(globUtils, globUtils.DebugUtilsPtr());
-	apiData.globUtils.deletionQueue.Initialize(apiData.globUtils, apiData.globUtils.resourceSetCount);
+	apiData.vma_trackingData.deviceHandle = globUtils.device.handle;
+	apiData.vma_trackingData.debugUtils = globUtils.DebugUtilsPtr();
+	Init::InitializeVMA(globUtils, &apiData.vma_trackingData);
+	apiData.globUtils.deletionQueue.Initialize(&apiData.globUtils, apiData.globUtils.resourceSetCount);
 
 	// Build our swapchain on our device
 	apiData.swapchain = Init::CreateSwapchain(
@@ -154,14 +158,14 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 		apiData.globUtils.DebugUtilsPtr());
 
 
-	// Create our main fences
+	// CreateJob our main fences
 	apiData.mainFences = Init::CreateMainFences(
 		apiData.globUtils.device,
 		apiData.globUtils.resourceSetCount,
 		apiData.globUtils.DebugUtilsPtr());
 
 
-	// Create the resources for rendering GUI
+	// CreateJob the resources for rendering GUI
 	apiData.guiData = Init::CreateGUIData(
 		apiData.globUtils.device,
 		apiData.globUtils.vma,
@@ -178,113 +182,12 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	// Initialize ImGui stuff
 	Init::InitializeImGui(apiData, apiData.globUtils.device, instanceProcAddr, apiData.globUtils.DebugUtilsPtr());
 
-	// Create the main render stuff
-	apiData.globUtils.gfxRenderPass = Init::BuildMainGfxRenderPass(apiData.globUtils.device, true, apiData.globUtils.DebugUtilsPtr());
+	// CreateJob the main render stuff
+	apiData.globUtils.gfxRenderPass = Init::BuildMainGfxRenderPass(
+		apiData.globUtils.device,
+		true, 
+		apiData.globUtils.DebugUtilsPtr());
 	
-	
-	
-	
-	// Allocate memory for cameras
-	{
-		vk::DeviceSize elementSize = 64;
-		if (apiData.globUtils.physDevice.properties.limits.minUniformBufferOffsetAlignment > elementSize)
-			elementSize = apiData.globUtils.physDevice.properties.limits.minUniformBufferOffsetAlignment;
-		apiData.test_camUboOffset = (u32)elementSize;
-
-		vk::DeviceSize memSize = elementSize * Constants::maxResourceSets * Gfx::Constants::maxViewportCount;
-		vk::BufferCreateInfo bufferInfo{};
-		bufferInfo.sharingMode = vk::SharingMode::eExclusive;
-		bufferInfo.size = memSize;
-		bufferInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
-		vk::Buffer buffer = apiData.globUtils.device.createBuffer(bufferInfo);
-
-		vk::MemoryRequirements memReqs = apiData.globUtils.device.getBufferMemoryRequirements(buffer);
-		if ((memReqs.memoryTypeBits & (1 << apiData.globUtils.physDevice.memInfo.hostVisible)) == false)
-			throw std::runtime_error("DEngine::Gfx Vulkan: Can't use host-visible memory for camera memory");
-
-		vk::MemoryAllocateInfo allocInfo{};
-		allocInfo.allocationSize = memSize;
-		allocInfo.memoryTypeIndex = apiData.globUtils.physDevice.memInfo.hostVisible;
-		vk::DeviceMemory mem = apiData.globUtils.device.allocateMemory(allocInfo);
-
-		void* mappedMemory = apiData.globUtils.device.mapMemory(mem, 0, memSize, vk::MemoryMapFlags());
-		apiData.test_mappedMem = mappedMemory;
-
-
-
-		apiData.globUtils.device.bindBufferMemory(buffer, mem, 0);
-
-		vk::DescriptorSetLayoutBinding binding{};
-		binding.binding = 0;
-		binding.descriptorCount = 1;
-		binding.descriptorType = vk::DescriptorType::eUniformBuffer;
-		binding.stageFlags = vk::ShaderStageFlagBits::eVertex;
-
-
-		vk::DescriptorSetLayoutCreateInfo descrLayoutInfo{};
-		descrLayoutInfo.bindingCount = 1;
-		descrLayoutInfo.pBindings = &binding;
-
-		apiData.test_cameraDescrLayout = apiData.globUtils.device.createDescriptorSetLayout(descrLayoutInfo);
-
-		vk::DescriptorPoolSize poolSize{};
-		poolSize.descriptorCount = Constants::maxResourceSets * Gfx::Constants::maxViewportCount;
-		poolSize.type = vk::DescriptorType::eUniformBuffer;
-		vk::DescriptorPoolCreateInfo poolInfo{};
-		poolInfo.poolSizeCount = 1;
-		poolInfo.pPoolSizes = &poolSize;
-		poolInfo.maxSets = Constants::maxResourceSets * Gfx::Constants::maxViewportCount;
-		vk::DescriptorPool descrPool = apiData.globUtils.device.createDescriptorPool(poolInfo);
-
-		Std::StaticVector<vk::DescriptorSetLayout, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> descrLayouts{};
-		descrLayouts.Resize(descrLayouts.Capacity());
-		for (auto& item : descrLayouts)
-			item = apiData.test_cameraDescrLayout;
-
-		vk::DescriptorSetAllocateInfo setAllocInfo{};
-		setAllocInfo.descriptorPool = descrPool;
-		setAllocInfo.descriptorSetCount = (u32)descrLayouts.Size();
-		setAllocInfo.pSetLayouts = descrLayouts.Data();
-
-		Std::StaticVector<vk::DescriptorSet, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> descrSets{};
-		descrSets.Resize(descrSets.Capacity());
-		vkResult = apiData.globUtils.device.allocateDescriptorSets(setAllocInfo, descrSets.Data());
-		if (vkResult != vk::Result::eSuccess)
-			throw std::runtime_error("DEngine, Vulkan: Unable to allocate descriptor sets for camera-matrices.");
-			
-		
-		// Update the descriptor sets to point at the camera-Data
-		{
-
-			Std::StaticVector<vk::WriteDescriptorSet, Constants::maxResourceSets * Gfx::Constants::maxViewportCount> descrWrites{};
-			descrWrites.Resize(descrWrites.Capacity());
-			Std::StaticVector<vk::DescriptorBufferInfo, descrWrites.Capacity()> bufferInfos{};
-			bufferInfos.Resize(descrWrites.Size());
-
-			for (uSize i = 0; i < descrSets.Size(); i++)
-			{
-				vk::DescriptorBufferInfo& bufferInfo = bufferInfos[i];
-				bufferInfo.buffer = buffer;
-				bufferInfo.offset = i * elementSize;
-				bufferInfo.range = 64;
-
-				vk::WriteDescriptorSet& setWrite = descrWrites[i];
-				setWrite.descriptorCount = 1;
-				setWrite.descriptorType = vk::DescriptorType::eUniformBuffer;
-				setWrite.dstArrayElement = 0;
-				setWrite.dstBinding = 0;
-				setWrite.dstSet = descrSets[i];
-				setWrite.pBufferInfo = &bufferInfo;
-			}
-
-			apiData.globUtils.device.updateDescriptorSets({ (u32)descrWrites.Size(), descrWrites.Data() }, {});
-		}
-
-		apiData.test_cameraDescrSets = descrSets;
-		
-	}
-	
-
 	Init::Test(apiData);
 	
 
@@ -298,7 +201,7 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &apiData.test_cameraDescrLayout;
+	pipelineLayoutInfo.pSetLayouts = &apiData.viewportManager.cameraDescrLayout;
 	apiData.testPipelineLayout = apiData.globUtils.device.createPipelineLayout(pipelineLayoutInfo);
 
 	Std::Opt<App::FileStream> vertFileOpt = App::FileStream::OpenPath("data/vert.spv");
@@ -406,9 +309,15 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	pipelineInfo.stageCount = (u32)shaderStages.Size();
 	pipelineInfo.pStages = shaderStages.Data();
 
-	apiData.testPipeline = apiData.globUtils.device.createGraphicsPipeline(vk::PipelineCache{}, pipelineInfo);
+	vkResult = apiData.globUtils.device.createGraphicsPipelines(
+		vk::PipelineCache(),
+		{ 1, &pipelineInfo },
+		nullptr,
+		&apiData.testPipeline);
+	if (vkResult != vk::Result::eSuccess)
+		throw std::runtime_error("Unable to make graphics pipeline.");
 
-	apiData.globUtils.device.destroyShaderModule(vertModule, nullptr);
-	apiData.globUtils.device.destroyShaderModule(fragModule, nullptr);
+	apiData.globUtils.device.Destroy(vertModule);
+	apiData.globUtils.device.Destroy(fragModule);
 	
 }

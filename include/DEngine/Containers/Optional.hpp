@@ -21,18 +21,19 @@ namespace DEngine::Std
 		
 	public:
 		inline Optional();
-
 		inline Optional(T const& value);
-
 		inline Optional(T&& value);
-
 		inline ~Optional();
+
+		inline Optional<T>& operator=(Optional<T> const& other);
 
 		[[nodiscard]] inline bool HasValue() const;
 
 		[[nodiscard]] inline T const& Value() const;
-
 		[[nodiscard]] inline T& Value();
+
+		[[nodiscard]] inline T const* ToPtr() const;
+		[[nodiscard]] inline T* ToPtr();
 	};
 
 	template<typename T>
@@ -61,8 +62,23 @@ namespace DEngine::Std
 	template<typename T>
 	inline Optional<T>::~Optional()
 	{
-		if (m_hasValue)
+		if (HasValue())
 			m_value.~T();
+	}
+
+	template<typename T>
+	inline Optional<T>& Optional<T>::operator=(Optional<T> const& other)
+	{
+		if (this == &other)
+			return *this;
+
+		if (HasValue())
+			m_value.~T();
+
+		if (other.HasValue())
+			m_value = other.Value();
+		else
+			m_hasValue = false;
 	}
 
 	template<typename T>
@@ -74,7 +90,7 @@ namespace DEngine::Std
 	template<typename T>
 	inline T const& Optional<T>::Value() const
 	{
-		if (m_hasValue == false)
+		if (!HasValue())
 			throw std::runtime_error("Tried to deference Optional-variable without Value.");
 		return m_value;
 	}
@@ -82,8 +98,20 @@ namespace DEngine::Std
 	template<typename T>
 	inline T& Optional<T>::Value()
 	{
-		if (m_hasValue == false)
+		if (!HasValue())
 			throw std::runtime_error("Tried to deference Optional-variable without Value.");
 		return m_value;
+	}
+
+	template<typename T>
+	inline T const* Optional<T>::ToPtr() const
+	{
+
+	}
+
+	template<typename T>
+	inline T* Optional<T>::ToPtr()
+	{
+		
 	}
 }

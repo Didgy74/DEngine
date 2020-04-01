@@ -10,3 +10,7 @@ rm -r android/app/.cxx
 # VSCode stuff
 rm -r .vscode
 rm -r build
+
+# Visual Studio stuff
+rm -r .vs
+rm -r out

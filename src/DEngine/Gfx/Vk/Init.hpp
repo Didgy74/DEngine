@@ -34,7 +34,12 @@ namespace DEngine::Gfx::Vk::Init
 
 	void InitializeVMA(
 		GlobUtils& globUtils,
-		DebugUtilsDispatch const* debugUtils);
+		VMA_MemoryTrackingData* vma_trackingData);
+
+	[[nodiscard]] bool InitializeViewportManager(
+		ViewportManager& vpManager,
+		PhysDeviceInfo const& physDevice,
+		DevDispatch const& device);
 
 	[[nodiscard]] Std::StaticVector<vk::Fence, Constants::maxResourceSets> CreateMainFences(
 		DevDispatch const& device,
@@ -120,7 +125,7 @@ namespace DEngine::Gfx::Vk::Init
 		vk::Image img,
 		bool useEditorPipeline);
 
-	[[nodiscard]] GfxRenderTarget InitializeGfxViewport(
+	[[nodiscard]] GfxRenderTarget InitializeGfxViewportRenderTarget(
 		GlobUtils const& globUtils,
 		uSize viewportID,
 		vk::Extent2D viewportSize);
