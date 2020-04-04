@@ -1,3 +1,12 @@
+//
+// File IO
+//
+// Stops the warnings made by MSVC when using "unsafe" CRT fopen functions.
+#ifdef _MSC_VER
+#   define _CRT_SECURE_NO_WARNINGS
+#endif
+#include <cstdio>
+
 #include "detail_Application.hpp"
 
 #define GLFW_INCLUDE_VULKAN
@@ -139,13 +148,10 @@ static void DEngine::Application::detail::Backend_GLFW_KeyboardKeyCallback(
 	int action, 
 	int mods)
 {
-	bool wasPressed = false;
 	if (action == GLFW_PRESS)
-		wasPressed = true;
+		detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), true, detail::tickStartNow);
 	else if (action == GLFW_RELEASE)
-		wasPressed = false;
-
-	detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), wasPressed, detail::tickStartNow);
+		detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), false, detail::tickStartNow);
 }
 
 static void DEngine::Application::detail::Backend_GLFW_MouseButtonCallback(
@@ -300,15 +306,6 @@ DEngine::Application::Button DEngine::Application::detail::Backend_GLFW_Keyboard
 
 	return Button::Undefined;
 }
-
-//
-// File IO
-//
-// Stops the warnings made by MSVC when using "unsafe" CRT fopen functions.
-#ifdef _MSC_VER
-#   define _CRT_SECURE_NO_WARNINGS
-#endif
-#include <cstdio>
 
 DEngine::Std::Opt<DEngine::Application::FileStream> DEngine::Application::FileStream::OpenPath(char const* path)
 {

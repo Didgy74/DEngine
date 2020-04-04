@@ -791,7 +791,7 @@ void DEngine::Gfx::Vk::Init::RecreateSwapchain(
 	Init::TransitionSwapchainImages(globUtils.device, globUtils.deletionQueue, globUtils.queues, swapchain.images);
 
 	// Command cmdBuffers are not resettable, we deallocate the old ones and allocate new ones
-	globUtils.device.freeCommandBuffers(
+	globUtils.device.FreeCommandBuffers(
 		swapchain.cmdPool, 
 		{ (u32)swapchain.cmdBuffers.Size(), swapchain.cmdBuffers.Data() });
 

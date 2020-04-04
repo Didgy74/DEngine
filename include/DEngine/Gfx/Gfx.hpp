@@ -8,6 +8,8 @@
 #include "DEngine/Math/Matrix/Matrix.hpp"
 #include "DEngine/Math/Common.hpp"
 
+#include <vector>
+
 namespace DEngine::Gfx
 {
 	class IWsi;
@@ -28,8 +30,9 @@ namespace DEngine::Gfx
 	{
 		bool presentMainWindow = false;
 		bool resizeEvent = false;
+		bool rebuildSurface = false;
 		
-		Std::StaticVector<ViewportUpdateData, 10> viewportUpdates = {};
+		std::vector<ViewportUpdateData> viewportUpdates = {};
 	};
 
 	class Data
@@ -83,7 +86,7 @@ namespace DEngine::Gfx
 		// Argument #1: VkInstance - The Vulkan instance handle
 		// Argument #2: VkAllocationCallbacks const* - Allocation callbacks for surface creation.
 		// Argument #3: VkSurfaceKHR* - The output surface handle
-		virtual i32 createVkSurface(u64 vkInstance, void const* allocCallbacks, u64* outSurface) = 0;
+		virtual i32 createVkSurface(uSize vkInstance, void const* allocCallbacks, u64* outSurface) = 0;
 	};
 
 	class ViewportRef

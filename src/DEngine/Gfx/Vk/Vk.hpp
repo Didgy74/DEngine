@@ -21,14 +21,14 @@
 
 namespace DEngine::Gfx::Vk
 {
-	constexpr u32 invalidIndex = static_cast<std::uint32_t>(-1);
+	constexpr u32 invalidIndex = static_cast<u32>(-1);
 	
 	template<typename T>
 	[[nodiscard]] inline constexpr bool IsValidIndex(T in) = delete;
 	template<>
-	[[nodiscard]] inline constexpr bool IsValidIndex<std::uint32_t>(std::uint32_t in) { return in != static_cast<std::uint32_t>(-1); }
+	[[nodiscard]] inline constexpr bool IsValidIndex<u32>(u32 in) { return in != static_cast<u32>(-1); }
 	template<>
-	[[nodiscard]] inline constexpr bool IsValidIndex<std::uint64_t>(std::uint64_t in) { return in != static_cast<std::uint64_t>(-1); }
+	[[nodiscard]] inline constexpr bool IsValidIndex<u64>(u64 in) { return in != static_cast<u64>(-1); }
 
 	struct MemoryTypes
 	{
@@ -77,7 +77,7 @@ namespace DEngine::Gfx::Vk
 	struct SwapchainData
 	{
 		vk::SwapchainKHR handle{};
-		std::uint8_t uid = 0;
+		u8 uid = 0;
 
 		vk::Extent2D extents{};
 		vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
@@ -108,6 +108,8 @@ namespace DEngine::Gfx::Vk
 
 	struct ViewportVkData
 	{
+		uSize id = static_cast<uSize>(-1);
+
 		GfxRenderTarget renderTarget{};
 		vk::CommandPool cmdPool{};
 		Std::StaticVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
@@ -118,6 +120,7 @@ namespace DEngine::Gfx::Vk
 		VmaAllocation camVmaAllocation{};
 		vk::Buffer camDataBuffer{};
 		void* mappedMem = nullptr;
+		uSize camElementSize = 0;
 	};
 
 	struct GUIRenderTarget
@@ -146,13 +149,13 @@ namespace DEngine::Gfx::Vk
 			uSize id = static_cast<uSize>(-1);
 			void* imguiTexID = nullptr;
 		};
+		uSize viewportIDTracker = 0;
+		std::vector<CreateJob> createQueue{};
+
+		std::vector<uSize> deleteQueue{};
 
 		// Controls the entire structure.
 		std::mutex mutexLock{};
-
-
-		uSize viewportIDTracker = 0;
-		std::vector<CreateJob> createQueue{};
 
 		// Unsorted vector holding viewport-data and their ID.
 		std::vector<Std::Pair<uSize, ViewportVkData>> viewportData{};

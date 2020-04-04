@@ -224,8 +224,10 @@ namespace DEngine::Gfx::Vk
 		PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR = nullptr;
 	};
 
-	struct BaseDispatch
+	class BaseDispatch
 	{
+	public:
+
 		static BaseDispatch Build(PFN_vkGetInstanceProcAddr procAddr);
 
 		BaseDispatchRaw raw{};
@@ -253,8 +255,10 @@ namespace DEngine::Gfx::Vk
 		}
 	};
 
-	struct DebugUtilsDispatch
+	class DebugUtilsDispatch
 	{
+	public:
+
 		EXT_DebugUtilsDispatchRaw raw{};
 
 		[[nodiscard]] static DebugUtilsDispatch Build(vk::Instance instance, PFN_vkGetInstanceProcAddr instanceProcAddr);
@@ -283,8 +287,10 @@ namespace DEngine::Gfx::Vk
 		}
 	};
 
-	struct InstanceDispatch
+	class InstanceDispatch
 	{
+	public:
+
 		static InstanceDispatch Build(vk::Instance instance, PFN_vkGetInstanceProcAddr getInstanceProcAddr);
 
 		vk::Instance handle{};
@@ -336,6 +342,10 @@ namespace DEngine::Gfx::Vk
 		}
 
 		KHR_SurfaceDispatchRaw surface_raw{};
+		void Destroy(
+			vk::SurfaceKHR in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+
 		void destroySurface(vk::SurfaceKHR surface, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
 		{
 			return handle.destroySurfaceKHR(surface, allocator, surface_raw);
@@ -364,14 +374,13 @@ namespace DEngine::Gfx::Vk
 		{
 			return physDevice.getSurfacePresentModesKHR(surface, pPresentModeCount, pPresentModes, surface_raw);
 		}
-
 	};
 
+	class QueueData;
 	class DeviceDispatch
 	{
 	private:
 		DeviceDispatch(const DeviceDispatch&) = default;
-
 		DeviceDispatch& operator=(const DeviceDispatch&) = default;
 
 	public:
@@ -622,8 +631,12 @@ namespace DEngine::Gfx::Vk
 		{
 			return handle.createShaderModule(createInfo, allocator, raw);
 		}
+
 		void Destroy(
 			vk::CommandPool in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::DescriptorPool in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 		void Destroy(
 			vk::Framebuffer in,
@@ -642,28 +655,25 @@ namespace DEngine::Gfx::Vk
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 		void Destroy(
 			vk::ShaderModule in,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::SwapchainKHR in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		void endCommandBuffer(vk::CommandBuffer cmdBuffer) const
 		{
 			return cmdBuffer.end(raw);
 		}
 
-		void freeCommandBuffers(
+		void FreeCommandBuffers(
 			vk::CommandPool commandPool,
-			vk::ArrayProxy<vk::CommandBuffer const> commandBuffers) const
-		{
-			return handle.freeCommandBuffers(commandPool, commandBuffers, raw);
-		}
+			vk::ArrayProxy<vk::CommandBuffer const> commandBuffers) const;
 
-		void freeMemory(
+		void FreeMemory(
 			vk::DeviceMemory memory,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.freeMemory(memory, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
-		[[nodiscard]] vk::Result getFenceStatus(vk::Fence fence) const;
+		[[nodiscard]] vk::Result GetFenceStatus(vk::Fence fence) const;
 
 		[[nodiscard]] vk::Queue getQueue(std::uint32_t familyIndex, std::uint32_t queueIndex) const
 		{
@@ -677,11 +687,6 @@ namespace DEngine::Gfx::Vk
 			vk::MemoryMapFlags flags) const
 		{
 			return handle.mapMemory(memory, offset, size, flags, raw);
-		}
-
-		void queueSubmit(vk::Queue queue, vk::ArrayProxy<vk::SubmitInfo const> submits, vk::Fence fence) const
-		{
-			return queue.submit(submits, fence, raw);
 		}
 
 		void updateDescriptorSets(
@@ -699,10 +704,8 @@ namespace DEngine::Gfx::Vk
 			return handle.waitForFences(fences, static_cast<VkBool32>(waitAll), timeout, raw);
 		}
 
-		void waitQueueIdle(vk::Queue queue) const
-		{
-			return queue.waitIdle(raw);
-		}
+		QueueData const* m_queueDataPtr = nullptr;
+		void WaitIdle() const;
 
 		// Memory requirements
 		[[nodiscard]] vk::MemoryRequirements getBufferMemoryRequirements(vk::Buffer buffer) const
@@ -716,7 +719,6 @@ namespace DEngine::Gfx::Vk
 
 
 		// Fences
-
 		void resetFences(vk::ArrayProxy<vk::Fence const> fences) const
 		{
 			return handle.resetFences(fences, raw);
@@ -753,11 +755,6 @@ namespace DEngine::Gfx::Vk
 		void destroySemaphore(vk::Semaphore semaphore, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
 		{
 			return handle.destroySemaphore(semaphore, allocator, raw);
-		}
-
-		void waitIdle() const
-		{
-			return handle.waitIdle(raw);
 		}
 
 

@@ -54,7 +54,8 @@ void DEngine::Gfx::Vk::APIData::DeleteViewport(uSize id)
 	vk::Result vkResult{};
 	APIData& apiData = *this;
 
-	assert(false);
+	std::lock_guard _{ apiData.viewportManager.mutexLock };
+	apiData.viewportManager.deleteQueue.push_back(id);
 }
 
 DEngine::Gfx::Vk::GlobUtils::GlobUtils()
@@ -115,9 +116,12 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	}
 
 	// TODO: I don't think I like this code
-	// CreateJob the VkSurface using the callback
+	// Create the VkSurface using the callback
 	vk::SurfaceKHR surface{};
-	vk::Result surfaceCreateResult = (vk::Result)apiData.wsiInterface->createVkSurface((u64)(VkInstance)instance.handle, nullptr, reinterpret_cast<u64*>(&surface));
+	vk::Result surfaceCreateResult = (vk::Result)apiData.wsiInterface->createVkSurface(
+		(u64)(VkInstance)instance.handle, 
+		nullptr, 
+		reinterpret_cast<u64*>(&surface));
 	if (surfaceCreateResult != vk::Result::eSuccess)
 		throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
 
@@ -136,13 +140,18 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	// CreateJob the device and the dispatch table for it.
 	vk::Device deviceHandle = Init::CreateDevice(instance, globUtils.physDevice);
 	globUtils.device.copy(DeviceDispatch::Build(deviceHandle, deviceProcAddr));
+	globUtils.device.m_queueDataPtr = &globUtils.queues;
 
 	bool result = Init::InitializeViewportManager(
 		apiData.viewportManager,
 		globUtils.physDevice,
 		globUtils.device);
 
-	QueueData::Initialize(globUtils.device, globUtils.physDevice.queueIndices, globUtils.DebugUtilsPtr(), globUtils.queues);
+	QueueData::Initialize(
+		globUtils.queues,
+		globUtils.device, 
+		globUtils.physDevice.queueIndices, 
+		globUtils.DebugUtilsPtr());
 
 	apiData.vma_trackingData.deviceHandle = globUtils.device.handle;
 	apiData.vma_trackingData.debugUtils = globUtils.DebugUtilsPtr();

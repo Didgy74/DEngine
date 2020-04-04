@@ -107,59 +107,73 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 		Editor::RenderImGuiStuff(editorData, rendererData);
 
-		Gfx::Draw_Params params{};
-		params.presentMainWindow = !App::detail::IsMinimized();
-
-		for (auto const& [vpID, viewport] : editorData.viewports)
+		if (!App::MainWindowMinimized())
 		{
-			if (viewport.visible && !viewport.paused)
+			Gfx::Draw_Params params{};
+
+			for (auto const& [vpID, viewport] : editorData.viewports)
 			{
-				Gfx::ViewportUpdateData viewportData{};
-				viewportData.id = viewport.gfxViewportRef.ViewportID();
-				viewportData.width = viewport.renderWidth;
-				viewportData.height = viewport.renderHeight;
-
-				f32 aspectRatio = (f32)viewport.width / viewport.height;
-
-				Editor::Camera const* camPtr = nullptr;
-				if (viewport.cameraID == Editor::Viewport::invalidCamID)
-					camPtr = &viewport.camera;
-				else
+				if (viewport.visible && !viewport.paused)
 				{
-					for (auto const& [camID, camera] : editorData.cameras)
+					Gfx::ViewportUpdateData viewportData{};
+					viewportData.id = viewport.gfxViewportRef.ViewportID();
+					viewportData.width = viewport.renderWidth;
+					viewportData.height = viewport.renderHeight;
+
+					f32 aspectRatio = (f32)viewport.width / viewport.height;
+
+					Editor::Camera const* camPtr = nullptr;
+					if (viewport.cameraID == Editor::Viewport::invalidCamID)
+						camPtr = &viewport.camera;
+					else
 					{
-						if (camID == viewport.cameraID)
+						for (auto const& [camID, camera] : editorData.cameras)
 						{
-							camPtr = &camera;
-							break;
+							if (camID == viewport.cameraID)
+							{
+								camPtr = &camera;
+								break;
+							}
 						}
 					}
+					Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(camPtr->rotation);
+
+					camMat = Math::LinTran3D::Translate(camPtr->position) * camMat;
+
+					Math::Mat4 test = Math::Mat4::Identity();
+					test.At(2, 2) = -test.At(2, 2);
+					test.At(0, 0) = -test.At(0, 0);
+					//camMat = test * camMat;
+
+
+					camMat = camMat.GetInverse().Value();
+
+					camMat = Math::LinTran3D::Perspective_RH_ZO(camPtr->fov, aspectRatio, camPtr->zNear, camPtr->zFar) * camMat;
+
+					viewportData.transform = camMat;
+
+					params.viewportUpdates.push_back(viewportData);
 				}
-				Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(camPtr->rotation);
-				
-				camMat = Math::LinTran3D::Translate(camPtr->position) * camMat;
-
-				Math::Mat4 test = Math::Mat4::Identity();
-				test.At(2, 2) = -test.At(2, 2);
-				test.At(0, 0) = -test.At(0, 0);
-				//camMat = test * camMat;
-
-
-				camMat = camMat.GetInverse().Value();
-
-				camMat = Math::LinTran3D::Perspective_RH_ZO(camPtr->fov, aspectRatio, camPtr->zNear, camPtr->zFar) * camMat;
-				
-				viewportData.transform = camMat;
-
-				params.viewportUpdates.PushBack(viewportData);
 			}
+
+			params.presentMainWindow = true;
+
+			if (App::detail::MainWindowSurfaceInitializeEvent())
+				params.rebuildSurface = true;
+
+			if (App::detail::MainWindowRestoreEvent())
+				params.rebuildSurface = true;
+
+			if (App::detail::ResizeEvent())
+				params.resizeEvent = true;
+
+			rendererData.Draw(params);
 		}
 
 
-		if (App::detail::ResizeEvent())
-			params.resizeEvent = true;
 
-		rendererData.Draw(params);
+
+
 
 	}
 

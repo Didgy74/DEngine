@@ -25,7 +25,9 @@ namespace DEngine::Application::detail
 	bool ShouldShutdown();
 	bool IsMinimized();
 	bool IsRestored();
+	bool MainWindowRestoreEvent();
 	bool ResizeEvent();
+	bool MainWindowSurfaceInitializeEvent();
 
 	void ImgGui_Initialize();
 	void ImGui_NewFrame();
@@ -33,7 +35,6 @@ namespace DEngine::Application::detail
 	Std::StaticVector<char const*, 5> GetRequiredVulkanInstanceExtensions();
 	bool CreateVkSurface(u64 vkInstance, void const* vkAllocationCallbacks, void* userData, u64* vkSurface);
 
-	// Input
 	// Input
 	extern bool buttonValues[(int)Button::COUNT];
 	extern std::chrono::high_resolution_clock::time_point buttonHeldStart[(int)Button::COUNT];
@@ -58,4 +59,8 @@ namespace DEngine::Application::detail
 	extern bool mainWindowRestoreEvent;
 	extern bool mainWindowResizeEvent;
 	extern bool shouldShutdown;
+
+	extern bool mainWindowSurfaceInitialized;
+	extern bool mainWindowSurfaceInitializeEvent;
+	extern bool mainWindowSurfaceTerminateEvent;
 }

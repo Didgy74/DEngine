@@ -28,6 +28,10 @@ namespace DEngine::Application::detail
 	bool mainWindowRestoreEvent = false;
 	bool mainWindowResizeEvent = false;
 	bool shouldShutdown = false;
+
+	bool mainWindowSurfaceInitialized = false;
+	bool mainWindowSurfaceInitializeEvent = false;
+	bool mainWindowSurfaceTerminateEvent = false;
 }
 
 bool DEngine::Application::ButtonValue(Button input)
@@ -209,6 +213,7 @@ void DEngine::Application::detail::ProcessEvents()
 {
 	auto now = std::chrono::high_resolution_clock::now();
 
+	// Input stuff
 	// Clear event-style values.
 	for (auto& item : detail::buttonEvents)
 		item = KeyEventType::Unchanged;
@@ -222,6 +227,10 @@ void DEngine::Application::detail::ProcessEvents()
 	}
 	for (auto& item : detail::touchInputs)
 		item.eventType = TouchEventType::Unchanged;
+
+	// Window stuff
+	detail::mainWindowSurfaceInitializeEvent = false;
+	detail::mainWindowSurfaceTerminateEvent = false;
 	detail::mainWindowRestoreEvent = false;
 	detail::mainWindowResizeEvent = false;
 
@@ -252,9 +261,19 @@ bool DEngine::Application::detail::IsRestored()
 	return mainWindowRestoreEvent;
 }
 
+bool DEngine::Application::detail::MainWindowRestoreEvent()
+{
+	return detail::mainWindowRestoreEvent;
+}
+
 bool DEngine::Application::detail::ResizeEvent()
 {
 	return mainWindowResizeEvent;
+}
+
+bool DEngine::Application::detail::MainWindowSurfaceInitializeEvent()
+{
+	return mainWindowSurfaceInitializeEvent;
 }
 
 void DEngine::Application::detail::ImGui_NewFrame()
@@ -311,4 +330,9 @@ void DEngine::Application::detail::ImGui_NewFrame()
 void DEngine::Application::SetRelativeMouseMode(bool enabled)
 {
 
+}
+
+bool DEngine::Application::MainWindowMinimized()
+{
+	return detail::mainWindowIsMinimized;
 }

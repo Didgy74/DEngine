@@ -35,6 +35,7 @@ namespace DEngine::Application
 
 	void Log(char const* msg);
 
+	bool MainWindowMinimized();
 	void SetRelativeMouseMode(bool enabled);
 
 	class FileStream;

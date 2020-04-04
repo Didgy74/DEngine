@@ -321,6 +321,16 @@ namespace DEngine::Gfx::Vk
     }
 }
 
+void DEngine::Gfx::Vk::InstanceDispatch::Destroy(
+    vk::SurfaceKHR in, 
+    vk::Optional<vk::AllocationCallbacks> allocator) const
+{
+    surface_raw.vkDestroySurfaceKHR(
+        static_cast<VkInstance>(handle),
+        static_cast<VkSurfaceKHR>(in),
+        reinterpret_cast<VkAllocationCallbacks const*>(static_cast<vk::AllocationCallbacks const*>(allocator)));
+}
+
 vk::ResultValue<vk::Semaphore> DEngine::Gfx::Vk::DeviceDispatch::createSemaphore(
     vk::SemaphoreCreateInfo const& createInfo,
     vk::Optional<vk::AllocationCallbacks const> allocator) const
@@ -350,9 +360,9 @@ vk::Result DEngine::Gfx::Vk::DeviceDispatch::createGraphicsPipelines(
 }
 
 #define DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(typeName) \
-    raw.vkDestroy##typeName##( \
+    raw.vkDestroy ##typeName( \
         static_cast<VkDevice>(handle), \
-        static_cast<Vk##typeName##>(in), \
+        static_cast<Vk##typeName>(in), \
         reinterpret_cast<VkAllocationCallbacks const*>(static_cast<vk::AllocationCallbacks const*>(allocator))); \
         
 
@@ -361,6 +371,11 @@ void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
     vk::Optional<vk::AllocationCallbacks> allocator) const
 {
     DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(CommandPool)
+}
+
+void DEngine::Gfx::Vk::DeviceDispatch::Destroy(vk::DescriptorPool in, vk::Optional<vk::AllocationCallbacks> allocator) const
+{
+    DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(DescriptorPool)
 }
 
 void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
@@ -400,14 +415,56 @@ void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
 
 void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
     vk::ShaderModule in, 
-    vk::Optional<vk::AllocationCallbacks const> allocator) const
+    vk::Optional<vk::AllocationCallbacks> allocator) const
 {
     DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(ShaderModule)
 }
 
-vk::Result DEngine::Gfx::Vk::DeviceDispatch::getFenceStatus(vk::Fence fence) const
+void DEngine::Gfx::Vk::DeviceDispatch::Destroy(
+    vk::SwapchainKHR in, 
+    vk::Optional<vk::AllocationCallbacks> allocator) const
+{
+    swapchain_raw.vkDestroySwapchainKHR(
+        static_cast<VkDevice>(handle),
+        static_cast<VkSwapchainKHR>(in),
+        reinterpret_cast<VkAllocationCallbacks const*>(static_cast<vk::AllocationCallbacks const*>(allocator)));
+}
+
+void DEngine::Gfx::Vk::DeviceDispatch::FreeCommandBuffers(
+    vk::CommandPool commandPool, 
+    vk::ArrayProxy<vk::CommandBuffer const> commandBuffers) const
+{
+    raw.vkFreeCommandBuffers(
+        static_cast<VkDevice>(handle),
+        static_cast<VkCommandPool>(commandPool),
+        commandBuffers.size(),
+        reinterpret_cast<VkCommandBuffer const*>(commandBuffers.data()));
+}
+
+void DEngine::Gfx::Vk::DeviceDispatch::FreeMemory(
+    vk::DeviceMemory memory, 
+    vk::Optional<vk::AllocationCallbacks const> allocator) const
+{
+    raw.vkFreeMemory(
+        static_cast<VkDevice>(handle),
+        static_cast<VkDeviceMemory>(memory),
+        reinterpret_cast<VkAllocationCallbacks const*>(static_cast<vk::AllocationCallbacks const*>(allocator)));
+}
+
+vk::Result DEngine::Gfx::Vk::DeviceDispatch::GetFenceStatus(vk::Fence fence) const
 {
     return static_cast<vk::Result>(raw.vkGetFenceStatus(
         static_cast<VkDevice>(handle),
         static_cast<VkFence>(fence)));
+}
+
+#include "QueueData.hpp"
+void DEngine::Gfx::Vk::DeviceDispatch::WaitIdle() const
+{
+    // Go through all queues and lock their mutexes.
+    std::lock_guard graphicsLock{ m_queueDataPtr->graphics.m_lock };
+    std::lock_guard transferLock{ m_queueDataPtr->transfer.m_lock };
+    std::lock_guard computeLock{ m_queueDataPtr->compute.m_lock };
+
+    raw.vkDeviceWaitIdle(static_cast<VkDevice>(handle));
 }

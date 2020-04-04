@@ -2,12 +2,14 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 #include "VulkanIncluder.hpp"
-#include "DynamicDispatch.hpp"
 
 #include <mutex>
 
 namespace DEngine::Gfx::Vk
 {
+    class DebugUtilsDispatch;
+    class DeviceDispatch;
+
     struct QueueIndices
     {
         static constexpr u32 invalidIndex = static_cast<u32>(-1);
@@ -23,7 +25,7 @@ namespace DEngine::Gfx::Vk
         Indices compute{};
     };
 
-    struct QueueData
+    class QueueData
     {
     public:
         static constexpr u32 invalidIndex = static_cast<u32>(-1);
@@ -40,19 +42,21 @@ namespace DEngine::Gfx::Vk
             void waitIdle() const;
 
             static void Initialize(
-                DevDispatch const& device,
+                SafeQueue& queue,
+                DeviceDispatch const& device,
                 u8 queueType,
                 u32 familyIndex,
                 u32 queueIndex,
-                DebugUtilsDispatch const* debugUtils,
-                SafeQueue& queue);
+                DebugUtilsDispatch const* debugUtils);
 
         private:
             mutable std::mutex m_lock{};
             u32 m_familyIndex = invalidIndex;
             u32 m_queueIndex = invalidIndex;
             vk::Queue m_handle{};
-            DevDispatch const* m_device{};
+            DeviceDispatch const* m_device = nullptr;
+
+            friend class DeviceDispatch;
         };
 
         SafeQueue graphics{};
@@ -62,9 +66,9 @@ namespace DEngine::Gfx::Vk
         [[nodiscard]] inline bool HasCompute() const { return compute.Handle() != vk::Queue(); }
 
         static void Initialize(
-            DevDispatch const& device,
+            QueueData& queueData,
+            DeviceDispatch const& device,
             QueueIndices indices,
-            DebugUtilsDispatch const* debugUtils,
-            QueueData& queueData);
+            DebugUtilsDispatch const* debugUtils);
     };
 }

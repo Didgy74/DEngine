@@ -14,8 +14,9 @@ extern int dengine_app_detail_main(int argc, char** argv);
 
 namespace DEngine::Application::detail
 {
-	static android_app* androidAppPtr = nullptr;
-	static bool androidWindowReady = false;
+	static android_app* Backend_androidAppPtr = nullptr;
+	static bool Backend_androidWindowReady = false;
+	static bool Backend_appIsOpen = true;
 
 	static TouchEventType Backend_Android_MotionActionToTouchEventType(int32_t in);
 
@@ -25,7 +26,9 @@ namespace DEngine::Application::detail
 		{
 			case APP_CMD_INIT_WINDOW:
 				// The window/surface is ready now.
-				detail::androidWindowReady = true;
+				detail::Backend_androidWindowReady = true;
+				detail::mainWindowSurfaceInitialized = true;
+				detail::mainWindowSurfaceInitializeEvent = true;
 				break;
 		}
 	}
@@ -34,6 +37,20 @@ namespace DEngine::Application::detail
 	{
 		switch (cmd)
 		{
+			case APP_CMD_INIT_WINDOW:
+				Log("Init window");
+				detail::mainWindowSurfaceInitialized = true;
+				detail::mainWindowSurfaceInitializeEvent = true;
+
+				detail::Backend_androidWindowReady = true;
+				break;
+			case APP_CMD_TERM_WINDOW:
+				Log("Terminate window");
+				detail::mainWindowSurfaceInitialized = false;
+				detail::mainWindowSurfaceTerminateEvent = true;
+
+				detail::Backend_androidWindowReady = false;
+				break;
 			case APP_CMD_LOST_FOCUS:
 				Log("Lost focus");
 				detail::mainWindowIsInFocus = false;
@@ -53,15 +70,20 @@ namespace DEngine::Application::detail
 				break;
 			case APP_CMD_START:
 				Log("Start");
+
 				break;
 			case APP_CMD_STOP:
 				Log("Stop");
 				break;
 			case APP_CMD_PAUSE:
+				detail::mainWindowIsMinimized = true;
 				Log("Pause");
 				break;
 			case APP_CMD_RESUME:
+				detail::mainWindowIsMinimized = false;
 				Log("Resume");
+				detail::mainWindowSurfaceInitialized = true;
+				detail::mainWindowSurfaceInitializeEvent = true;
 				break;
 			case APP_CMD_WINDOW_REDRAW_NEEDED:
 				Log("Window redraw needed");
@@ -84,12 +106,6 @@ namespace DEngine::Application::detail
 		if (inputSource != AINPUT_SOURCE_TOUCHSCREEN)
 			return;
 		int32_t motionAction = AMotionEvent_getAction(event);
-		switch (motionAction)
-		{
-			case AMOTION_EVENT_ACTION_UP:
-				Log("Motion event: Up");
-				break;
-		}
 
 		size_t pointerCount = AMotionEvent_getPointerCount(event);
 		for (size_t i = 0; i < pointerCount; i++)
@@ -126,15 +142,20 @@ namespace DEngine::Application::detail
 // This gets ran by the new thread that our Android app starts.
 void android_main(android_app* app)
 {
-	DEngine::Application::detail::androidAppPtr = app;
+	DEngine::Application::detail::Backend_androidAppPtr = app;
 	dengine_app_detail_main(0, nullptr);
 }
 
 bool DEngine::Application::detail::Backend_Initialize()
 {
+	// Set default values
+	detail::mainWindowIsInFocus = true;
+	detail::mainWindowIsMinimized = false;
+	detail::shouldShutdown = false;
+
 	// Set the callback to process system events
-	detail::androidAppPtr->onAppCmd = HandleCmdInit;
-	while (!detail::androidWindowReady)
+	detail::Backend_androidAppPtr->onAppCmd = HandleCmdInit;
+	while (!detail::Backend_androidWindowReady)
 	{
 		// Keep polling events until the window is ready
 		int fileDescriptors = 0; // What even is this?
@@ -143,13 +164,13 @@ bool DEngine::Application::detail::Backend_Initialize()
 		{
 			if (source != nullptr)
 			{
-				source->process(detail::androidAppPtr, source);
+				source->process(detail::Backend_androidAppPtr, source);
 			}
 		}
 	}
 
-	int width = ANativeWindow_getWidth(androidAppPtr->window);
-	int height = ANativeWindow_getHeight(androidAppPtr->window);
+	int width = ANativeWindow_getWidth(Backend_androidAppPtr->window);
+	int height = ANativeWindow_getHeight(Backend_androidAppPtr->window);
 
 	detail::displaySize[0] = (u32)width;
 	detail::displaySize[1] = (u32)width;
@@ -163,8 +184,8 @@ bool DEngine::Application::detail::Backend_Initialize()
 	detail::mainWindowIsInFocus = true;
 	detail::mainWindowIsMinimized = false;
 
-	detail::androidAppPtr->onAppCmd = HandleCmd;
-	detail::androidAppPtr->onInputEvent = HandleInputEvents;
+	detail::Backend_androidAppPtr->onAppCmd = HandleCmd;
+	detail::Backend_androidAppPtr->onInputEvent = HandleInputEvents;
 
 	return true;
 }
@@ -172,15 +193,36 @@ bool DEngine::Application::detail::Backend_Initialize()
 void DEngine::Application::detail::Backend_ProcessEvents(
 	std::chrono::high_resolution_clock::time_point now)
 {
-	int fileDescriptors = 0; // What even is this?
-	android_poll_source* source = nullptr;
-	if (ALooper_pollAll(0, nullptr, &fileDescriptors, (void**)&source) >= 0)
+	if (!detail::Backend_androidWindowReady)
 	{
-		if (source != nullptr)
+		while (!detail::Backend_androidWindowReady)
 		{
-			source->process(detail::androidAppPtr, source);
+			// Keep polling events until the window is ready
+			int fileDescriptors = 0; // What even is this?
+			android_poll_source* source = nullptr;
+			if (ALooper_pollAll(-1, nullptr, &fileDescriptors, (void**)&source) >= 0)
+			{
+				if (source != nullptr)
+				{
+					source->process(detail::Backend_androidAppPtr, source);
+				}
+			}
 		}
 	}
+	else
+	{
+		int fileDescriptors = 0; // What even is this?
+		android_poll_source* source = nullptr;
+		if (ALooper_pollAll(0, nullptr, &fileDescriptors, (void**)&source) >= 0)
+		{
+			if (source != nullptr)
+			{
+				source->process(detail::Backend_androidAppPtr, source);
+			}
+		}
+	}
+
+
 }
 
 bool DEngine::Application::detail::CreateVkSurface(
@@ -208,7 +250,7 @@ bool DEngine::Application::detail::CreateVkSurface(
 
 	VkAndroidSurfaceCreateInfoKHR createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
-	createInfo.window = detail::androidAppPtr->window;
+	createInfo.window = detail::Backend_androidAppPtr->window;
 
 	VkSurfaceKHR returnVal{};
 	VkResult result = funcPtr(
@@ -278,7 +320,7 @@ DEngine::Std::Opt<DEngine::Application::FileStream> DEngine::Application::FileSt
 	static_assert(sizeof(detail::Backend_FileStreamData) <= sizeof(FileStream::m_buffer),
 				  "Error. Cannot fit implementation data in FileStream internal buffer.");
 
-	AAsset* file = AAssetManager_open(detail::androidAppPtr->activity->assetManager, path, AASSET_MODE_RANDOM);
+	AAsset* file = AAssetManager_open(detail::Backend_androidAppPtr->activity->assetManager, path, AASSET_MODE_RANDOM);
 	if (file == nullptr)
 		return {};
 
