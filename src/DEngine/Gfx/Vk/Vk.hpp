@@ -135,7 +135,6 @@ namespace DEngine::Gfx::Vk
 
 	struct GUIData
 	{
-		vk::RenderPass renderPass{};
 		GUIRenderTarget renderTarget{};
 		vk::CommandPool cmdPool{};
 		// Has length of resource sets

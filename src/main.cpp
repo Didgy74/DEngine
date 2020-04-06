@@ -44,7 +44,7 @@ public:
 	// Argument #1: VkInstance - The Vulkan instance handle
 	// Argument #2: VkAllocationCallbacks const* - Allocation callbacks for surface creation.
 	// Argument #3: VkSurfaceKHR* - The output surface handle
-	virtual DEngine::i32 createVkSurface(DEngine::u64 vkInstance, void const* allocCallbacks, DEngine::u64* outSurface) override
+	virtual DEngine::i32 createVkSurface(DEngine::uSize vkInstance, void const* allocCallbacks, DEngine::u64* outSurface) override
 	{
 		 bool result = DEngine::App::detail::CreateVkSurface(vkInstance, allocCallbacks, nullptr, outSurface);
 		 if (result)
@@ -68,7 +68,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		ImGui::SetCurrentContext(imguiContext);
 		ImGuiIO& imguiIO = ImGui::GetIO();
 		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_DockingEnable;
-		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_IsTouchScreen;
+
 		//if constexpr (App::targetOS == App::OS::Windows)
 			//imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_ViewportsEnable
 
@@ -160,7 +160,6 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 			if (App::detail::MainWindowSurfaceInitializeEvent())
 				params.rebuildSurface = true;
-
 			if (App::detail::MainWindowRestoreEvent())
 				params.rebuildSurface = true;
 

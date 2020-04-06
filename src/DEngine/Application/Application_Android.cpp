@@ -16,9 +16,48 @@ namespace DEngine::Application::detail
 {
 	static android_app* Backend_androidAppPtr = nullptr;
 	static bool Backend_androidWindowReady = false;
-	static bool Backend_appIsOpen = true;
+	static int Backend_currentOrientation = 0;
+	static bool Backend_configChangedThisTick = false;
 
 	static TouchEventType Backend_Android_MotionActionToTouchEventType(int32_t in);
+
+	static void HandleConfigChanged(android_app* app)
+	{
+		int width = ANativeWindow_getWidth(app->window);
+		int height = ANativeWindow_getHeight(app->window);
+		std::string a = std::string("Queried dims are: ") + std::to_string(width) + ", " + std::to_string(height);
+		Log(a.c_str());
+
+		int newOrientation = AConfiguration_getOrientation(app->config);
+		if (newOrientation == Backend_currentOrientation)
+		{
+			Log("New orientation is same as old one.");
+		}
+		else if ((detail::Backend_currentOrientation == ACONFIGURATION_ORIENTATION_LAND &&
+		     newOrientation == ACONFIGURATION_ORIENTATION_PORT) ||
+		     (detail::Backend_currentOrientation == ACONFIGURATION_ORIENTATION_PORT &&
+		     newOrientation == ACONFIGURATION_ORIENTATION_LAND))
+		{
+			// We went from portrait to landscape, or reverse
+			detail::mainWindowResizeEvent = true;
+
+			int width = ANativeWindow_getWidth(app->window);
+			int height = ANativeWindow_getHeight(app->window);
+
+			detail::displaySize[0] = (u32)width;
+			detail::displaySize[1] = (u32)height;
+			detail::mainWindowSize[0] = (u32)width;
+			detail::mainWindowSize[1] = (u32)height;
+			detail::mainWindowFramebufferSize[0] = (u32)width;
+			detail::mainWindowFramebufferSize[1] = (u32)height;
+
+		}
+		else
+		{
+			Log("Error. Encountered an orientation that was not landscape or portrait.");
+			//abort();
+		}
+	}
 
 	static void HandleCmdInit(android_app* app, int32_t cmd)
 	{
@@ -61,6 +100,7 @@ namespace DEngine::Application::detail
 				break;
 			case APP_CMD_CONFIG_CHANGED:
 				Log("Config changed");
+				detail::Backend_configChangedThisTick = true;
 				break;
 			case APP_CMD_CONTENT_RECT_CHANGED:
 				Log("Content rect changed");
@@ -173,9 +213,9 @@ bool DEngine::Application::detail::Backend_Initialize()
 	int height = ANativeWindow_getHeight(Backend_androidAppPtr->window);
 
 	detail::displaySize[0] = (u32)width;
-	detail::displaySize[1] = (u32)width;
+	detail::displaySize[1] = (u32)height;
 	detail::mainWindowPos[0] = 0;
-	detail::mainWindowPos[1] = 1;
+	detail::mainWindowPos[1] = 0;
 	detail::mainWindowSize[0] = (u32)width;
 	detail::mainWindowSize[1] = (u32)height;
 	detail::mainWindowFramebufferSize[0] = (u32)width;
@@ -187,6 +227,13 @@ bool DEngine::Application::detail::Backend_Initialize()
 	detail::Backend_androidAppPtr->onAppCmd = HandleCmd;
 	detail::Backend_androidAppPtr->onInputEvent = HandleInputEvents;
 
+	detail::Backend_currentOrientation = AConfiguration_getOrientation(Backend_androidAppPtr->config);
+	if (detail::Backend_currentOrientation != ACONFIGURATION_ORIENTATION_LAND &&
+		detail::Backend_currentOrientation != ACONFIGURATION_ORIENTATION_PORT)
+	{
+		Log("Error. Could not determine the orientation of the device.");
+		abort();
+	}
 	return true;
 }
 
@@ -198,9 +245,9 @@ void DEngine::Application::detail::Backend_ProcessEvents(
 		while (!detail::Backend_androidWindowReady)
 		{
 			// Keep polling events until the window is ready
-			int fileDescriptors = 0; // What even is this?
+			int events = 0; // What even is this?
 			android_poll_source* source = nullptr;
-			if (ALooper_pollAll(-1, nullptr, &fileDescriptors, (void**)&source) >= 0)
+			if (ALooper_pollAll(-1, nullptr, &events, (void**)&source) >= 0)
 			{
 				if (source != nullptr)
 				{
@@ -213,7 +260,7 @@ void DEngine::Application::detail::Backend_ProcessEvents(
 	{
 		int fileDescriptors = 0; // What even is this?
 		android_poll_source* source = nullptr;
-		if (ALooper_pollAll(0, nullptr, &fileDescriptors, (void**)&source) >= 0)
+		if (ALooper_pollAll(1, nullptr, &fileDescriptors, (void**)&source) >= 0)
 		{
 			if (source != nullptr)
 			{
@@ -222,7 +269,9 @@ void DEngine::Application::detail::Backend_ProcessEvents(
 		}
 	}
 
-
+	if (detail::Backend_configChangedThisTick)
+		HandleConfigChanged(detail::Backend_androidAppPtr);
+	detail::Backend_configChangedThisTick = false;
 }
 
 bool DEngine::Application::detail::CreateVkSurface(

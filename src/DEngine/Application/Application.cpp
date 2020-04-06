@@ -165,8 +165,8 @@ void DEngine::Application::detail::ImgGui_Initialize()
 {
 	// Setup back-end capabilities flags
 	ImGuiIO& io = ImGui::GetIO();
-	io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // We can honor GetMouseCursor() values (optional)
-	io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos; // We can honor io.WantSetMousePos requests (optional, rarely used)
+	//io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // We can honor GetMouseCursor() values (optional)
+	//io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos; // We can honor io.WantSetMousePos requests (optional, rarely used)
 	//io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports; // We can create multi-viewports on the Platform side (optional)
 #if GLFW_HAS_GLFW_HOVERED && defined(_WIN32)
 	io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport; // We can set io.MouseHoveredViewport correctly (optional, not easy)
@@ -196,17 +196,6 @@ void DEngine::Application::detail::ImgGui_Initialize()
 	io.KeyMap[ImGuiKey_X] = (int)Button::X;
 	io.KeyMap[ImGuiKey_Y] = (int)Button::Y;
 	io.KeyMap[ImGuiKey_Z] = (int)Button::Z;
-
-	/*
-	// Our mouse update function expect PlatformHandle to be filled for the main viewport
-	ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-	main_viewport->PlatformHandle = (void*)detail::mainWindow;
-#ifdef _WIN32
-	main_viewport->PlatformHandleRaw = glfwGetWin32Window(detail::mainWindow);
-#endif
-	//if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-		//ImGui_ImplGlfw_InitPlatformInterface();
-	*/
 }
 
 void DEngine::Application::detail::ProcessEvents()
@@ -219,7 +208,7 @@ void DEngine::Application::detail::ProcessEvents()
 		item = KeyEventType::Unchanged;
 	for (auto& item : detail::mouseDelta)
 		item = 0;
-	// Remove all touch-inputs with event-type Up
+	// Remove all touch-inputs with event-type Up or have been cancelled.
 	for (uSize i = 0; i < detail::touchInputs.Size(); i += 1)
 	{
 		if (detail::touchInputs[i].eventType == TouchEventType::Up || detail::touchInputs[i].eventType == TouchEventType::Cancelled)
@@ -280,8 +269,6 @@ void DEngine::Application::detail::ImGui_NewFrame()
 {
 	// Update buttons
 	ImGuiIO& io = ImGui::GetIO();
-
-	io.DeltaTime = 1 / 60.f;
 
 	io.DisplaySize = ImVec2((f32)detail::mainWindowSize[0], (f32)detail::mainWindowSize[1]);
 	if (io.DisplaySize.x > 0 && io.DisplaySize.y > 0)

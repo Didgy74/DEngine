@@ -345,11 +345,6 @@ namespace DEngine::Gfx::Vk
 		void Destroy(
 			vk::SurfaceKHR in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-
-		void destroySurface(vk::SurfaceKHR surface, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroySurfaceKHR(surface, allocator, surface_raw);
-		}
 		vk::SurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilitiesKHR(vk::PhysicalDevice physDevice, vk::SurfaceKHR surface) const
 		{
 			return physDevice.getSurfaceCapabilitiesKHR(surface, surface_raw);

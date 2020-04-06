@@ -20,6 +20,12 @@ namespace DEngine::Gfx::Vk
 	class DeletionQueue
 	{
 	public:
+		DeletionQueue() = default;
+		DeletionQueue(DeletionQueue const&) = delete;
+		DeletionQueue(DeletionQueue&&) = delete;
+		DeletionQueue& operator=(DeletionQueue const&) = delete;
+		DeletionQueue& operator=(DeletionQueue&&) = delete;
+
 		template<typename T>
 		using TestCallback = void(*)(GlobUtils const& globUtils, T customData);
 		template<typename T>

@@ -87,6 +87,11 @@ namespace DEngine::Gfx::Vk::Init
 		SwapchainData const& swapchainData,
 		vk::Image srcImg);
 
+	[[nodiscard]] vk::RenderPass CreateGuiRenderPass(
+			DeviceDispatch const& device,
+			vk::Format swapchainFormat,
+			DebugUtilsDispatch const* debugUtils);
+
 	[[nodiscard]] GUIRenderTarget CreateGUIRenderTarget(
 		DeviceDispatch const& device,
 		VmaAllocator vma,
@@ -98,14 +103,15 @@ namespace DEngine::Gfx::Vk::Init
 		DebugUtilsDispatch const* debugUtils);
 
 	[[nodiscard]] GUIData CreateGUIData(
-		DeviceDispatch const& device,
-		VmaAllocator vma,
-		DeletionQueue const& deletionQueue,
-		QueueData const& queues,
-		vk::Format swapchainFormat,
-		u8 resourceSetCount,
-		vk::Extent2D swapchainDimensions,
-		DebugUtilsDispatch const* debugUtils);
+			DeviceDispatch const& device,
+			VmaAllocator vma,
+			DeletionQueue const& deletionQueue,
+			QueueData const& queues,
+			vk::RenderPass guiRenderPass,
+			vk::Format swapchainFormat,
+			vk::Extent2D swapchainDimensions,
+			u8 resourceSetCount,
+			DebugUtilsDispatch const* debugUtils);
 
 	void InitializeImGui(
 		APIData& apiData,

@@ -49,7 +49,7 @@ void DEngine::Gfx::Vk::DeletionQueue::ExecuteCurrentTick(DeletionQueue& queue)
 		// For any fence that is not yet signalled, the job it owns and
 		// it's VkFence will be pushed to the next tick.
 		FencedQueueType& currentQueue = queue.fencedJobQueues[queue.currentFencedJobQueueIndex];
-		for (auto& item : currentQueue.a)
+		for (auto const& item : currentQueue.a)
 		{
 			vk::Result waitResult = queue.globUtils->device.GetFenceStatus(item.fence);
 			if (waitResult == vk::Result::eSuccess)
@@ -64,24 +64,29 @@ void DEngine::Gfx::Vk::DeletionQueue::ExecuteCurrentTick(DeletionQueue& queue)
 			{
 				// Fence not ready, we push the job to the next tick.
 				FencedQueueType& nextQueue = queue.fencedJobQueues[!queue.currentFencedJobQueueIndex];
-				nextQueue.a.push_back(item);
+				
 
-				FencedJob& newJob = nextQueue.a.back();
-				newJob.job.dataOffset = nextQueue.b.size();
+				FencedJob newJob{};
+				newJob.fence = item.fence;
+				newJob.job.callback = item.job.callback;
+				newJob.job.dataOffset = nextQueue.b.size() * sizeof(u64);
+				newJob.job.dataSize = item.job.dataSize;
+				nextQueue.a.push_back(newJob);
 
-				// Resize the nextQueue's data-buffer to fit this job's custom data.
 				uSize addSize = newJob.job.dataSize;
+				// Then we pad to align to 8 bytes.
 				addSize += ((sizeof(u64)-1) - ((addSize + sizeof(u64)-1) % sizeof(u64)));
+				assert(addSize % sizeof(u64) == 0);
 				// Divide by 8 to get it in amount of u64
 				addSize /= sizeof(u64);
 
 				nextQueue.b.resize(nextQueue.b.size() + addSize);
-				
+
 				// Copy the custom data
 				std::memcpy(
-					nextQueue.b.data() + newJob.job.dataOffset,
-					currentQueue.b.data() + item.job.dataOffset,
-					item.job.dataSize);
+					reinterpret_cast<char*>(nextQueue.b.data()) + newJob.job.dataOffset,
+					reinterpret_cast<char*>(currentQueue.b.data()) + item.job.dataOffset,
+					newJob.job.dataSize);
 			}
 			else
 			{

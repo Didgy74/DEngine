@@ -379,7 +379,6 @@ void DEngine::Gfx::Vk::Init::RebuildSurfaceInfo(
 	vk::SurfaceKHR newSurface,
 	SurfaceInfo& outSurfaceInfo)
 {
-	instance.destroySurface(outSurfaceInfo.handle);
 	outSurfaceInfo.handle = newSurface;
 
 	outSurfaceInfo.capabilities = instance.getPhysicalDeviceSurfaceCapabilitiesKHR(physDevice.handle, outSurfaceInfo.handle);
@@ -633,7 +632,7 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 	}
 
 	u32 swapchainImageCount = 0;
-	vkResult = device.getSwapchainImagesKHR(swapchain.handle, &swapchainImageCount, (vk::Image*)nullptr);
+	vkResult = device.getSwapchainImagesKHR(swapchain.handle, &swapchainImageCount, nullptr);
 	if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 		throw std::runtime_error("Unable to grab swapchainData images from VkSwapchainKHR object.");
 	DENGINE_GFX_ASSERT(swapchainImageCount != 0);
@@ -881,6 +880,48 @@ bool DEngine::Gfx::Vk::Init::TransitionSwapchainImages(
 	return true;
 }
 
+vk::RenderPass DEngine::Gfx::Vk::Init::CreateGuiRenderPass(
+		DeviceDispatch const& device,
+		vk::Format swapchainFormat,
+		DebugUtilsDispatch const* debugUtils)
+{
+	vk::AttachmentDescription colorAttachment{};
+	colorAttachment.initialLayout = vk::ImageLayout::eTransferSrcOptimal;
+	colorAttachment.finalLayout = vk::ImageLayout::eTransferSrcOptimal;
+	colorAttachment.format = swapchainFormat;
+	colorAttachment.samples = vk::SampleCountFlagBits::e1;
+	colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+	colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
+	colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+	colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+	vk::AttachmentDescription attachments[1] = { colorAttachment };
+	vk::AttachmentReference colorAttachmentRef{};
+	colorAttachmentRef.attachment = 0;
+	colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
+	vk::SubpassDescription subpassDescription{};
+	subpassDescription.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+	subpassDescription.colorAttachmentCount = 1;
+	subpassDescription.pColorAttachments = &colorAttachmentRef;
+	// Set up render pass
+	vk::RenderPassCreateInfo createInfo{};
+	createInfo.attachmentCount = 1;
+	createInfo.pAttachments = attachments;
+	createInfo.subpassCount = 1;
+	createInfo.pSubpasses = &subpassDescription;
+
+	vk::RenderPass renderPass = device.createRenderPass(createInfo);
+	if (debugUtils != nullptr)
+	{
+		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+		nameInfo.objectHandle = (u64)(VkRenderPass)renderPass;
+		nameInfo.objectType = renderPass.objectType;
+		nameInfo.pObjectName = "GUI RenderPass";
+		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+	}
+
+	return renderPass;
+}
+
 DEngine::Gfx::Vk::GUIRenderTarget DEngine::Gfx::Vk::Init::CreateGUIRenderTarget(
 	DeviceDispatch const& device,
 	VmaAllocator vma,
@@ -1034,50 +1075,14 @@ DEngine::Gfx::Vk::GUIData DEngine::Gfx::Vk::Init::CreateGUIData(
 	VmaAllocator vma,
 	DeletionQueue const& deletionQueue,
 	QueueData const& queues,
+	vk::RenderPass guiRenderPass,
 	vk::Format swapchainFormat,
-	u8 resourceSetCount,
 	vk::Extent2D swapchainDimensions,
+	u8 resourceSetCount,
 	DebugUtilsDispatch const* debugUtils)
 {
 	vk::Result vkResult{};
 	GUIData returnVal{};
-
-	// CreateJob the renderpass
-	{
-		vk::AttachmentDescription colorAttachment{};
-		colorAttachment.initialLayout = vk::ImageLayout::eTransferSrcOptimal;
-		colorAttachment.finalLayout = vk::ImageLayout::eTransferSrcOptimal;
-		colorAttachment.format = swapchainFormat;
-		colorAttachment.samples = vk::SampleCountFlagBits::e1;
-		colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
-		colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-		colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-		colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-		vk::AttachmentDescription attachments[1] = { colorAttachment };
-		vk::AttachmentReference colorAttachmentRef{};
-		colorAttachmentRef.attachment = 0;
-		colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
-		vk::SubpassDescription subpassDescription{};
-		subpassDescription.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
-		subpassDescription.colorAttachmentCount = 1;
-		subpassDescription.pColorAttachments = &colorAttachmentRef;
-		// Set up render pass
-		vk::RenderPassCreateInfo createInfo{};
-		createInfo.attachmentCount = 1;
-		createInfo.pAttachments = attachments;
-		createInfo.subpassCount = 1;
-		createInfo.pSubpasses = &subpassDescription;
-
-		returnVal.renderPass = device.createRenderPass(createInfo);
-		if (debugUtils != nullptr)
-		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkRenderPass)returnVal.renderPass;
-			nameInfo.objectType = returnVal.renderPass.objectType;
-			nameInfo.pObjectName = "GUI RenderPass";
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
-		}
-	}
 
 	// CreateJob the commandbuffers
 	{
@@ -1110,7 +1115,7 @@ DEngine::Gfx::Vk::GUIData DEngine::Gfx::Vk::Init::CreateGUIData(
 		queues, 
 		swapchainDimensions, 
 		swapchainFormat, 
-		returnVal.renderPass, 
+		guiRenderPass,
 		debugUtils);
 
 	return returnVal;
@@ -1510,7 +1515,7 @@ void DEngine::Gfx::Vk::Init::InitializeImGui(
 	if (debugUtils)
 		imguiInfo.useDebugUtils = true;
 
-	bool imguiInitSuccess = ImGui_ImplVulkan_Init(&imguiInfo, static_cast<VkRenderPass>(apiData.guiData.renderPass));
+	bool imguiInitSuccess = ImGui_ImplVulkan_Init(&imguiInfo, static_cast<VkRenderPass>(apiData.globUtils.guiRenderPass));
 	if (!imguiInitSuccess)
 		throw std::runtime_error("Could not initialize the ImGui Vulkan stuff.");
 

@@ -37,8 +37,8 @@ void DEngine::Gfx::Vk::Init::InitializeVMA(
 	vk::Result vkResult{};
 
 	VmaDeviceMemoryCallbacks callbacks{};
-	callbacks.pUserData = vma_trackingData;
 	callbacks.pfnAllocate = &AllocCallbackForVMA;
+	callbacks.pUserData = vma_trackingData;
 
 	InstanceDispatch const& instance = globUtils.instance;
 	DevDispatch const& device = globUtils.device;
@@ -73,7 +73,7 @@ void DEngine::Gfx::Vk::Init::InitializeVMA(
 	vmaInfo.frameInUseCount = 0;
 	vmaInfo.instance = (VkInstance) instance.handle;
 	vmaInfo.pAllocationCallbacks = nullptr;
-	vmaInfo.pDeviceMemoryCallbacks = vma_trackingData ? &callbacks : nullptr;
+	vmaInfo.pDeviceMemoryCallbacks = vma_trackingData && vma_trackingData->debugUtils ? &callbacks : nullptr;
 	vmaInfo.pHeapSizeLimit = nullptr;
 	vmaInfo.physicalDevice = (VkPhysicalDevice) globUtils.physDevice.handle;
 	vmaInfo.pRecordSettings = nullptr;

@@ -156,6 +156,8 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	apiData.vma_trackingData.deviceHandle = globUtils.device.handle;
 	apiData.vma_trackingData.debugUtils = globUtils.DebugUtilsPtr();
 	Init::InitializeVMA(globUtils, &apiData.vma_trackingData);
+
+
 	apiData.globUtils.deletionQueue.Initialize(&apiData.globUtils, apiData.globUtils.resourceSetCount);
 
 	// Build our swapchain on our device
@@ -167,22 +169,28 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 		apiData.globUtils.DebugUtilsPtr());
 
 
-	// CreateJob our main fences
+	// Create our main fences
 	apiData.mainFences = Init::CreateMainFences(
 		apiData.globUtils.device,
 		apiData.globUtils.resourceSetCount,
 		apiData.globUtils.DebugUtilsPtr());
 
 
-	// CreateJob the resources for rendering GUI
+	apiData.globUtils.guiRenderPass = Init::CreateGuiRenderPass(
+			apiData.globUtils.device,
+			apiData.swapchain.surfaceFormat.format,
+			globUtils.DebugUtilsPtr());
+	// Create the resources for rendering GUI
 	apiData.guiData = Init::CreateGUIData(
 		apiData.globUtils.device,
 		apiData.globUtils.vma,
 		apiData.globUtils.deletionQueue,
 		apiData.globUtils.queues,
+		globUtils.guiRenderPass,
 		apiData.swapchain.surfaceFormat.format,
-		apiData.globUtils.resourceSetCount,
 		apiData.swapchain.extents,
+		apiData.globUtils.resourceSetCount,
+
 		apiData.globUtils.DebugUtilsPtr());
 
 	// Record the copy-image command cmdBuffers that go from render-target to swapchain
@@ -191,7 +199,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	// Initialize ImGui stuff
 	Init::InitializeImGui(apiData, apiData.globUtils.device, instanceProcAddr, apiData.globUtils.DebugUtilsPtr());
 
-	// CreateJob the main render stuff
+	// Create the main render stuff
 	apiData.globUtils.gfxRenderPass = Init::BuildMainGfxRenderPass(
 		apiData.globUtils.device,
 		true, 

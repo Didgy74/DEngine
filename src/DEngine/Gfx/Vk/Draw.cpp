@@ -447,7 +447,7 @@ namespace DEngine::Gfx::Vk
 		SurfaceInfo& surface,
 		SwapchainData& swapchain)
 	{
-		globUtils.queues.graphics.waitIdle();
+		globUtils.device.WaitIdle();
 
 		Init::RecreateSwapchain(globUtils, surface, swapchain);
 
@@ -461,7 +461,7 @@ namespace DEngine::Gfx::Vk
 			globUtils.queues,
 			swapchain.extents,
 			swapchain.surfaceFormat.format,
-			guiData.renderPass,
+			globUtils.guiRenderPass,
 			globUtils.DebugUtilsPtr());
 
 		Init::RecordSwapchainCmdBuffers(globUtils.device, swapchain, guiData.renderTarget.img);
@@ -470,15 +470,16 @@ namespace DEngine::Gfx::Vk
 	void HandleSurfaceRecreationEvent(
 		GlobUtils const& globUtils,
 		SurfaceInfo& surfaceInfo,
+		IWsi& wsiInterface,
 		SwapchainData& swapchainData,
-		IWsi& wsiInterface)
+		GUIData& guiData)
 	{
-		globUtils.deletionQueue.Destroy(
-			swapchainData.cmdPool,
-			swapchainData.cmdBuffers);
-		globUtils.deletionQueue.Destroy(swapchainData.handle);
-		globUtils.deletionQueue.Destroy(surfaceInfo.handle);
-		swapchainData.images.Clear();
+		globUtils.device.WaitIdle();		
+
+		globUtils.device.Destroy(swapchainData.handle);
+		swapchainData.handle = vk::SwapchainKHR();
+		globUtils.instance.Destroy(surfaceInfo.handle);
+		surfaceInfo.handle = vk::SurfaceKHR();
 		
 
 		// TODO: I don't think I like this code
@@ -491,11 +492,20 @@ namespace DEngine::Gfx::Vk
 		if (surfaceCreateResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
 
+		
 		Init::RebuildSurfaceInfo(
 			globUtils.instance,
 			globUtils.physDevice,
 			surface,
 			surfaceInfo);
+		
+		swapchainData.handle = vk::SwapchainKHR();
+
+		HandleSwapchainResizeEvent(
+			globUtils,
+			guiData,
+			surfaceInfo,
+			swapchainData);
 	}
 }
 
@@ -511,11 +521,11 @@ void DEngine::Gfx::Vk::APIData::Draw(Data& gfxData, Draw_Params const& drawParam
 		HandleSurfaceRecreationEvent(
 			globUtils,
 			apiData.surface,
+			*apiData.wsiInterface,
 			apiData.swapchain,
-			*apiData.wsiInterface);
-
+			apiData.guiData);
 	// Handle swapchain resize
-	if (drawParams.resizeEvent)
+	else if (drawParams.resizeEvent)
 		HandleSwapchainResizeEvent(
 			globUtils, 
 			apiData.guiData,
@@ -572,7 +582,7 @@ void DEngine::Gfx::Vk::APIData::Draw(Data& gfxData, Draw_Params const& drawParam
 			apiData.globUtils.device,
 			apiData.guiData.cmdBuffers[currentInFlightIndex],
 			apiData.guiData.renderTarget,
-			apiData.guiData.renderPass,
+			globUtils.guiRenderPass,
 			currentInFlightIndex,
 			apiData.globUtils.DebugUtilsPtr());
 		cmdBuffersToSubmit.push_back(apiData.guiData.cmdBuffers[currentInFlightIndex]);
