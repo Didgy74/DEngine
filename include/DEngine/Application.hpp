@@ -17,6 +17,8 @@
 
 namespace DEngine::Application
 {
+	u64 TickCount();
+
 	enum class OS : u8;
 	enum class Platform : u8;
 
@@ -116,17 +118,18 @@ enum class DEngine::Application::TouchEventType : DEngine::u8
 {
 	Unchanged,
 	Down,
-	Up,
-	Cancelled,
-	Moved
+	Moved,
+	Up
 };
 
 struct DEngine::Application::TouchInput
 {
-	uSize id = 0;
+	static constexpr u8 invalidID = static_cast<u8>(-1);
+	u8 id = invalidID;
 	TouchEventType eventType = TouchEventType::Unchanged;
 	f32 x = 0.f;
 	f32 y = 0.f;
+	f32 duration = 0.f;
 };
 
 class DEngine::Application::FileStream

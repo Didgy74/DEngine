@@ -44,7 +44,7 @@ public:
 	// Argument #1: VkInstance - The Vulkan instance handle
 	// Argument #2: VkAllocationCallbacks const* - Allocation callbacks for surface creation.
 	// Argument #3: VkSurfaceKHR* - The output surface handle
-	virtual DEngine::i32 createVkSurface(DEngine::uSize vkInstance, void const* allocCallbacks, DEngine::u64* outSurface) override
+	virtual DEngine::i32 CreateVkSurface(DEngine::uSize vkInstance, void const* allocCallbacks, DEngine::u64& outSurface) override
 	{
 		 bool result = DEngine::App::detail::CreateVkSurface(vkInstance, allocCallbacks, nullptr, outSurface);
 		 if (result)
@@ -156,15 +156,10 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 				}
 			}
 
-			params.presentMainWindow = true;
-
-			if (App::detail::MainWindowSurfaceInitializeEvent())
-				params.rebuildSurface = true;
+			params.swapchainWidth = App::detail::mainWindowSize[0];
+			params.swapchainHeight = App::detail::mainWindowSize[1];
 			if (App::detail::MainWindowRestoreEvent())
-				params.rebuildSurface = true;
-
-			if (App::detail::ResizeEvent())
-				params.resizeEvent = true;
+				params.restoreEvent = true;
 
 			rendererData.Draw(params);
 		}

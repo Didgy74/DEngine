@@ -6,11 +6,10 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 set(DENGINE_INCLUDE_DIRS "${DENGINE_ROOT_DIR}/include")
 set(DENGINE_SRC_FILES
         "${DENGINE_ROOT_DIR}/src/main.cpp"
+        "${DENGINE_ROOT_DIR}/src/DEngine/Assert.cpp"
         "${DENGINE_ROOT_DIR}/src/DEngine/Editor.cpp"
         "${DENGINE_ROOT_DIR}/src/DEngine/Time.cpp"
         "${DENGINE_ROOT_DIR}/src/DEngine/Application/Application.cpp"
-        "${DENGINE_ROOT_DIR}/src/DEngine/Containers/Assert.cpp"
-        "${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Assert.cpp"
         "${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Gfx.cpp"
         "${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/DeletionQueue.cpp"
         "${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/Draw.cpp"

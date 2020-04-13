@@ -1,7 +1,7 @@
 #pragma once
 
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/Assert.hpp"
+#include "DEngine/Containers/detail/Assert.hpp"
 
 #include <stdexcept>
 
@@ -70,6 +70,8 @@ namespace DEngine::Std
 	template<typename T>
 	inline T& Span<T>::At(uSize i) const
 	{
+		if (m_data == nullptr)
+			throw std::runtime_error("Tried to .At() a Span with data pointer set to nullptr.");
 		if (i >= m_size)
 			throw std::out_of_range("Tried to .At() a Span with index out of bounds.");
 		return m_data[i];

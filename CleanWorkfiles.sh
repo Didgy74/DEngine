@@ -16,3 +16,4 @@ rm -r build
 # Visual Studio stuff
 rm -r .vs
 rm -r out
+rm CMakeSettings.json

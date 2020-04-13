@@ -1,11 +1,13 @@
 #include "detail_Application.hpp"
 #include "DEngine/Containers/StaticVector.hpp"
+#include "Assert.hpp"
 
 #include "ImGui/imgui.h"
 
 #include <iostream>
 #include <cstring>
 #include <chrono>
+#include <stdexcept>
 
 namespace DEngine::Application::detail
 {
@@ -18,6 +20,7 @@ namespace DEngine::Application::detail
 	u32 mousePosition[2] = {};
 	i32 mouseDelta[2] = {};
 	Std::StaticVector<TouchInput, 10> touchInputs{};
+	Std::StaticVector<std::chrono::high_resolution_clock::time_point, touchInputs.Capacity()> touchInputStartTime{};
 
 	u32 displaySize[2] = {};
 	i32 mainWindowPos[2] = {};
@@ -29,27 +32,49 @@ namespace DEngine::Application::detail
 	bool mainWindowResizeEvent = false;
 	bool shouldShutdown = false;
 
+	// Time related stuff
+	u64 tickCount = 0;
+	f32 deltaTime = 1.f / 60.f;
+	std::chrono::high_resolution_clock::time_point currentNow{};
+	std::chrono::high_resolution_clock::time_point previousNow{};
+
 	bool mainWindowSurfaceInitialized = false;
 	bool mainWindowSurfaceInitializeEvent = false;
 	bool mainWindowSurfaceTerminateEvent = false;
+
+
+	static bool IsValid(Button in);
+}
+
+static bool DEngine::Application::detail::IsValid(Button in)
+{
+	return static_cast<u64>(in) < static_cast<u64>(Button::COUNT);
+}
+
+DEngine::u64 DEngine::Application::TickCount()
+{
+	return detail::tickCount;
 }
 
 bool DEngine::Application::ButtonValue(Button input)
 {
+	if (!detail::IsValid(input))
+		throw std::runtime_error("Called DEngine::Application::ButtonValue with invalid Button value.");
 	return detail::buttonValues[(int)input];
 }
 
 void DEngine::Application::detail::UpdateButton(
 	Button button, 
-	bool pressed, 
-	std::chrono::high_resolution_clock::time_point now)
+	bool pressed)
 {
+	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(button));
+
 	detail::buttonValues[(int)button] = pressed;
 	detail::buttonEvents[(int)button] = pressed ? KeyEventType::Pressed : KeyEventType::Unpressed;
 
 	if (pressed)
 	{
-		detail::buttonHeldStart[(int)button] = now;
+		detail::buttonHeldStart[(int)button] = detail::currentNow;
 	}
 	else
 	{
@@ -59,11 +84,15 @@ void DEngine::Application::detail::UpdateButton(
 
 DEngine::Application::KeyEventType DEngine::Application::ButtonEvent(Button input)
 {
+	if (!detail::IsValid(input))
+		throw std::runtime_error("Called DEngine::Application::ButtonEvent with invalid Button value.");
 	return detail::buttonEvents[(int)input];
 }
 
 DEngine::f32 DEngine::Application::ButtonDuration(Button input)
 {
+	if (!detail::IsValid(input))
+		throw std::runtime_error("Called DEngine::Application::ButtonDuration with invalid Button value.");
 	return detail::buttonHeldDuration[(int)input];
 }
 
@@ -99,59 +128,70 @@ void DEngine::Application::detail::UpdateMouse(u32 posX, u32 posY)
 	detail::mousePosition[1] = posY;
 }
 
-DEngine::Std::StaticVector<DEngine::Application::TouchInput, 10> DEngine::Application::TouchInputs()
+namespace DEngine::Application::detail
 {
-	return detail::touchInputs;
+	static bool TouchInputIDExists(u8 id)
+	{
+		for (uSize i = 0; i < detail::touchInputs.Size(); i += 1)
+		{
+			if (detail::touchInputs[i].id == id)
+				return true;
+		}
+		return false;
+	}
 }
 
-void DEngine::Application::detail::UpdateTouchInput(TouchInput in)
+void DEngine::Application::detail::UpdateTouchInput_Down(u8 id, f32 x, f32 y)
 {
-	// Search if this ID already exists
-	uSize existingIndex = static_cast<uSize>(-1);
-	for (uSize i = 0; i < detail::touchInputs.Size(); i++)
+	DENGINE_DETAIL_APPLICATION_ASSERT(!TouchInputIDExists(id));
+
+	TouchInput newValue{};
+	newValue.eventType = TouchEventType::Down;
+	newValue.id = id;
+	newValue.x = x;
+	newValue.y = y;
+
+	detail::touchInputs.PushBack(newValue);
+	detail::touchInputStartTime.PushBack(detail::currentNow);
+}
+
+void DEngine::Application::detail::UpdateTouchInput_Move(u8 id, f32 x, f32 y)
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(TouchInputIDExists(id));
+	
+	for (auto& item : detail::touchInputs)
 	{
-		if (detail::touchInputs[i].id == in.id)
+		if (item.id == id)
 		{
-			existingIndex = i;
+			item.eventType = TouchEventType::Moved;
+			item.x = x;
+			item.y = y;
+
 			break;
 		}
 	}
-	if (existingIndex != static_cast<uSize>(-1))
-	{
-		// The ID exists, so we update it.
-		detail::touchInputs[existingIndex] = in;
-	}
-	else
-	{
-		// The ID does not exist, so we insert it
-		
-		// We need to figure out which index we can insert our ID into to keep the array sorted.
-		// If we find no available index, we can push-back the new one.
-		uSize insertionIndex = static_cast<uSize>(-1);
-		if (detail::touchInputs.Size() == 1 && detail::touchInputs[0].id > 0)
-			insertionIndex = 0;
-		else
-		{
-			for (uSize i = 1; i < detail::touchInputs.Size(); i++)
-			{
-				if (detail::touchInputs[i - 1].id < detail::touchInputs[i].id - 1)
-				{
-					insertionIndex = i;
-					break;
-				}
-			}
-		}
+}
 
-		if (insertionIndex == static_cast<uSize>(-1))
+void DEngine::Application::detail::UpdateTouchInput_Up(u8 id, f32 x, f32 y)
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(TouchInputIDExists(id));
+
+	for (auto& item : detail::touchInputs)
+	{
+		if (item.id == id)
 		{
-			detail::touchInputs.PushBack(in);
-		}
-		else
-		{
-			// Insert the value at the index
-			detail::touchInputs.Insert(insertionIndex, static_cast<TouchInput&&>(in));
+			item.eventType = TouchEventType::Up;
+			item.x = x;
+			item.y = y;
+
+			break;
 		}
 	}
+}
+
+DEngine::Std::StaticVector<DEngine::Application::TouchInput, 10> DEngine::Application::TouchInputs()
+{
+	return detail::touchInputs;
 }
 
 bool DEngine::Application::detail::Initialize()
@@ -200,7 +240,10 @@ void DEngine::Application::detail::ImgGui_Initialize()
 
 void DEngine::Application::detail::ProcessEvents()
 {
-	auto now = std::chrono::high_resolution_clock::now();
+	detail::previousNow = detail::currentNow;
+	detail::currentNow = std::chrono::high_resolution_clock::now();
+	if (detail::tickCount > 0)
+		detail::deltaTime = std::chrono::duration<f32>(detail::currentNow - detail::previousNow).count();
 
 	// Input stuff
 	// Clear event-style values.
@@ -208,31 +251,41 @@ void DEngine::Application::detail::ProcessEvents()
 		item = KeyEventType::Unchanged;
 	for (auto& item : detail::mouseDelta)
 		item = 0;
-	// Remove all touch-inputs with event-type Up or have been cancelled.
 	for (uSize i = 0; i < detail::touchInputs.Size(); i += 1)
 	{
-		if (detail::touchInputs[i].eventType == TouchEventType::Up || detail::touchInputs[i].eventType == TouchEventType::Cancelled)
+		if (detail::touchInputs[i].eventType == TouchEventType::Up)
+		{
 			detail::touchInputs.Erase(i);
+			detail::touchInputStartTime.Erase(i);
+			i -= 1;
+		}
+		else
+			detail::touchInputs[i].eventType = TouchEventType::Unchanged;
 	}
-	for (auto& item : detail::touchInputs)
-		item.eventType = TouchEventType::Unchanged;
-
 	// Window stuff
 	detail::mainWindowSurfaceInitializeEvent = false;
 	detail::mainWindowSurfaceTerminateEvent = false;
 	detail::mainWindowRestoreEvent = false;
 	detail::mainWindowResizeEvent = false;
 
-	Backend_ProcessEvents(now);
+	Backend_ProcessEvents();
 
 	// Calculate duration for each button being held.
 	for (uSize i = 0; i < (uSize)Button::COUNT; i += 1)
 	{
 		if (detail::buttonValues[i])
-			buttonHeldDuration[i] = std::chrono::duration<f32>(now - buttonHeldStart[i]).count();
+			detail::buttonHeldDuration[i] = std::chrono::duration<f32>(detail::currentNow - detail::buttonHeldStart[i]).count();
 		else
-			buttonHeldDuration[i] = 0.f;
+			detail::buttonHeldDuration[i] = 0.f;
 	}
+	// Calculate duration for each touch input.
+	for (uSize i = 0; i < detail::touchInputs.Size(); i += 1)
+	{
+		if (detail::touchInputs[i].eventType != TouchEventType::Up)
+			detail::touchInputs[i].duration = std::chrono::duration<f32>(detail::currentNow - detail::touchInputStartTime[i]).count();
+	}
+
+	detail::tickCount += 1;
 }
 
 bool DEngine::Application::detail::ShouldShutdown()
@@ -309,9 +362,6 @@ void DEngine::Application::detail::ImGui_NewFrame()
 			io.MousePos = ImVec2(touchInputs[blehIndex].x, touchInputs[blehIndex].y);
 		}
 	}
-
-	
-
 }
 
 void DEngine::Application::SetRelativeMouseMode(bool enabled)

@@ -2,7 +2,7 @@
 #include "APIDataBase.hpp"
 
 #include "DEngine/Utility.hpp"
-#include "DEngine/Gfx/Assert.hpp"
+#include "Assert.hpp"
 
 using namespace DEngine;
 

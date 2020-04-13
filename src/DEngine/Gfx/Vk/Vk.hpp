@@ -65,7 +65,6 @@ namespace DEngine::Gfx::Vk
 	struct SwapchainSettings
 	{
 		vk::SurfaceKHR surface{};
-		vk::SurfaceCapabilitiesKHR capabilities{};
 		vk::PresentModeKHR presentMode{};
 		vk::SurfaceFormatKHR surfaceFormat{};
 		vk::SurfaceTransformFlagBitsKHR transform = {};
@@ -180,6 +179,8 @@ namespace DEngine::Gfx::Vk
 		GlobUtils();
 		GlobUtils(GlobUtils const&) = delete;
 		GlobUtils(GlobUtils&&) = delete;
+
+		Gfx::ILog* logger = nullptr;
 
 		InstanceDispatch instance{};
 

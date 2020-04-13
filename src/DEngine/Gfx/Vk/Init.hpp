@@ -52,28 +52,24 @@ namespace DEngine::Gfx::Vk::Init
 		vk::SurfaceKHR surface,
 		ILog* logger);
 
-	void RebuildSurfaceInfo(
-		InstanceDispatch const& instance,
-		PhysDeviceInfo const& physDevice,
-		vk::SurfaceKHR newSurface,
-		SurfaceInfo& outSurfaceInfo);
-
 	[[nodiscard]] SwapchainSettings BuildSwapchainSettings(
 		InstanceDispatch const& instance,
 		vk::PhysicalDevice physDevice,
-		SurfaceInfo const& surfaceCaps,
+		SurfaceInfo const& surfaceInfo,
+		u32 width,
+		u32 height,
 		ILog* logger);
 
 	[[nodiscard]] SwapchainData CreateSwapchain(
 		Vk::DeviceDispatch const& device,
 		QueueData const& queues,
 		DeletionQueue const& deletionQueue,
-		SwapchainSettings const& settings,
+		SwapchainSettings settings,
 		DebugUtilsDispatch const* debugUtilsOpt);
 
 	void RecreateSwapchain(
 		GlobUtils const& globUtils,
-		SurfaceInfo& surface,
+		SwapchainSettings settings,
 		SwapchainData& swapchain);
 
 	bool TransitionSwapchainImages(

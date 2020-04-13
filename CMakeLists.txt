@@ -9,9 +9,13 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 # Set DEngine options
 # -------------------
 # START
-	option(DENGINE_GFX_ENABLE_ASSERT "Asserts inside the rendering code" OFF)
+	option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ON)
 
-	option(DENGINE_CONTAINERS_ENABLE_ASSERT "Asserts inside DEngine containers" OFF)
+	option(DENGINE_APPLICATION_ENABLE_ASSERT "Asserts inside the application code" ON)
+
+	option(DENGINE_GFX_ENABLE_ASSERT "Asserts inside the rendering code" ON)
+
+	option(DENGINE_CONTAINERS_ENABLE_ASSERT "Asserts inside DEngine containers" ON)	
 #
 # END
 #
@@ -24,11 +28,10 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 	set(DENGINE_INCLUDE_DIRS "${DENGINE_ROOT_DIR}/include")
 	set(DENGINE_SRC_FILES 
 		"${DENGINE_ROOT_DIR}/src/main.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Assert.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Editor.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Time.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Application/Application.cpp"
-		"${DENGINE_ROOT_DIR}/src/DEngine/Containers/Assert.cpp"
-		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Assert.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Gfx.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/DeletionQueue.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/Draw.cpp"
@@ -40,7 +43,7 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 		"${DENGINE_ROOT_DIR}/src/DEngine/Math/Common.cpp"
 		)
 	add_executable(${PROJECT_NAME} ${DENGINE_SRC_FILES})
-	target_include_directories(${PROJECT_NAME} PRIVATE "${DENGINE_INCLUDE_DIRS}")
+	target_include_directories(${PROJECT_NAME} PRIVATE ${DENGINE_INCLUDE_DIRS})
 
 	target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
 
@@ -68,14 +71,23 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 # Handle DEngine options
 # ----------------------
 # START
+	if(DENGINE_ENABLE_ASSERT)
+		target_compile_definitions(${PROJECT_NAME} PUBLIC "DENGINE_ENABLE_ASSERT")
+	endif()
+
+		# Handles the renderer's assert option
+	if(DENGINE_APPLICATION_ENABLE_ASSERT)
+		target_compile_definitions(${PROJECT_NAME} PUBLIC "DENGINE_APPLICATION_ENABLE_ASSERT")
+	endif()
+
 	# Handles the renderer's assert option
 	if(DENGINE_GFX_ENABLE_ASSERT)
-		target_compile_definitions(${PROJECT_NAME} PRIVATE "DENGINE_GFX_ENABLE_ASSERT")
+		target_compile_definitions(${PROJECT_NAME} PUBLIC "DENGINE_GFX_ENABLE_ASSERT")
 	endif()
 
 	# Handles the DEngine container's assert option
 	if(DENGINE_CONTAINERS_ENABLE_ASSERT)
-		target_compile_definitions(${PROJECT_NAME} PRIVATE "DENGINE_CONTAINERS_ENABLE_ASSERT")
+		target_compile_definitions(${PROJECT_NAME} PUBLIC "DENGINE_CONTAINERS_ENABLE_ASSERT")
 	endif()
 #
 # END
@@ -99,6 +111,9 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 # -----------------------
 # START
 	add_library(DENGINE_APPLICATION STATIC "${DENGINE_ROOT_DIR}/src/DEngine/Application/Application_Desktop.cpp")
+	if(DENGINE_APPLICATION_ENABLE_ASSERT)
+		target_compile_definitions(DENGINE_APPLICATION PUBLIC "DENGINE_APPLICATION_ENABLE_ASSERT")
+	endif()
 	target_link_libraries(${PROJECT_NAME} PRIVATE DENGINE_APPLICATION)
 	target_include_directories(DENGINE_APPLICATION PRIVATE ${DENGINE_INCLUDE_DIRS})
 	target_include_directories(DENGINE_APPLICATION PRIVATE ${VULKAN_INCLUDE_DIRS})
@@ -140,7 +155,7 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 # GLFW3 binaries
 if(WIN32)
 	set(GLFW3_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/external/GLFW3")
-    if(MSVC)
+	if(MSVC)
 		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
 			set(GLFW3_BINDIR "${GLFW3_FOLDER}/MSVC x86")
 		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
@@ -150,7 +165,7 @@ if(WIN32)
 		message(FATAL_ERROR "Platform not supported. Couldn't link GLFW.")
 	endif()
 	set(GLFW3_BINNAME glfw3.dll)
-    set(GLFW3_BINARY "${GLFW3_BINDIR}/${GLFW3_BINNAME}")
+	set(GLFW3_BINARY "${GLFW3_BINDIR}/${GLFW3_BINNAME}")
 	add_custom_command(
 		TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different

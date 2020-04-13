@@ -2,7 +2,7 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Utility.hpp"
-#include "DEngine/Containers/Assert.hpp"
+#include "DEngine/Containers/detail/Assert.hpp"
 
 #include <stdexcept>
 #include <new>

@@ -28,9 +28,9 @@ namespace DEngine::Gfx
 
 	struct Draw_Params
 	{
-		bool presentMainWindow = false;
-		bool resizeEvent = false;
-		bool rebuildSurface = false;
+		u32 swapchainWidth = 0;
+		u32 swapchainHeight = 0;
+		bool restoreEvent = false;
 		
 		std::vector<ViewportUpdateData> viewportUpdates = {};
 	};
@@ -86,7 +86,7 @@ namespace DEngine::Gfx
 		// Argument #1: VkInstance - The Vulkan instance handle
 		// Argument #2: VkAllocationCallbacks const* - Allocation callbacks for surface creation.
 		// Argument #3: VkSurfaceKHR* - The output surface handle
-		virtual i32 createVkSurface(uSize vkInstance, void const* allocCallbacks, u64* outSurface) = 0;
+		virtual i32 CreateVkSurface(uSize vkInstance, void const* allocCallbacks, u64& outSurface) = 0;
 	};
 
 	class ViewportRef

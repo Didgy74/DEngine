@@ -1,11 +1,9 @@
-#ifdef DENGINE_GFX_ENABLE_ASSERT
-
-#include "DEngine/Gfx/Assert.hpp"
+#include "DEngine/detail/Assert.hpp"
 
 #include <iostream>
 #include <cstdlib>
 
-namespace DEngine::Gfx
+namespace DEngine::detail
 {
 	void Assert(const char* conditionString, const char* file, unsigned long long line, const char* msg)
 	{
@@ -26,5 +24,3 @@ namespace DEngine::Gfx
 		std::abort();
 	}
 }
-
-#endif

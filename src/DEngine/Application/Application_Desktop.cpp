@@ -24,7 +24,6 @@
 namespace DEngine::Application::detail
 {
 	static GLFWwindow* mainWindow = nullptr;
-	static std::chrono::high_resolution_clock::time_point tickStartNow{};
 
 	static void Backend_GLFW_ErrorCallback(
 		int error, 
@@ -97,18 +96,18 @@ bool DEngine::Application::detail::Backend_Initialize()
 	int windowPosX = 0;
 	int windowPosY = 0;
 	glfwGetWindowPos(detail::mainWindow, &windowPosX, &windowPosY);
-	detail::mainWindowPos[0] = windowPosX;
-	detail::mainWindowPos[1] = windowPosY;
+	detail::mainWindowPos[0] = (i32)windowPosX;
+	detail::mainWindowPos[1] = (i32)windowPosY;
 	int windowSizeX = 0;
 	int windowSizeY = 0;
 	glfwGetWindowSize(detail::mainWindow, &windowSizeX, &windowSizeY);
-	detail::mainWindowSize[0] = windowSizeX;
-	detail::mainWindowSize[1] = windowSizeY;
+	detail::mainWindowSize[0] = (u32)windowSizeX;
+	detail::mainWindowSize[1] = (u32)windowSizeY;
 	int windowFramebufferSizeX = 0;
 	int windowFramebufferSizeY = 0;
 	glfwGetFramebufferSize(detail::mainWindow, &windowFramebufferSizeX, &windowFramebufferSizeY);
-	detail::mainWindowFramebufferSize[0] = windowFramebufferSizeX;
-	detail::mainWindowFramebufferSize[1] = windowFramebufferSizeY;
+	detail::mainWindowFramebufferSize[0] = (u32)windowFramebufferSizeX;
+	detail::mainWindowFramebufferSize[1] = (u32)windowFramebufferSizeY;
 
 	detail::mainWindowIsInFocus = glfwGetWindowAttrib(detail::mainWindow, GLFW_FOCUSED);
 
@@ -133,11 +132,8 @@ bool DEngine::Application::detail::Backend_Initialize()
 	return true;
 }
 
-void DEngine::Application::detail::Backend_ProcessEvents(
-	std::chrono::high_resolution_clock::time_point now)
+void DEngine::Application::detail::Backend_ProcessEvents()
 {
-	detail::tickStartNow = now;
-
 	glfwPollEvents();
 }
 
@@ -149,9 +145,9 @@ static void DEngine::Application::detail::Backend_GLFW_KeyboardKeyCallback(
 	int mods)
 {
 	if (action == GLFW_PRESS)
-		detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), true, detail::tickStartNow);
+		detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), true);
 	else if (action == GLFW_RELEASE)
-		detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), false, detail::tickStartNow);
+		detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), false);
 }
 
 static void DEngine::Application::detail::Backend_GLFW_MouseButtonCallback(
@@ -169,7 +165,7 @@ static void DEngine::Application::detail::Backend_GLFW_MouseButtonCallback(
 	else if (action == GLFW_RELEASE)
 		wasPressed = false;
 
-	detail::UpdateButton(Backend_GLFW_MouseButtonToRawButton(button), wasPressed, detail::tickStartNow);
+	detail::UpdateButton(Backend_GLFW_MouseButtonToRawButton(button), wasPressed);
 }
 
 static void DEngine::Application::detail::Backend_GLFW_MousePosCallback(
@@ -239,17 +235,17 @@ static void DEngine::Application::detail::Backend_GLFW_WindowMinimizeCallback(
 }
 
 bool DEngine::Application::detail::CreateVkSurface(
-	u64 vkInstance, 
+	uSize vkInstance, 
 	void const* vkAllocationCallbacks, 
 	void* userData, 
-	u64* vkSurface)
+	u64& vkSurface)
 {
 #pragma warning( suppress : 26812)
 	VkResult err = glfwCreateWindowSurface(
-	(VkInstance)vkInstance, 
+	reinterpret_cast<VkInstance>(vkInstance), 
 		detail::mainWindow, 
-		(VkAllocationCallbacks const*)vkAllocationCallbacks, 
-		(VkSurfaceKHR*)vkSurface);
+		reinterpret_cast<VkAllocationCallbacks const*>(vkAllocationCallbacks), 
+		reinterpret_cast<VkSurfaceKHR*>(&vkSurface));
 	if (err != 0)
 		return false;
 
@@ -300,6 +296,8 @@ DEngine::Application::Button DEngine::Application::detail::Backend_GLFW_Keyboard
 		return Button::Space;
 	case GLFW_KEY_LEFT_CONTROL:
 		return Button::LeftCtrl;
+	case GLFW_KEY_ESCAPE:
+		return Button::Escape;
 
 	}
 

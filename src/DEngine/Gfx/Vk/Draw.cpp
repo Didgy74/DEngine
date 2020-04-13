@@ -1,5 +1,5 @@
 #include "Vk.hpp"
-#include "DEngine/Gfx/Assert.hpp"
+#include "../Assert.hpp"
 
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_vulkan.h"
@@ -392,7 +392,7 @@ namespace DEngine::Gfx::Vk
 					break;
 				}
 			}
-			DENGINE_GFX_ASSERT(viewportIndex != static_cast<uSize>(-1));
+			DENGINE_DETAIL_GFX_ASSERT(viewportIndex != static_cast<uSize>(-1));
 			ViewportVkData& viewportData = viewportManager.viewportData[viewportIndex].b;
 
 			// Delete all the resources
@@ -425,7 +425,7 @@ namespace DEngine::Gfx::Vk
 					break;
 				}
 			}
-			DENGINE_GFX_ASSERT(viewportIndex != static_cast<uSize>(-1));
+			DENGINE_DETAIL_GFX_ASSERT(viewportIndex != static_cast<uSize>(-1));
 			ViewportVkData& viewportPtr = viewportManager.viewportData[viewportIndex].b;
 			if (viewportPtr.renderTarget.img == vk::Image())
 			{
@@ -442,6 +442,9 @@ namespace DEngine::Gfx::Vk
 	}
 
 	void HandleSwapchainResizeEvent(
+		u32 width,
+		u32 height,
+		IWsi& wsiInterface,
 		GlobUtils const& globUtils,
 		GUIData& guiData,
 		SurfaceInfo& surface,
@@ -449,7 +452,20 @@ namespace DEngine::Gfx::Vk
 	{
 		globUtils.device.WaitIdle();
 
-		Init::RecreateSwapchain(globUtils, surface, swapchain);
+		surface = Init::BuildSurfaceInfo(
+			globUtils.instance,
+			globUtils.physDevice.handle,
+			surface.handle,
+			globUtils.logger);
+
+		SwapchainSettings spSettings = Init::BuildSwapchainSettings(
+			globUtils.instance,
+			globUtils.physDevice.handle,
+			surface,
+			width,
+			height,
+			globUtils.logger);
+		Init::RecreateSwapchain(globUtils, spSettings, swapchain);
 
 		globUtils.device.Destroy(guiData.renderTarget.framebuffer);
 		globUtils.device.Destroy(guiData.renderTarget.imgView);
@@ -468,6 +484,8 @@ namespace DEngine::Gfx::Vk
 	}
 
 	void HandleSurfaceRecreationEvent(
+		u32 width,
+		u32 height,
 		GlobUtils const& globUtils,
 		SurfaceInfo& surfaceInfo,
 		IWsi& wsiInterface,
@@ -481,27 +499,28 @@ namespace DEngine::Gfx::Vk
 		globUtils.instance.Destroy(surfaceInfo.handle);
 		surfaceInfo.handle = vk::SurfaceKHR();
 		
-
 		// TODO: I don't think I like this code
 		// Create the VkSurface using the callback
 		vk::SurfaceKHR surface{};
-		vk::Result surfaceCreateResult = (vk::Result)wsiInterface.createVkSurface(
+		vk::Result surfaceCreateResult = (vk::Result)wsiInterface.CreateVkSurface(
 			(u64)(VkInstance)globUtils.instance.handle, 
 			nullptr, 
-			reinterpret_cast<u64*>(&surface));
+			*reinterpret_cast<u64*>(&surface));
 		if (surfaceCreateResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
 
-		
-		Init::RebuildSurfaceInfo(
+		surfaceInfo = Init::BuildSurfaceInfo(
 			globUtils.instance,
-			globUtils.physDevice,
+			globUtils.physDevice.handle,
 			surface,
-			surfaceInfo);
+			globUtils.logger);
 		
 		swapchainData.handle = vk::SwapchainKHR();
 
 		HandleSwapchainResizeEvent(
+			width,
+			height,
+			wsiInterface,
 			globUtils,
 			guiData,
 			surfaceInfo,
@@ -517,16 +536,21 @@ void DEngine::Gfx::Vk::APIData::Draw(Data& gfxData, Draw_Params const& drawParam
 	DevDispatch const& device = globUtils.device;
 
 	// Handle surface recreation
-	if (drawParams.rebuildSurface)
+	if (drawParams.restoreEvent)
 		HandleSurfaceRecreationEvent(
+			drawParams.swapchainWidth,
+			drawParams.swapchainHeight,
 			globUtils,
 			apiData.surface,
 			*apiData.wsiInterface,
 			apiData.swapchain,
 			apiData.guiData);
 	// Handle swapchain resize
-	else if (drawParams.resizeEvent)
+	else if (drawParams.swapchainWidth != apiData.swapchain.extents.width || drawParams.swapchainHeight != apiData.swapchain.extents.height)
 		HandleSwapchainResizeEvent(
+			drawParams.swapchainWidth,
+			drawParams.swapchainHeight,
+			*apiData.wsiInterface,
 			globUtils, 
 			apiData.guiData,
 			apiData.surface, 
@@ -575,18 +599,15 @@ void DEngine::Gfx::Vk::APIData::Draw(Data& gfxData, Draw_Params const& drawParam
 	// TODO: This viewportmanager-synchronization must be fixed.
 	apiData.viewportManager.mutexLock.unlock();
 
-	if (drawParams.presentMainWindow)
-	{
-		// First we re-record the GUI cmd buffer and submit it.
-		RecordGUICmdBuffer(
-			apiData.globUtils.device,
-			apiData.guiData.cmdBuffers[currentInFlightIndex],
-			apiData.guiData.renderTarget,
-			globUtils.guiRenderPass,
-			currentInFlightIndex,
-			apiData.globUtils.DebugUtilsPtr());
-		cmdBuffersToSubmit.push_back(apiData.guiData.cmdBuffers[currentInFlightIndex]);
-	}
+	// First we re-record the GUI cmd buffer and submit it.
+	RecordGUICmdBuffer(
+		apiData.globUtils.device,
+		apiData.guiData.cmdBuffers[currentInFlightIndex],
+		apiData.guiData.renderTarget,
+		globUtils.guiRenderPass,
+		currentInFlightIndex,
+		apiData.globUtils.DebugUtilsPtr());
+	cmdBuffersToSubmit.push_back(apiData.guiData.cmdBuffers[currentInFlightIndex]);
 
 	// Submit the command cmdBuffers
 	vk::SubmitInfo submitInfo{};
@@ -595,11 +616,8 @@ void DEngine::Gfx::Vk::APIData::Draw(Data& gfxData, Draw_Params const& drawParam
 	apiData.globUtils.queues.graphics.submit({ submitInfo }, apiData.mainFences[currentInFlightIndex]);
 
 
-	if (drawParams.presentMainWindow)
-	{
-		// We query the next available swapchain image, so we know which image we need to copy to
-		PresentShit(apiData);
-	}
+	// We query the next available swapchain image, so we know which image we need to copy to
+	PresentShit(apiData);
 
 	DeletionQueue::ExecuteCurrentTick(apiData.globUtils.deletionQueue);
 	apiData.currentInFlightFrame = (apiData.currentInFlightFrame + 1) % apiData.globUtils.resourceSetCount;

@@ -2,7 +2,7 @@
 
 #include "VulkanIncluder.hpp"
 
-#include "DEngine/Gfx/Assert.hpp"
+#include "../Assert.hpp"
 
 #include "ImGui/imgui_impl_vulkan.h"
 
@@ -373,43 +373,33 @@ DEngine::Gfx::Vk::SurfaceInfo DEngine::Gfx::Vk::Init::BuildSurfaceInfo(
 	return returnVal;
 }
 
-void DEngine::Gfx::Vk::Init::RebuildSurfaceInfo(
-	InstanceDispatch const& instance,
-	PhysDeviceInfo const& physDevice,
-	vk::SurfaceKHR newSurface,
-	SurfaceInfo& outSurfaceInfo)
-{
-	outSurfaceInfo.handle = newSurface;
-
-	outSurfaceInfo.capabilities = instance.getPhysicalDeviceSurfaceCapabilitiesKHR(physDevice.handle, outSurfaceInfo.handle);
-
-	// Check presentation support
-	bool presentSupport = instance.getPhysicalDeviceSurfaceSupportKHR(physDevice.handle, physDevice.queueIndices.graphics.familyIndex, outSurfaceInfo.handle);
-	if (presentSupport == false)
-		throw std::runtime_error("Vulkan: No presentation support for new surface");
-}
-
 DEngine::Gfx::Vk::SwapchainSettings DEngine::Gfx::Vk::Init::BuildSwapchainSettings(
 	InstanceDispatch const& instance,
 	vk::PhysicalDevice physDevice,
 	SurfaceInfo const& surfaceInfo,
+	u32 width,
+	u32 height,
 	ILog* logger)
 {
 	SwapchainSettings settings{};
 	settings.surface = surfaceInfo.handle;
-	settings.capabilities = surfaceInfo.capabilities;
-	settings.extents = settings.capabilities.currentExtent;
+	settings.extents = surfaceInfo.capabilities.currentExtent;
+
+
+		
 	settings.compositeAlphaFlag = surfaceInfo.compositeAlphaFlag;
+	settings.transform = vk::SurfaceTransformFlagBitsKHR::eIdentity;
 
 	// Handle swapchainData length
 	u32 swapchainLength = Constants::preferredSwapchainLength;
 	// If we need to, clamp the swapchainData length.
 	// Upper clamp only applies if maxImageCount != 0
-	if (settings.capabilities.maxImageCount != 0 && swapchainLength > settings.capabilities.maxImageCount)
-		swapchainLength = settings.capabilities.maxImageCount;
+	if (surfaceInfo.capabilities.maxImageCount != 0 && swapchainLength > surfaceInfo.capabilities.maxImageCount)
+		swapchainLength = surfaceInfo.capabilities.maxImageCount;
 	if (swapchainLength < 2)
 	{
-		logger->log("Vulkan: Vulkan backend doesn't support swapchainData length of 1.");
+		if (logger)
+			logger->log("Vulkan: Vulkan backend doesn't support swapchainData length of 1.");
 		std::abort();
 	}
 
@@ -593,7 +583,7 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 	Vk::DeviceDispatch const& device,
 	QueueData const& queues,
 	DeletionQueue const& deletionQueue,
-	SwapchainSettings const& settings,
+	SwapchainSettings settings,
 	DebugUtilsDispatch const* debugUtils)
 {
 	vk::Result vkResult{};
@@ -635,8 +625,8 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 	vkResult = device.getSwapchainImagesKHR(swapchain.handle, &swapchainImageCount, nullptr);
 	if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 		throw std::runtime_error("Unable to grab swapchainData images from VkSwapchainKHR object.");
-	DENGINE_GFX_ASSERT(swapchainImageCount != 0);
-	DENGINE_GFX_ASSERT(swapchainImageCount == settings.numImages);
+	DENGINE_DETAIL_GFX_ASSERT(swapchainImageCount != 0);
+	DENGINE_DETAIL_GFX_ASSERT(swapchainImageCount == settings.numImages);
 	if (swapchainImageCount > swapchain.images.Capacity())
 		throw std::runtime_error("Unable to fit swapchainData image handles in allocated memory.");
 	swapchain.images.Resize(swapchainImageCount);
@@ -713,26 +703,11 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 
 void DEngine::Gfx::Vk::Init::RecreateSwapchain(
 	GlobUtils const& globUtils,
-	SurfaceInfo& surface,
+	SwapchainSettings settings,
 	SwapchainData& swapchain)
 {
 	// Query surface for new details
 	vk::Result vkResult{};
-
-	vk::SurfaceCapabilitiesKHR capabilities = globUtils.instance.getPhysicalDeviceSurfaceCapabilitiesKHR(
-		globUtils.physDevice.handle, 
-		surface.handle);
-	surface.capabilities = capabilities;
-
-	SwapchainSettings settings = {};
-	settings.surface = surface.handle;
-	settings.extents = surface.capabilities.currentExtent;
-	settings.numImages = static_cast<std::uint32_t>(swapchain.images.Size());
-	settings.presentMode = swapchain.presentMode;
-	settings.surfaceFormat = swapchain.surfaceFormat;
-	settings.capabilities = surface.capabilities;
-	settings.transform = surface.capabilities.currentTransform;
-	settings.compositeAlphaFlag = surface.compositeAlphaFlag;
 
 	// We have figured out the settings to build the new swapchainData, now we actually make it
 
@@ -748,7 +723,7 @@ void DEngine::Gfx::Vk::Init::RecreateSwapchain(
 	swapchainCreateInfo.imageSharingMode = vk::SharingMode::eExclusive;
 	swapchainCreateInfo.presentMode = settings.presentMode;
 	swapchainCreateInfo.surface = settings.surface;
-	swapchainCreateInfo.preTransform = vk::SurfaceTransformFlagBitsKHR::eIdentity;
+	swapchainCreateInfo.preTransform = settings.transform;
 	swapchainCreateInfo.clipped = 1;
 	swapchainCreateInfo.compositeAlpha = settings.compositeAlphaFlag;
 	swapchainCreateInfo.imageUsage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment;

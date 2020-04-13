@@ -1,5 +1,5 @@
 #include "Vk.hpp"
-#include "DEngine/Gfx/Assert.hpp"
+#include "../Assert.hpp"
 #include "Init.hpp"
 
 #include "DEngine/FixedWidthTypes.hpp"
@@ -87,6 +87,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	vk::Result vkResult{};
 
 	apiData.logger = initInfo.optional_iLog;
+	apiData.globUtils.logger = initInfo.optional_iLog;
 	apiData.wsiInterface = initInfo.iWsi;
 
 	globUtils.resourceSetCount = 2;
@@ -118,10 +119,10 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	// TODO: I don't think I like this code
 	// Create the VkSurface using the callback
 	vk::SurfaceKHR surface{};
-	vk::Result surfaceCreateResult = (vk::Result)apiData.wsiInterface->createVkSurface(
+	vk::Result surfaceCreateResult = (vk::Result)apiData.wsiInterface->CreateVkSurface(
 		(u64)(VkInstance)instance.handle, 
 		nullptr, 
-		reinterpret_cast<u64*>(&surface));
+		*reinterpret_cast<u64*>(&surface));
 	if (surfaceCreateResult != vk::Result::eSuccess)
 		throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
 
@@ -133,7 +134,13 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	apiData.surface = Init::BuildSurfaceInfo(instance, globUtils.physDevice.handle, surface, apiData.logger);
 
 	// Build the settings we will use to build the swapchain.
-	SwapchainSettings swapchainSettings = Init::BuildSwapchainSettings(instance, globUtils.physDevice.handle, apiData.surface, apiData.logger);
+	SwapchainSettings swapchainSettings = Init::BuildSwapchainSettings(
+		instance, 
+		globUtils.physDevice.handle, 
+		apiData.surface,
+		apiData.surface.capabilities.currentExtent.width,
+		apiData.surface.capabilities.currentExtent.height,
+		apiData.logger);
 
 	PFN_vkGetDeviceProcAddr deviceProcAddr = (PFN_vkGetDeviceProcAddr)instanceProcAddr((VkInstance)instance.handle, "vkGetDeviceProcAddr");
 
@@ -228,7 +235,7 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	vertFile.Seek(0, App::FileStream::SeekOrigin::End);
 	u64 vertFileLength = vertFile.Tell();
 	vertFile.Seek(0, App::FileStream::SeekOrigin::Start);
-	std::vector<char> vertCode(vertFileLength);
+	std::vector<char> vertCode((uSize)vertFileLength);
 	vertFile.Read(vertCode.data(), vertFileLength);
 	
 	vk::ShaderModuleCreateInfo vertModCreateInfo{};
@@ -247,7 +254,7 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	fragFile.Seek(0, App::FileStream::SeekOrigin::End);
 	u64 fragFileLength = fragFile.Tell();
 	fragFile.Seek(0, App::FileStream::SeekOrigin::Start);
-	std::vector<char> fragCode(fragFileLength);
+	std::vector<char> fragCode((uSize)fragFileLength);
 	fragFile.Read(fragCode.data(), fragFileLength);
 
 	vk::ShaderModuleCreateInfo fragModInfo{};

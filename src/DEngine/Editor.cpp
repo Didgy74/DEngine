@@ -7,9 +7,49 @@
 #include "ImGui/imgui.h"
 
 #include <iostream>
+#include <DEngine/Application.hpp>
 
 namespace DEngine::Editor
 {
+	static void DrawMainMenuBar(EditorData& editorData)
+	{
+		if (ImGui::BeginMainMenuBar())
+		{
+			editorData.mainMenuBarSize = ImGui::GetWindowSize();
+
+			if (ImGui::MenuItem("File", nullptr, nullptr, true))
+			{
+
+			}
+
+			if (ImGui::MenuItem("     ", nullptr, nullptr, false))
+			{
+
+			}
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Delta:", nullptr, nullptr, false))
+			{
+
+			}
+
+			auto now = std::chrono::steady_clock::now();
+			if (std::chrono::duration<float>(now - editorData.deltaTimePoint).count() >= editorData.deltaTimeRefreshTime)
+			{
+				editorData.displayedDeltaTime = std::to_string(Time::Delta());
+				editorData.deltaTimePoint = now;
+			}
+
+			if (ImGui::MenuItem(editorData.displayedDeltaTime.c_str(), nullptr, nullptr, false))
+			{
+
+			}
+
+			ImGui::EndMainMenuBar();
+		}
+	}
+
 	static void DrawViewportManager(EditorData& editorData)
 	{
 		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
@@ -275,7 +315,7 @@ static void DEngine::Editor::HandleVirtualViewportResizing(
 	Viewport& viewport,
 	ImVec2 currentSize)
 {
-	// Manage the resizing of the viewport.
+	// Manage the resizing of the mainImGuiViewport.
 	if (currentSize.x != viewport.width || currentSize.y != viewport.height)
 		viewport.currentlyResizing = true;
 	if (viewport.currentlyResizing && currentSize.x == viewport.width && currentSize.y == viewport.height)
@@ -334,7 +374,7 @@ static void DEngine::Editor::HandleViewportCameraMovement(
 
 static void DEngine::Editor::DrawAllVirtualViewports(EditorData& editorData, Gfx::Data& gfx)
 {
-	// We use signed integer because of the way we remove the viewport.
+	// We use signed integer because of the way we remove the mainImGuiViewport.
 	for (iSize i = 0; i < (iSize)editorData.viewports.size(); i += 1)
 	{
 		auto const& viewportID = editorData.viewports[i].a;
@@ -412,84 +452,47 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 {
 	ImGui::NewFrame();
 
-	if (Time::TickCount() == 1)
+	editorData.dockSpaceID = ImGui::GetID("test");
+
+	DrawMainMenuBar(editorData);
+
 	{
-		editorData.dockSpaceID = ImGui::GetID("test");
+		ImGuiDockNodeFlags dockspaceFlags = 0;
+		//dockspaceFlags = ImGuiDockNodeFlags_PassthruCentralNode;
+
+		// We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
+		// because it would be confusing to have two docking targets within each others.
+		ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+		ImGuiViewport* mainImGuiViewport = ImGui::GetMainViewport();
+		ImGui::SetNextWindowPos(mainImGuiViewport->Pos);
+		ImGui::SetNextWindowSize(mainImGuiViewport->Size);
+		ImGui::SetNextWindowViewport(mainImGuiViewport->ID);
+		//ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+		//ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+		window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+		window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+		// When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background 
+		// and handle the pass-thru hole, so we ask Begin() to not render a background.
+		if (dockspaceFlags & ImGuiDockNodeFlags_PassthruCentralNode)
+			window_flags |= ImGuiWindowFlags_NoBackground;
+
+		// Important: note that we proceed even if Begin() returns false (aka window is collapsed).
+		// This is because we want to keep our DockSpace() active. If a DockSpace() is inactive,
+		// all active windows docked into it will lose their parent and become undocked.
+		// We cannot preserve the docking relationship between an active window and an inactive docking, otherwise
+		// any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
+		//ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+		//bool test = false;
+		ImGui::Begin("DockSpace Demo", nullptr, window_flags);
+		//ImGui::PopStyleVar(3);
+
+		ImGui::DockSpace(editorData.dockSpaceID, ImVec2(0.0f, 0.0f), dockspaceFlags);
+		
+		ImGui::End();
 	}
 
-	if (ImGui::BeginMainMenuBar())
-	{
-		editorData.mainMenuBarSize = ImGui::GetWindowSize();
-
-		if (ImGui::MenuItem("File", nullptr, nullptr, true))
-		{
-
-		}
-
-		if (ImGui::MenuItem("     ", nullptr, nullptr, false))
-		{
-
-		}
-
-		ImGui::Separator();
-
-		if (ImGui::MenuItem("Delta:", nullptr, nullptr, false))
-		{
-
-		}
-
-		auto now = std::chrono::steady_clock::now();
-		if (std::chrono::duration<float>(now - editorData.deltaTimePoint).count() >= editorData.deltaTimeRefreshTime)
-		{
-			editorData.displayedDeltaTime = std::to_string(Time::Delta());
-			editorData.deltaTimePoint = now;
-		}
-
-		if (ImGui::MenuItem(editorData.displayedDeltaTime.c_str(), nullptr, nullptr, false))
-		{
-
-		}
-
-		ImGui::EndMainMenuBar();
-	}
-
-
-	ImGuiDockNodeFlags dockspaceFlags = 0;
-	//dockspaceFlags = ImGuiDockNodeFlags_PassthruCentralNode;
-
-	// We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
-	// because it would be confusing to have two docking targets within each others.
-	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
-	ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(viewport->Pos);
-	ImGui::SetNextWindowSize(viewport->Size);
-	ImGui::SetNextWindowViewport(viewport->ID);
-	//ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-	//ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-
-	// When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background 
-	// and handle the pass-thru hole, so we ask Begin() to not render a background.
-	if (dockspaceFlags & ImGuiDockNodeFlags_PassthruCentralNode)
-		window_flags |= ImGuiWindowFlags_NoBackground;
-
-	// Important: note that we proceed even if Begin() returns false (aka window is collapsed).
-	// This is because we want to keep our DockSpace() active. If a DockSpace() is inactive,
-	// all active windows docked into it will lose their parent and become undocked.
-	// We cannot preserve the docking relationship between an active window and an inactive docking, otherwise
-	// any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
-	//ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-	//bool test = false;
-	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
-	//ImGui::PopStyleVar(3);
-
-	ImGui::DockSpace(editorData.dockSpaceID, ImVec2(0.0f, 0.0f), dockspaceFlags);
-
-
-
-	ImGui::End();
-
+	
 	static bool testShowWindow = true;
 	if (testShowWindow)
 	{
@@ -522,78 +525,49 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 		windowFlags |= ImGuiWindowFlags_NoTitleBar;
 		if (ImGui::Begin("Testtestest", &windowIsOpen, windowFlags))
 		{
-			Viewport* vp = nullptr;
-			for (auto& item : editorData.viewports)
+			uSize viewportIndex = static_cast<uSize>(-1);
+			for (uSize i = 0; i < editorData.viewports.size(); i += 1)
 			{
-				if (item.a == editorData.fullscreenViewportID)
+				if (editorData.viewports[i].a == editorData.fullscreenViewportID)
 				{
-					vp = &item.b;
+					viewportIndex = i;
 					break;
 				}
 			}
-			assert(vp != nullptr);
-			vp->visible = true;
+			Viewport& vp = editorData.viewports[viewportIndex].b;
+			vp.visible = true;
 
 
 			ImVec2 imgSize = ImGui::GetContentRegionAvail();
 
-			HandleVirtualViewportResizing(*vp, imgSize);
-
+			HandleVirtualViewportResizing(vp, imgSize);
 			ImVec2 imgPos = ImGui::GetCursorPos();
+			ImGui::Image(vp.gfxViewportRef.ImGuiTexID(), imgSize);
 
-			ImGui::Image(vp->gfxViewportRef.ImGuiTexID(), imgSize);
+			uSize camIndex = static_cast<uSize>(-1);
+			for (uSize i = 0; i < editorData.cameras.size(); i += 1)
+			{
+				if (vp.cameraID == editorData.cameras[i].a)
+				{
+					camIndex = i;
+					break;
+				}
+			}
+			Camera& cam = camIndex == static_cast<uSize>(-1) ? vp.camera : editorData.cameras[camIndex].b;
 
+			// Handle mouse FreeLook
 			if (ImGui::IsItemHovered())
 			{
-				Viewport& viewport = *vp;
-				Camera* camPtr = &viewport.camera;
-				if (viewport.cameraID != Viewport::invalidCamID)
-				{
-					camPtr = nullptr;
-					// Find the camera
-					for (auto& [camID, camera] : editorData.cameras)
-					{
-						if (camID == viewport.cameraID)
-						{
-							camPtr = &camera;
-							break;
-						}
-					}
-					assert(camPtr != nullptr);
-				}
-#pragma warning( suppress : 6011 )
-				Camera& cam = *camPtr;
 				if (App::ButtonValue(App::Button::RightMouse))
 					HandleViewportCameraMovement(cam);
-
-				if (ImGui::GetIO().MouseDown[0])
-				{
-					ImVec2 windowPos = ImGui::GetWindowPos();
-					ImVec2 mousePos = ImGui::GetMousePos();
-					mousePos.x -= imgPos.x + windowPos.x;
-					mousePos.y -= imgPos.y + windowPos.y;
-					Math::Vec2D mousePosNormalized = { (f32)mousePos.x / (f32)imgSize.x, (f32)mousePos.y / (f32)imgSize.y };
-					mousePosNormalized.x -= 0.5f;
-					mousePosNormalized.y -= 0.5f;
-					mousePosNormalized *= 2.f;
-					mousePosNormalized.y = -mousePosNormalized.y;
-
-					//std::cout << mousePosNormalized.x << ", " << mousePosNormalized.y << std::endl;
-					//std::cout << mousePos.x << ", " << mousePos.y << std::endl;
-					//std::cout << imgSize.x << ", " << imgSize.y << std::endl;
-
-
-					f32 moveSpeed = 5.f;
-					cam.position -= moveSpeed * Math::LinTran3D::ForwardVector(cam.rotation) * Time::Delta() * mousePosNormalized.y;
-					cam.position += moveSpeed * Math::LinTran3D::RightVector(cam.rotation) * Time::Delta() * mousePosNormalized.x;
-				}
-
 			}
+
+
 		}
 		ImGui::End();
 
 		if (App::ButtonEvent(App::Button::Escape) == App::KeyEventType::Pressed ||
-			ImGui::GetIO().MouseDownWasDoubleClick[0] == true)
+			App::ButtonEvent(App::Button::Back) == App::KeyEventType::Pressed)
 		{
 			editorData.insideFullscreenViewport = false;
 			editorData.fullscreenViewportID = EditorData::invalidViewportID;
