@@ -1,24 +1,16 @@
 #pragma once
 
 #include "DEngine/FixedWidthTypes.hpp"
+#include "DEngine/Trait.hpp"
 
-#include "MatrixBase.hpp"
-#include "MatrixBaseSquare.hpp"
+#include "DEngine/Math/detail/MatrixBase.hpp"
+#include "DEngine/Math/detail/MatrixBaseSquare.hpp"
 
-#include <type_traits>
 
 namespace DEngine::Math
 {
 	template<uSize length, typename T>
 	struct Vector;
-
-	namespace detail
-	{
-		namespace Matrix
-		{
-			using DefaultValueType = float;
-		}
-	}
 
 	using Mat2 = Matrix<2, 2, f32>;
 	using Mat2Int = Matrix<2, 2, i32>;
@@ -27,14 +19,12 @@ namespace DEngine::Math
 	using Mat4 = Matrix<4, 4, f32>;
 	using Mat4Int = Matrix<4, 4, i32>;
 
-	template<uSize width, uSize height, typename T = detail::Matrix::DefaultValueType>
-	struct Matrix : public std::conditional_t<width == height, detail::MatrixBaseSquare<width, T>, detail::MatrixBase<width, height, T>>
+	template<uSize width, uSize height, typename T = f32>
+	struct Matrix : public Std::Conditional<width == height, detail::MatrixBaseSquare<width, T>, detail::MatrixBase<width, height, T>>
 	{
 	public:
-		[[nodiscard]] constexpr T& At(uSize i);
-		[[nodiscard]] constexpr T const& At(uSize i) const;
 		[[nodiscard]] constexpr T& At(uSize x, uSize y);
-		[[nodiscard]] constexpr T const& At(uSize x, uSize y) const;
+		[[nodiscard]] constexpr T At(uSize x, uSize y) const;
 
 		[[nodiscard]] constexpr T* Data();
 		[[nodiscard]] constexpr T const* Data() const;
@@ -59,25 +49,13 @@ namespace DEngine::Math
 	};
 
 	template<uSize width, uSize height, typename T>
-	constexpr T& Matrix<width, height, T>::At(uSize i)
-	{
-		return this->data[i];
-	}
-
-	template<uSize width, uSize height, typename T>
-	constexpr T const& Matrix<width, height, T>::At(uSize i) const
-	{
-		return this->data[i];
-	}
-
-	template<uSize width, uSize height, typename T>
 	constexpr T& Matrix<width, height, T>::At(uSize x, uSize y)
 	{
 		return this->data[x * height + y];
 	}
 
 	template<uSize width, uSize height, typename T>
-	constexpr T const& Matrix<width, height, T>::At(uSize x, uSize y) const
+	constexpr T Matrix<width, height, T>::At(uSize x, uSize y) const
 	{
 		return this->data[x * height + y];
 	}

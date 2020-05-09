@@ -2,6 +2,7 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Span.hpp"
+#include "DEngine/Containers/Optional.hpp"
 
 #include <stdexcept>
 #include <new>
@@ -21,6 +22,8 @@ namespace DEngine::Std
         uSize m_size = 0;
 
     public:
+        using ValueType = T;
+
         StaticVector();
         StaticVector(uSize length);
         ~StaticVector();
@@ -38,10 +41,15 @@ namespace DEngine::Std
         bool CanPushBack() const noexcept;
         void Clear();
         void Erase(uSize index);
+        // Erases the element but does not retain the order of the vector.
+        void EraseUnsorted(uSize index);
         void Insert(uSize index, T&& in);
         void PushBack(T const& in);
         void PushBack(T&& in);
         void Resize(uSize newSize);
+
+        template<typename Callable>
+        [[nodiscard]] Std::Optional<uSize> FindIf(Callable&& test) const;
 
         [[nodiscard]] T& At(uSize i);
         [[nodiscard]] T const& At(uSize i) const;
@@ -151,6 +159,20 @@ namespace DEngine::Std
     }
 
     template<typename T, uSize maxLength>
+    void StaticVector<T, maxLength>::EraseUnsorted(uSize index)
+    {
+        if (index >= m_size)
+            throw std::out_of_range("Attempted to .EraseUnsorted() a StaticVector with an out-of-bounds index.");
+        m_values[index].~T();
+        if (m_size > 0)
+        {
+            new(&m_values[index]) T(static_cast<T&&>(m_values[m_size - 1]));
+            m_values[m_size - 1].~T();
+            m_size -= 1;
+        }
+    }
+
+    template<typename T, uSize maxLength>
     void StaticVector<T, maxLength>::Insert(uSize index, T&& in)
     {
         if (index >= m_size)
@@ -198,6 +220,18 @@ namespace DEngine::Std
                 m_values[i].~T();
         }
         m_size = newSize;
+    }
+
+    template<typename T, uSize maxLength>
+    template<typename Callable>
+    Std::Optional<uSize> StaticVector<T, maxLength>::FindIf(Callable&& test) const
+    {
+        for (uSize i = 0; i < Size(); i += 1)
+        {
+            if (test(m_values[i]))
+                return i;
+        }
+        return {};
     }
 
     template<typename T, uSize maxLength>

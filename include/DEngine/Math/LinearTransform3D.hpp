@@ -1,50 +1,28 @@
 #pragma once
 
 #include "DEngine/Math/Trigonometric.hpp"
-#include "DEngine/Math/Matrix/Matrix.hpp"
-#include "DEngine/Math/Vector/Vector.hpp"
+#include "DEngine/Math/Matrix.hpp"
+#include "DEngine/Math/Vector.hpp"
 #include "DEngine/Math/Enums.hpp"
 #include "DEngine/Math/Setup.hpp"
 
 namespace DEngine::Math::LinearTransform3D
 {
-	template<typename T>
-	[[nodiscard]] constexpr Matrix<4, 3, T> Multiply_Reduced(Matrix<4, 3, T> const& left, Matrix<4, 3, T> const& right)
+	[[nodiscard]] constexpr Matrix<4, 3, f32> Multiply_Reduced(
+		Matrix<4, 3, f32> const& left, 
+		Matrix<4, 3, f32> const& right);
+
+	[[nodiscard]] constexpr Vector<3, f32> Multiply_Reduced(
+		Matrix<4, 3, f32> const& left,
+		Vector<3, f32> const& right)
 	{
-		Matrix<4, 3, T> newMatrix{};
-		for (uSize x = 0; x < 3; x += 1)
-		{
-			for (uSize y = 0; y < 3; y += 1)
-			{
-				T dot{};
-				for (uSize i = 0; i < 3; i += 1)
-					dot += left[i][y] * right[x][i];
-				newMatrix[x][y] = dot;
-			}
-		}
-
-		for (uSize y = 0; y < 3; y += 1)
-		{
-			T dot{};
-			for (uSize i = 0; i < 3; i += 1)
-				dot += left[i][y] * right[3][i];
-			dot += left[3][y];
-			newMatrix[3][y] = dot;
-		}
-
-		return newMatrix;
-	}
-	template<typename T>
-	[[nodiscard]] constexpr Vector<3, T> Multiply_Reduced(const Matrix<4, 3, T>& left, const Vector<3, T>& right)
-	{
-		Vector<3, T> newVector;
-
+		Vector<3, f32> newVector{};
 		for (size_t y = 0; y < 3; y++)
 		{
-			T dot = T(0);
+			f32 dot = 0.f;
 			for (size_t i = 0; i < 3; i++)
-				dot += left[i][y] * right[i];
-			newVector[y] = dot + left[3][y];
+				dot += left.At(i, y) * right[i];
+			newVector[y] = dot + left.At(3, y);
 		}
 
 		return newVector;
@@ -65,19 +43,17 @@ namespace DEngine::Math::LinearTransform3D
 		return newMat;
 	}
 
-	[[nodiscard]] constexpr Mat4 Translate(f32 x, f32 y, f32 z);
-	[[nodiscard]] constexpr Mat4 Translate(Vec3D const& input);
-	[[nodiscard]] constexpr Matrix<4, 3> Translate_Reduced(f32 x, f32 y, f32 z);
-	[[nodiscard]] constexpr Matrix<4, 3> Translate_Reduced(Vec3D const& input);
+	[[nodiscard]] constexpr Matrix<4, 4, f32> Translate(f32 x, f32 y, f32 z);
+	[[nodiscard]] constexpr Matrix<4, 4, f32> Translate(Vector<3, f32> const& input);
+	[[nodiscard]] constexpr Matrix<4, 3, f32> Translate_Reduced(f32 x, f32 y, f32 z);
+	[[nodiscard]] constexpr Matrix<4, 3, f32> Translate_Reduced(Vector<3, f32> const& input);
 
-	constexpr void SetTranslation(Mat4& matrix, f32 x, f32 y, f32 z);
-	constexpr void SetTranslation(Mat4& matrix, Vec3D const& input);
-	constexpr void SetTranslation(Matrix<4, 3>& matrix, f32 x, f32 y, f32 z);
-	constexpr void SetTranslation(Matrix<4, 3>& matrix, Vec3D const& input);
-	template<typename T = f32>
-	constexpr Vector<3, T> GetTranslation(Matrix<4, 4, T> const& input);
-	template<typename T = f32>
-	constexpr Vector<3, T> GetTranslation(Matrix<4, 3, T> const& input);
+	constexpr void SetTranslation(Matrix<4, 4, f32>& matrix, f32 x, f32 y, f32 z);
+	constexpr void SetTranslation(Matrix<4, 4, f32>& matrix, Vector<3, f32> const& input);
+	constexpr void SetTranslation(Matrix<4, 3, f32>& matrix, f32 x, f32 y, f32 z);
+	constexpr void SetTranslation(Matrix<4, 3, f32>& matrix, Vector<3, f32> const& input);
+	constexpr Vector<3, f32> GetTranslation(Matrix<4, 4, f32> const& input);
+	constexpr Vector<3, f32> GetTranslation(Matrix<4, 3, f32> const& input);
 
 	template<AngleUnit angleUnit = Setup::defaultAngleUnit>
 	[[nodiscard]] Mat3 Rotate(ElementaryAxis axis, f32 amount);
@@ -86,34 +62,49 @@ namespace DEngine::Math::LinearTransform3D
 	template<AngleUnit angleUnit = Setup::defaultAngleUnit>
 	[[nodiscard]] Mat3 Rotate(f32 x, f32 y, f32 z);
 	template<AngleUnit angleUnit = Setup::defaultAngleUnit>
-	[[nodiscard]] Mat3 Rotate(Vec3D const& angles);
+	[[nodiscard]] Mat3 Rotate(Vector<3, f32> const& angles);
 	template<AngleUnit angleUnit = Setup::defaultAngleUnit>
-	[[nodiscard]] Mat3 Rotate(Vec3D const& axis, f32 amount);
-	template<typename T>
-	[[nodiscard]] constexpr Matrix<3, 3, T> Rotate(UnitQuaternion<T> const& quat);
+	[[nodiscard]] Mat3 Rotate(Vector<3, f32> const& axis, f32 amount);
+	[[nodiscard]] constexpr Matrix<3, 3, f32> Rotate(UnitQuat const& quat);
 	[[nodiscard]] constexpr Mat4 Rotate_Homo(UnitQuat const& quat);
 	[[nodiscard]] constexpr Matrix<4, 3> Rotate_Reduced(UnitQuat const& quat);
 
-	[[nodiscard]] constexpr Vec3D ForwardVector(UnitQuat const& quat);
-	[[nodiscard]] constexpr Vec3D UpVector(UnitQuat const& quat);
-	[[nodiscard]] constexpr Vec3D RightVector(UnitQuat const& quat);
+	[[nodiscard]] constexpr Vector<3, f32> ForwardVector(UnitQuat const& quat);
+	[[nodiscard]] constexpr Vector<3, f32> UpVector(UnitQuat const& quat);
+	[[nodiscard]] constexpr Vector<3, f32> RightVector(UnitQuat const& quat);
 
-	[[nodiscard]] constexpr Mat3 Scale(f32 x, f32 y, f32 z);
-	[[nodiscard]] constexpr Mat3 Scale(Vec3D const& input);
-	[[nodiscard]] constexpr Mat4 Scale_Homo(f32 x, f32 y, f32 z);
-	[[nodiscard]] constexpr Mat4 Scale_Homo(Vec3D const& input);
-	[[nodiscard]] constexpr Matrix<4, 3> Scale_Reduced(f32 x, f32 y, f32 z);
-	[[nodiscard]] constexpr Matrix<4, 3> Scale_Reduced(Vec3D const& input);
+	[[nodiscard]] constexpr Matrix<3, 3, f32> Scale(f32 x, f32 y, f32 z);
+	[[nodiscard]] constexpr Matrix<3, 3, f32> Scale(Vector<3, f32> const& input);
+	[[nodiscard]] constexpr Matrix<4, 4, f32> Scale_Homo(f32 x, f32 y, f32 z);
+	[[nodiscard]] constexpr Matrix<4, 4, f32> Scale_Homo(Vector<3, f32> const& input);
+	[[nodiscard]] constexpr Matrix<4, 3, f32> Scale_Reduced(f32 x, f32 y, f32 z);
+	[[nodiscard]] constexpr Matrix<4, 3, f32> Scale_Reduced(Vector<3, f32> const& input);
 
-	[[nodiscard]] Mat4 LookAt_LH(Vec3D const& position, Vec3D const& forward, Vec3D const& upVector);
-	[[nodiscard]] Mat4 LookAt_RH(Vec3D const& position, Vec3D const& forward, Vec3D const& upVector);
+	[[nodiscard]] inline Matrix<4, 4, f32> LookAt_LH(
+		Vector<3, f32> const& position, 
+		Vector<3, f32> const& forward, 
+		Vector<3, f32> const& upVector);
+	[[nodiscard]] inline Matrix<4, 4, f32> LookAt_RH(
+		Vector<3, f32> const& position,
+		Vector<3, f32> const& forward,
+		Vector<3, f32> const& upVector);
 
-	template<typename T = f32>
-	[[nodiscard]] Matrix<4, 4, T> Perspective_RH_ZO(T fovY, T aspectRatio, T zNear, T zFar);
-	template<typename T = f32>
-	[[nodiscard]] Matrix<4, 4, T> Perspective_RH_NO(T fovY, T aspectRatio, T zNear, T zFar);
-	template<typename T = f32>
-	[[nodiscard]] Matrix<4, 4, T> Perspective(API3D api, T fovY, T aspectRatio, T zNear, T zFar);
+	[[nodiscard]] inline Matrix<4, 4, f32> Perspective_RH_ZO(
+		f32 fovY, 
+		f32 aspectRatio, 
+		f32 zNear, 
+		f32 zFar);
+	[[nodiscard]] inline Matrix<4, 4, f32> Perspective_RH_NO(
+		f32 fovY, 
+		f32 aspectRatio, 
+		f32 zNear, 
+		f32 zFar);
+	[[nodiscard]] inline Matrix<4, 4, f32> Perspective(
+		API3D api, 
+		f32 fovY, 
+		f32 aspectRatio, 
+		f32 zNear, 
+		f32 zFar);
 
 	template<typename T = f32>
 	[[nodiscard]] Matrix<4, 4, T> Orthographic_RH_ZO(T left, T right, T bottom, T top, T zNear, T zFar);
@@ -130,7 +121,36 @@ namespace DEngine::Math
 	namespace LinTran3D = LinearTransform3D;
 }
 
-constexpr DEngine::Math::Mat4 DEngine::Math::LinearTransform3D::Translate(f32 x, f32 y, f32 z)
+constexpr DEngine::Math::Matrix<4, 3, DEngine::f32> DEngine::Math::LinearTransform3D::Multiply_Reduced(
+	Matrix<4, 3, f32> const& left, 
+	Matrix<4, 3, f32> const& right)
+{
+	Matrix<4, 3, f32> newMatrix{};
+	for (uSize x = 0; x < 3; x += 1)
+	{
+		for (uSize y = 0; y < 3; y += 1)
+		{
+			f32 dot = 0.f;
+			for (uSize i = 0; i < 3; i += 1)
+				dot += left.At(i, y) * right.At(x, i);
+			newMatrix.At(x, y) = dot;
+		}
+	}
+	for (uSize y = 0; y < 3; y += 1)
+	{
+		f32 dot = 0.f;
+		for (uSize i = 0; i < 3; i += 1)
+			dot += left.At(i, y) * right.At(3, i);
+		dot += left.At(3, y);
+		newMatrix.At(3, y) = dot;
+	}
+	return newMatrix;
+}
+
+constexpr DEngine::Math::Mat4 DEngine::Math::LinearTransform3D::Translate(
+	f32 x, 
+	f32 y, 
+	f32 z)
 {
 	return Mat4
 	{
@@ -141,7 +161,7 @@ constexpr DEngine::Math::Mat4 DEngine::Math::LinearTransform3D::Translate(f32 x,
 	};
 }
 
-constexpr DEngine::Math::Mat4 DEngine::Math::LinearTransform3D::Translate(Vec3D const& input)
+constexpr DEngine::Math::Matrix<4, 4, DEngine::f32> DEngine::Math::LinearTransform3D::Translate(Vector<3, f32> const& input)
 {
 	return Translate(input.x, input.y, input.z);
 }
@@ -157,19 +177,23 @@ constexpr DEngine::Math::Matrix<4, 3> DEngine::Math::LinearTransform3D::Translat
 	};
 }
 
-constexpr DEngine::Math::Matrix<4, 3> DEngine::Math::LinearTransform3D::Translate_Reduced(Vec3D const& input)
+constexpr DEngine::Math::Matrix<4, 3, DEngine::f32> DEngine::Math::LinearTransform3D::Translate_Reduced(Vector<3, f32> const& input)
 { 
 	return Translate_Reduced(input.x, input.y, input.z); 
 }
 
-constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Mat4& matrix, f32 x, f32 y, f32 z)
+constexpr void DEngine::Math::LinearTransform3D::SetTranslation(
+	Mat4& matrix, 
+	f32 x, 
+	f32 y, 
+	f32 z)
 {
 	matrix.At(3, 0) = x;
 	matrix.At(3, 1) = y;
 	matrix.At(3, 2) = z;
 }
 
-constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Mat4& matrix, Vec3D const& input)
+constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 4, f32>& matrix, Vector<3, f32> const& input)
 {
 	SetTranslation(matrix, input.x, input.y, input.z);
 }
@@ -181,21 +205,9 @@ constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 3>& ma
 	matrix.At(3, 2) = z;
 }
 
-constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 3>& matrix, Vec3D const& input)
+constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 3, f32>& matrix, Vector<3, f32> const& input)
 { 
 	SetTranslation(matrix, input.x, input.y, input.z);
-}
-
-template<typename T>
-constexpr DEngine::Math::Vector<3, T> DEngine::Math::LinearTransform3D::GetTranslation(Matrix<4, 4, T> const& input)
-{
-	return Vector<3, T>{ input.At(3, 0), input.At(3, 1), input.At(3, 2) };
-}
-
-template<typename T>
-constexpr DEngine::Math::Vector<3, T> DEngine::Math::LinearTransform3D::GetTranslation(Matrix<4, 3, T> const& input)
-{
-	return Vector<3, T>{ input.At(3, 0), input.At(3, 1), input.At(3, 2) };
 }
 
 /*
@@ -246,18 +258,18 @@ DEngine::Math::Mat3 DEngine::Math::LinearTransform3D::Rotate(f32 x, f32 y, f32 z
 }
 
 template<DEngine::Math::AngleUnit angleUnit>
-DEngine::Math::Mat3 DEngine::Math::LinearTransform3D::Rotate(Vec3D const& angles)
+DEngine::Math::Matrix<3, 3, DEngine::f32> DEngine::Math::LinearTransform3D::Rotate(Vector<3, f32> const& angles)
 {
 	return Rotate<angleUnit>(angles.x, angles.y, angles.z);
 }
 
 template<DEngine::Math::AngleUnit angleUnit>
-DEngine::Math::Mat3 DEngine::Math::LinearTransform3D::Rotate(Vec3D const& axisInput, f32 amount)
+DEngine::Math::Matrix<3, 3, DEngine::f32> DEngine::Math::LinearTransform3D::Rotate(Vector<3, f32> const& axisInput, f32 amount)
 {
-	Vec3D axis = axisInput.Normalized();
-	const float cos = Cos<angleUnit>(amount);
-	const float sin = Sin<angleUnit>(amount);
-	return Mat3
+	Vector<3, f32> axis = axisInput.Normalized();
+	const f32 cos = Cos<angleUnit>(amount);
+	const f32 sin = Sin<angleUnit>(amount);
+	return Matrix<3, 3, f32>
 	{
 		cos + Sqrd(axis.x)*(1 - cos), axis.x*axis.y*(1 - cos) - axis.z*sin, axis.x*axis.z*(1 - cos) + axis.y*sin,
 		axis.y*axis.x*(1 - cos) + axis.z*sin, cos + Sqrd(axis.y)*(1 - cos), axis.y*axis.z*(1 - cos) - axis.x*sin,
@@ -265,15 +277,14 @@ DEngine::Math::Mat3 DEngine::Math::LinearTransform3D::Rotate(Vec3D const& axisIn
 	}.Transposed();
 }
 
-template<typename T>
-[[nodiscard]] constexpr DEngine::Math::Matrix<3, 3, T> DEngine::Math::LinearTransform3D::Rotate(UnitQuaternion<T> const& quat)
+constexpr DEngine::Math::Matrix<3, 3, DEngine::f32> DEngine::Math::LinearTransform3D::Rotate(UnitQuat const& quat)
 {
-	T const& s = quat.S();
-	T const& x = quat.X();
-	T const& y = quat.Y();
-	T const& z = quat.Z();
+	f32 const& s = quat.S();
+	f32 const& x = quat.X();
+	f32 const& y = quat.Y();
+	f32 const& z = quat.Z();
 
-	return Matrix<3, 3, T>
+	return Matrix<3, 3, f32>
 	{
 		1 - 2 * Sqrd(y) - 2 * Sqrd(z), 2 * x* y + 2 * z * s, 2 * x* z - 2 * y * s,
 		2 * x* y - 2 * z * s, 1 - 2 * Sqrd(x) - 2 * Sqrd(z), 2 * y* z + 2 * x * s,
@@ -311,52 +322,55 @@ constexpr DEngine::Math::Matrix<4, 3> DEngine::Math::LinearTransform3D::Rotate_R
 	};
 }
 
-constexpr DEngine::Math::Vec3D DEngine::Math::LinearTransform3D::ForwardVector(UnitQuat const& quat)
+constexpr DEngine::Math::Vector<3, DEngine::f32> DEngine::Math::LinearTransform3D::ForwardVector(UnitQuat const& quat)
 {
-	auto s = quat.S();
-	auto x = quat.X();
-	auto y = quat.Y();
-	auto z = quat.Z();
+	f32 const& s = quat.S();
+	f32 const& x = quat.X();
+	f32 const& y = quat.Y();
+	f32 const& z = quat.Z();
 
-	Vec3D returnVal{};
-	returnVal.x = (2*x*z) + (2*y*s);
-	returnVal.y = (2*y*z) - (2*x*s);
-	returnVal.z = 1 - (2*x*x) - (2*y*y);
+	Vector<3, f32> returnVal{
+		(2*x*z) + (2*y*s),
+		(2*y*z) - (2*x*s),
+		1 - (2*x*x) - (2*y*y)
+	};
 
 	return returnVal;
 }
 
-constexpr DEngine::Math::Vec3D DEngine::Math::LinearTransform3D::UpVector(UnitQuat const& quat)
+constexpr DEngine::Math::Vector<3, DEngine::f32> DEngine::Math::LinearTransform3D::UpVector(UnitQuat const& quat)
 {
-	auto s = quat.S();
-	auto x = quat.X();
-	auto y = quat.Y();
-	auto z = quat.Z();
+	f32 const& s = quat.S();
+	f32 const& x = quat.X();
+	f32 const& y = quat.Y();
+	f32 const& z = quat.Z();
 
-	Vec3D returnVal{};
-	returnVal.x = (2*x*y) - (2*z*s);
-	returnVal.y = 1 - (2*x*x) - (2*z*z);
-	returnVal.z = (2*y*z) + (2*x*s);
+	Vector<3, f32> returnVal{
+		(2*x*y) - (2*z*s),
+		1 - (2*x*x) - (2*z*z),
+		(2*y*z) + (2*x*s)
+	};
 	return returnVal;
 }
 
-constexpr DEngine::Math::Vec3D DEngine::Math::LinearTransform3D::RightVector(UnitQuat const& quat)
+constexpr DEngine::Math::Vector<3, DEngine::f32> DEngine::Math::LinearTransform3D::RightVector(UnitQuat const& quat)
 {
-	auto s = quat.S();
-	auto x = quat.X();
-	auto y = quat.Y();
-	auto z = quat.Z();
+	f32 const& s = quat.S();
+	f32 const& x = quat.X();
+	f32 const& y = quat.Y();
+	f32 const& z = quat.Z();
 
-	Vec3D returnVal{};
-	returnVal.x = 1 - (2*y*y) - (2*z*z);
-	returnVal.y = (2*x*y) + (2*z*s);
-	returnVal.z = (2*x*z) - (2*y*s);
+	Vector<3, f32> returnVal{
+		1 - (2*y*y) - (2*z*z),
+		(2*x*y) + (2*z*s),
+		(2*x*z) - (2*y*s)
+	};
 	return returnVal;
 }
 
-constexpr DEngine::Math::Mat3 DEngine::Math::LinearTransform3D::Scale(f32 x, f32 y, f32 z)
+constexpr DEngine::Math::Matrix<3, 3, DEngine::f32> DEngine::Math::LinearTransform3D::Scale(f32 x, f32 y, f32 z)
 {
-	return Mat3
+	return Matrix<3, 3, f32>
 	{
 		x, 0, 0,
 		0, y, 0,
@@ -364,14 +378,14 @@ constexpr DEngine::Math::Mat3 DEngine::Math::LinearTransform3D::Scale(f32 x, f32
 	};
 }
 
-constexpr DEngine::Math::Mat3 DEngine::Math::LinearTransform3D::Scale(Vec3D const& input)
+constexpr DEngine::Math::Matrix<3, 3, DEngine::f32> DEngine::Math::LinearTransform3D::Scale(Vector<3, f32> const& input)
 {
 	return Scale(input.x, input.y, input.z);
 }
 
-constexpr DEngine::Math::Mat4 DEngine::Math::LinearTransform3D::Scale_Homo(f32 x, f32 y, f32 z)
+constexpr DEngine::Math::Matrix<4, 4, DEngine::f32> DEngine::Math::LinearTransform3D::Scale_Homo(f32 x, f32 y, f32 z)
 {
-	return Mat4
+	return Matrix<4, 4, f32>
 	{
 		 x, 0, 0, 0,
 		 0, y, 0, 0,
@@ -380,7 +394,7 @@ constexpr DEngine::Math::Mat4 DEngine::Math::LinearTransform3D::Scale_Homo(f32 x
 	};
 }
 
-constexpr DEngine::Math::Mat4 DEngine::Math::LinearTransform3D::Scale_Homo(Vec3D const& input)
+constexpr DEngine::Math::Matrix<4, 4, DEngine::f32> DEngine::Math::LinearTransform3D::Scale_Homo(Vector<3, f32> const& input)
 {
 	return Scale_Homo(input.x, input.y, input.z);
 }
@@ -396,48 +410,53 @@ constexpr DEngine::Math::Matrix<4, 3> DEngine::Math::LinearTransform3D::Scale_Re
 	};
 }
 
-constexpr DEngine::Math::Matrix<4, 3> DEngine::Math::LinearTransform3D::Scale_Reduced(Vec3D const& input) 
+constexpr DEngine::Math::Matrix<4, 3, DEngine::f32> DEngine::Math::LinearTransform3D::Scale_Reduced(Vector<3, f32> const& input) 
 { 
 	return Scale_Reduced(input.x, input.y, input.z); 
 }
 
-inline DEngine::Math::Mat4 DEngine::Math::LinearTransform3D::LookAt_LH(Vec3D const& position, Vec3D const& forward, Vec3D const& upVector)
+inline DEngine::Math::Matrix<4, 4, DEngine::f32> DEngine::Math::LinearTransform3D::LookAt_LH(
+	Vector<3, f32> const& position, 
+	Vector<3, f32> const& forward, 
+	Vector<3, f32> const& upVector)
 {
-	Vec3D zAxis = (forward - position).Normalized();
-	Vec3D xAxis = Vec3D::Cross(upVector, zAxis).Normalized();
-	Vec3D yAxis = Vec3D::Cross(zAxis, xAxis);
+	Vector<3, f32> zAxis = (forward - position).Normalized();
+	Vector<3, f32> xAxis = Vector<3, f32>::Cross(upVector, zAxis).Normalized();
+	Vector<3, f32> yAxis = Vector<3, f32>::Cross(zAxis, xAxis);
 	return Mat4
 	({
 		xAxis.x, yAxis.x, zAxis.x, 0,
 		xAxis.y, yAxis.y, zAxis.y, 0,
 		xAxis.z, yAxis.z, zAxis.z, 0,
-		-Vec3D::Dot(xAxis, position), -Vec3D::Dot(yAxis, position), -Vec3D::Dot(zAxis, position), 1
+		-Vector<3, f32>::Dot(xAxis, position), -Vector<3, f32>::Dot(yAxis, position), -Vector<3, f32>::Dot(zAxis, position), 1
 	});
 }
 
-inline DEngine::Math::Mat4 DEngine::Math::LinearTransform3D::LookAt_RH(Vec3D const& position, Vec3D const& forward, Vec3D const& upVector)
+inline DEngine::Math::Matrix<4, 4, DEngine::f32> DEngine::Math::LinearTransform3D::LookAt_RH(
+	Vector<3, f32> const& position, 
+	Vector<3, f32> const& forward, 
+	Vector<3, f32> const& upVector)
 {
-	Vec3D zAxis = (position - forward).Normalized();
-	Vec3D xAxis = Vec3D::Cross(upVector, zAxis).Normalized();
-	Vec3D yAxis = Vec3D::Cross(zAxis, xAxis);
+	Vector<3, f32> zAxis = (position - forward).Normalized();
+	Vector<3, f32> xAxis = Vector<3, f32>::Cross(upVector, zAxis).Normalized();
+	Vector<3, f32> yAxis = Vector<3, f32>::Cross(zAxis, xAxis);
 	return Mat4
 	{
 		xAxis.x, yAxis.x, zAxis.x, 0,
 		xAxis.y, yAxis.y, zAxis.y, 0,
 		xAxis.z, yAxis.z, zAxis.z, 0,
-		-Vec3D::Dot(xAxis, position), -Vec3D::Dot(yAxis, position), -Vec3D::Dot(zAxis, position), 1
+		-Vector<3, f32>::Dot(xAxis, position), -Vector<3, f32>::Dot(yAxis, position), -Vector<3, f32>::Dot(zAxis, position), 1
 	};
 }
 
-template<typename T>
-inline DEngine::Math::Matrix<4, 4, T> DEngine::Math::LinearTransform3D::Perspective_RH_ZO(
-	T fovY, 
-	T aspectRatio, 
-	T zNear, 
-	T zFar)
+inline DEngine::Math::Matrix<4, 4, DEngine::f32> DEngine::Math::LinearTransform3D::Perspective_RH_ZO(
+	f32 fovY, 
+	f32 aspectRatio, 
+	f32 zNear, 
+	f32 zFar)
 {
-	T const tanHalfFovy = Tan<AngleUnit::Degrees>(fovY / 2);
-	return Matrix<4, 4, T>
+	f32 const tanHalfFovy = Tan<AngleUnit::Degrees>(fovY / 2);
+	return Matrix<4, 4, f32>
 	{
 		1 / (aspectRatio * tanHalfFovy), 0, 0, 0,
 		0, 1 / tanHalfFovy, 0, 0,
@@ -446,11 +465,14 @@ inline DEngine::Math::Matrix<4, 4, T> DEngine::Math::LinearTransform3D::Perspect
 	};
 }
 
-template<typename T>
-inline DEngine::Math::Matrix<4, 4, T> DEngine::Math::LinearTransform3D::Perspective_RH_NO(T fovY, T aspectRatio, T zNear, T zFar)
+inline DEngine::Math::Matrix<4, 4, DEngine::f32> DEngine::Math::LinearTransform3D::Perspective_RH_NO(
+	f32 fovY, 
+	f32 aspectRatio,
+	f32 zNear,
+	f32 zFar)
 {
-	T const tanHalfFovy = Tan<AngleUnit::Degrees>(fovY / 2);
-	return Matrix<4, 4, T>
+	f32 const tanHalfFovy = Tan<AngleUnit::Degrees>(fovY / 2);
+	return Matrix<4, 4, f32>
 	{
 		1 / (aspectRatio * tanHalfFovy), 0, 0, 0,
 		0, 1 / tanHalfFovy, 0, 0,
@@ -459,15 +481,19 @@ inline DEngine::Math::Matrix<4, 4, T> DEngine::Math::LinearTransform3D::Perspect
 	};
 }
 
-template<typename T>
-inline DEngine::Math::Matrix<4, 4, T> DEngine::Math::LinearTransform3D::Perspective(API3D api, T fovY, T aspectRatio, T zNear, T zFar)
+inline DEngine::Math::Matrix<4, 4, DEngine::f32> DEngine::Math::LinearTransform3D::Perspective(
+	API3D api, 
+	f32 fovY, 
+	f32 aspectRatio, 
+	f32 zNear, 
+	f32 zFar)
 {
 	switch (api)
 	{
 	case API3D::OpenGL:
-		return Perspective_RH_NO<T>(fovY, aspectRatio, zNear, zFar);
+		return Perspective_RH_NO(fovY, aspectRatio, zNear, zFar);
 	case API3D::Vulkan:
-		return Perspective_RH_ZO<T>(fovY, aspectRatio, zNear, zFar);
+		return Perspective_RH_ZO(fovY, aspectRatio, zNear, zFar);
 	default:
 		return {};
 	}

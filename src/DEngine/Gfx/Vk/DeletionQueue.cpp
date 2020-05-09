@@ -7,15 +7,18 @@
 
 #include "ImGui/imgui_impl_vulkan.h"
 
-void DEngine::Gfx::Vk::DeletionQueue::Initialize(
-	GlobUtils const* globUtilsIn, 
+bool DEngine::Gfx::Vk::DeletionQueue::Init(
+	DeletionQueue& delQueue,
+	GlobUtils const* globUtilsIn,
 	u8 resourceSetCountIn)
 {
-	currentResourceSetIndex = 0;
-	globUtils = globUtilsIn;
-	resourceSetCount = resourceSetCountIn;
+	delQueue.currentResourceSetIndex = 0;
+	delQueue.globUtils = globUtilsIn;
+	delQueue.resourceSetCount = resourceSetCountIn;
 
-	jobQueues.Resize(resourceSetCount);
+	delQueue.jobQueues.Resize(delQueue.resourceSetCount);
+
+	return true;
 }
 
 void DEngine::Gfx::Vk::DeletionQueue::ExecuteCurrentTick(DeletionQueue& queue)

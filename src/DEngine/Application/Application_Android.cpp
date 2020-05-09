@@ -1,5 +1,6 @@
 #include "detail_Application.hpp"
 
+#include <android/window.h>
 #include <android/log.h>
 #include <android_native_app_glue.h>
 #include <jni.h>
@@ -11,20 +12,12 @@
 
 #include <string>
 
+void DEngine_Debug_Log(char const* msg);
+
 extern int dengine_app_detail_main(int argc, char** argv);
 
 namespace DEngine::Application::detail
 {
-	enum class Backend_Orientation
-	{
-		Invalid,
-		Portrait,
-		Landscape
-	};
-	static Backend_Orientation Backend_ToOrientation(int aconfiguration_orientation);
-	static Backend_Orientation Backend_initialOrientation = Backend_Orientation::Invalid;
-	static Backend_Orientation Backend_currentOrientation = Backend_Orientation::Invalid;
-
 	static android_app* Backend_app = nullptr;
 	static bool Backend_androidAppReady = false;
 	static bool Backend_androidWindowReady = false;
@@ -34,183 +27,40 @@ namespace DEngine::Application::detail
 	static JNIEnv* Backend_jniEnv = nullptr;
 	static jclass Backend_jniActivity = nullptr;
 	static jmethodID Backend_jniGetCurrentOrientation{};
+	static jmethodID Backend_jniOpenSoftInput{};
 	static bool Backend_initJNI();
 
-	// Grabs the updated orientation
+	enum class Backend_Orientation
+	{
+		Invalid,
+		Portrait,
+		Landscape
+	};
+	static Backend_Orientation Backend_ToOrientation(int aconfiguration_orientation);
+	static Backend_Orientation Backend_initialOrientation = Backend_Orientation::Invalid;
+	static Backend_Orientation Backend_currentOrientation = Backend_Orientation::Invalid;
 	static Backend_Orientation Backend_GetUpdatedOrientation();
+
+
 	static Button Backend_AndroidKeyCodeToButton(int32_t in);
 
 	static TouchEventType Backend_Android_MotionActionToTouchEventType(int32_t in);
 
 	static void Backend_HandleConfigChanged_Deferred();
 
-	static void HandleCmd(android_app* app, int32_t cmd)
-	{
-		switch (cmd)
-		{
-			case APP_CMD_INIT_WINDOW:
-				Log("Init window");
-				detail::mainWindowSurfaceInitialized = true;
-				detail::mainWindowSurfaceInitializeEvent = true;
-
-				detail::Backend_androidWindowReady = true;
-
-				if (detail::tickCount > 0)
-					detail::mainWindowRestoreEvent = true;
-				break;
-			case APP_CMD_TERM_WINDOW:
-				Log("Terminate window");
-				detail::mainWindowSurfaceInitialized = false;
-				detail::mainWindowSurfaceTerminateEvent = true;
-
-				detail::Backend_androidWindowReady = false;
-				break;
-			case APP_CMD_LOST_FOCUS:
-				Log("Lost focus");
-				detail::mainWindowIsInFocus = false;
-				break;
-			case APP_CMD_GAINED_FOCUS:
-				Log("Gained focus");
-				detail::mainWindowIsInFocus = true;
-				break;
-			case APP_CMD_CONFIG_CHANGED:
-				Log("Config changed");
-				detail::Backend_configChangedThisTick = true;
-				break;
-			case APP_CMD_CONTENT_RECT_CHANGED:
-				Log("Content rect changed");
-				break;
-			case APP_CMD_WINDOW_RESIZED:
-				Log("Window resized");
-				break;
-			case APP_CMD_START:
-				Log("Start");
-				detail::Backend_androidAppReady = true;
-				break;
-			case APP_CMD_STOP:
-				Log("Stop");
-				detail::Backend_androidAppReady = false;
-				break;
-			case APP_CMD_PAUSE:
-				detail::mainWindowIsMinimized = true;
-				Log("Pause");
-				break;
-			case APP_CMD_RESUME:
-				detail::mainWindowIsMinimized = false;
-				Log("Resume");
-				detail::mainWindowSurfaceInitialized = true;
-				detail::mainWindowSurfaceInitializeEvent = true;
-				break;
-			case APP_CMD_WINDOW_REDRAW_NEEDED:
-				Log("Window redraw needed");
-				break;
-			case APP_CMD_INPUT_CHANGED:
-				Log("Input changed");
-				break;
-			case APP_CMD_DESTROY:
-				Log("Destroy");
-				detail::shouldShutdown = true;
-				break;
-			case APP_CMD_SAVE_STATE:
-				Log("Save state");
-				break;
-		}
-	}
+	static void HandleCmd(android_app* app, int32_t cmd);
 
 	// Return 1 if you have handled the event, 0 for any default
 	// dispatching.
-	static int32_t HandleInputEvents(android_app* app, AInputEvent* event)
-	{
-		bool handled = false;
-
-		int32_t inputType = AInputEvent_getType(event);
-		int32_t source = AInputEvent_getSource(event);
-
-		switch (inputType)
-		{
-			case AINPUT_EVENT_TYPE_KEY:
-			{
-				int32_t keyAction = AKeyEvent_getAction(event);
-				if (keyAction != AKEY_EVENT_ACTION_DOWN && keyAction != AKEY_EVENT_ACTION_UP)
-					break;
-
-				bool buttonValue = false;
-				switch (keyAction)
-				{
-					case AKEY_EVENT_ACTION_DOWN:
-						buttonValue = true;
-						break;
-					case AKEY_EVENT_ACTION_UP:
-						buttonValue = false;
-						break;
-				}
-				int32_t keyCode = AKeyEvent_getKeyCode(event);
-				Button buttonCode = Backend_AndroidKeyCodeToButton(keyCode);
-				if (buttonCode != Button::Undefined)
-				{
-					detail::UpdateButton(buttonCode, buttonValue);
-					handled = true;
-				}
-
-			}
-				break;
-			case AINPUT_EVENT_TYPE_MOTION:
-			{
-				int32_t pointer = AMotionEvent_getAction(event);
-				int32_t action = pointer & AMOTION_EVENT_ACTION_MASK;
-				size_t index = size_t((pointer & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT);
-				if (source == AINPUT_SOURCE_TOUCHSCREEN)
-				{
-					switch (action)
-					{
-						case AMOTION_EVENT_ACTION_DOWN:
-						case AMOTION_EVENT_ACTION_POINTER_DOWN:
-						{
-							f32 x = AMotionEvent_getX(event, index);
-							f32 y = AMotionEvent_getY(event, index);
-							i32 id = AMotionEvent_getPointerId(event, index);
-							detail::UpdateTouchInput_Down((u8)id, x, y);
-							handled = true;
-							break;
-						}
-
-						case AMOTION_EVENT_ACTION_MOVE:
-						{
-							size_t count = AMotionEvent_getPointerCount(event);
-							for (size_t i = 0; i < count; i++)
-							{
-								f32 x = AMotionEvent_getX(event, i);
-								f32 y = AMotionEvent_getY(event, i);
-								i32 id = AMotionEvent_getPointerId(event, i);
-								detail::UpdateTouchInput_Move((u8)id, x, y);
-							}
-							handled = true;
-							break;
-						}
-
-						case AMOTION_EVENT_ACTION_UP:
-						case AMOTION_EVENT_ACTION_POINTER_UP:
-						{
-							f32 x = AMotionEvent_getX(event, index);
-							f32 y = AMotionEvent_getY(event, index);
-							i32 id = AMotionEvent_getPointerId(event, index);
-							detail::UpdateTouchInput_Up((u8)id, x, y);
-							handled = true;
-							break;
-						}
-
-						default:
-							break;
-					}
-				}
-			}
-			break;
-		}
-
-
-
-		return handled ? 1 : 0;
-	}
+	static int32_t HandleInputEvents(
+			android_app* app,
+			AInputEvent* event);
+	static bool HandleInputEvents_Motion(
+			AInputEvent* event,
+			int32_t source);
+	static bool HandleInputKeyEvents_Key(
+			AInputEvent* event,
+			int32_t source);
 }
 
 static DEngine::Application::detail::Backend_Orientation DEngine::Application::detail::Backend_ToOrientation(int aconfiguration_orientation)
@@ -236,6 +86,203 @@ static DEngine::Application::detail::Backend_Orientation DEngine::Application::d
 	int a = Backend_jniEnv->CallIntMethod(Backend_app->activity->clazz, Backend_jniGetCurrentOrientation);
 	Backend_Orientation b = Backend_ToOrientation(a);
 	return b;
+}
+
+static void DEngine::Application::detail::HandleCmd(android_app* app, int32_t cmd)
+{
+	switch (cmd)
+	{
+	case APP_CMD_INIT_WINDOW:
+		Log("Init window");
+		detail::mainWindowSurfaceInitialized = true;
+		detail::mainWindowSurfaceInitializeEvent = true;
+
+		detail::Backend_androidWindowReady = true;
+
+		if (detail::tickCount > 0)
+			detail::mainWindowRestoreEvent = true;
+		break;
+	case APP_CMD_TERM_WINDOW:
+		Log("Terminate window");
+		detail::mainWindowSurfaceInitialized = false;
+		detail::mainWindowSurfaceTerminateEvent = true;
+
+		detail::Backend_androidWindowReady = false;
+		break;
+	case APP_CMD_LOST_FOCUS:
+		Log("Lost focus");
+		detail::mainWindowIsInFocus = false;
+		break;
+	case APP_CMD_GAINED_FOCUS:
+		Log("Gained focus");
+		detail::mainWindowIsInFocus = true;
+		break;
+	case APP_CMD_CONFIG_CHANGED:
+		Log("Config changed");
+		detail::Backend_configChangedThisTick = true;
+		break;
+	case APP_CMD_CONTENT_RECT_CHANGED:
+		Log("Content rect changed");
+		break;
+	case APP_CMD_WINDOW_RESIZED:
+		Log("Window resized");
+		break;
+	case APP_CMD_START:
+		Log("Start");
+		detail::Backend_androidAppReady = true;
+		break;
+	case APP_CMD_STOP:
+		Log("Stop");
+		detail::Backend_androidAppReady = false;
+		break;
+	case APP_CMD_PAUSE:
+		detail::mainWindowIsMinimized = true;
+		Log("Pause");
+		break;
+	case APP_CMD_RESUME:
+		detail::mainWindowIsMinimized = false;
+		Log("Resume");
+		detail::mainWindowSurfaceInitialized = true;
+		detail::mainWindowSurfaceInitializeEvent = true;
+		break;
+	case APP_CMD_WINDOW_REDRAW_NEEDED:
+		Log("Window redraw needed");
+		break;
+	case APP_CMD_INPUT_CHANGED:
+		Log("Input changed");
+		DEngine_Debug_Log("Input changed");
+		break;
+	case APP_CMD_DESTROY:
+		Log("Destroy");
+		detail::shouldShutdown = true;
+		break;
+	case APP_CMD_SAVE_STATE:
+		Log("Save state");
+		break;
+	}
+}
+
+static bool DEngine::Application::detail::HandleInputEvents_Motion(AInputEvent* event, int32_t source)
+{
+	bool handled = false;
+
+	int32_t pointer = AMotionEvent_getAction(event);
+	int32_t action = pointer & AMOTION_EVENT_ACTION_MASK;
+	size_t index = size_t((pointer & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT);
+	if (source == AINPUT_SOURCE_TOUCHSCREEN)
+	{
+		switch (action)
+		{
+			case AMOTION_EVENT_ACTION_DOWN:
+			case AMOTION_EVENT_ACTION_POINTER_DOWN:
+			{
+				f32 x = AMotionEvent_getX(event, index);
+				f32 y = AMotionEvent_getY(event, index);
+				i32 id = AMotionEvent_getPointerId(event, index);
+				detail::UpdateTouchInput_Down((u8) id, x, y);
+				handled = true;
+				break;
+			}
+
+			case AMOTION_EVENT_ACTION_MOVE:
+			{
+				size_t count = AMotionEvent_getPointerCount(event);
+				for (size_t i = 0; i < count; i++)
+				{
+					f32 x = AMotionEvent_getX(event, i);
+					f32 y = AMotionEvent_getY(event, i);
+					i32 id = AMotionEvent_getPointerId(event, i);
+					detail::UpdateTouchInput_Move((u8) id, x, y);
+				}
+				handled = true;
+				break;
+			}
+
+			case AMOTION_EVENT_ACTION_UP:
+			case AMOTION_EVENT_ACTION_POINTER_UP:
+			{
+				f32 x = AMotionEvent_getX(event, index);
+				f32 y = AMotionEvent_getY(event, index);
+				i32 id = AMotionEvent_getPointerId(event, index);
+				detail::UpdateTouchInput_Up((u8) id, x, y);
+				handled = true;
+				break;
+			}
+
+			default:
+				break;
+		}
+	}
+
+	return handled;
+}
+
+static bool DEngine::Application::detail::HandleInputKeyEvents_Key(
+		AInputEvent* event,
+		int32_t source)
+{
+	bool handled = false;
+
+	int32_t keyAction = AKeyEvent_getAction(event);
+	if (keyAction != AKEY_EVENT_ACTION_DOWN && keyAction != AKEY_EVENT_ACTION_UP)
+		return false;
+
+	bool buttonValue = false;
+	switch (keyAction)
+	{
+	case AKEY_EVENT_ACTION_DOWN:
+		buttonValue = true;
+		break;
+	case AKEY_EVENT_ACTION_UP:
+		buttonValue = false;
+		break;
+	default:
+		break;
+	}
+	int32_t keyCode = AKeyEvent_getKeyCode(event);
+	Button buttonCode = Backend_AndroidKeyCodeToButton(keyCode);
+	if (buttonCode != Button::Undefined)
+	{
+		if (keyAction == AKEY_EVENT_ACTION_UP)
+		{
+			if (buttonCode == Button::Zero)
+				detail::charInputs.PushBack(48);
+			if (buttonCode == Button::One)
+				detail::charInputs.PushBack(49);
+			if (buttonCode == Button::Two)
+				detail::charInputs.PushBack(50);
+			if (buttonCode == Button::Three)
+				detail::charInputs.PushBack(51);
+		}
+
+		detail::UpdateButton(buttonCode, buttonValue);
+		handled = true;
+	}
+
+	return handled;
+}
+
+// Return 1 if you have handled the event, 0 for any default
+// dispatching.
+static int32_t DEngine::Application::detail::HandleInputEvents(android_app* app, AInputEvent* event)
+{
+	bool handled = false;
+
+	int32_t inputType = AInputEvent_getType(event);
+	int32_t source = AInputEvent_getSource(event);
+
+	switch (inputType)
+	{
+	case AINPUT_EVENT_TYPE_KEY:
+		handled = detail::HandleInputKeyEvents_Key(event, source);
+		break;
+	case AINPUT_EVENT_TYPE_MOTION:
+		DEngine_Debug_Log("Motion input");
+		handled = detail::HandleInputEvents_Motion(event, source);
+		break;
+	}
+
+	return handled ? 1 : 0;
 }
 
 static void DEngine::Application::detail::Backend_HandleConfigChanged_Deferred()
@@ -304,6 +351,7 @@ bool DEngine::Application::detail::Backend_Initialize()
 	Backend_jniActivity = static_cast<jclass>(Backend_jniEnv->CallObjectMethod(classLoader, loadClass, activityName));
 
 	Backend_jniGetCurrentOrientation = Backend_jniEnv->GetMethodID(Backend_jniActivity, "getCurrentOrientation", "()I");
+	Backend_jniOpenSoftInput = Backend_jniEnv->GetMethodID(Backend_jniActivity, "openSoftInput", "()V");
 
 
 
@@ -347,6 +395,15 @@ bool DEngine::Application::detail::Backend_Initialize()
 
 	Backend_initialOrientation = Backend_GetUpdatedOrientation();
 	Backend_currentOrientation = Backend_initialOrientation;
+
+	uint32_t addWindowFlags = 0;
+	//addWindowFlags |= AWINDOW_FLAG_FORCE_NOT_FULLSCREEN;
+	//addWindowFlags |= AWINDOW_FLAG_FULLSCREEN;
+	uint32_t remWindowFlags = 0;
+	//remWindowFlags |= AWINDOW_FLAG_FULLSCREEN;
+	//remWindowFlags |= AWINDOW_FLAG_LAYOUT_IN_SCREEN;
+
+	ANativeActivity_setWindowFlags(Backend_app->activity, addWindowFlags, remWindowFlags);
 
 	return true;
 }
@@ -464,12 +521,43 @@ static DEngine::Application::Button DEngine::Application::detail::Backend_Androi
 {
 	switch (in)
 	{
-		case AKEYCODE_BACK:
-			return Button::Back;
-		default:
-			return Button::Undefined;
+	case AKEYCODE_0:
+		return Button::Zero;
+	case AKEYCODE_1:
+		return Button::One;
+	case AKEYCODE_2:
+		return Button::Two;
+	case AKEYCODE_3:
+		return Button::Three;
+	case AKEYCODE_4:
+		return Button::Four;
+	case AKEYCODE_5:
+		return Button::Five;
+	case AKEYCODE_6:
+		return Button::Six;
+	case AKEYCODE_7:
+		return Button::Seven;
+	case AKEYCODE_8:
+		return Button::Eight;
+	case AKEYCODE_9:
+		return Button::Nine;
+
+	case AKEYCODE_DEL:
+		return Button::Delete;
+	case AKEYCODE_BACK:
+		return Button::Back;
+	default:
+		return Button::Undefined;
 	}
 }
+
+void DEngine::Application::OpenSoftInput()
+{
+	detail::Backend_jniEnv->CallVoidMethod(detail::Backend_app->activity->clazz, detail::Backend_jniOpenSoftInput);
+
+	//detail::Backend_jniEnv->CallIntMethod(detail::Backend_app->activity->clazz, detail::Backend_jniGetCurrentOrientation);
+}
+
 
 //
 // File IO
@@ -477,36 +565,64 @@ static DEngine::Application::Button DEngine::Application::detail::Backend_Androi
 
 namespace DEngine::Application::detail
 {
-	struct Backend_FileStreamData
+	struct Backend_FileInputStreamData
 	{
 		AAsset* file = nullptr;
-		off64_t pos = 0;
+		// There is no AAsset_tell() so we need to remember the position manually.
+		size_t pos = 0;
 	};
-
-
 }
 
-DEngine::Std::Opt<DEngine::Application::FileStream> DEngine::Application::FileStream::OpenPath(char const* path)
+DEngine::Application::FileInputStream::FileInputStream()
 {
-	static_assert(sizeof(detail::Backend_FileStreamData) <= sizeof(FileStream::m_buffer),
-				  "Error. Cannot fit implementation data in FileStream internal buffer.");
+	static_assert(sizeof(detail::Backend_FileInputStreamData) <= sizeof(FileInputStream::m_buffer));
 
-	AAsset* file = AAssetManager_open(detail::Backend_app->activity->assetManager, path, AASSET_MODE_RANDOM);
-	if (file == nullptr)
-		return {};
-
-	detail::Backend_FileStreamData implData{};
-	implData.file = file;
-	implData.pos = 0;
-	FileStream stream{};
-	std::memcpy(&stream.m_buffer[0], &implData, sizeof(implData));
-	return Std::Opt<FileStream>(static_cast<FileStream&&>(stream));
+	detail::Backend_FileInputStreamData implData{};
+	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
 }
 
-bool DEngine::Application::FileStream::Seek(i64 offset, SeekOrigin origin)
+DEngine::Application::FileInputStream::FileInputStream(char const* path)
 {
-	detail::Backend_FileStreamData implData{};
+	detail::Backend_FileInputStreamData implData{};
+	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
+
+	Open(path);
+}
+
+DEngine::Application::FileInputStream::FileInputStream(FileInputStream&& other) noexcept
+{
+	std::memcpy(&m_buffer[0], &other.m_buffer[0], sizeof(detail::Backend_FileInputStreamData));
+	detail::Backend_FileInputStreamData implData{};
+	std::memcpy(&other.m_buffer[0], &implData, sizeof(implData));
+}
+
+DEngine::Application::FileInputStream::~FileInputStream()
+{
+	Close();
+}
+
+DEngine::Application::FileInputStream& DEngine::Application::FileInputStream::operator=(FileInputStream&& other) noexcept
+{
+	if (this == &other)
+		return *this;
+
+	Close();
+
+	std::memcpy(&m_buffer[0], &other.m_buffer[0], sizeof(detail::Backend_FileInputStreamData));
+	detail::Backend_FileInputStreamData implData{};
+	std::memcpy(&other.m_buffer[0], &implData, sizeof(implData));
+
+	return *this;
+}
+
+
+bool DEngine::Application::FileInputStream::Seek(i64 offset, SeekOrigin origin)
+{
+	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
+
+	if (implData.file == nullptr)
+		return false;
 
 	int posixOrigin = 0;
 	switch (origin)
@@ -521,22 +637,22 @@ bool DEngine::Application::FileStream::Seek(i64 offset, SeekOrigin origin)
 			posixOrigin = SEEK_END;
 			break;
 	}
-	off64_t result = AAsset_seek64(implData.file, (off64_t)offset, posixOrigin);
+	off64_t result = AAsset_seek64(implData.file, static_cast<off64_t>(offset), posixOrigin);
 	if (result == -1)
 		return false;
 
-	// Update pos of our original buffer
-	implData.pos = result;
+	implData.pos = static_cast<size_t>(result);
 	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
 
 	return true;
 }
 
-bool DEngine::Application::FileStream::Read(char* output, u64 size)
+bool DEngine::Application::FileInputStream::Read(char* output, u64 size)
 {
-	detail::Backend_FileStreamData implData{};
+	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
-
+	if (implData.file == nullptr)
+		return false;
 
 	int result = AAsset_read(implData.file, output, (size_t)size);
 	if (result < 0)
@@ -548,24 +664,41 @@ bool DEngine::Application::FileStream::Read(char* output, u64 size)
 	return true;
 }
 
-DEngine::u64 DEngine::Application::FileStream::Tell()
+DEngine::Std::Opt<DEngine::u64> DEngine::Application::FileInputStream::Tell() const
 {
-	detail::Backend_FileStreamData implData{};
+	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
+	if (implData.file == nullptr)
+		return {};
 
 	return (u64)implData.pos;
 }
 
-DEngine::Application::FileStream::FileStream(FileStream&& other) noexcept
+bool DEngine::Application::FileInputStream::IsOpen() const
 {
-	std::memcpy(&m_buffer[0], &other.m_buffer[0], sizeof(detail::Backend_FileStreamData));
-	std::memset(&other.m_buffer[0], 0, sizeof(detail::Backend_FileStreamData));
+	detail::Backend_FileInputStreamData implData{};
+	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
+	return implData.file != nullptr;
 }
 
-DEngine::Application::FileStream::~FileStream()
+bool DEngine::Application::FileInputStream::Open(char const* path)
 {
-	detail::Backend_FileStreamData implData{};
+	Close();
+
+	detail::Backend_FileInputStreamData implData{};
+	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
+	implData.file = AAssetManager_open(detail::Backend_app->activity->assetManager, path, AASSET_MODE_RANDOM);
+	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
+	return implData.file != nullptr;
+}
+
+void DEngine::Application::FileInputStream::Close()
+{
+	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
 	if (implData.file != nullptr)
 		AAsset_close(implData.file);
+
+	implData = detail::Backend_FileInputStreamData{};
+	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
 }

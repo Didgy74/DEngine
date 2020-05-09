@@ -3,6 +3,7 @@
 
 #include "DEngine/Application.hpp"
 #include "DEngine/FixedWidthTypes.hpp"
+#include "DEngine/Containers/Optional.hpp"
 #include "DEngine/Containers/StaticVector.hpp"
 
 #include <chrono>
@@ -40,13 +41,12 @@ namespace DEngine::Application::detail
 	extern f32 buttonHeldDuration[(int)Button::COUNT];
 	extern KeyEventType buttonEvents[(int)Button::COUNT];
 	void UpdateButton(Button button, bool pressed);
+	extern Std::StaticVector<char, maxCharInputCount> charInputs;
 
-	extern bool hasMouse;
-	extern u32 mousePosition[2];
-	extern i32 mouseDelta[2];
+	extern Std::Opt<CursorData> cursorOpt;
 	extern Std::StaticVector<TouchInput, 10> touchInputs;
-	void UpdateMouse(u32 posX, u32 posY, i32 deltaX, i32 deltaY);
-	void UpdateMouse(u32 posX, u32 posY);
+	void UpdateCursor(u32 posX, u32 posY, i32 deltaX, i32 deltaY);
+	void UpdateCursor(u32 posX, u32 posY);
 	void UpdateTouchInput_Down(u8 id, f32 x, f32 y);
 	void UpdateTouchInput_Move(u8 id, f32 x, f32 y);
 	void UpdateTouchInput_Up(u8 id, f32 x, f32 y);
@@ -70,4 +70,10 @@ namespace DEngine::Application::detail
 	extern bool mainWindowSurfaceInitialized;
 	extern bool mainWindowSurfaceInitializeEvent;
 	extern bool mainWindowSurfaceTerminateEvent;
+
+
+
+	extern GamepadState gamepadState;
+	extern bool gamepadConnected;
+	extern int gamepadID;
 }

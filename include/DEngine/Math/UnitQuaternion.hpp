@@ -2,7 +2,7 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Math/Trigonometric.hpp"
-#include "DEngine/Math/Vector/Vector.hpp"
+#include "DEngine/Math/Vector.hpp"
 
 namespace DEngine::Math
 {

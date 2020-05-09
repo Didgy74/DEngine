@@ -1,16 +1,292 @@
 #include "Editor.hpp"
 #include "DEngine/Time.hpp"
+
+#include "DEngine/Scene.hpp"
+#include "DEngine/Application.hpp"
 #include "DEngine/Math/LinearTransform3D.hpp"
+#include "DEngine/Math/Vector.hpp"
+#include "DEngine/detail/Assert.hpp"
 
 #include "DEngine/Application.hpp"
 
 #include "ImGui/imgui.h"
 
 #include <iostream>
-#include <DEngine/Application.hpp>
+#include <string>
+
+DEngine::Editor::EditorData* DEngine_Debug_globEditorData = nullptr;
+
+void DEngine_Debug_Log(char const* msg)
+{
+	if (DEngine_Debug_globEditorData)
+		DEngine_Debug_globEditorData->log += std::string(msg) + "\n";
+}
 
 namespace DEngine::Editor
 {
+	static void DrawLogWindow(EditorData& editorData)
+	{
+		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
+
+		if (ImGui::Begin("Log"))
+		{
+			if (ImGui::Button("Clear"))
+				editorData.log.clear();
+
+			ImGui::Text("%s", editorData.log.c_str());
+		}
+		ImGui::End();
+	}
+
+	static void DrawEntityWindow(EditorData& editorData, Scene& scene)
+	{
+		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
+
+		if (ImGui::Begin("Entities"))
+		{
+			for (uSize i = 0; i < scene.entities.Size(); i += 1)
+			{
+				Entity const& entity = scene.entities[i];
+
+				std::string str = std::to_string((u64)entity);
+				
+				bool selected = false;
+				if (entity == (Entity)editorData.currentlySelectedEntity)
+					selected = true;
+				ImGui::Selectable(str.c_str(), &selected);
+				if (selected)
+					editorData.currentlySelectedEntity = (u64)entity;
+
+				str = "Delete###" + std::to_string(i);
+				if (ImGui::Button(str.c_str()))
+				{
+					scene.DeleteEntity(entity);
+					i -= 1;
+				}
+
+				ImGui::Spacing();
+			}
+
+			if (ImGui::Button("New"))
+			{
+				scene.NewEntity();
+			}
+		}
+		ImGui::End();
+	}
+
+	void DrawComponentsWindow(EditorData& editorData, Scene& scene)
+	{
+		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
+
+		if (ImGui::Begin("Components"))
+		{
+			if (editorData.currentlySelectedEntity != static_cast<u64>(-1))
+			{
+				Entity entity = (Entity)editorData.currentlySelectedEntity;
+
+				// Position
+				{
+					auto posIndex = scene.transforms.FindIf(
+						[&entity](Std::Pair<Entity, Transform> const& val) -> bool
+						{
+							return val.a == entity;
+						});
+					bool hasPos = posIndex.HasValue();
+					if (ImGui::Checkbox("Transform###0", &hasPos))
+					{
+						// It was changed from not having position to having position. Insert a component.
+						if (hasPos)
+						{
+							scene.transforms.PushBack({ entity, {} });
+							posIndex = scene.transforms.Size() - 1;
+						}
+						else
+						{
+							// We remove the position component.
+							scene.transforms.EraseUnsorted(posIndex.Value());
+							posIndex = Std::NullOpt;
+						}
+					}
+
+					// Draw the component
+					if (posIndex.HasValue())
+					{
+						Transform& transform = scene.transforms[posIndex.Value()].b;
+
+						ImGui::InputFloat3("Position", &transform.position.x);
+					}
+				}
+
+				{
+					auto texIndex = scene.textureIDs.FindIf(
+						[&entity](Std::Pair<Entity, Gfx::TextureID> const& val) -> bool
+						{
+							return val.a == entity;
+						});
+					bool hasTex = texIndex.HasValue();
+					if (ImGui::Checkbox("TextureID###1", &hasTex))
+					{
+						// It was changed from not having position to having position. Insert a component.
+						if (hasTex)
+						{
+							scene.textureIDs.PushBack({ entity, {} });
+							texIndex = scene.textureIDs.Size() - 1;
+						}
+						else
+						{
+							// We remove the position component.
+							scene.textureIDs.EraseUnsorted(texIndex.Value());
+							texIndex = Std::NullOpt;
+						}
+					}
+
+					// Draw the component
+					if (texIndex.HasValue())
+					{
+						Gfx::TextureID& texID = scene.textureIDs[texIndex.Value()].b;
+
+						ImGui::InputInt("TextureID", (int*)&texID);
+					}
+				}
+
+				{
+					auto circleCollIndex = scene.circleColliders.FindIf(
+						[&entity](Std::Pair<Entity, Physics::CircleCollider2D> const& val) -> bool
+						{
+							return val.a == entity;
+						});
+					bool hasCircleColl = circleCollIndex.HasValue();
+					if (ImGui::Checkbox("CircleCollider2D###2", &hasCircleColl))
+					{
+						// It was changed from not having position to having position. Insert a component.
+						if (hasCircleColl)
+						{
+							scene.circleColliders.PushBack({ entity, {} });
+							circleCollIndex = scene.circleColliders.Size() - 1;
+						}
+						else
+						{
+							// We remove the position component.
+							scene.circleColliders.EraseUnsorted(circleCollIndex.Value());
+							circleCollIndex = Std::NullOpt;
+						}
+					}
+
+					// Draw the component
+					if (circleCollIndex.HasValue())
+					{
+						Physics::CircleCollider2D& circleColl = scene.circleColliders[circleCollIndex.Value()].b;
+
+						ImGui::InputFloat("Radius", &circleColl.radius);
+					}
+				}
+
+				{
+					auto rbIndex = scene.boxColliders.FindIf(
+						[&entity](Std::Pair<Entity, Physics::BoxCollider2D> const& val) -> bool
+						{
+							return val.a == entity;
+						});
+					bool hasRb = rbIndex.HasValue();
+					if (ImGui::Checkbox("BoxCollider2D###3", &hasRb))
+					{
+						// It was changed from not having position to having position. Insert a component.
+						if (hasRb)
+						{
+							scene.boxColliders.PushBack({ entity, {} });
+							rbIndex = scene.boxColliders.Size() - 1;
+						}
+						else
+						{
+							// We remove the position component.
+							scene.boxColliders.EraseUnsorted(rbIndex.Value());
+							rbIndex = Std::NullOpt;
+						}
+					}
+
+					// Draw the component
+					if (rbIndex.HasValue())
+					{
+						Physics::BoxCollider2D& boxColl = scene.boxColliders[rbIndex.Value()].b;
+
+						ImGui::InputFloat2("Size", &boxColl.size.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+					}
+				}
+
+				{
+					auto rbIndex = scene.rigidbodies.FindIf(
+						[&entity](Std::Pair<Entity, Physics::Rigidbody2D> const& val) -> bool
+						{
+							return val.a == entity;
+						});
+					bool hasRb = rbIndex.HasValue();
+					if (ImGui::Checkbox("Rigidbody2D###4", &hasRb))
+					{
+						// It was changed from not having position to having position. Insert a component.
+						if (hasRb)
+						{
+							scene.rigidbodies.PushBack({ entity, {} });
+							rbIndex = scene.rigidbodies.Size() - 1;
+						}
+						else
+						{
+							// We remove the position component.
+							scene.rigidbodies.EraseUnsorted(rbIndex.Value());
+							rbIndex = Std::NullOpt;
+						}
+					}
+
+					// Draw the component
+					if (rbIndex.HasValue())
+					{
+						Physics::Rigidbody2D& rb = scene.rigidbodies[rbIndex.Value()].b;
+
+						ImGui::InputFloat2("Velocity", &rb.velocity.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+						ImGui::InputFloat2("Acceleration", &rb.acceleration.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+						ImGui::InputFloat("InvMass", &rb.inverseMass);
+						ImGui::InputFloat("Restitution", &rb.restitution);
+					}
+				}
+
+				{
+					auto moveIndex = scene.moves.FindIf(
+						[&entity](Std::Pair<Entity, Move> const& val) -> bool
+						{
+							return val.a == entity;
+						});
+					bool hasMove = moveIndex.HasValue();
+					if (ImGui::Checkbox("Move###5", &hasMove))
+					{
+						// It was changed from not having position to having position. Insert a component.
+						if (hasMove)
+						{
+							scene.moves.PushBack({ entity, {} });
+							moveIndex = scene.moves.Size() - 1;
+						}
+						else
+						{
+							// We remove the position component.
+							scene.moves.EraseUnsorted(moveIndex.Value());
+							moveIndex = Std::NullOpt;
+						}
+					}
+				}
+			}
+		}
+		ImGui::End();
+	}
+
+	static bool IsInsideRect(Math::Vec2 point, Math::Vec2 rectOffset, Math::Vec2 rectSize)
+	{
+		Math::Vec2 temp = rectOffset + rectSize;
+		return point.x >= rectOffset.x && point.x < temp.x&& point.y >= rectOffset.y && point.y < temp.y;
+	}
+
 	static void DrawMainMenuBar(EditorData& editorData)
 	{
 		if (ImGui::BeginMainMenuBar())
@@ -55,7 +331,7 @@ namespace DEngine::Editor
 		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
 
-		if (ImGui::Begin("Testerrr", nullptr))
+		if (ImGui::Begin("Viewports", nullptr))
 		{
 			if (ImGui::Button("New viewport!"))
 			{
@@ -107,7 +383,7 @@ namespace DEngine::Editor
 		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
 		ImGuiWindowFlags windowFlags = 0;
 		windowFlags |= ImGuiWindowFlags_::ImGuiWindowFlags_NoResize;
-		if (ImGui::Begin("List of cameras"))
+		if (ImGui::Begin("Cameras"))
 		{
 			// Draw Camera info widgets
 			for (uSize i = 0; i < editorData.cameras.size(); i += 1)
@@ -175,6 +451,18 @@ namespace DEngine::Editor
 
 			// DEBUG STUFF
 			// Print all touch inputs
+
+			auto gamepadOpt = App::GetGamepad();
+			if (gamepadOpt.HasValue())
+			{
+				App::GamepadState gamepad = gamepadOpt.Value();
+				std::string str = std::to_string(gamepad.leftStickX);
+
+				ImGui::Text("%s", str.c_str());
+
+				str = std::to_string(gamepad.leftStickY);
+				ImGui::Text("%s", str.c_str());
+			}
 
 			auto inputArray = App::TouchInputs();
 			for (auto& input : inputArray)
@@ -331,29 +619,29 @@ static void DEngine::Editor::HandleVirtualViewportResizing(
 static void DEngine::Editor::HandleViewportCameraMovement(
 	Camera& cam)
 {
-	auto deltaOpt = App::Mouse();
-	if (deltaOpt.HasValue())
+	auto cursorOpt = App::Cursor();
+	if (cursorOpt.HasValue())
 	{
-		auto delta = deltaOpt.Value();
+		auto cursor = cursorOpt.Value();
 
 		f32 sensitivity = 0.75f;
-		i32 amountX = delta.delta[0];
+		i32 amountX = cursor.posDeltaX;
 		// Apply left and right rotation
-		cam.rotation = Math::UnitQuat::FromVector(Math::Vec3D::Up(), -sensitivity * amountX) * cam.rotation;
+		cam.rotation = Math::UnitQuat::FromVector(Math::Vec3::Up(), -sensitivity * amountX) * cam.rotation;
 
-		i32 amountY = delta.delta[1];
+		i32 amountY = cursor.posDeltaY;
 
 		// Limit rotation up and down
-		Math::Vec3D forward = Math::LinTran3D::ForwardVector(cam.rotation);
-		float dot = Math::Vec3D::Dot(forward, Math::Vec3D::Up());
-		if (dot <= -0.99f)
+		Math::Vec3 forward = Math::LinTran3D::ForwardVector(cam.rotation);
+		float dot = Math::Vec3::Dot(forward, Math::Vec3::Up());
+		if (dot <= -0.9f)
 			amountY = Math::Min(0, amountY);
-		else if (dot >= 0.99f)
+		else if (dot >= 0.9f)
 			amountY = Math::Max(0, amountY);
 
 		// Apply up and down rotation
-		Math::Vec3D right = Math::LinTran3D::RightVector(cam.rotation);
-		cam.rotation = Math::UnitQuat::FromVector(right, sensitivity * amountY) * cam.rotation;
+		Math::Vec3 right = Math::LinTran3D::RightVector(cam.rotation);
+		cam.rotation = Math::UnitQuat::FromVector(right, -sensitivity * amountY) * cam.rotation;
 
 		// Handle camera movement
 		f32 moveSpeed = 5.f;
@@ -366,9 +654,9 @@ static void DEngine::Editor::HandleViewportCameraMovement(
 		if (App::ButtonValue(App::Button::A))
 			cam.position -= moveSpeed * Math::LinTran3D::RightVector(cam.rotation) * Time::Delta();
 		if (App::ButtonValue(App::Button::Space))
-			cam.position.y -= moveSpeed * Time::Delta();
-		if (App::ButtonValue(App::Button::LeftCtrl))
 			cam.position.y += moveSpeed * Time::Delta();
+		if (App::ButtonValue(App::Button::LeftCtrl))
+			cam.position.y -= moveSpeed * Time::Delta();
 	}
 }
 
@@ -448,7 +736,7 @@ DEngine::Editor::EditorData DEngine::Editor::Initialize()
 	return {};
 }
 
-void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
+void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Scene& scene, Gfx::Data& gfx)
 {
 	ImGui::NewFrame();
 
@@ -492,7 +780,6 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 		ImGui::End();
 	}
 
-	
 	static bool testShowWindow = true;
 	if (testShowWindow)
 	{
@@ -505,6 +792,9 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 		DrawViewportManager(editorData);
 		DrawCameraManager(editorData);
 		DrawAllVirtualViewports(editorData, gfx);
+		DrawEntityWindow(editorData, scene);
+		DrawComponentsWindow(editorData, scene);
+		DrawLogWindow(editorData);
 	}
 	else
 	{
@@ -536,14 +826,6 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 			}
 			Viewport& vp = editorData.viewports[viewportIndex].b;
 			vp.visible = true;
-
-
-			ImVec2 imgSize = ImGui::GetContentRegionAvail();
-
-			HandleVirtualViewportResizing(vp, imgSize);
-			ImVec2 imgPos = ImGui::GetCursorPos();
-			ImGui::Image(vp.gfxViewportRef.ImGuiTexID(), imgSize);
-
 			uSize camIndex = static_cast<uSize>(-1);
 			for (uSize i = 0; i < editorData.cameras.size(); i += 1)
 			{
@@ -554,6 +836,169 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 				}
 			}
 			Camera& cam = camIndex == static_cast<uSize>(-1) ? vp.camera : editorData.cameras[camIndex].b;
+
+
+			ImVec2 imgSize = ImGui::GetContentRegionAvail();
+
+			HandleVirtualViewportResizing(vp, imgSize);
+			ImVec2 imgPos = ImGui::GetCursorPos();
+			ImGui::Image(vp.gfxViewportRef.ImGuiTexID(), imgSize);
+
+			ImVec2 windowPos = ImGui::GetWindowPos();
+			Math::Vec2 imgAbsPos = {
+				ImGui::GetWindowPos().x + imgPos.x,
+				ImGui::GetWindowPos().y + imgPos.y };
+
+			// Handle touchscreen FreeLook
+			auto touchInputs = App::TouchInputs();
+			if (editorData.fullscreen_posTouchID == App::TouchInput::invalidID)
+			{
+				// We need to find a touch input that was just pressed
+				// and is inside the left rect
+				for (auto item : touchInputs)
+				{
+					if (item.eventType != App::TouchEventType::Down)
+						continue;
+
+					Math::Vec2 touchAbsPos = { item.x, item.y };
+
+					// Check if touch input is inside our left rect
+					if (IsInsideRect(touchAbsPos, imgAbsPos, { imgSize.x / 2.f, imgSize.y }))
+					{
+						editorData.fullscreen_posTouchID = item.id;
+						break;
+					}
+				}
+			}
+			if (editorData.fullscreen_rotTouchID == App::TouchInput::invalidID)
+			{
+				// We need to find a touch input that was just pressed
+				// and is inside the left rect
+				for (auto item : touchInputs)
+				{
+					if (item.eventType != App::TouchEventType::Down)
+						continue;
+
+					Math::Vec2 touchAbsPos = { item.x, item.y };
+
+					// Check if touch input is inside our left rect
+					if (IsInsideRect(touchAbsPos, { imgAbsPos.x + imgSize.x / 2.f, imgAbsPos.y}, { imgSize.x / 2.f, imgSize.y }))
+					{
+						editorData.fullscreen_rotTouchID = item.id;
+						break;
+					}
+				}
+			}
+
+			if (editorData.fullscreen_posTouchID != App::TouchInput::invalidID)
+			{
+				// We need to find the touch ID
+				// then check if it's still inside the rect, and is not an Up event.
+				uSize touchInputIndex = static_cast<uSize>(-1);
+				for (uSize i = 0; i < touchInputs.Size(); i += 1)
+				{
+					if (editorData.fullscreen_posTouchID == touchInputs[i].id)
+					{
+						touchInputIndex = i;
+						break;
+					}
+				}
+				DENGINE_DETAIL_ASSERT(touchInputIndex != static_cast<uSize>(-1)); // This should never happen
+				App::TouchInput touch = touchInputs[touchInputIndex];
+
+				Math::Vec2 touchAbsPos = { touch.x, touch.y };
+
+				if (touch.eventType == App::TouchEventType::Up || !IsInsideRect(touchAbsPos, imgAbsPos, { imgSize.x / 2.f, imgSize.y }))
+				{
+					editorData.fullscreen_posTouchID = App::TouchInput::invalidID;
+				}
+				else
+				{
+					// We are inside the rect, apply the camera rotation
+
+					// First we need to translate the mouse position to [-1, 1] range
+					// inside our rect.
+
+					// Get it to [0, 1] first.
+					Math::Vec2 normCoord = {
+							(touchAbsPos.x - imgAbsPos.x) / (imgSize.x / 2.f),
+							(touchAbsPos.y - imgAbsPos.y) / imgSize.y};
+					normCoord *= 2.f;
+					normCoord.x -= 1.f;
+					normCoord.y -= 1.f;
+					normCoord.y *= -1.f;
+
+					f32 speed = 0.1f;
+					cam.position += Math::LinTran3D::ForwardVector(cam.rotation) * -normCoord.y * speed;
+					cam.position += Math::LinTran3D::RightVector(cam.rotation) * normCoord.x * speed;
+				}
+			}
+
+
+
+			if (editorData.fullscreen_rotTouchID != App::TouchInput::invalidID)
+			{
+				// We need to find the touch ID
+				// then check if it's still inside the rect, and is not an Up event.
+				uSize touchInputIndex = static_cast<uSize>(-1);
+				for (uSize i = 0; i < touchInputs.Size(); i += 1)
+				{
+					if (editorData.fullscreen_rotTouchID == touchInputs[i].id)
+					{
+						touchInputIndex = i;
+						break;
+					}
+				}
+				DENGINE_DETAIL_ASSERT(touchInputIndex != static_cast<uSize>(-1)); // This should never happen
+				App::TouchInput touch = touchInputs[touchInputIndex];
+
+				Math::Vec2 touchAbsPos = { touch.x, touch.y };
+
+				if (touch.eventType == App::TouchEventType::Up || 
+					!IsInsideRect(touchAbsPos, { imgAbsPos.x + imgSize.x / 2.f, imgAbsPos.y}, { imgSize.x / 2.f, imgSize.y }))
+				{
+					editorData.fullscreen_rotTouchID = App::TouchInput::invalidID;
+				}
+				else
+				{
+					// We are inside the rect, apply the camera rotation
+
+					// First we need to translate the mouse position to [-1, 1] range
+					// inside our rect.
+
+					// Get it to [0, 1] first.
+					Math::Vec2 normCoord = {
+						(touchAbsPos.x - (imgAbsPos.x + imgSize.x / 2.f)) /  (imgSize.x / 2.f),
+						(touchAbsPos.y - imgAbsPos.y) / imgSize.y};
+					normCoord *= 2.f;
+					normCoord.x -= 1.f;
+					normCoord.y -= 1.f;
+					normCoord.y *= -1.f;
+
+					f32 sensitivity = 1.f;
+					f32 amountX = normCoord.x;
+					// Apply left and right rotation
+					cam.rotation = Math::UnitQuat::FromVector(Math::Vec3::Up(), -sensitivity * amountX) * cam.rotation;
+
+					f32 amountY = normCoord.y;
+
+					// Limit rotation up and down
+					Math::Vec3 forward = Math::LinTran3D::ForwardVector(cam.rotation);
+					float dot = Math::Vec3::Dot(forward, Math::Vec3::Up());
+					if (dot <= -0.9f)
+						amountY = Math::Min(0.f, amountY);
+					else if (dot >= 0.9f)
+						amountY = Math::Max(0.f, amountY);
+
+					// Apply up and down rotation
+					Math::Vec3 right = Math::LinTran3D::RightVector(cam.rotation);
+					cam.rotation = Math::UnitQuat::FromVector(right, sensitivity * amountY) * cam.rotation;
+
+					std::string yo = std::to_string(normCoord.x) + ", " + std::to_string(normCoord.y);
+					App::Log(yo.c_str());
+				}
+			}
+
 
 			// Handle mouse FreeLook
 			if (ImGui::IsItemHovered())
@@ -582,7 +1027,7 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx)
 static void DEngine::Editor::SetImGuiStyle()
 {
 	ImGuiIO& io = ImGui::GetIO();
-	io.FontGlobalScale = 4.f;
+	io.FontGlobalScale = 2.5f;
 	ImGuiStyle* style = &ImGui::GetStyle();
 
 	ImVec4* colors = style->Colors;

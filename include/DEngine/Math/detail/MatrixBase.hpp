@@ -2,13 +2,6 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 
-#include "DEngine/Math/Trait.hpp"
-
-#include <string>
-#include <type_traits>
-#include <initializer_list>
-#include <iterator>
-
 namespace DEngine::Math
 {
 	template<uSize width, uSize height, typename T>
@@ -20,15 +13,19 @@ namespace DEngine::Math
 		struct MatrixBase
 		{
 		public:
-			T data[width * height] = {};
+			T data[width * height];
 
-			[[nodiscard]] constexpr Math::Matrix<width - 1, height - 1, T> GetMinor(uSize columnToRemove, uSize rowToRemove) const;
+			[[nodiscard]] constexpr Math::Matrix<width-1, height-1, T> GetMinor(
+				uSize columnToRemove, 
+				uSize rowToRemove) const;
 		};
 
 		template<uSize width, uSize height, typename T>
-		constexpr Math::Matrix<width - 1, height - 1, T> MatrixBase<width, height, T>::GetMinor(uSize columnToRemove, uSize rowToRemove) const
+		constexpr Math::Matrix<width-1, height-1, T> MatrixBase<width, height, T>::GetMinor(
+			uSize columnToRemove, 
+			uSize rowToRemove) const
 		{
-			Math::Matrix<width - 1, height - 1, T> newMatrix{};
+			Math::Matrix<width-1, height-1, T> newMatrix{};
 			for (uSize x = 0; x < width; x += 1)
 			{
 				if (x == columnToRemove)

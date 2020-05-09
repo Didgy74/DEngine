@@ -1,12 +1,11 @@
-//
-// File IO
-//
+#define DENGINE_APPLICATION_BUTTON_COUNT
+
 // Stops the warnings made by MSVC when using "unsafe" CRT fopen functions.
 #ifdef _MSC_VER
 #   define _CRT_SECURE_NO_WARNINGS
 #endif
-#include <cstdio>
 
+#include "DEngine/Application.hpp"
 #include "detail_Application.hpp"
 
 #define GLFW_INCLUDE_VULKAN
@@ -20,6 +19,7 @@
 #include <iostream>
 #include <cmath>
 #include <cstring>
+#include <cstdio>
 
 namespace DEngine::Application::detail
 {
@@ -36,15 +36,23 @@ namespace DEngine::Application::detail
 		int scancode, 
 		int action, 
 		int mods);
+	static void Backend_GLFW_CharCallback(GLFWwindow* window, unsigned int codepoint);
 	static void Backend_GLFW_MouseButtonCallback(
 		GLFWwindow* window,
 		int button,
 		int action,
 		int mods);
-	static void Backend_GLFW_MousePosCallback(
+	static void Backend_GLFW_CursorPosCallback(
 		GLFWwindow* window,
 		double xpos,
 		double ypos);
+	static void Backend_GLFW_ScrollCallback(
+		GLFWwindow* window, 
+		double xoffset,
+		double yoffset);
+	static void Backend_GLFW_JoystickConnectedCallback(
+		int jid, 
+		int event);
 	static void Backend_GLFW_WindowPosCallback(
 		GLFWwindow* window, 
 		int xpos,
@@ -65,6 +73,13 @@ namespace DEngine::Application::detail
 	static void Backend_GLFW_WindowMinimizeCallback(
 		GLFWwindow* window, 
 		int iconified);
+
+
+}
+
+void DEngine::Application::OpenSoftInput()
+{
+	
 }
 
 void DEngine::Application::Log(char const* msg)
@@ -111,23 +126,39 @@ bool DEngine::Application::detail::Backend_Initialize()
 
 	detail::mainWindowIsInFocus = glfwGetWindowAttrib(detail::mainWindow, GLFW_FOCUSED);
 
-	detail::hasMouse = true;
+	detail::cursorOpt = CursorData();
+	CursorData& cursor = detail::cursorOpt.Value();
 	double mouseXPos = 0;
 	double mouseYPos = 0;
 	glfwGetCursorPos(detail::mainWindow, &mouseXPos, &mouseYPos);
-	detail::mousePosition[0] = (u32)std::floor(mouseXPos);
-	detail::mousePosition[1] = (u32)std::floor(mouseYPos);
+	cursor.posX = (u32)std::floor(mouseXPos);
+	cursor.posY = (u32)std::floor(mouseYPos);
 
-
+	for (uSize i = 0; i < 8; i += 1)
+	{
+		int result = glfwJoystickPresent((int)i);
+		if (result == GLFW_TRUE)
+		{
+			detail::gamepadConnected = true;
+			break;
+		}
+	}
+	
 	glfwSetKeyCallback(detail::mainWindow, Backend_GLFW_KeyboardKeyCallback);
+	glfwSetCharCallback(detail::mainWindow, Backend_GLFW_CharCallback);
 	glfwSetMouseButtonCallback(detail::mainWindow, Backend_GLFW_MouseButtonCallback);
-	glfwSetCursorPosCallback(detail::mainWindow, Backend_GLFW_MousePosCallback);
+	glfwSetCursorPosCallback(detail::mainWindow, Backend_GLFW_CursorPosCallback);
+	glfwSetScrollCallback(detail::mainWindow, Backend_GLFW_ScrollCallback);
+	
+	glfwSetJoystickCallback(Backend_GLFW_JoystickConnectedCallback);
+
 	glfwSetWindowPosCallback(detail::mainWindow, Backend_GLFW_WindowPosCallback);
 	glfwSetWindowSizeCallback(detail::mainWindow, Backend_GLFW_WindowSizeCallback);
 	glfwSetFramebufferSizeCallback(detail::mainWindow, Backend_GLFW_WindowFramebufferSizeCallback);
 	glfwSetWindowCloseCallback(detail::mainWindow, Backend_GLFW_WindowCloseCallback);
 	glfwSetWindowFocusCallback(detail::mainWindow, Backend_GLFW_WindowFocusCallback);
 	glfwSetWindowIconifyCallback(detail::mainWindow, Backend_GLFW_WindowMinimizeCallback);
+	
 
 	return true;
 }
@@ -135,6 +166,16 @@ bool DEngine::Application::detail::Backend_Initialize()
 void DEngine::Application::detail::Backend_ProcessEvents()
 {
 	glfwPollEvents();
+
+	if (detail::gamepadConnected)
+	{
+		int gamepadCount = 0;
+		float const* axes = glfwGetJoystickAxes(detail::gamepadID, &gamepadCount);
+
+		detail::gamepadState.leftStickX = axes[GLFW_GAMEPAD_AXIS_LEFT_X];
+		detail::gamepadState.leftStickY = axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
+	}
+	
 }
 
 static void DEngine::Application::detail::Backend_GLFW_KeyboardKeyCallback(
@@ -148,6 +189,13 @@ static void DEngine::Application::detail::Backend_GLFW_KeyboardKeyCallback(
 		detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), true);
 	else if (action == GLFW_RELEASE)
 		detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), false);
+}
+
+static void DEngine::Application::detail::Backend_GLFW_CharCallback(
+	GLFWwindow* window, 
+	unsigned int codepoint)
+{
+	detail::charInputs.PushBack((char)codepoint);
 }
 
 static void DEngine::Application::detail::Backend_GLFW_MouseButtonCallback(
@@ -168,12 +216,37 @@ static void DEngine::Application::detail::Backend_GLFW_MouseButtonCallback(
 	detail::UpdateButton(Backend_GLFW_MouseButtonToRawButton(button), wasPressed);
 }
 
-static void DEngine::Application::detail::Backend_GLFW_MousePosCallback(
+static void DEngine::Application::detail::Backend_GLFW_CursorPosCallback(
 	GLFWwindow* window, 
 	double xpos, 
 	double ypos)
 {
-	detail::UpdateMouse((u32)std::floor(xpos), (u32)std::floor(ypos));
+	detail::UpdateCursor((u32)std::floor(xpos), (u32)std::floor(ypos));
+}
+
+static void DEngine::Application::detail::Backend_GLFW_ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+{
+	CursorData& cursor = detail::cursorOpt.Value();
+	cursor.scrollDeltaY = (f32)yoffset;
+}
+
+void DEngine::Application::detail::Backend_GLFW_JoystickConnectedCallback(int jid, int event)
+{
+	if (event == GLFW_CONNECTED)
+	{
+		detail::gamepadConnected = true;
+		detail::gamepadID = jid;
+	}
+	else if (event == GLFW_DISCONNECTED)
+	{
+		detail::gamepadConnected = false;
+	}
+	else
+	{
+		// This can happen in future releases.
+
+	}
+
 }
 
 static void DEngine::Application::detail::Backend_GLFW_WindowPosCallback(
@@ -273,7 +346,6 @@ DEngine::Application::Button DEngine::Application::detail::Backend_GLFW_MouseBut
 		return Button::LeftMouse;
 	case GLFW_MOUSE_BUTTON_RIGHT:
 		return Button::RightMouse;
-
 	}
 
 	return Button::Undefined;
@@ -292,12 +364,25 @@ DEngine::Application::Button DEngine::Application::detail::Backend_GLFW_Keyboard
 	case GLFW_KEY_D:
 		return Button::D;
 
+	case GLFW_KEY_UP:
+		return Button::Up;
+	case GLFW_KEY_DOWN:
+		return Button::Down;
+	case GLFW_KEY_LEFT:
+		return Button::Left;
+	case GLFW_KEY_RIGHT:
+		return Button::Right;
+
 	case GLFW_KEY_SPACE:
 		return Button::Space;
 	case GLFW_KEY_LEFT_CONTROL:
 		return Button::LeftCtrl;
 	case GLFW_KEY_ESCAPE:
 		return Button::Escape;
+	case GLFW_KEY_BACKSPACE:
+		return Button::Backspace;
+	case GLFW_KEY_DELETE:
+		return Button::Delete;
 
 	}
 
@@ -305,21 +390,46 @@ DEngine::Application::Button DEngine::Application::detail::Backend_GLFW_Keyboard
 	return Button::Undefined;
 }
 
-DEngine::Std::Opt<DEngine::Application::FileStream> DEngine::Application::FileStream::OpenPath(char const* path)
+DEngine::Application::FileInputStream::FileInputStream()
 {
-	std::FILE* file = std::fopen(path, "rb");
-	if (file == nullptr)
-		return {};
-
-	FileStream stream{};
-	std::memcpy(&stream.m_buffer[0], &file, sizeof(std::FILE*));
-	return Std::Opt<FileStream>(static_cast<FileStream&&>(stream));
+	static_assert(sizeof(std::FILE*) <= sizeof(FileInputStream::m_buffer));
 }
 
-bool DEngine::Application::FileStream::Seek(i64 offset, SeekOrigin origin)
+DEngine::Application::FileInputStream::FileInputStream(char const* path)
+{
+	Open(path);
+}
+
+DEngine::Application::FileInputStream::FileInputStream(FileInputStream&& other) noexcept
+{
+	std::memcpy(&m_buffer[0], &other.m_buffer[0], sizeof(std::FILE*));
+	std::memset(&other.m_buffer[0], 0, sizeof(std::FILE*));
+}
+
+DEngine::Application::FileInputStream::~FileInputStream()
+{
+	Close();
+}
+
+DEngine::Application::FileInputStream& DEngine::Application::FileInputStream::operator=(FileInputStream&& other) noexcept
+{
+	if (this == &other)
+		return *this;
+
+	Close();
+
+	std::memcpy(&this->m_buffer[0], &other.m_buffer[0], sizeof(std::FILE*));
+	std::memset(&other.m_buffer[0], 0, sizeof(std::FILE*));
+
+	return *this;
+}
+
+bool DEngine::Application::FileInputStream::Seek(i64 offset, SeekOrigin origin)
 {
 	std::FILE* file = nullptr;
 	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
+	if (file == nullptr)
+		return false;
 
 	int posixOrigin = 0;
 	switch (origin)
@@ -342,40 +452,53 @@ bool DEngine::Application::FileStream::Seek(i64 offset, SeekOrigin origin)
 
 }
 
-bool DEngine::Application::FileStream::Read(char* output, u64 size)
+bool DEngine::Application::FileInputStream::Read(char* output, u64 size)
 {
 	std::FILE* file = nullptr;
 	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
+	if (file == nullptr)
+		return false;
 
 	size_t result = std::fread(output, 1, (size_t)size, file);
 	return result == (size_t)size;
 }
 
-DEngine::u64 DEngine::Application::FileStream::Tell()
+DEngine::Std::Opt<DEngine::u64> DEngine::Application::FileInputStream::Tell() const
 {
 	std::FILE* file = nullptr;
 	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
+	if (file == nullptr)
+		return {};
 
 	long result = ftell(file);
 	if (result == long(-1))
-	{
 		// Handle error
-		return (u64)-1;
-	}
+		return {};
 	else
-		return (u64)result;
+		return static_cast<u64>(result);
 }
 
-DEngine::Application::FileStream::FileStream(FileStream&& other) noexcept
+bool DEngine::Application::FileInputStream::IsOpen() const
 {
-	std::memcpy(&m_buffer[0], &other.m_buffer[0], sizeof(std::FILE*));
-	std::memset(&other.m_buffer[0], 0, sizeof(std::FILE*));
+	std::FILE* file = nullptr;
+	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
+	return file != nullptr;
 }
 
-DEngine::Application::FileStream::~FileStream()
+bool DEngine::Application::FileInputStream::Open(char const* path)
+{
+	Close();
+	std::FILE* file = std::fopen(path, "rb");
+	std::memcpy(&m_buffer[0], &file, sizeof(std::FILE*));
+	return file != nullptr;
+}
+
+void DEngine::Application::FileInputStream::Close()
 {
 	std::FILE* file = nullptr;
 	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
 	if (file != nullptr)
 		std::fclose(file);
+
+	std::memset(&m_buffer[0], 0, sizeof(std::FILE*));
 }

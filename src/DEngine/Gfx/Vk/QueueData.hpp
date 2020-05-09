@@ -65,7 +65,7 @@ namespace DEngine::Gfx::Vk
         SafeQueue compute{};
         [[nodiscard]] inline bool HasCompute() const { return compute.Handle() != vk::Queue(); }
 
-        static void Initialize(
+        static void Init(
             QueueData& queueData,
             DeviceDispatch const& device,
             QueueIndices indices,

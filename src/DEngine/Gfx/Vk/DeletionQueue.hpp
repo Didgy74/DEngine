@@ -41,7 +41,8 @@ namespace DEngine::Gfx::Vk
 		using CallbackPFN = void(*)(GlobUtils const& globUtils, Std::Span<char> customData);
 
 		// Do NOT call this, only if you're initializing the entire shit
-		void Initialize(
+		[[nodiscard]] static bool Init(
+			DeletionQueue& delQueue,
 			GlobUtils const* globUtilsIn,
 			u8 resourceSetCountIn);
 

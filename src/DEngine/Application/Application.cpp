@@ -16,9 +16,8 @@ namespace DEngine::Application::detail
 	std::chrono::high_resolution_clock::time_point buttonHeldStart[(int)Button::COUNT] = {};
 	f32 buttonHeldDuration[(int)Button::COUNT] = {};
 	KeyEventType buttonEvents[(int)Button::COUNT] = {};
-	bool hasMouse = false;
-	u32 mousePosition[2] = {};
-	i32 mouseDelta[2] = {};
+	Std::StaticVector<char, maxCharInputCount> charInputs{};
+	Std::Opt<CursorData> cursorOpt{};
 	Std::StaticVector<TouchInput, 10> touchInputs{};
 	Std::StaticVector<std::chrono::high_resolution_clock::time_point, touchInputs.Capacity()> touchInputStartTime{};
 
@@ -42,6 +41,9 @@ namespace DEngine::Application::detail
 	bool mainWindowSurfaceInitializeEvent = false;
 	bool mainWindowSurfaceTerminateEvent = false;
 
+	GamepadState gamepadState{};
+	bool gamepadConnected = false;
+	int gamepadID = 0;
 
 	static bool IsValid(Button in);
 }
@@ -96,36 +98,36 @@ DEngine::f32 DEngine::Application::ButtonDuration(Button input)
 	return detail::buttonHeldDuration[(int)input];
 }
 
-DEngine::Std::Opt<DEngine::Application::MouseData> DEngine::Application::Mouse()
+DEngine::Std::StaticVector<char, DEngine::Application::maxCharInputCount> DEngine::Application::CharInputs()
 {
-	if (detail::hasMouse)
-	{
-		MouseData temp{};
-		temp.pos = { detail::mousePosition[0], detail::mousePosition[1] };
-		temp.delta = { detail::mouseDelta[0], detail::mouseDelta[1] };
-
-		return { temp };
-	}
-
-	return {};
+	return detail::charInputs;
 }
 
-void DEngine::Application::detail::UpdateMouse(u32 posX, u32 posY, i32 deltaX, i32 deltaY)
+DEngine::Std::Opt<DEngine::Application::CursorData> DEngine::Application::Cursor()
 {
-	detail::mouseDelta[0] = deltaX;
-	detail::mouseDelta[1] = deltaY;
-
-	detail::mousePosition[0] = posX;
-	detail::mousePosition[1] = posY;
+	return detail::cursorOpt;
 }
 
-void DEngine::Application::detail::UpdateMouse(u32 posX, u32 posY)
+void DEngine::Application::detail::UpdateCursor(u32 posX, u32 posY, i32 deltaX, i32 deltaY)
 {
-	detail::mouseDelta[0] = (i32)posX - (i32)detail::mousePosition[0];
-	detail::mouseDelta[1] = (i32)posY - (i32)detail::mousePosition[1];
+	CursorData& cursorData = detail::cursorOpt.Value();
+	cursorData.posDeltaX = deltaX;
+	cursorData.posDeltaY = deltaY;
 
-	detail::mousePosition[0] = posX;
-	detail::mousePosition[1] = posY;
+	cursorData.posX = posX;
+	cursorData.posY = posY;
+}
+
+void DEngine::Application::detail::UpdateCursor(u32 posX, u32 posY)
+{
+	CursorData& cursorData = detail::cursorOpt.Value();
+
+	// We compare it with the previous values to get delta.
+	cursorData.posDeltaX = (i32)posX - (i32)cursorData.posX;
+	cursorData.posDeltaY = (i32)posY - (i32)cursorData.posY;
+
+	cursorData.posX = posX;
+	cursorData.posY = posY;
 }
 
 namespace DEngine::Application::detail
@@ -249,8 +251,15 @@ void DEngine::Application::detail::ProcessEvents()
 	// Clear event-style values.
 	for (auto& item : detail::buttonEvents)
 		item = KeyEventType::Unchanged;
-	for (auto& item : detail::mouseDelta)
-		item = 0;
+	detail::charInputs.Clear();
+	if (detail::cursorOpt.HasValue())
+	{
+		CursorData& cursorData = detail::cursorOpt.Value();
+		cursorData.posDeltaX = 0;
+		cursorData.posDeltaY = 0;
+		cursorData.scrollDeltaY = 0;
+	}
+
 	for (uSize i = 0; i < detail::touchInputs.Size(); i += 1)
 	{
 		if (detail::touchInputs[i].eventType == TouchEventType::Up)
@@ -329,6 +338,18 @@ void DEngine::Application::detail::ImGui_NewFrame()
 			(float)detail::mainWindowFramebufferSize[0] / io.DisplaySize.x,
 			(float)detail::mainWindowFramebufferSize[1] / io.DisplaySize.y);
 		
+	// Copy keydown stuff
+	for (uSize i = 0; i < (uSize)Button::COUNT; i++)
+		io.KeysDown[i] = detail::buttonValues[i];
+	if (detail::buttonValues[(int)Button::Delete])
+		io.KeysDown[(int)Button::Backspace] = true;
+
+
+	// Char input stuff
+	auto charInputs = CharInputs();
+	for (auto item : charInputs)
+		io.AddInputCharacter(item);
+
 	for (uSize i = 0; i < IM_ARRAYSIZE(io.MouseDown); i += 1)
 		io.MouseDown[i] = false;
 	io.MousePos = ImVec2(-FLT_MAX, -FLT_MAX);
@@ -336,30 +357,32 @@ void DEngine::Application::detail::ImGui_NewFrame()
 	// Update mouse position
 	if (detail::mainWindowIsInFocus)
 	{
-		Std::Opt<MouseData> mouseOpt = Mouse();
-		if (mouseOpt.HasValue())
+		Std::Opt<CursorData> cursorOpt = Cursor();
+		if (cursorOpt.HasValue())
 		{
+			CursorData const& cursor = cursorOpt.Value();
 			io.MouseDown[0] = ButtonValue(Button::LeftMouse);
 			io.MouseDown[1] = ButtonValue(Button::RightMouse);
-			MouseData mouse = mouseOpt.Value();
-			io.MousePos = ImVec2((float)mouse.pos[0], (float)mouse.pos[1]);
+			io.MousePos = ImVec2((float)cursor.posX, (float)cursor.posY);
+
+			io.MouseWheel = cursor.scrollDeltaY;
 		}
 
 		auto touchInputs = TouchInputs();
-		uSize blehIndex = static_cast<uSize>(-1);
+		uSize primaryTouchIndex = static_cast<uSize>(-1);
 		for (uSize i = 0; i < touchInputs.Size(); i += 1)
 		{
 			if (touchInputs[i].id == 0)
 			{
-				blehIndex = i;
+				primaryTouchIndex = i;
 				break;
 			}
 		}
-		if (blehIndex != static_cast<uSize>(-1) )
+		if (primaryTouchIndex != static_cast<uSize>(-1) )
 		{
-			if (touchInputs[blehIndex].eventType != TouchEventType::Up)
+			if (touchInputs[primaryTouchIndex].eventType != TouchEventType::Up)
 				io.MouseDown[0] = true;
-			io.MousePos = ImVec2(touchInputs[blehIndex].x, touchInputs[blehIndex].y);
+			io.MousePos = ImVec2(touchInputs[primaryTouchIndex].x, touchInputs[primaryTouchIndex].y);
 		}
 	}
 }
@@ -367,6 +390,14 @@ void DEngine::Application::detail::ImGui_NewFrame()
 void DEngine::Application::SetRelativeMouseMode(bool enabled)
 {
 
+}
+
+DEngine::Std::Optional<DEngine::Application::GamepadState> DEngine::Application::GetGamepad()
+{
+	if (detail::gamepadConnected)
+		return detail::gamepadState;
+	else
+		return {};
 }
 
 bool DEngine::Application::MainWindowMinimized()

@@ -526,29 +526,6 @@ vk::Device DEngine::Gfx::Vk::Init::CreateDevice(
 	return vkDevice;
 }
 
-bool DEngine::Gfx::Vk::Init::InitializeViewportManager(
-	ViewportManager& vpManager,
-	PhysDeviceInfo const& physDevice,
-	DevDispatch const& device)
-{
-	vk::DeviceSize elementSize = 64;
-	if (physDevice.properties.limits.minUniformBufferOffsetAlignment > elementSize)
-		elementSize = physDevice.properties.limits.minUniformBufferOffsetAlignment;
-	vpManager.camElementSize = (uSize)elementSize;
-
-	vk::DescriptorSetLayoutBinding binding{};
-	binding.binding = 0;
-	binding.descriptorCount = 1;
-	binding.descriptorType = vk::DescriptorType::eUniformBuffer;
-	binding.stageFlags = vk::ShaderStageFlagBits::eVertex;
-	vk::DescriptorSetLayoutCreateInfo descrLayoutInfo{};
-	descrLayoutInfo.bindingCount = 1;
-	descrLayoutInfo.pBindings = &binding;
-	vpManager.cameraDescrLayout = device.createDescriptorSetLayout(descrLayoutInfo);
-
-	return true;
-}
-
 DEngine::Std::StaticVector<vk::Fence, DEngine::Gfx::Vk::Constants::maxResourceSets> DEngine::Gfx::Vk::Init::CreateMainFences(
 	DevDispatch const& device, 
 	u8 resourceSetCount,
@@ -650,6 +627,7 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 	TransitionSwapchainImages(device, deletionQueue, queues, swapchain.images);
 
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
+	cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
 	swapchain.cmdPool = device.createCommandPool(cmdPoolInfo);
 	if (debugUtils != nullptr)
 	{
@@ -800,6 +778,7 @@ bool DEngine::Gfx::Vk::Init::TransitionSwapchainImages(
 	vk::Result vkResult{};
 
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
+	cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
 	vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
 
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
@@ -848,7 +827,7 @@ bool DEngine::Gfx::Vk::Init::TransitionSwapchainImages(
 	vk::SubmitInfo submitInfo{};
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &cmdBuffer;
-	queues.graphics.submit({ submitInfo }, fence);
+	queues.graphics.submit(submitInfo, fence);
 
 	deletionQueue.Destroy(fence, cmdPool);
 
@@ -996,7 +975,7 @@ DEngine::Gfx::Vk::GUIRenderTarget DEngine::Gfx::Vk::Init::CreateGUIRenderTarget(
 
 	// Transition the image
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
-	cmdPoolInfo.queueFamilyIndex = 0;
+	cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
 	vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
 	cmdBufferAllocInfo.commandPool = cmdPool;
@@ -1026,9 +1005,9 @@ DEngine::Gfx::Vk::GUIRenderTarget DEngine::Gfx::Vk::Init::CreateGUIRenderTarget(
 		vk::PipelineStageFlagBits::eTopOfPipe,
 		vk::PipelineStageFlagBits::eBottomOfPipe,
 		vk::DependencyFlags{},
-		{},
-		{},
-		{ imgMemoryBarrier });
+		nullptr,
+		nullptr,
+		imgMemoryBarrier);
 
 	device.endCommandBuffer(cmdBuffer);
 
@@ -1038,7 +1017,7 @@ DEngine::Gfx::Vk::GUIRenderTarget DEngine::Gfx::Vk::Init::CreateGUIRenderTarget(
 	vk::SubmitInfo submitInfo{};
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &cmdBuffer;
-	queues.graphics.submit({ submitInfo }, tempFence);
+	queues.graphics.submit(submitInfo, tempFence);
 	
 	deletionQueue.Destroy(tempFence, cmdPool);
 
@@ -1063,6 +1042,7 @@ DEngine::Gfx::Vk::GUIData DEngine::Gfx::Vk::Init::CreateGUIData(
 	{
 		vk::CommandPoolCreateInfo cmdPoolInfo{};
 		cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+		cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
 		returnVal.cmdPool = device.createCommandPool(cmdPoolInfo);
 		if (debugUtils != nullptr)
 		{
@@ -1127,9 +1107,9 @@ void DEngine::Gfx::Vk::Init::RecordSwapchainCmdBuffers(
 			vk::PipelineStageFlagBits::eColorAttachmentOutput,
 			vk::PipelineStageFlagBits::eTransfer,
 			vk::DependencyFlags{},
-			{},
-			{},
-			{ preTransfer_GuiBarrier });
+			nullptr,
+			nullptr,
+			preTransfer_GuiBarrier);
 
 		vk::ImageMemoryBarrier preTransfer_SwapchainBarrier{};
 		preTransfer_SwapchainBarrier.image = dstImage;
@@ -1145,9 +1125,9 @@ void DEngine::Gfx::Vk::Init::RecordSwapchainCmdBuffers(
 			vk::PipelineStageFlagBits::eColorAttachmentOutput,
 			vk::PipelineStageFlagBits::eTransfer,
 			vk::DependencyFlags{},
-			{},
-			{},
-			{ preTransfer_SwapchainBarrier });
+			nullptr,
+			nullptr,
+			preTransfer_SwapchainBarrier);
 
 		vk::ImageCopy copyRegion{};
 		copyRegion.extent = vk::Extent3D{ swapchainData.extents.width, swapchainData.extents.height, 1 };
@@ -1161,7 +1141,7 @@ void DEngine::Gfx::Vk::Init::RecordSwapchainCmdBuffers(
 			vk::ImageLayout::eTransferSrcOptimal,
 			dstImage,
 			vk::ImageLayout::eTransferDstOptimal,
-			{ copyRegion });
+			copyRegion);
 
 		vk::ImageMemoryBarrier postTransfer_SwapchainBarrier{};
 		postTransfer_SwapchainBarrier.image = dstImage;
@@ -1177,9 +1157,9 @@ void DEngine::Gfx::Vk::Init::RecordSwapchainCmdBuffers(
 			vk::PipelineStageFlagBits::eTransfer,
 			vk::PipelineStageFlagBits::eColorAttachmentOutput,
 			vk::DependencyFlags{},
-			{},
-			{},
-			{ postTransfer_SwapchainBarrier });
+			nullptr,
+			nullptr,
+			postTransfer_SwapchainBarrier);
 
 		// RenderPass handles transitioning rendered image back to color attachment output
 
@@ -1249,6 +1229,7 @@ void DEngine::Gfx::Vk::Init::TransitionGfxImage(
 	vk::Result vkResult{};
 
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
+	cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
 	vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
 
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
@@ -1305,7 +1286,7 @@ void DEngine::Gfx::Vk::Init::TransitionGfxImage(
 	vk::SubmitInfo submitInfo{};
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &cmdBuffer;
-	queues.graphics.submit({ submitInfo }, fence);
+	queues.graphics.submit(submitInfo, fence);
 
 	deletionQueue.Destroy(fence, cmdPool);
 }
@@ -1423,10 +1404,10 @@ DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewportR
 
 namespace DEngine::Gfx::Vk
 {
-	void imguiCheckVkResult(VkResult result)
+	static void imguiCheckVkResult(VkResult result)
 	{
 		if (static_cast<vk::Result>(result) != vk::Result::eSuccess)
-			throw std::runtime_error("");
+			throw std::runtime_error("Unknown ImGui Vulkan error.");
 	}
 }
 
@@ -1495,6 +1476,7 @@ void DEngine::Gfx::Vk::Init::InitializeImGui(
 		throw std::runtime_error("Could not initialize the ImGui Vulkan stuff.");
 
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
+	cmdPoolInfo.queueFamilyIndex = apiData.globUtils.queues.graphics.FamilyIndex();
 	vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
 
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
@@ -1518,9 +1500,9 @@ void DEngine::Gfx::Vk::Init::InitializeImGui(
 	vk::SubmitInfo submitInfo{};
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &cmdBuffer;
-	apiData.globUtils.queues.graphics.submit({ submitInfo }, tempFence);
+	apiData.globUtils.queues.graphics.submit(submitInfo, tempFence);
 	
-	vkResult = apiData.globUtils.device.waitForFences({ tempFence }, true, std::numeric_limits<std::uint64_t>::max());
+	vkResult = apiData.globUtils.device.waitForFences(tempFence, true, std::numeric_limits<std::uint64_t>::max());
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("Vulkan: Could not wait for fence after submitting ImGui create-fonts cmdBuffer.");
 	device.Destroy(tempFence);

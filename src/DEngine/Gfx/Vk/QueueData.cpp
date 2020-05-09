@@ -71,7 +71,7 @@ void DEngine::Gfx::Vk::QueueData::SafeQueue::Initialize(
 	}
 }
 
-void DEngine::Gfx::Vk::QueueData::Initialize(
+void DEngine::Gfx::Vk::QueueData::Init(
 	QueueData& queueData,
 	DeviceDispatch const& device, 
 	QueueIndices indices, 

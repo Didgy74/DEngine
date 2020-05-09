@@ -32,14 +32,11 @@ namespace DEngine::Gfx::Vk::Init
 		InstanceDispatch const& instance,
 		PhysDeviceInfo const& physDevice);
 
-	void InitializeVMA(
-		GlobUtils& globUtils,
+	[[nodiscard]] vk::ResultValue<VmaAllocator> InitializeVMA(
+		InstanceDispatch const& instance,
+		vk::PhysicalDevice physDeviceHandle,
+		DeviceDispatch const& device,
 		VMA_MemoryTrackingData* vma_trackingData);
-
-	[[nodiscard]] bool InitializeViewportManager(
-		ViewportManager& vpManager,
-		PhysDeviceInfo const& physDevice,
-		DevDispatch const& device);
 
 	[[nodiscard]] Std::StaticVector<vk::Fence, Constants::maxResourceSets> CreateMainFences(
 		DevDispatch const& device,

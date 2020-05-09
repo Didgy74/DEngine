@@ -5,7 +5,7 @@
 #include "DEngine/Containers/Optional.hpp"
 #include "DEngine/Containers/StaticVector.hpp"
 
-#include "DEngine/Math/Matrix/Matrix.hpp"
+#include "DEngine/Math/Matrix.hpp"
 #include "DEngine/Math/Common.hpp"
 
 #include <vector>
@@ -16,7 +16,16 @@ namespace DEngine::Gfx
 	class ILog;
 	struct InitInfo;
 	class ViewportRef;
-	struct Draw_Params;
+	struct DrawParams;
+	enum class TextureID : u64 {};
+
+	struct TextureAssetInterface
+	{
+	public:
+		virtual ~TextureAssetInterface() {};
+
+		virtual char const* get(TextureID id) const = 0;
+	};
 
 	struct ViewportUpdateData
 	{
@@ -26,25 +35,29 @@ namespace DEngine::Gfx
 		Math::Mat4 transform{};
 	};
 
-	struct Draw_Params
+	struct DrawParams
 	{
 		u32 swapchainWidth = 0;
 		u32 swapchainHeight = 0;
 		bool restoreEvent = false;
-		
-		std::vector<ViewportUpdateData> viewportUpdates = {};
+
+		std::vector<TextureID> textureIDs;
+		std::vector<Math::Mat4> transforms;
+
+		std::vector<ViewportUpdateData> viewportUpdates;
 	};
 
 	class Data
 	{
 	public:
-		Data(Data&&) noexcept = default;
+		Data(Data&&) noexcept;
+		virtual ~Data();
 
 		ViewportRef NewViewport();
 		void DeleteViewport(uSize viewportID);
 		uSize GetViewportCount();
 
-		void Draw(Draw_Params const& params);
+		void Draw(DrawParams const& params);
 
 	private:
 		Data() = default;
@@ -52,8 +65,9 @@ namespace DEngine::Gfx
 
 		ILog* iLog = nullptr;
 		IWsi* iWsi = nullptr;
+		TextureAssetInterface const* texAssetInterface = nullptr;
 
-		void* apiDataBuffer{};
+		void* apiDataBuffer = nullptr;
 
 		friend Std::Opt<Data> Initialize(const InitInfo& initInfo);
 	};
@@ -65,6 +79,7 @@ namespace DEngine::Gfx
 
 		ILog* optional_iLog = nullptr;
 		IWsi* iWsi = nullptr;
+		TextureAssetInterface const* texAssetInterface = nullptr;
 		Std::Span<char const*> requiredVkInstanceExtensions{};
 	};
 
@@ -94,12 +109,13 @@ namespace DEngine::Gfx
 	public:
 		ViewportRef() = default;
 
-		[[nodiscard]] bool IsValid() const { return viewportID != 255; }
+		[[nodiscard]] bool IsValid() const { return viewportID != invalidID; }
 		[[nodiscard]] uSize ViewportID() const { return viewportID; }
 		[[nodiscard]] void* ImGuiTexID() const { return imguiTexID; }
 
 	private:
-		uSize viewportID = static_cast<uSize>(-1);
+		static constexpr uSize invalidID = static_cast<uSize>(-1);
+		uSize viewportID = invalidID;
 		void* imguiTexID = nullptr;
 
 		friend class Data;

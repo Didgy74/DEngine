@@ -4,14 +4,21 @@
 #include "DEngine/Containers/Array.hpp"
 #include "DEngine/Containers/Pair.hpp"
 #include "DEngine/Gfx/Gfx.hpp"
+#include "DEngine/Application.hpp"
 
-#include "DEngine/Math/Vector/Vector.hpp"
+#include "DEngine/Math/Vector.hpp"
 #include "DEngine/Math/UnitQuaternion.hpp"
 
 #include "ImGui/imgui.h"
 
 #include <vector>
 #include <chrono>
+#include <string>
+
+namespace DEngine
+{
+	class Scene;
+}
 
 namespace DEngine::Editor
 {
@@ -30,7 +37,7 @@ namespace DEngine::Editor
 		static constexpr f32 defaultZFar = 10000.f;
 		static constexpr ProjectionMode defaultProjectionMode = ProjectionMode::Perspective;
 
-		Math::Vec3D position{};
+		Math::Vec3 position{};
 		Math::UnitQuat rotation{};
 		f32 fov = defaultFovY;
 		f32 orthographicWidth = defaultOrtographicWidth;
@@ -61,6 +68,10 @@ namespace DEngine::Editor
 
 	struct EditorData
 	{
+		std::string log;
+
+		u64 currentlySelectedEntity = static_cast<u64>(-1);
+
 		std::vector<Std::Pair<uSize, Viewport>> viewports{};
 		static constexpr uSize invalidViewportID = static_cast<uSize>(-1);
 
@@ -77,8 +88,10 @@ namespace DEngine::Editor
 		float viewportFullscreenHoldTime = 1.f;
 		bool insideFullscreenViewport = false;
 		uSize fullscreenViewportID = invalidViewportID;
+		App::TouchInput::IDType fullscreen_posTouchID = App::TouchInput::invalidID;
+		App::TouchInput::IDType fullscreen_rotTouchID = App::TouchInput::invalidID;
 	};
 
 	EditorData Initialize();
-	void RenderImGuiStuff(EditorData& editorData, Gfx::Data& gfx);
+	void RenderImGuiStuff(EditorData& editorData, Scene& scene, Gfx::Data& gfx);
 }

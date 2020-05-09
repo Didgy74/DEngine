@@ -2,7 +2,7 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 
-#include "DEngine/Math/Matrix/MatrixBase.hpp"
+#include "DEngine/Math/detail/MatrixBase.hpp"
 #include "DEngine/Math/Trait.hpp"
 #include "DEngine/Containers/Optional.hpp"
 

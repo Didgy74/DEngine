@@ -1,7 +1,6 @@
 #pragma once
 
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Utility.hpp"
 #include "DEngine/Containers/detail/Assert.hpp"
 
 #include <stdexcept>
@@ -9,65 +8,98 @@
 
 namespace DEngine::Std
 {
+	enum class NullOpt_T : char;
+
+	constexpr NullOpt_T NullOpt = {};
+
 	template<typename T>
 	class Optional
 	{
 		bool m_hasValue = false;
 		union
 		{
-			alignas(T) unsigned char m_valueBuffer[sizeof(T)] = {};
+			unsigned char m_unused = {};
 			T m_value;
 		};
 		
 	public:
-		inline Optional();
-		inline Optional(T const& value);
-		inline Optional(T&& value);
-		inline ~Optional();
+		Optional();
+		Optional(Optional<T> const&);
+		Optional(Optional<T>&&);
+		Optional(NullOpt_T nullOpt);
+		Optional(T const&);
+		Optional(T&&);
+		~Optional();
 
-		inline Optional<T>& operator=(Optional<T> const& other);
+		Optional<T>& operator=(Optional<T> const&);
+		Optional<T>& operator=(Optional<T>&&);
 
-		[[nodiscard]] inline bool HasValue() const;
+		[[nodiscard]] bool HasValue() const;
 
-		[[nodiscard]] inline T const& Value() const;
-		[[nodiscard]] inline T& Value();
+		[[nodiscard]] T const& Value() const;
+		[[nodiscard]] T& Value();
 
-		[[nodiscard]] inline T const* ToPtr() const;
-		[[nodiscard]] inline T* ToPtr();
+		[[nodiscard]] T const* ToPtr() const;
+		[[nodiscard]] T* ToPtr();
 	};
 
 	template<typename T>
 	using Opt = Optional<T>;
 
 	template<typename T>
-	inline Optional<T>::Optional() :
-		m_hasValue(false)
+	Optional<T>::Optional() {}
+
+	template<typename T>
+	Optional<T>::Optional(Optional<T> const& other)
+	{
+		if (other.HasValue())
+		{
+			new(&m_value) T(other.Value());
+			m_hasValue = true;
+		}
+	}
+
+	template<typename T>
+	Optional<T>::Optional(Optional<T>&& other)
+	{
+		if (other.HasValue())
+		{
+			new(&m_value) T(static_cast<T&&>(other.Value()));
+			m_hasValue = true;
+
+			other.m_value.~T();
+			other.m_hasValue = false;
+		}
+	}
+
+	template<typename T>
+	Optional<T>::Optional(NullOpt_T nullOpt)
 	{
 	}
 
 	template<typename T>
-	inline Optional<T>::Optional(T const& value) :
+	Optional<T>::Optional(T const& value) :
 		m_hasValue(true)
 	{
-		new(m_valueBuffer) T(value);
+		new(&m_value) T(value);
 	}
 
 	template<typename T>
-	inline Optional<T>::Optional(T&& value) :
+	Optional<T>::Optional(T&& value) :
 		m_hasValue(true)
 	{
-		new(m_valueBuffer) T(static_cast<T&&>(value));
+		new(&m_value) T(static_cast<T&&>(value));
 	}
 
 	template<typename T>
-	inline Optional<T>::~Optional()
+	Optional<T>::~Optional()
 	{
 		if (HasValue())
 			m_value.~T();
 	}
 
 	template<typename T>
-	inline Optional<T>& Optional<T>::operator=(Optional<T> const& other)
+	Optional<T>& Optional<T>::operator=(Optional<T> const& other)
 	{
 		if (this == &other)
 			return *this;
@@ -76,19 +108,42 @@ namespace DEngine::Std
 			m_value.~T();
 
 		if (other.HasValue())
+		{
 			m_value = other.Value();
+			m_hasValue = true;
+		}
 		else
 			m_hasValue = false;
 	}
 
 	template<typename T>
-	inline bool Optional<T>::HasValue() const
+	Optional<T>& Optional<T>::operator=(Optional<T>&& other)
+	{
+		if (this == &other)
+			return *this;
+
+		if (HasValue())
+			m_value.~T();
+
+		if (other.HasValue())
+		{
+			m_value = static_cast<T&&>(other.Value());
+			m_hasValue = true;
+		}
+		else
+			m_hasValue = false;
+
+		return *this;
+	}
+
+	template<typename T>
+	bool Optional<T>::HasValue() const
 	{
 		return m_hasValue;
 	}
 
 	template<typename T>
-	inline T const& Optional<T>::Value() const
+	T const& Optional<T>::Value() const
 	{
 		if (!HasValue())
 			throw std::runtime_error("Tried to deference Optional-variable without Value.");
@@ -96,7 +151,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	inline T& Optional<T>::Value()
+	T& Optional<T>::Value()
 	{
 		if (!HasValue())
 			throw std::runtime_error("Tried to deference Optional-variable without Value.");
@@ -104,14 +159,20 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	inline T const* Optional<T>::ToPtr() const
+	T const* Optional<T>::ToPtr() const
 	{
-
+		if (HasValue())
+			return &m_value;
+		else
+			return nullptr;
 	}
 
 	template<typename T>
-	inline T* Optional<T>::ToPtr()
+	T* Optional<T>::ToPtr()
 	{
-		
+		if (HasValue())
+			return &m_value;
+		else
+			return nullptr;
 	}
 }

@@ -31,22 +31,16 @@ DEngine::Gfx::Vk::APIData::APIData()
 
 DEngine::Gfx::Vk::APIData::~APIData()
 {
+	APIData& apiData = *this;
+
+	apiData.globUtils.device.WaitIdle();
 }
 
 void DEngine::Gfx::Vk::APIData::NewViewport(uSize& viewportID, void*& imguiTexID)
 {
-	vk::Result vkResult{};
 	APIData& apiData = *this;
 
-	ViewportManager::CreateJob createJob{};
-	createJob.imguiTexID = ImGui_ImplVulkan_AddTexture(VkImageView(), VkImageLayout());
-	std::lock_guard _{ apiData.viewportManager.mutexLock };
-	createJob.id = apiData.viewportManager.viewportIDTracker;
-	viewportID = createJob.id;
-	imguiTexID = createJob.imguiTexID;
-
-	apiData.viewportManager.createQueue.push_back(createJob);
-	apiData.viewportManager.viewportIDTracker += 1;
+	apiData.viewportManager.NewViewport(viewportID, imguiTexID);
 }
 
 void DEngine::Gfx::Vk::APIData::DeleteViewport(uSize id)
@@ -54,8 +48,7 @@ void DEngine::Gfx::Vk::APIData::DeleteViewport(uSize id)
 	vk::Result vkResult{};
 	APIData& apiData = *this;
 
-	std::lock_guard _{ apiData.viewportManager.mutexLock };
-	apiData.viewportManager.deleteQueue.push_back(id);
+	apiData.viewportManager.DeleteViewport(id);
 }
 
 DEngine::Gfx::Vk::GlobUtils::GlobUtils()
@@ -85,19 +78,20 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	GlobUtils& globUtils = apiData.globUtils;
 
 	vk::Result vkResult{};
+	bool boolResult = false;
 
 	apiData.logger = initInfo.optional_iLog;
 	apiData.globUtils.logger = initInfo.optional_iLog;
 	apiData.wsiInterface = initInfo.iWsi;
+	apiData.test_textureAssetInterface = initInfo.texAssetInterface;
 
 	globUtils.resourceSetCount = 2;
 	apiData.currentInFlightFrame = 0;
 	globUtils.useEditorPipeline = true;
 
+	// Make the VkInstance
 	PFN_vkGetInstanceProcAddr instanceProcAddr = Vk::loadInstanceProcAddressPFN();
-
 	BaseDispatch baseDispatch = BaseDispatch::Build(instanceProcAddr);
-
 	Init::CreateVkInstance_Return createVkInstanceResult = Init::CreateVkInstance(
 		initInfo.requiredVkInstanceExtensions, 
 		true, 
@@ -106,6 +100,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	InstanceDispatch instance = InstanceDispatch::Build(createVkInstanceResult.instanceHandle, instanceProcAddr);
 	globUtils.instance = instance;
 
+	// Enable DebugUtils functionality.
 	// If we enabled debug utils, we build the debug utils dispatch table and the debug utils messenger.
 	if (createVkInstanceResult.debugUtilsEnabled)
 	{
@@ -126,7 +121,6 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	if (surfaceCreateResult != vk::Result::eSuccess)
 		throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
 
-
 	// Pick our phys device and load the info for it
 	apiData.globUtils.physDevice = Init::LoadPhysDevice(instance, surface);
 
@@ -135,8 +129,8 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 
 	// Build the settings we will use to build the swapchain.
 	SwapchainSettings swapchainSettings = Init::BuildSwapchainSettings(
-		instance, 
-		globUtils.physDevice.handle, 
+		instance,
+		globUtils.physDevice.handle,
 		apiData.surface,
 		apiData.surface.capabilities.currentExtent.width,
 		apiData.surface.capabilities.currentExtent.height,
@@ -149,23 +143,56 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	globUtils.device.copy(DeviceDispatch::Build(deviceHandle, deviceProcAddr));
 	globUtils.device.m_queueDataPtr = &globUtils.queues;
 
-	bool result = Init::InitializeViewportManager(
+	boolResult = ViewportManager::Init(
 		apiData.viewportManager,
-		globUtils.physDevice,
-		globUtils.device);
+		globUtils.device,
+		globUtils.physDevice.properties.limits.minUniformBufferOffsetAlignment,
+		globUtils.DebugUtilsPtr());
+	if (!boolResult)
+		throw std::runtime_error("DEngine - Vulkan: Failed to initialize ViewportManager.");
 
-	QueueData::Initialize(
+	boolResult = DeletionQueue::Init(
+		globUtils.deletionQueue,
+		&globUtils,
+		globUtils.resourceSetCount);
+	if (!boolResult)
+		throw std::runtime_error("DEngine - Vulkan: Failed to initialize DeletionQueue");
+
+	QueueData::Init(
 		globUtils.queues,
 		globUtils.device, 
 		globUtils.physDevice.queueIndices, 
 		globUtils.DebugUtilsPtr());
 
+	TextureManager::Init(
+		apiData.textureManager,
+		globUtils.device,
+		globUtils.queues,
+		globUtils.DebugUtilsPtr());
+
+	// Init VMA
 	apiData.vma_trackingData.deviceHandle = globUtils.device.handle;
 	apiData.vma_trackingData.debugUtils = globUtils.DebugUtilsPtr();
-	Init::InitializeVMA(globUtils, &apiData.vma_trackingData);
+	vk::ResultValue<VmaAllocator> vmaResult = Init::InitializeVMA(
+		globUtils.instance,
+		globUtils.physDevice.handle,
+		globUtils.device,
+		&apiData.vma_trackingData);
+	if (vmaResult.result != vk::Result::eSuccess)
+		throw std::runtime_error("DEngine - Vulkan: Failed to initialize VMA.");
+	else
+		globUtils.vma = vmaResult.value;
 
+	boolResult = ObjectDataManager::Init(
+		apiData.objectDataManager,
+		globUtils.physDevice.properties.limits.minUniformBufferOffsetAlignment,
+		globUtils.resourceSetCount,
+		globUtils.vma,
+		globUtils.device,
+		globUtils.DebugUtilsPtr());
+	if (!boolResult)
+		throw std::runtime_error("DEngine - Vulkan: Failed to initialize ObjectDataManager.");
 
-	apiData.globUtils.deletionQueue.Initialize(&apiData.globUtils, apiData.globUtils.resourceSetCount);
 
 	// Build our swapchain on our device
 	apiData.swapchain = Init::CreateSwapchain(
@@ -197,44 +224,59 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 		apiData.swapchain.surfaceFormat.format,
 		apiData.swapchain.extents,
 		apiData.globUtils.resourceSetCount,
-
 		apiData.globUtils.DebugUtilsPtr());
 
 	// Record the copy-image command cmdBuffers that go from render-target to swapchain
-	Init::RecordSwapchainCmdBuffers(apiData.globUtils.device, apiData.swapchain, apiData.guiData.renderTarget.img);
+	Init::RecordSwapchainCmdBuffers(
+		apiData.globUtils.device, 
+		apiData.swapchain, 
+		apiData.guiData.renderTarget.img);
 
 	// Initialize ImGui stuff
-	Init::InitializeImGui(apiData, apiData.globUtils.device, instanceProcAddr, apiData.globUtils.DebugUtilsPtr());
+	Init::InitializeImGui(
+		apiData, apiData.globUtils.device, 
+		instanceProcAddr, 
+		apiData.globUtils.DebugUtilsPtr());
 
 	// Create the main render stuff
 	apiData.globUtils.gfxRenderPass = Init::BuildMainGfxRenderPass(
 		apiData.globUtils.device,
 		true, 
 		apiData.globUtils.DebugUtilsPtr());
+
+
 	
+
+
+
+
+
 	Init::Test(apiData);
 	
 
 	return true;
 }
 
-
 void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 {
 	vk::Result vkResult{};
 
+	Std::Array<vk::DescriptorSetLayout, 3> layouts{ 
+		apiData.viewportManager.cameraDescrLayout, 
+		apiData.objectDataManager.descrSetLayout,
+		apiData.textureManager.descrSetLayout };
+
 	vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
-	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &apiData.viewportManager.cameraDescrLayout;
+	pipelineLayoutInfo.setLayoutCount = 3;
+	pipelineLayoutInfo.pSetLayouts = layouts.Data();
 	apiData.testPipelineLayout = apiData.globUtils.device.createPipelineLayout(pipelineLayoutInfo);
 
-	Std::Opt<App::FileStream> vertFileOpt = App::FileStream::OpenPath("data/vert.spv");
-	if (!vertFileOpt.HasValue())
+	App::FileInputStream vertFile{ "data/vert.spv" };
+	if (!vertFile.IsOpen())
 		throw std::runtime_error("Could not open vertex shader file");
-	App::FileStream& vertFile = vertFileOpt.Value();
-	vertFile.Seek(0, App::FileStream::SeekOrigin::End);
-	u64 vertFileLength = vertFile.Tell();
-	vertFile.Seek(0, App::FileStream::SeekOrigin::Start);
+	vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
+	u64 vertFileLength = vertFile.Tell().Value();
+	vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
 	std::vector<char> vertCode((uSize)vertFileLength);
 	vertFile.Read(vertCode.data(), vertFileLength);
 	
@@ -247,13 +289,12 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	vertStageInfo.module = vertModule;
 	vertStageInfo.pName = "main";
 
-	Std::Opt<App::FileStream> fragFileOpt = App::FileStream::OpenPath("data/frag.spv");
-	if (!fragFileOpt.HasValue())
+	App::FileInputStream fragFile{ "data/frag.spv" };
+	if (!fragFile.IsOpen())
 		throw std::runtime_error("Could not open fragment shader file");
-	App::FileStream& fragFile = fragFileOpt.Value();
-	fragFile.Seek(0, App::FileStream::SeekOrigin::End);
-	u64 fragFileLength = fragFile.Tell();
-	fragFile.Seek(0, App::FileStream::SeekOrigin::Start);
+	fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
+	u64 fragFileLength = fragFile.Tell().Value();
+	fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
 	std::vector<char> fragCode((uSize)fragFileLength);
 	fragFile.Read(fragCode.data(), fragFileLength);
 

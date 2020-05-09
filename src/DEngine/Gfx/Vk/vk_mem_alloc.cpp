@@ -30,8 +30,10 @@ namespace DEngine::Gfx::Vk::Init
 	}
 }
 
-void DEngine::Gfx::Vk::Init::InitializeVMA(
-	GlobUtils& globUtils,
+vk::ResultValue<VmaAllocator> DEngine::Gfx::Vk::Init::InitializeVMA(
+	InstanceDispatch const& instance,
+	vk::PhysicalDevice physDeviceHandle,
+	DeviceDispatch const& device,
 	VMA_MemoryTrackingData* vma_trackingData) 
 {
 	vk::Result vkResult{};
@@ -40,8 +42,6 @@ void DEngine::Gfx::Vk::Init::InitializeVMA(
 	callbacks.pfnAllocate = &AllocCallbackForVMA;
 	callbacks.pUserData = vma_trackingData;
 
-	InstanceDispatch const& instance = globUtils.instance;
-	DevDispatch const& device = globUtils.device;
 	VmaVulkanFunctions vmaDispatch{};
 	vmaDispatch.vkAllocateMemory = device.raw.vkAllocateMemory;
 	vmaDispatch.vkBindBufferMemory = device.raw.vkBindBufferMemory;
@@ -75,7 +75,7 @@ void DEngine::Gfx::Vk::Init::InitializeVMA(
 	vmaInfo.pAllocationCallbacks = nullptr;
 	vmaInfo.pDeviceMemoryCallbacks = vma_trackingData && vma_trackingData->debugUtils ? &callbacks : nullptr;
 	vmaInfo.pHeapSizeLimit = nullptr;
-	vmaInfo.physicalDevice = (VkPhysicalDevice) globUtils.physDevice.handle;
+	vmaInfo.physicalDevice = (VkPhysicalDevice)physDeviceHandle;
 	vmaInfo.pRecordSettings = nullptr;
 	vmaInfo.preferredLargeHeapBlockSize = 0; // This is default
 	vmaInfo.pVulkanFunctions = &vmaDispatch;
@@ -83,9 +83,7 @@ void DEngine::Gfx::Vk::Init::InitializeVMA(
 
 	VmaAllocator returnVal{};
 
-	vkResult = (vk::Result) vmaCreateAllocator(&vmaInfo, &returnVal);
-	if (vkResult != vk::Result::eSuccess)
-		throw std::runtime_error("DEngine - Vulkan: Could not initialize VMA.");
+	vkResult = static_cast<vk::Result>(vmaCreateAllocator(&vmaInfo, &returnVal));
 
-	globUtils.vma = returnVal;
+	return { vkResult, returnVal };
 }

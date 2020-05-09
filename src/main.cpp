@@ -1,22 +1,21 @@
 
-#include "ImGui/imgui.h"
-
+#include "DEngine/Scene.hpp"
 #include "DEngine/Application/detail_Application.hpp"
 #include "DEngine/Time.hpp"
 #include "DEngine/Editor.hpp"
 
 #include "DEngine/Gfx/Gfx.hpp"
 #include "DEngine/FixedWidthTypes.hpp"
-
-#include "DEngine/Math/Vector/Vector.hpp"
+#include "DEngine/Utility.hpp"
+#include "DEngine/Math/Vector.hpp"
 #include "DEngine/Math/UnitQuaternion.hpp"
 #include "DEngine/Math/LinearTransform3D.hpp"
 
-#include <utility>
 #include <iostream>
 #include <vector>
 #include <string>
-#include <sstream>
+
+extern DEngine::Editor::EditorData* DEngine_Debug_globEditorData;
 
 class GfxLogger : public DEngine::Gfx::ILog
 {
@@ -54,6 +53,50 @@ public:
 	}
 };
 
+class GfxTexAssetInterfacer : public DEngine::Gfx::TextureAssetInterface
+{
+	virtual char const* get(DEngine::Gfx::TextureID id) const override
+	{
+		if ((DEngine::u64)id == 0)
+			return "data/Test.ktx";
+		else
+			return "data/2.png";
+	}
+};
+
+void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
+{
+	auto rbIndex = scene.rigidbodies.FindIf(
+		[entity](Std::Pair<Entity, Physics::Rigidbody2D> const& val) -> bool
+		{
+			return entity == val.a;
+		});
+	if (!rbIndex.HasValue())
+		return;
+
+	Physics::Rigidbody2D& rb = scene.rigidbodies[rbIndex.Value()].b;
+
+	Math::Vec2 addAcceleration{};
+
+	f32 amount = 1.f * deltaTime;
+
+	if (App::ButtonValue(App::Button::Up))
+		addAcceleration.y += amount;
+	if (App::ButtonValue(App::Button::Down))
+		addAcceleration.y -= amount;
+	if (App::ButtonValue(App::Button::Right))
+		addAcceleration.x += amount;
+	if (App::ButtonValue(App::Button::Left))
+		addAcceleration.x -= amount;
+
+	if (addAcceleration.MagnitudeSqrd() != 0)
+	{
+		addAcceleration.Normalize();
+
+		rb.acceleration += addAcceleration;
+	}
+}
+
 int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
@@ -77,23 +120,30 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		App::detail::ImgGui_Initialize();
 	}
 	Editor::EditorData editorData = Editor::Initialize();
+	DEngine_Debug_globEditorData = &editorData;
+
 
 
 	// Initialize the renderer
 	auto requiredInstanceExtensions = App::detail::GetRequiredVulkanInstanceExtensions();
 	GfxLogger gfxLogger{};
 	GfxWsiInterfacer gfxWsiInterface{};
+	GfxTexAssetInterfacer gfxTexAssetInterfacer{};
 	Gfx::InitInfo rendererInitInfo{};
 	rendererInitInfo.iWsi = &gfxWsiInterface;
+	rendererInitInfo.texAssetInterface = &gfxTexAssetInterfacer;
 	rendererInitInfo.optional_iLog = &gfxLogger;
 	rendererInitInfo.requiredVkInstanceExtensions = requiredInstanceExtensions.ToSpan();
-	Std::Optional<Gfx::Data> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
+	Std::Opt<Gfx::Data> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
 	if (!rendererDataOpt.HasValue())
 	{
 		std::cout << "Could not initialize renderer." << std::endl;
 		std::abort();
 	}
-	Gfx::Data rendererData = std::move(rendererDataOpt.Value());
+	Gfx::Data rendererData = Std::Move(rendererDataOpt.Value());
+
+
+	Scene myScene;
 
 
 	while (true)
@@ -104,12 +154,16 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 			break;
 		App::detail::ImGui_NewFrame();
 
+		Editor::RenderImGuiStuff(editorData, myScene, rendererData);
 
-		Editor::RenderImGuiStuff(editorData, rendererData);
+		Physics::Update(myScene, Time::Delta());
+
+		for (auto item : myScene.moves)
+			item.b.Update(item.a, myScene, Time::Delta());
 
 		if (!App::MainWindowMinimized())
 		{
-			Gfx::Draw_Params params{};
+			Gfx::DrawParams params{};
 
 			for (auto const& [vpID, viewport] : editorData.viewports)
 			{
@@ -119,42 +173,42 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 					viewportData.id = viewport.gfxViewportRef.ViewportID();
 					viewportData.width = viewport.renderWidth;
 					viewportData.height = viewport.renderHeight;
-
-					f32 aspectRatio = (f32)viewport.width / viewport.height;
-
-					Editor::Camera const* camPtr = nullptr;
-					if (viewport.cameraID == Editor::Viewport::invalidCamID)
-						camPtr = &viewport.camera;
-					else
+					uSize camIndex = static_cast<uSize>(-1);
+					for (uSize i = 0; i < editorData.cameras.size(); i += 1)
 					{
-						for (auto const& [camID, camera] : editorData.cameras)
+						if (viewport.cameraID == editorData.cameras[i].a)
 						{
-							if (camID == viewport.cameraID)
-							{
-								camPtr = &camera;
-								break;
-							}
+							camIndex = i;
+							break;
 						}
 					}
-					Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(camPtr->rotation);
-
-					camMat = Math::LinTran3D::Translate(camPtr->position) * camMat;
-
-					Math::Mat4 test = Math::Mat4::Identity();
-					test.At(2, 2) = -test.At(2, 2);
-					test.At(0, 0) = -test.At(0, 0);
-					//camMat = test * camMat;
-
-
+					Editor::Camera const& cam = camIndex == static_cast<uSize>(-1) ? viewport.camera : editorData.cameras[camIndex].b;
+					Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(cam.rotation);
+					camMat = Math::LinTran3D::Translate(cam.position) * camMat;
 					camMat = camMat.GetInverse().Value();
-
-					camMat = Math::LinTran3D::Perspective_RH_ZO(camPtr->fov, aspectRatio, camPtr->zNear, camPtr->zFar) * camMat;
-
+					f32 aspectRatio = (f32)viewport.width / viewport.height;
+					camMat = Math::LinTran3D::Perspective_RH_ZO(cam.fov, aspectRatio, cam.zNear, cam.zFar) * camMat;
 					viewportData.transform = camMat;
-
 					params.viewportUpdates.push_back(viewportData);
 				}
 			}
+
+			for (auto item : myScene.textureIDs)
+			{
+				auto& entity = item.a;
+
+				// First check if this entity has a position
+				auto posIndex = myScene.transforms.FindIf([&entity](Std::Pair<Entity, Transform> const& val) -> bool {
+					return val.a == entity;
+					});
+				if (!posIndex.HasValue())
+					continue;
+				auto& transform = myScene.transforms[posIndex.Value()].b;
+
+				params.textureIDs.push_back(item.b);
+				params.transforms.push_back(Math::LinTran3D::Translate(transform.position));
+			}
+
 
 			params.swapchainWidth = App::detail::mainWindowSize[0];
 			params.swapchainHeight = App::detail::mainWindowSize[1];
@@ -163,15 +217,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 			rendererData.Draw(params);
 		}
-
-
-
-
-
-
 	}
-
-
 
 	return 0;
 }

@@ -30,17 +30,24 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 		"${DENGINE_ROOT_DIR}/src/main.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Assert.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Editor.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/FrameAllocator.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Physics2D.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Time.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Utility.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Application/Application.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Gfx.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/DeletionQueue.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/Draw.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/DynamicDispatch.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/Init.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/ObjectDataManager.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/QueueData.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/TextureManager.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/ViewportManager.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/Vk.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Gfx/Vk/vk_mem_alloc.cpp"
 		"${DENGINE_ROOT_DIR}/src/DEngine/Math/Common.cpp"
+		"${DENGINE_ROOT_DIR}/src/DEngine/Math/Vector.cpp"
 		)
 	add_executable(${PROJECT_NAME} ${DENGINE_SRC_FILES})
 	target_include_directories(${PROJECT_NAME} PRIVATE ${DENGINE_INCLUDE_DIRS})
@@ -72,22 +79,22 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 # ----------------------
 # START
 	if(DENGINE_ENABLE_ASSERT)
-		target_compile_definitions(${PROJECT_NAME} PUBLIC "DENGINE_ENABLE_ASSERT")
+		target_compile_definitions(${PROJECT_NAME} PRIVATE "DENGINE_ENABLE_ASSERT")
 	endif()
 
 		# Handles the renderer's assert option
 	if(DENGINE_APPLICATION_ENABLE_ASSERT)
-		target_compile_definitions(${PROJECT_NAME} PUBLIC "DENGINE_APPLICATION_ENABLE_ASSERT")
+		target_compile_definitions(${PROJECT_NAME} PRIVATE "DENGINE_APPLICATION_ENABLE_ASSERT")
 	endif()
 
 	# Handles the renderer's assert option
 	if(DENGINE_GFX_ENABLE_ASSERT)
-		target_compile_definitions(${PROJECT_NAME} PUBLIC "DENGINE_GFX_ENABLE_ASSERT")
+		target_compile_definitions(${PROJECT_NAME} PRIVATE "DENGINE_GFX_ENABLE_ASSERT")
 	endif()
 
 	# Handles the DEngine container's assert option
 	if(DENGINE_CONTAINERS_ENABLE_ASSERT)
-		target_compile_definitions(${PROJECT_NAME} PUBLIC "DENGINE_CONTAINERS_ENABLE_ASSERT")
+		target_compile_definitions(${PROJECT_NAME} PRIVATE "DENGINE_CONTAINERS_ENABLE_ASSERT")
 	endif()
 #
 # END
@@ -100,8 +107,8 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 # Link Texas
 # ----------
 # START
-	#add_subdirectory("Texas")
-	#target_link_libraries(${PROJECT_NAME} PUBLIC Texas)
+	add_subdirectory("external/Texas")
+	target_link_libraries(${PROJECT_NAME} PRIVATE Texas)
 #
 # END
 #
@@ -112,7 +119,7 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 # START
 	add_library(DENGINE_APPLICATION STATIC "${DENGINE_ROOT_DIR}/src/DEngine/Application/Application_Desktop.cpp")
 	if(DENGINE_APPLICATION_ENABLE_ASSERT)
-		target_compile_definitions(DENGINE_APPLICATION PUBLIC "DENGINE_APPLICATION_ENABLE_ASSERT")
+		target_compile_definitions(DENGINE_APPLICATION PRIVATE "DENGINE_APPLICATION_ENABLE_ASSERT")
 	endif()
 	target_link_libraries(${PROJECT_NAME} PRIVATE DENGINE_APPLICATION)
 	target_include_directories(DENGINE_APPLICATION PRIVATE ${DENGINE_INCLUDE_DIRS})

@@ -5,6 +5,7 @@
 build
 .vscode
 android/local.properties
+android/android.iml
 android/.gradle
 android/.idea
 android/app/app.iml

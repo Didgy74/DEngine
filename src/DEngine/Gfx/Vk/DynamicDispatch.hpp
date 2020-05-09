@@ -388,30 +388,20 @@ namespace DEngine::Gfx::Vk
 		DeviceDispatchRaw raw{};
 
 		[[nodiscard]] vk::Result allocateCommandBuffers(
-			vk::CommandBufferAllocateInfo const& pAllocateInfo,
-			vk::CommandBuffer* pCommandBuffers) const
-		{
-			return handle.allocateCommandBuffers(&pAllocateInfo, pCommandBuffers, raw);
-		}
+			vk::CommandBufferAllocateInfo const& allocateInfo,
+			vk::CommandBuffer* pCommandBuffers) const;
 
 		[[nodiscard]] vk::Result allocateDescriptorSets(
 			vk::DescriptorSetAllocateInfo const& allocInfo,
-			vk::DescriptorSet* pDescriptorSets) const
-		{
-			return handle.allocateDescriptorSets(&allocInfo, pDescriptorSets, raw);
-		}
+			vk::DescriptorSet* pDescriptorSets) const;
 
 		[[nodiscard]] vk::DeviceMemory allocateMemory(
 			vk::MemoryAllocateInfo const& allocInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.allocateMemory(allocInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
-		void beginCommandBuffer(vk::CommandBuffer cmdBuffer, vk::CommandBufferBeginInfo const& beginInfo) const
-		{
-			return cmdBuffer.begin(beginInfo, raw);
-		}
+		void beginCommandBuffer(
+			vk::CommandBuffer cmdBuffer, 
+			vk::CommandBufferBeginInfo const& beginInfo) const;
 
 		void bindBufferMemory(
 			vk::Buffer buffer,
@@ -430,8 +420,8 @@ namespace DEngine::Gfx::Vk
 		}
 
 		void cmdBeginRenderPass(
-			vk::CommandBuffer commandBuffer, 
-			vk::RenderPassBeginInfo const& renderPassBegin, 
+			vk::CommandBuffer commandBuffer,
+			vk::RenderPassBeginInfo const& renderPassBegin,
 			vk::SubpassContents contents) const
 		{
 			return commandBuffer.beginRenderPass(renderPassBegin, contents, raw);
@@ -439,10 +429,10 @@ namespace DEngine::Gfx::Vk
 
 		void cmdBindDescriptorSets(
 			vk::CommandBuffer commandBuffer,
-			vk::PipelineBindPoint pipelineBindPoint, 
-			vk::PipelineLayout layout, 
-			std::uint32_t firstSet, 
-			vk::ArrayProxy<vk::DescriptorSet const> descriptorSets, 
+			vk::PipelineBindPoint pipelineBindPoint,
+			vk::PipelineLayout layout,
+			std::uint32_t firstSet,
+			vk::ArrayProxy<vk::DescriptorSet const> descriptorSets,
 			vk::ArrayProxy<uint32_t const> dynamicOffsets) const
 		{
 			return commandBuffer.bindDescriptorSets(
@@ -454,10 +444,20 @@ namespace DEngine::Gfx::Vk
 				raw);
 		}
 
-		void cmdBindPipeline(vk::CommandBuffer commandBuffer, vk::PipelineBindPoint pipelineBindPoint, vk::Pipeline pipeline) const
+		void cmdBindPipeline(
+			vk::CommandBuffer commandBuffer, 
+			vk::PipelineBindPoint pipelineBindPoint,
+			vk::Pipeline pipeline) const
 		{
 			return commandBuffer.bindPipeline(pipelineBindPoint, pipeline, raw);
 		}
+
+		void cmdCopyBufferToImage(
+			vk::CommandBuffer commandBuffer,
+			vk::Buffer srcBuffer,
+			vk::Image dstImage,
+			vk::ImageLayout dstImageLayout,
+			vk::ArrayProxy<vk::BufferImageCopy const> regions) const;
 
 		void cmdCopyImage(
 			vk::CommandBuffer commandBuffer,
@@ -547,8 +547,8 @@ namespace DEngine::Gfx::Vk
 		}
 
 		void cmdSetViewport(
-			vk::CommandBuffer commandBuffer, 
-			std::uint32_t firstViewport, 
+			vk::CommandBuffer commandBuffer,
+			std::uint32_t firstViewport,
 			vk::ArrayProxy<vk::Viewport const> viewports) const
 		{
 			return commandBuffer.setViewport(firstViewport, viewports, raw);
@@ -563,27 +563,18 @@ namespace DEngine::Gfx::Vk
 
 		[[nodiscard]] vk::CommandPool createCommandPool(
 			vk::CommandPoolCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createCommandPool(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
 		[[nodiscard]] vk::DescriptorPool createDescriptorPool(
 			vk::DescriptorPoolCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createDescriptorPool(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
 		[[nodiscard]] vk::DescriptorSetLayout createDescriptorSetLayout(
 			vk::DescriptorSetLayoutCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createDescriptorSetLayout(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
 		[[nodiscard]] vk::Fence createFence(
-			vk::FenceCreateInfo const& createInfo, 
+			vk::FenceCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
 		{
 			return handle.createFence(createInfo, allocator, raw);
@@ -602,6 +593,14 @@ namespace DEngine::Gfx::Vk
 			vk::Optional<vk::AllocationCallbacks const> allocator,
 			vk::Pipeline* pPipelines) const;
 
+		[[nodiscard]] vk::Image createImage(
+			vk::ImageCreateInfo const& createInfo,
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+
+		[[nodiscard]] vk::ImageView createImageView(
+			vk::ImageViewCreateInfo const& createInfo, 
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+
 		[[nodiscard]] vk::PipelineLayout createPipelineLayout(
 			vk::PipelineLayoutCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
@@ -611,10 +610,7 @@ namespace DEngine::Gfx::Vk
 
 		[[nodiscard]] vk::Sampler createSampler(
 			vk::SamplerCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createSampler(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
 		[[nodiscard]] vk::ResultValue<vk::Semaphore> createSemaphore(
 			vk::SemaphoreCreateInfo const& createInfo,
@@ -686,10 +682,7 @@ namespace DEngine::Gfx::Vk
 
 		void updateDescriptorSets(
 			vk::ArrayProxy<vk::WriteDescriptorSet const> descriptorWrites,
-			vk::ArrayProxy<vk::CopyDescriptorSet const> descriptorCopies) const
-		{
-			return handle.updateDescriptorSets(descriptorWrites, descriptorCopies, raw);
-		}
+			vk::ArrayProxy<vk::CopyDescriptorSet const> descriptorCopies) const;
 
 		[[nodiscard]] vk::Result waitForFences(
 			vk::ArrayProxy<vk::Fence const> fences, 
@@ -722,15 +715,7 @@ namespace DEngine::Gfx::Vk
 
 
 		// Images
-		[[nodiscard]] vk::Image createImage(vk::ImageCreateInfo const& createInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createImage(createInfo, allocator, raw);
-		}
 
-		vk::ImageView createImageView(vk::ImageViewCreateInfo const& createInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createImageView(createInfo, allocator, raw);
-		}
 
 
 
