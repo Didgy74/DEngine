@@ -67,10 +67,8 @@ class GfxTexAssetInterfacer : public DEngine::Gfx::TextureAssetInterface
 void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 {
 	auto rbIndex = scene.rigidbodies.FindIf(
-		[entity](Std::Pair<Entity, Physics::Rigidbody2D> const& val) -> bool
-		{
-			return entity == val.a;
-		});
+		[entity](Std::Pair<Entity, Physics::Rigidbody2D> const& val) -> bool {
+			return entity == val.a; });
 	if (!rbIndex.HasValue())
 		return;
 
