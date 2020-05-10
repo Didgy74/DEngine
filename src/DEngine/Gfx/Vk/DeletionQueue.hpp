@@ -5,7 +5,10 @@
 #include "DynamicDispatch.hpp"
 
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/FixedVector.hpp"
+#include "DEngine/Containers/StaticVector.hpp"
+#include "DEngine/Containers/Pair.hpp"
+
+#include "VMAIncluder.hpp"
 
 #include <vector>
 #include <mutex>
@@ -17,78 +20,71 @@ namespace DEngine::Gfx::Vk
 	class DeletionQueue
 	{
 	public:
-		static constexpr uSize jobBufferSize = 128;
+		DeletionQueue() = default;
+		DeletionQueue(DeletionQueue const&) = delete;
+		DeletionQueue(DeletionQueue&&) = delete;
+		DeletionQueue& operator=(DeletionQueue const&) = delete;
+		DeletionQueue& operator=(DeletionQueue&&) = delete;
 
-		using CallbackPFN = void(*)(GlobUtils const& globUtils, char const(&buffer)[jobBufferSize]);
+		template<typename T>
+		using TestCallback = void(*)(GlobUtils const& globUtils, T customData);
+		template<typename T>
+		inline void DestroyTest(
+			TestCallback<T> callback, 
+			T const& customData) const;
+		template<typename T>
+		inline void DestroyTest(
+			vk::Fence fence,
+			TestCallback<T> callback, 
+			T const& customData) const;
+
+		using CallbackPFN = void(*)(GlobUtils const& globUtils, Std::Span<char> customData);
 
 		// Do NOT call this, only if you're initializing the entire shit
-		inline void Initialize(GlobUtils const& globUtilsIn, u8 resourceSetCountIn)
-		{
-			currentResourceSetIndex = 0;
-			this->globUtils = &globUtilsIn;
-			this->resourceSetCount = resourceSetCountIn;
-
-			jobQueues.Resize(resourceSetCountIn);
-			for (auto& item : jobQueues)
-				item.reserve(25);
-			tempQueue.reserve(25);
-
-			fencedJobQueues.Resize(resourceSetCountIn);
-			for (auto& item : fencedJobQueues)
-				item.reserve(25);
-		}
+		[[nodiscard]] static bool Init(
+			DeletionQueue& delQueue,
+			GlobUtils const* globUtilsIn,
+			u8 resourceSetCountIn);
 
 		static void ExecuteCurrentTick(DeletionQueue& queue);
 
-		inline void Destroy(CallbackPFN callback, char const(&buffer)[jobBufferSize]) const
-		{
-			std::lock_guard lockGuard{ accessMutex };
-
-			tempQueue.push_back({});
-			Job& newJob = tempQueue.back();
-			newJob.callback = callback;
-			std::memcpy(newJob.buffer, buffer, jobBufferSize);
-		}
-
-		// Warning: Only works with VulkanHPP handles.
-		template<typename T>
-		inline void Destroy(T objectHandle) const
-		{
-			char buffer[jobBufferSize] = {};
-			std::memcpy(buffer, &objectHandle, sizeof(objectHandle));
-
-			Destroy(&DestroyVulkanHppHandle<T>, buffer);
-		}
+		void Destroy(
+			CallbackPFN callback, 
+			Std::Span<char const> customData) const;
 
 		// Waits for a fence to be signalled and then executes
 		// the job, and afterwards destroys the Fence.
-		inline void Destroy(
+		void Destroy(
 			vk::Fence fence,
 			CallbackPFN callback,
-			char const(&buffer)[jobBufferSize]) const
-		{
-			std::lock_guard lockGuard{ accessMutex };
+			Std::Span<char const> customData) const;
 
-			FencedJob newJob{};
-			newJob.fence = fence;
-			newJob.job.callback = callback;
-			std::memcpy(newJob.job.buffer, buffer, jobBufferSize);
+		void DestroyImGuiTexture(void* texId) const;
 
-			std::vector<FencedJob>& currentQueue = fencedJobQueues[currentResourceSetIndex];
-			currentQueue.push_back(newJob);
-		}
+		void Destroy(VmaAllocation alloc, vk::Image img) const;
+		void Destroy(vk::Fence fence, VmaAllocation alloc, vk::Image img) const;
+		void Destroy(VmaAllocation alloc, vk::Buffer buffer) const;
+		void Destroy(vk::Fence fence, VmaAllocation alloc, vk::Buffer buffer) const;
 
-		// Warning: Only works with VulkanHPP handles.
-		template<typename T>
-		inline void Destroy(
-			vk::Fence fence,
-			T objectHandle) const
-		{
-			char buffer[jobBufferSize] = {};
-			std::memcpy(buffer, &objectHandle, sizeof(objectHandle));
+		// Frees the command buffers
+		// The contents of the span will be copied into the deletion queue.
+		// Does NOT free the commandpool.
+		void Destroy(vk::CommandPool cmdPool, Std::Span<vk::CommandBuffer const> commandBuffers) const;
 
-			Destroy(fence, &DestroyVulkanHppHandle<T>, buffer);
-		}
+		void Destroy(vk::CommandPool in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+		void Destroy(vk::Fence fence, vk::CommandPool in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+		void Destroy(vk::DescriptorPool in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+		void Destroy(vk::Fence fence,vk::DescriptorPool in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+		void Destroy(vk::Framebuffer in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+		void Destroy(vk::Fence fence, vk::Framebuffer in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+		void Destroy(vk::ImageView in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+		void Destroy(vk::Fence fence, vk::ImageView in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+
+		void Destroy(vk::SurfaceKHR in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+		void Destroy(vk::Fence fence, vk::SurfaceKHR in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+		void Destroy(vk::SwapchainKHR in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+		void Destroy(vk::Fence fence, vk::SwapchainKHR in, vk::Optional<vk::AllocationCallbacks> callbacks = nullptr) const;
+
 
 	private:
 		GlobUtils const* globUtils = nullptr;
@@ -98,23 +94,68 @@ namespace DEngine::Gfx::Vk
 		struct Job
 		{
 			CallbackPFN callback = nullptr;
-			alignas(std::max_align_t) char buffer[jobBufferSize] = {};
+			// Offset in bytes.
+			uSize dataOffset = 0;
+			// Size in bytes
+			uSize dataSize = 0;
 		};
-		mutable Cont::FixedVector<std::vector<Job>, Constants::maxResourceSets> jobQueues{};
-		mutable std::vector<Job> tempQueue{};
+		// First is the custom-data vector. We use u64 for alignment purposes.
+		// Custom-data is type-erased.
+		// Second is the vector of jobs
+		using QueueType = Std::Pair<std::vector<Job>, std::vector<u64>>;
+		mutable Std::StaticVector<QueueType, Constants::maxResourceSets> jobQueues{};
+		mutable QueueType tempQueue{};
+
 		struct FencedJob
 		{
-			Job job{};
 			vk::Fence fence{};
+			Job job{};
 		};
-		mutable Cont::FixedVector<std::vector<FencedJob>, Constants::maxResourceSets> fencedJobQueues{};
-
-		template<typename T>
-		static inline void DestroyVulkanHppHandle(GlobUtils const& globUtils, char const(&buffer)[jobBufferSize])
-		{
-			T objectHandle{};
-			std::memcpy(&objectHandle, buffer, sizeof(T));
-			//globUtils.device.handle.destroy(objectHandle, nullptr, globUtils.device.raw);
-		}
+		using FencedQueueType = Std::Pair<std::vector<FencedJob>, std::vector<u64>>;
+		mutable FencedQueueType fencedJobQueues[2];
+		bool currentFencedJobQueueIndex = 0;
 	};
+
+	template<typename T>
+	inline void DeletionQueue::DestroyTest(
+		TestCallback<T> callback, 
+		T const& customData) const
+	{
+		struct TempData
+		{
+			TestCallback<T> callback = nullptr;
+			T customData;
+		};
+		TempData tempData{};
+		tempData.callback = callback;
+		tempData.customData = customData;
+		CallbackPFN wrapperFunc = [](GlobUtils const& globUtils, Std::Span<char> customData)
+		{
+			TempData& tempData = *reinterpret_cast<TempData*>(customData.Data());
+			tempData.callback(globUtils, tempData.customData);
+		};
+		Destroy(wrapperFunc, { reinterpret_cast<char const*>(&tempData), sizeof(tempData) });
+	}
+
+	template<typename T>
+	inline void DeletionQueue::DestroyTest(
+		vk::Fence fence,
+		TestCallback<T> callback, 
+		T const& customData) const
+	{
+		struct TempData
+		{
+			TestCallback<T> callback = nullptr;
+			T customData;
+		};
+		TempData tempData{};
+		tempData.callback = callback;
+		tempData.customData = customData;
+		CallbackPFN wrapperFunc = [](GlobUtils const& globUtils, Std::Span<char> customData)
+		{
+			TempData& tempData = *reinterpret_cast<TempData*>(customData.Data());
+			tempData.callback(globUtils, tempData.customData);
+		};
+		Destroy(fence, wrapperFunc, { reinterpret_cast<char const*>(&tempData), sizeof(tempData) });
+	}
 }

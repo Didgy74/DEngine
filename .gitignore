@@ -2,9 +2,16 @@
 # Created by https://www.gitignore.io/api/clion,cmake,visualstudio
 # Edit at https://www.gitignore.io/?templates=clion,cmake,visualstudio
 
-build/
-.vscode/
+build
 .vscode
+android/local.properties
+android/android.iml
+android/.gradle
+android/.idea
+android/app/app.iml
+android/app/.cxx
+android/app/build
+
 
 ### CLion ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and WebStorm

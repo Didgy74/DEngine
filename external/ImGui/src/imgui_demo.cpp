@@ -374,7 +374,7 @@ void ImGui::ShowDemoWindow(bool* p_open)
             ImGui::CheckboxFlags("io.ConfigFlags: NavEnableSetMousePos", (unsigned int *)&io.ConfigFlags, ImGuiConfigFlags_NavEnableSetMousePos);
             ImGui::SameLine(); HelpMarker("Instruct navigation to move the mouse cursor. See comment for ImGuiConfigFlags_NavEnableSetMousePos.");
             ImGui::CheckboxFlags("io.ConfigFlags: NoMouse", (unsigned int *)&io.ConfigFlags, ImGuiConfigFlags_NoMouse);
-            if (io.ConfigFlags & ImGuiConfigFlags_NoMouse) // Create a way to restore this flag otherwise we could be stuck completely!
+            if (io.ConfigFlags & ImGuiConfigFlags_NoMouse) // CreateJob a way to restore this flag otherwise we could be stuck completely!
             {
                 if (fmodf((float)ImGui::GetTime(), 0.40f) < 0.20f)
                 {
@@ -397,7 +397,7 @@ void ImGui::ShowDemoWindow(bool* p_open)
                 ImGui::Checkbox("io.ConfigDockingWithShift", &io.ConfigDockingWithShift);
                 ImGui::SameLine(); HelpMarker("Enable docking when holding Shift only (allows to drop in wider space, reduce visual noise)");
                 ImGui::Checkbox("io.ConfigDockingAlwaysTabBar", &io.ConfigDockingAlwaysTabBar);
-                ImGui::SameLine(); HelpMarker("Create a docking node and tab-bar on single floating windows.");
+                ImGui::SameLine(); HelpMarker("CreateJob a docking node and tab-bar on single floating windows.");
                 ImGui::Checkbox("io.ConfigDockingTransparentPayload", &io.ConfigDockingTransparentPayload);
                 ImGui::SameLine(); HelpMarker("Make window or viewport transparent when docking and only display docking boxes on the target viewport. Useful if rendering of multiple viewport cannot be synced. Best used with ConfigViewportsNoAutoMerge.");
                 ImGui::Unindent();
@@ -1155,14 +1155,14 @@ static void ShowDemoWindowWidgets()
         static float arr[] = { 0.6f, 0.1f, 1.0f, 0.5f, 0.92f, 0.1f, 0.2f };
         ImGui::PlotLines("Frame Times", arr, IM_ARRAYSIZE(arr));
 
-        // Create a dummy array of contiguous float values to plot
+        // CreateJob a dummy array of contiguous float values to plot
         // Tip: If your float aren't contiguous but part of a structure, you can pass a pointer to your first float and the sizeof() of your structure in the Stride parameter.
         static float values[90] = {};
         static int values_offset = 0;
         static double refresh_time = 0.0;
         if (!animate || refresh_time == 0.0)
             refresh_time = ImGui::GetTime();
-        while (refresh_time < ImGui::GetTime()) // Create dummy Data at fixed 60 hz rate for the demo
+        while (refresh_time < ImGui::GetTime()) // CreateJob dummy Data at fixed 60 hz rate for the demo
         {
             static float phase = 0.0f;
             values[values_offset] = cosf(phase);
@@ -2845,7 +2845,7 @@ static void ShowDemoWindowColumns()
         ImGui::TreePop();
     }
 
-    // Create multiple items in a same cell before switching to next column
+    // CreateJob multiple items in a same cell before switching to next column
     if (ImGui::TreeNode("Mixed items"))
     {
         ImGui::Columns(3, "mixed");
@@ -4889,8 +4889,8 @@ void ShowExampleAppDocuments(bool* p_open)
     enum Target
     {
         Target_None,
-        Target_Tab,                 // Create documents as local tab into a local tab bar
-        Target_DockSpaceAndWindow   // Create documents as regular windows, and create an embedded dockspace
+        Target_Tab,                 // CreateJob documents as local tab into a local tab bar
+        Target_DockSpaceAndWindow   // CreateJob documents as regular windows, and create an embedded dockspace
     };
     static Target opt_target = Target_Tab;
     static bool opt_reorderable = true;
@@ -5007,11 +5007,11 @@ void ShowExampleAppDocuments(bool* p_open)
         {
             NotifyOfDocumentsClosedElsewhere(app);
 
-            // Create a DockSpace node where any window can be docked
+            // CreateJob a DockSpace node where any window can be docked
             ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
             ImGui::DockSpace(dockspace_id);
 
-            // Create Windows
+            // CreateJob Windows
             for (int doc_n = 0; doc_n < app.Documents.Size; doc_n++)
             {
                 MyDocument* doc = &app.Documents[doc_n];

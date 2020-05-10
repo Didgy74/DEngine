@@ -224,8 +224,10 @@ namespace DEngine::Gfx::Vk
 		PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR = nullptr;
 	};
 
-	struct BaseDispatch
+	class BaseDispatch
 	{
+	public:
+
 		static BaseDispatch Build(PFN_vkGetInstanceProcAddr procAddr);
 
 		BaseDispatchRaw raw{};
@@ -253,8 +255,10 @@ namespace DEngine::Gfx::Vk
 		}
 	};
 
-	struct DebugUtilsDispatch
+	class DebugUtilsDispatch
 	{
+	public:
+
 		EXT_DebugUtilsDispatchRaw raw{};
 
 		[[nodiscard]] static DebugUtilsDispatch Build(vk::Instance instance, PFN_vkGetInstanceProcAddr instanceProcAddr);
@@ -283,8 +287,10 @@ namespace DEngine::Gfx::Vk
 		}
 	};
 
-	struct InstanceDispatch
+	class InstanceDispatch
 	{
+	public:
+
 		static InstanceDispatch Build(vk::Instance instance, PFN_vkGetInstanceProcAddr getInstanceProcAddr);
 
 		vk::Instance handle{};
@@ -336,10 +342,9 @@ namespace DEngine::Gfx::Vk
 		}
 
 		KHR_SurfaceDispatchRaw surface_raw{};
-		void destroySurface(vk::SurfaceKHR surface, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroySurfaceKHR(surface, allocator, surface_raw);
-		}
+		void Destroy(
+			vk::SurfaceKHR in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 		vk::SurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilitiesKHR(vk::PhysicalDevice physDevice, vk::SurfaceKHR surface) const
 		{
 			return physDevice.getSurfaceCapabilitiesKHR(surface, surface_raw);
@@ -364,51 +369,39 @@ namespace DEngine::Gfx::Vk
 		{
 			return physDevice.getSurfacePresentModesKHR(surface, pPresentModeCount, pPresentModes, surface_raw);
 		}
-
 	};
 
+	class QueueData;
 	class DeviceDispatch
 	{
 	private:
 		DeviceDispatch(const DeviceDispatch&) = default;
-
 		DeviceDispatch& operator=(const DeviceDispatch&) = default;
 
 	public:
 		DeviceDispatch() = default;
 
 		void copy(const DeviceDispatch& in);
-
 		static DeviceDispatch Build(vk::Device vkDevice, PFN_vkGetDeviceProcAddr getProcAddr);
 
 		vk::Device handle{};
 		DeviceDispatchRaw raw{};
 
 		[[nodiscard]] vk::Result allocateCommandBuffers(
-			vk::CommandBufferAllocateInfo const& pAllocateInfo,
-			vk::CommandBuffer* pCommandBuffers) const
-		{
-			return handle.allocateCommandBuffers(&pAllocateInfo, pCommandBuffers, raw);
-		}
+			vk::CommandBufferAllocateInfo const& allocateInfo,
+			vk::CommandBuffer* pCommandBuffers) const;
 
 		[[nodiscard]] vk::Result allocateDescriptorSets(
 			vk::DescriptorSetAllocateInfo const& allocInfo,
-			vk::DescriptorSet* pDescriptorSets) const
-		{
-			return handle.allocateDescriptorSets(&allocInfo, pDescriptorSets, raw);
-		}
+			vk::DescriptorSet* pDescriptorSets) const;
 
 		[[nodiscard]] vk::DeviceMemory allocateMemory(
 			vk::MemoryAllocateInfo const& allocInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.allocateMemory(allocInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
-		void beginCommandBuffer(vk::CommandBuffer cmdBuffer, vk::CommandBufferBeginInfo const& beginInfo) const
-		{
-			return cmdBuffer.begin(beginInfo, raw);
-		}
+		void beginCommandBuffer(
+			vk::CommandBuffer cmdBuffer, 
+			vk::CommandBufferBeginInfo const& beginInfo) const;
 
 		void bindBufferMemory(
 			vk::Buffer buffer,
@@ -427,8 +420,8 @@ namespace DEngine::Gfx::Vk
 		}
 
 		void cmdBeginRenderPass(
-			vk::CommandBuffer commandBuffer, 
-			vk::RenderPassBeginInfo const& renderPassBegin, 
+			vk::CommandBuffer commandBuffer,
+			vk::RenderPassBeginInfo const& renderPassBegin,
 			vk::SubpassContents contents) const
 		{
 			return commandBuffer.beginRenderPass(renderPassBegin, contents, raw);
@@ -436,10 +429,10 @@ namespace DEngine::Gfx::Vk
 
 		void cmdBindDescriptorSets(
 			vk::CommandBuffer commandBuffer,
-			vk::PipelineBindPoint pipelineBindPoint, 
-			vk::PipelineLayout layout, 
-			std::uint32_t firstSet, 
-			vk::ArrayProxy<vk::DescriptorSet const> descriptorSets, 
+			vk::PipelineBindPoint pipelineBindPoint,
+			vk::PipelineLayout layout,
+			std::uint32_t firstSet,
+			vk::ArrayProxy<vk::DescriptorSet const> descriptorSets,
 			vk::ArrayProxy<uint32_t const> dynamicOffsets) const
 		{
 			return commandBuffer.bindDescriptorSets(
@@ -451,10 +444,20 @@ namespace DEngine::Gfx::Vk
 				raw);
 		}
 
-		void cmdBindPipeline(vk::CommandBuffer commandBuffer, vk::PipelineBindPoint pipelineBindPoint, vk::Pipeline pipeline) const
+		void cmdBindPipeline(
+			vk::CommandBuffer commandBuffer, 
+			vk::PipelineBindPoint pipelineBindPoint,
+			vk::Pipeline pipeline) const
 		{
 			return commandBuffer.bindPipeline(pipelineBindPoint, pipeline, raw);
 		}
+
+		void cmdCopyBufferToImage(
+			vk::CommandBuffer commandBuffer,
+			vk::Buffer srcBuffer,
+			vk::Image dstImage,
+			vk::ImageLayout dstImageLayout,
+			vk::ArrayProxy<vk::BufferImageCopy const> regions) const;
 
 		void cmdCopyImage(
 			vk::CommandBuffer commandBuffer,
@@ -544,8 +547,8 @@ namespace DEngine::Gfx::Vk
 		}
 
 		void cmdSetViewport(
-			vk::CommandBuffer commandBuffer, 
-			std::uint32_t firstViewport, 
+			vk::CommandBuffer commandBuffer,
+			std::uint32_t firstViewport,
 			vk::ArrayProxy<vk::Viewport const> viewports) const
 		{
 			return commandBuffer.setViewport(firstViewport, viewports, raw);
@@ -560,27 +563,18 @@ namespace DEngine::Gfx::Vk
 
 		[[nodiscard]] vk::CommandPool createCommandPool(
 			vk::CommandPoolCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createCommandPool(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
 		[[nodiscard]] vk::DescriptorPool createDescriptorPool(
 			vk::DescriptorPoolCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createDescriptorPool(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
 		[[nodiscard]] vk::DescriptorSetLayout createDescriptorSetLayout(
 			vk::DescriptorSetLayoutCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createDescriptorSetLayout(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
 		[[nodiscard]] vk::Fence createFence(
-			vk::FenceCreateInfo const& createInfo, 
+			vk::FenceCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
 		{
 			return handle.createFence(createInfo, allocator, raw);
@@ -593,6 +587,20 @@ namespace DEngine::Gfx::Vk
 			return handle.createFramebuffer(createInfo, allocator, raw);
 		}
 
+		[[nodiscard]] vk::Result createGraphicsPipelines(
+			vk::PipelineCache pipelineCache,
+			vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> createInfos,
+			vk::Optional<vk::AllocationCallbacks const> allocator,
+			vk::Pipeline* pPipelines) const;
+
+		[[nodiscard]] vk::Image createImage(
+			vk::ImageCreateInfo const& createInfo,
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+
+		[[nodiscard]] vk::ImageView createImageView(
+			vk::ImageViewCreateInfo const& createInfo, 
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+
 		[[nodiscard]] vk::PipelineLayout createPipelineLayout(
 			vk::PipelineLayoutCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
@@ -602,10 +610,11 @@ namespace DEngine::Gfx::Vk
 
 		[[nodiscard]] vk::Sampler createSampler(
 			vk::SamplerCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createSampler(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+
+		[[nodiscard]] vk::ResultValue<vk::Semaphore> createSemaphore(
+			vk::SemaphoreCreateInfo const& createInfo,
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
 
 		[[nodiscard]] vk::ShaderModule createShaderModule(
 			vk::ShaderModuleCreateInfo const& createInfo,
@@ -614,43 +623,48 @@ namespace DEngine::Gfx::Vk
 			return handle.createShaderModule(createInfo, allocator, raw);
 		}
 
-		void destroyCommandPool(vk::CommandPool commandPool, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyCommandPool(commandPool, allocator, raw);
-		}
-
-		void destroyFramebuffer(
-			vk::Framebuffer framebuffer,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyFramebuffer(framebuffer, allocator, raw);
-		}
-
-		void destroyShaderModule(
-			vk::ShaderModule shaderModule,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyShaderModule(shaderModule, allocator, raw);
-		}
+		void Destroy(
+			vk::CommandPool in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::DescriptorPool in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::Framebuffer in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::Fence in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::Image in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::ImageView in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::RenderPass in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::ShaderModule in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
+			vk::SwapchainKHR in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		void endCommandBuffer(vk::CommandBuffer cmdBuffer) const
 		{
 			return cmdBuffer.end(raw);
 		}
 
-		void freeCommandBuffers(
+		void FreeCommandBuffers(
 			vk::CommandPool commandPool,
-			vk::ArrayProxy<vk::CommandBuffer const> commandBuffers) const
-		{
-			return handle.freeCommandBuffers(commandPool, commandBuffers, raw);
-		}
+			vk::ArrayProxy<vk::CommandBuffer const> commandBuffers) const;
 
-		void freeMemory(
+		void FreeMemory(
 			vk::DeviceMemory memory,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.freeMemory(memory, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+
+		[[nodiscard]] vk::Result GetFenceStatus(vk::Fence fence) const;
 
 		[[nodiscard]] vk::Queue getQueue(std::uint32_t familyIndex, std::uint32_t queueIndex) const
 		{
@@ -666,17 +680,9 @@ namespace DEngine::Gfx::Vk
 			return handle.mapMemory(memory, offset, size, flags, raw);
 		}
 
-		void queueSubmit(vk::Queue queue, vk::ArrayProxy<vk::SubmitInfo const> submits, vk::Fence fence) const
-		{
-			return queue.submit(submits, fence, raw);
-		}
-
 		void updateDescriptorSets(
 			vk::ArrayProxy<vk::WriteDescriptorSet const> descriptorWrites,
-			vk::ArrayProxy<vk::CopyDescriptorSet const> descriptorCopies) const
-		{
-			return handle.updateDescriptorSets(descriptorWrites, descriptorCopies, raw);
-		}
+			vk::ArrayProxy<vk::CopyDescriptorSet const> descriptorCopies) const;
 
 		[[nodiscard]] vk::Result waitForFences(
 			vk::ArrayProxy<vk::Fence const> fences, 
@@ -686,28 +692,8 @@ namespace DEngine::Gfx::Vk
 			return handle.waitForFences(fences, static_cast<VkBool32>(waitAll), timeout, raw);
 		}
 
-		void waitQueueIdle(vk::Queue queue) const
-		{
-			return queue.waitIdle(raw);
-		}
-
-		// Pipelines
-		[[nodiscard]] vk::Pipeline createGraphicsPipeline(
-			vk::PipelineCache pipelineCache,
-			vk::GraphicsPipelineCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createGraphicsPipeline(pipelineCache, createInfo, allocator, raw);
-		}
-		[[nodiscard]] vk::Result createGraphicsPipelines(
-			vk::PipelineCache pipelineCache,
-			std::uint32_t createInfoCount,
-			vk::GraphicsPipelineCreateInfo const* pCreateInfos,
-			vk::Optional<vk::AllocationCallbacks const> allocator,
-			vk::Pipeline* pPipelines) const
-		{
-			return handle.createGraphicsPipelines(pipelineCache, createInfoCount, pCreateInfos, allocator, pPipelines, raw);
-		}
+		QueueData const* m_queueDataPtr = nullptr;
+		void WaitIdle() const;
 
 		// Memory requirements
 		[[nodiscard]] vk::MemoryRequirements getBufferMemoryRequirements(vk::Buffer buffer) const
@@ -721,12 +707,6 @@ namespace DEngine::Gfx::Vk
 
 
 		// Fences
-
-		void destroyFence(vk::Fence fence, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyFence(fence, allocator, raw);
-		}
-
 		void resetFences(vk::ArrayProxy<vk::Fence const> fences) const
 		{
 			return handle.resetFences(fences, raw);
@@ -735,22 +715,7 @@ namespace DEngine::Gfx::Vk
 
 
 		// Images
-		[[nodiscard]] vk::Image createImage(vk::ImageCreateInfo const& createInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createImage(createInfo, allocator, raw);
-		}
-		void destroyImage(vk::Image image, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyImage(image, allocator, raw);
-		}
-		vk::ImageView createImageView(vk::ImageViewCreateInfo const& createInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createImageView(createInfo, allocator, raw);
-		}
-		void destroyImageView(vk::ImageView image, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyImageView(image, allocator, raw);
-		}
+
 
 
 
@@ -761,27 +726,15 @@ namespace DEngine::Gfx::Vk
 		{
 			return handle.createRenderPass(createInfo, allocator, raw);
 		}
-		void destroyRenderPass(vk::RenderPass renderPass, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroyRenderPass(renderPass, allocator, raw);
-		}
 
 
 
 
 		// Semaphore
-		vk::Semaphore createSemaphore(vk::SemaphoreCreateInfo const& createInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createSemaphore(createInfo, allocator, raw);
-		}
+
 		void destroySemaphore(vk::Semaphore semaphore, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
 		{
 			return handle.destroySemaphore(semaphore, allocator, raw);
-		}
-
-		void waitIdle() const
-		{
-			return handle.waitIdle(raw);
 		}
 
 

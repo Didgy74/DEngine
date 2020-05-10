@@ -19,7 +19,7 @@ file(GLOB_RECURSE IMGUI_SOURCE_FILES
 )
 
 target_sources(${IMGUI_LIB_NAME} ${IMGUI_SOURCE_FILES})
-target_sources(${IMGUI_LIB_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/examples/imgui_impl_sdl.cpp")
+#target_sources(${IMGUI_LIB_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/examples/imgui_impl_sdl.cpp")
 
 target_compile_definitions(${IMGUI_LIB_NAME} PRIVATE IMGUI_DISABLE_OBSOLETE_FUNCTIONS)
 

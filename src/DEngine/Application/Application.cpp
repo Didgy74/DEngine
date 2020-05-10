@@ -1,160 +1,300 @@
-#define DENGINE_APPLICATION_BUTTON_COUNT
-#include "DEngine/Application.hpp"
 #include "detail_Application.hpp"
-
-#include "DEngine/FixedWidthTypes.hpp"
-
-#include "SDL2/SDL.h"
-#include "SDL2/SDL_vulkan.h"
+#include "DEngine/Containers/StaticVector.hpp"
+#include "Assert.hpp"
 
 #include "ImGui/imgui.h"
-#include "ImGui/imgui_impl_sdl.h"
 
 #include <iostream>
+#include <cstring>
 #include <chrono>
+#include <stdexcept>
 
 namespace DEngine::Application::detail
 {
-	static bool buttonValues[(int)Button::COUNT] = {};
-	static std::chrono::high_resolution_clock::time_point buttonHeldStart[(int)Button::COUNT] = {};
-	static f32 buttonHeldDuration[(int)Button::COUNT] = {};
-	static InputEvent buttonEvents[(int)Button::COUNT] = {};
-	static u32 mousePosition[2] = {};
-	static i32 mouseDelta[2] = {};
-	static void UpdateButton(Button button, bool pressed, std::chrono::high_resolution_clock::time_point now);
-	static void UpdateMouse(u32 posX, u32 posY, i32 deltaX, i32 deltaY);
-	static void UpdateMouse(u32 posX, u32 posY);
-	static Button SDLKeyboardKeyToRawButton(i32 input);
-	static Button SDLMouseKeyToRawButton(i32 input);
+	// Input
+	bool buttonValues[(int)Button::COUNT] = {};
+	std::chrono::high_resolution_clock::time_point buttonHeldStart[(int)Button::COUNT] = {};
+	f32 buttonHeldDuration[(int)Button::COUNT] = {};
+	KeyEventType buttonEvents[(int)Button::COUNT] = {};
+	Std::StaticVector<char, maxCharInputCount> charInputs{};
+	Std::Opt<CursorData> cursorOpt{};
+	Std::StaticVector<TouchInput, 10> touchInputs{};
+	Std::StaticVector<std::chrono::high_resolution_clock::time_point, touchInputs.Capacity()> touchInputStartTime{};
 
-	SDL_Window* mainWindow = nullptr;
-	bool isMinimized = false;
+	u32 displaySize[2] = {};
+	i32 mainWindowPos[2] = {};
+	u32 mainWindowSize[2] = {};
+	u32 mainWindowFramebufferSize[2] = {};
+	bool mainWindowIsInFocus = false;
+	bool mainWindowIsMinimized = false;
+	bool mainWindowRestoreEvent = false;
+	bool mainWindowResizeEvent = false;
 	bool shouldShutdown = false;
-	bool isRestored = false;
-	bool resizeEvent = false;
 
+	// Time related stuff
+	u64 tickCount = 0;
+	f32 deltaTime = 1.f / 60.f;
+	std::chrono::high_resolution_clock::time_point currentNow{};
+	std::chrono::high_resolution_clock::time_point previousNow{};
 
+	bool mainWindowSurfaceInitialized = false;
+	bool mainWindowSurfaceInitializeEvent = false;
+	bool mainWindowSurfaceTerminateEvent = false;
+
+	GamepadState gamepadState{};
+	bool gamepadConnected = false;
+	int gamepadID = 0;
+
+	static bool IsValid(Button in);
+}
+
+static bool DEngine::Application::detail::IsValid(Button in)
+{
+	return static_cast<u64>(in) < static_cast<u64>(Button::COUNT);
+}
+
+DEngine::u64 DEngine::Application::TickCount()
+{
+	return detail::tickCount;
+}
+
+bool DEngine::Application::ButtonValue(Button input)
+{
+	if (!detail::IsValid(input))
+		throw std::runtime_error("Called DEngine::Application::ButtonValue with invalid Button value.");
+	return detail::buttonValues[(int)input];
+}
+
+void DEngine::Application::detail::UpdateButton(
+	Button button, 
+	bool pressed)
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(button));
+
+	detail::buttonValues[(int)button] = pressed;
+	detail::buttonEvents[(int)button] = pressed ? KeyEventType::Pressed : KeyEventType::Unpressed;
+
+	if (pressed)
+	{
+		detail::buttonHeldStart[(int)button] = detail::currentNow;
+	}
+	else
+	{
+		detail::buttonHeldStart[(int)button] = std::chrono::high_resolution_clock::time_point();
+	}
+}
+
+DEngine::Application::KeyEventType DEngine::Application::ButtonEvent(Button input)
+{
+	if (!detail::IsValid(input))
+		throw std::runtime_error("Called DEngine::Application::ButtonEvent with invalid Button value.");
+	return detail::buttonEvents[(int)input];
+}
+
+DEngine::f32 DEngine::Application::ButtonDuration(Button input)
+{
+	if (!detail::IsValid(input))
+		throw std::runtime_error("Called DEngine::Application::ButtonDuration with invalid Button value.");
+	return detail::buttonHeldDuration[(int)input];
+}
+
+DEngine::Std::StaticVector<char, DEngine::Application::maxCharInputCount> DEngine::Application::CharInputs()
+{
+	return detail::charInputs;
+}
+
+DEngine::Std::Opt<DEngine::Application::CursorData> DEngine::Application::Cursor()
+{
+	return detail::cursorOpt;
+}
+
+void DEngine::Application::detail::UpdateCursor(u32 posX, u32 posY, i32 deltaX, i32 deltaY)
+{
+	CursorData& cursorData = detail::cursorOpt.Value();
+	cursorData.posDeltaX = deltaX;
+	cursorData.posDeltaY = deltaY;
+
+	cursorData.posX = posX;
+	cursorData.posY = posY;
+}
+
+void DEngine::Application::detail::UpdateCursor(u32 posX, u32 posY)
+{
+	CursorData& cursorData = detail::cursorOpt.Value();
+
+	// We compare it with the previous values to get delta.
+	cursorData.posDeltaX = (i32)posX - (i32)cursorData.posX;
+	cursorData.posDeltaY = (i32)posY - (i32)cursorData.posY;
+
+	cursorData.posX = posX;
+	cursorData.posY = posY;
+}
+
+namespace DEngine::Application::detail
+{
+	static bool TouchInputIDExists(u8 id)
+	{
+		for (uSize i = 0; i < detail::touchInputs.Size(); i += 1)
+		{
+			if (detail::touchInputs[i].id == id)
+				return true;
+		}
+		return false;
+	}
+}
+
+void DEngine::Application::detail::UpdateTouchInput_Down(u8 id, f32 x, f32 y)
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(!TouchInputIDExists(id));
+
+	TouchInput newValue{};
+	newValue.eventType = TouchEventType::Down;
+	newValue.id = id;
+	newValue.x = x;
+	newValue.y = y;
+
+	detail::touchInputs.PushBack(newValue);
+	detail::touchInputStartTime.PushBack(detail::currentNow);
+}
+
+void DEngine::Application::detail::UpdateTouchInput_Move(u8 id, f32 x, f32 y)
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(TouchInputIDExists(id));
+	
+	for (auto& item : detail::touchInputs)
+	{
+		if (item.id == id)
+		{
+			item.eventType = TouchEventType::Moved;
+			item.x = x;
+			item.y = y;
+
+			break;
+		}
+	}
+}
+
+void DEngine::Application::detail::UpdateTouchInput_Up(u8 id, f32 x, f32 y)
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(TouchInputIDExists(id));
+
+	for (auto& item : detail::touchInputs)
+	{
+		if (item.id == id)
+		{
+			item.eventType = TouchEventType::Up;
+			item.x = x;
+			item.y = y;
+
+			break;
+		}
+	}
+}
+
+DEngine::Std::StaticVector<DEngine::Application::TouchInput, 10> DEngine::Application::TouchInputs()
+{
+	return detail::touchInputs;
 }
 
 bool DEngine::Application::detail::Initialize()
 {
-	// Setup SDL
-	if (SDL_Init(SDL_INIT_VIDEO) != 0)
-	{
-		printf("Error: %s\n", SDL_GetError());
-		return false;
-	}
-
-	// Setup window
-	i32 sdlWindowFlags = 0;
-	sdlWindowFlags |= SDL_WINDOW_VULKAN;
-	//sdlWindowFlags |= SDL_WINDOW_ALLOW_HIGHDPI;
-	sdlWindowFlags |= SDL_WINDOW_RESIZABLE;
-	i32 windowWidth = 0;
-	i32 windowHeight = 0;
-	if constexpr (targetOSType == Platform::Desktop)
-	{
-		windowWidth = 1280;
-		windowHeight = 720;
-	}
-	else if (targetOSType == Platform::Mobile)
-	{
-		sdlWindowFlags |= SDL_WINDOW_FULLSCREEN;
-		windowWidth = 400;
-		windowHeight = 400;
-	}
-	detail::mainWindow = SDL_CreateWindow(
-		"Dear ImGui SDL2+Vulkan example", 
-		SDL_WINDOWPOS_CENTERED, 
-		SDL_WINDOWPOS_CENTERED, 
-		windowWidth, 
-		windowHeight,
-		sdlWindowFlags);
-	if constexpr (targetOSType == Platform::Desktop)
-	{
-		SDL_SetWindowMinimumSize(detail::mainWindow, 800, 600);
-	}
+	Backend_Initialize();
 
 	return true;
 }
 
 void DEngine::Application::detail::ImgGui_Initialize()
 {
-	ImGui_ImplSDL2_InitForVulkan(detail::mainWindow);
+	// Setup back-end capabilities flags
+	ImGuiIO& io = ImGui::GetIO();
+	//io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // We can honor GetMouseCursor() values (optional)
+	//io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos; // We can honor io.WantSetMousePos requests (optional, rarely used)
+	//io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports; // We can create multi-viewports on the Platform side (optional)
+#if GLFW_HAS_GLFW_HOVERED && defined(_WIN32)
+	io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport; // We can set io.MouseHoveredViewport correctly (optional, not easy)
+#endif
+	io.BackendPlatformName = "DEngine";
+
+	// Keyboard mapping. ImGui will use those indices to peek into the io.KeysDown[] array.
+	io.KeyMap[ImGuiKey_Tab] = (int)Button::Tab;
+	io.KeyMap[ImGuiKey_LeftArrow] = (int)Button::Left;
+	io.KeyMap[ImGuiKey_RightArrow] = (int)Button::Right;
+	io.KeyMap[ImGuiKey_UpArrow] = (int)Button::Up;
+	io.KeyMap[ImGuiKey_DownArrow] = (int)Button::Down;
+	io.KeyMap[ImGuiKey_PageUp] = (int)Button::PageUp;
+	io.KeyMap[ImGuiKey_PageDown] = (int)Button::PageDown;
+	io.KeyMap[ImGuiKey_Home] = (int)Button::Home;
+	io.KeyMap[ImGuiKey_End] = (int)Button::End;
+	io.KeyMap[ImGuiKey_Insert] = (int)Button::Insert;
+	io.KeyMap[ImGuiKey_Delete] = (int)Button::Delete;
+	io.KeyMap[ImGuiKey_Backspace] = (int)Button::Backspace;
+	io.KeyMap[ImGuiKey_Space] = (int)Button::Space;
+	io.KeyMap[ImGuiKey_Enter] = (int)Button::Enter;
+	io.KeyMap[ImGuiKey_Escape] = (int)Button::Escape;
+	io.KeyMap[ImGuiKey_KeyPadEnter] = (int)Button::Enter;
+	io.KeyMap[ImGuiKey_A] = (int)Button::A;
+	io.KeyMap[ImGuiKey_C] = (int)Button::C;
+	io.KeyMap[ImGuiKey_V] = (int)Button::V;
+	io.KeyMap[ImGuiKey_X] = (int)Button::X;
+	io.KeyMap[ImGuiKey_Y] = (int)Button::Y;
+	io.KeyMap[ImGuiKey_Z] = (int)Button::Z;
 }
 
 void DEngine::Application::detail::ProcessEvents()
 {
-	auto now = std::chrono::high_resolution_clock::now();
-	// Clear the input-events array
-	for (auto& item : detail::buttonEvents)
-		item = InputEvent::Unchanged;
-	for (auto& item : detail::mouseDelta)
-		item = 0;
-	shouldShutdown = false;
-	isRestored = false;
-	resizeEvent = false;
+	detail::previousNow = detail::currentNow;
+	detail::currentNow = std::chrono::high_resolution_clock::now();
+	if (detail::tickCount > 0)
+		detail::deltaTime = std::chrono::duration<f32>(detail::currentNow - detail::previousNow).count();
 
-	SDL_Event event{};
-	while (SDL_PollEvent(&event))
+	// Input stuff
+	// Clear event-style values.
+	for (auto& item : detail::buttonEvents)
+		item = KeyEventType::Unchanged;
+	detail::charInputs.Clear();
+	if (detail::cursorOpt.HasValue())
 	{
-		ImGui_ImplSDL2_ProcessEvent(&event);
-		if (event.type == SDL_EventType::SDL_QUIT)
-		{
-			shouldShutdown = true;
-		}
-		else if (event.type == SDL_EventType::SDL_WINDOWEVENT && event.window.windowID)
-		{
-			if (event.window.event == SDL_WindowEventID::SDL_WINDOWEVENT_CLOSE)
-			{
-				shouldShutdown = true;
-			}
-			else if (event.window.event == SDL_WindowEventID::SDL_WINDOWEVENT_RESIZED)
-			{
-				resizeEvent = true;
-			}
-			else if (event.window.event == SDL_WindowEventID::SDL_WINDOWEVENT_MINIMIZED)
-			{
-				isMinimized = true;
-			}
-			else if (event.window.event == SDL_WindowEventID::SDL_WINDOWEVENT_RESTORED)
-			{
-				isMinimized = false;
-				isRestored = true;
-			}
-		}
-		else if (event.type == SDL_EventType::SDL_KEYDOWN)
-		{
-			if (event.key.repeat == 0)
-				detail::UpdateButton(SDLKeyboardKeyToRawButton(event.key.keysym.sym), true, now);
-		}
-		else if (event.type == SDL_EventType::SDL_KEYUP)
-		{
-			detail::UpdateButton(SDLKeyboardKeyToRawButton(event.key.keysym.sym), false, now);
-		}
-		else if (event.type == SDL_EventType::SDL_MOUSEMOTION)
-		{
-			detail::UpdateMouse(event.motion.x, event.motion.y, event.motion.xrel, event.motion.yrel);
-		}
-		else if (event.type == SDL_EventType::SDL_MOUSEBUTTONDOWN)
-		{
-			detail::UpdateButton(SDLMouseKeyToRawButton(event.button.button), true, now);
-		}
-		else if (event.type == SDL_EventType::SDL_MOUSEBUTTONUP)
-		{
-			detail::UpdateButton(SDLMouseKeyToRawButton(event.button.button), false, now);
-		}
+		CursorData& cursorData = detail::cursorOpt.Value();
+		cursorData.posDeltaX = 0;
+		cursorData.posDeltaY = 0;
+		cursorData.scrollDeltaY = 0;
 	}
 
+	for (uSize i = 0; i < detail::touchInputs.Size(); i += 1)
+	{
+		if (detail::touchInputs[i].eventType == TouchEventType::Up)
+		{
+			detail::touchInputs.Erase(i);
+			detail::touchInputStartTime.Erase(i);
+			i -= 1;
+		}
+		else
+			detail::touchInputs[i].eventType = TouchEventType::Unchanged;
+	}
+	// Window stuff
+	detail::mainWindowSurfaceInitializeEvent = false;
+	detail::mainWindowSurfaceTerminateEvent = false;
+	detail::mainWindowRestoreEvent = false;
+	detail::mainWindowResizeEvent = false;
+
+	Backend_ProcessEvents();
 
 	// Calculate duration for each button being held.
 	for (uSize i = 0; i < (uSize)Button::COUNT; i += 1)
 	{
 		if (detail::buttonValues[i])
-		{
-			buttonHeldDuration[i] = std::chrono::duration<f32>(now - buttonHeldStart[i]).count();
-		}
+			detail::buttonHeldDuration[i] = std::chrono::duration<f32>(detail::currentNow - detail::buttonHeldStart[i]).count();
+		else
+			detail::buttonHeldDuration[i] = 0.f;
 	}
+	// Calculate duration for each touch input.
+	for (uSize i = 0; i < detail::touchInputs.Size(); i += 1)
+	{
+		if (detail::touchInputs[i].eventType != TouchEventType::Up)
+			detail::touchInputs[i].duration = std::chrono::duration<f32>(detail::currentNow - detail::touchInputStartTime[i]).count();
+	}
+
+	detail::tickCount += 1;
 }
 
 bool DEngine::Application::detail::ShouldShutdown()
@@ -164,213 +304,103 @@ bool DEngine::Application::detail::ShouldShutdown()
 
 bool DEngine::Application::detail::IsMinimized()
 {
-	return isMinimized;
+	return mainWindowIsMinimized;
 }
 
 bool DEngine::Application::detail::IsRestored()
 {
-	return isRestored;
+	return mainWindowRestoreEvent;
+}
+
+bool DEngine::Application::detail::MainWindowRestoreEvent()
+{
+	return detail::mainWindowRestoreEvent;
 }
 
 bool DEngine::Application::detail::ResizeEvent()
 {
-	return resizeEvent;
+	return mainWindowResizeEvent;
+}
+
+bool DEngine::Application::detail::MainWindowSurfaceInitializeEvent()
+{
+	return mainWindowSurfaceInitializeEvent;
 }
 
 void DEngine::Application::detail::ImGui_NewFrame()
 {
-	ImGui_ImplSDL2_NewFrame(detail::mainWindow);
-}
+	// Update buttons
+	ImGuiIO& io = ImGui::GetIO();
 
-bool DEngine::Application::ButtonValue(Button input)
-{
-	return detail::buttonValues[(int)input];
-}
+	io.DisplaySize = ImVec2((f32)detail::mainWindowSize[0], (f32)detail::mainWindowSize[1]);
+	if (io.DisplaySize.x > 0 && io.DisplaySize.y > 0)
+		io.DisplayFramebufferScale = ImVec2(
+			(float)detail::mainWindowFramebufferSize[0] / io.DisplaySize.x,
+			(float)detail::mainWindowFramebufferSize[1] / io.DisplaySize.y);
+		
+	// Copy keydown stuff
+	for (uSize i = 0; i < (uSize)Button::COUNT; i++)
+		io.KeysDown[i] = detail::buttonValues[i];
+	if (detail::buttonValues[(int)Button::Delete])
+		io.KeysDown[(int)Button::Backspace] = true;
 
-DEngine::Application::InputEvent DEngine::Application::ButtonEvent(Button input)
-{
-	return detail::buttonEvents[(int)input];
-}
 
-DEngine::f32 DEngine::Application::ButtonDuration(Button input)
-{
-	return detail::buttonHeldDuration[(int)input];
-}
+	// Char input stuff
+	auto charInputs = CharInputs();
+	for (auto item : charInputs)
+		io.AddInputCharacter(item);
 
-DEngine::Cont::Array<DEngine::i32, 2> DEngine::Application::MouseDelta()
-{
-	return { detail::mouseDelta[0], detail::mouseDelta[1] };
-}
+	for (uSize i = 0; i < IM_ARRAYSIZE(io.MouseDown); i += 1)
+		io.MouseDown[i] = false;
+	io.MousePos = ImVec2(-FLT_MAX, -FLT_MAX);
 
-void DEngine::Application::Log(char const* msg)
-{
-	SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "DENGINE GFX ERROR: %s\n", msg);
+	// Update mouse position
+	if (detail::mainWindowIsInFocus)
+	{
+		Std::Opt<CursorData> cursorOpt = Cursor();
+		if (cursorOpt.HasValue())
+		{
+			CursorData const& cursor = cursorOpt.Value();
+			io.MouseDown[0] = ButtonValue(Button::LeftMouse);
+			io.MouseDown[1] = ButtonValue(Button::RightMouse);
+			io.MousePos = ImVec2((float)cursor.posX, (float)cursor.posY);
+
+			io.MouseWheel = cursor.scrollDeltaY;
+		}
+
+		auto touchInputs = TouchInputs();
+		uSize primaryTouchIndex = static_cast<uSize>(-1);
+		for (uSize i = 0; i < touchInputs.Size(); i += 1)
+		{
+			if (touchInputs[i].id == 0)
+			{
+				primaryTouchIndex = i;
+				break;
+			}
+		}
+		if (primaryTouchIndex != static_cast<uSize>(-1) )
+		{
+			if (touchInputs[primaryTouchIndex].eventType != TouchEventType::Up)
+				io.MouseDown[0] = true;
+			io.MousePos = ImVec2(touchInputs[primaryTouchIndex].x, touchInputs[primaryTouchIndex].y);
+		}
+	}
 }
 
 void DEngine::Application::SetRelativeMouseMode(bool enabled)
 {
-	std::cout << "Set mouse mode: " << enabled << std::endl;
-	//i32 errorCode = SDL_SetRelativeMouseMode(static_cast<SDL_bool>(enabled));
-	//if (errorCode != 0)
-		//throw std::runtime_error("Failedto set relative mouse mode");
+
 }
 
-DEngine::Cont::FixedVector<char const*, 5> DEngine::Application::detail::GetRequiredVulkanInstanceExtensions()
+DEngine::Std::Optional<DEngine::Application::GamepadState> DEngine::Application::GetGamepad()
 {
-	u32 count = 0;
-	SDL_bool result = SDL_Vulkan_GetInstanceExtensions(detail::mainWindow, &count, nullptr);
-	if (result == SDL_FALSE)
-		throw std::runtime_error("DEngine::Application: Unable to grab required Vulkan instance extensions.");
-
-	Cont::FixedVector<char const*, 5> ptrs{};
-	ptrs.Resize(count);
-
-	SDL_Vulkan_GetInstanceExtensions(detail::mainWindow, &count, ptrs.Data());
-
-	return ptrs;
-}
-
-bool DEngine::Application::detail::CreateVkSurface(
-	u64 vkInstance, 
-	void const* vkAllocationCallbacks, 
-	void* userData, 
-	u64* vkSurface)
-{
-	SDL_Window* sdlWindow = detail::mainWindow;
-
-	SDL_bool result = SDL_Vulkan_CreateSurface(sdlWindow, (VkInstance)vkInstance, reinterpret_cast<VkSurfaceKHR*>(vkSurface));
-
-	return result;
-}
-
-static void DEngine::Application::detail::UpdateButton(
-	Button button, 
-	bool pressed, 
-	std::chrono::high_resolution_clock::time_point now)
-{
-	detail::buttonValues[(int)button] = pressed;
-	detail::buttonEvents[(int)button] = pressed ? InputEvent::Pressed : InputEvent::Unpressed;
-
-	if (pressed)
-	{
-		detail::buttonHeldStart[(int)button] = now;
-	}
+	if (detail::gamepadConnected)
+		return detail::gamepadState;
 	else
-	{
-		detail::buttonHeldDuration[(int)button] = 0.f;
-		detail::buttonHeldStart[(int)button] = std::chrono::high_resolution_clock::time_point();
-	}
+		return {};
 }
 
-static void DEngine::Application::detail::UpdateMouse(u32 posX, u32 posY, i32 deltaX, i32 deltaY)
+bool DEngine::Application::MainWindowMinimized()
 {
-	detail::mouseDelta[0] = deltaX;
-	detail::mouseDelta[1] = deltaY;
-
-	detail::mousePosition[0] = posX;
-	detail::mousePosition[1] = posY;
-}
-
-static void DEngine::Application::detail::UpdateMouse(u32 posX, u32 posY)
-{
-	detail::mouseDelta[0] = (i32)posX - (i32)detail::mousePosition[0];
-	detail::mouseDelta[1] = (i32)posY - (i32)detail::mousePosition[1];
-
-	detail::mousePosition[0] = posX;
-	detail::mousePosition[1] = posY;
-}
-
-DEngine::Application::Button DEngine::Application::detail::SDLMouseKeyToRawButton(i32 input)
-{
-	switch (input)
-	{
-	case SDL_BUTTON_LEFT:
-		return Button::LeftMouse;
-	case SDL_BUTTON_RIGHT:
-		return Button::RightMouse;
-	}
-
-	return Button::Undefined;
-}
-
-DEngine::Application::Button DEngine::Application::detail::SDLKeyboardKeyToRawButton(i32 input)
-{
-	switch (input)
-	{
-	case SDLK_ESCAPE:
-		return Button::Escape;
-
-	case SDLK_AC_BACK:
-		return Button::Back;
-
-	case SDLK_SPACE:
-		return Button::Space;
-
-	case SDLK_LCTRL:
-		return Button::LeftCtrl;
-
-	case SDLK_UP:
-		return Button::Up;
-	case SDLK_DOWN:
-		return Button::Down;
-	case SDLK_LEFT:
-		return Button::Left;
-	case SDLK_RIGHT:
-		return Button::Right;
-
-	case SDLK_a:
-		return Button::A;
-	case SDLK_b:
-		return Button::B;
-	case SDLK_c:
-		return Button::C;
-	case SDLK_d:
-		return Button::D;
-	case SDLK_e:
-		return Button::E;
-	case SDLK_f:
-		return Button::F;
-	case SDLK_g:
-		return Button::G;
-	case SDLK_h:
-		return Button::H;
-	case SDLK_i:
-		return Button::I;
-	case SDLK_j:
-		return Button::J;
-	case SDLK_k:
-		return Button::K;
-	case SDLK_l:
-		return Button::L;
-	case SDLK_m:
-		return Button::M;
-	case SDLK_n:
-		return Button::N;
-	case SDLK_o:
-		return Button::O;
-	case SDLK_p:
-		return Button::P;
-	case SDLK_q:
-		return Button::Q;
-	case SDLK_r:
-		return Button::R;
-	case SDLK_s:
-		return Button::S;
-	case SDLK_t:
-		return Button::T;
-	case SDLK_u:
-		return Button::U;
-	case SDLK_v:
-		return Button::V;
-	case SDLK_w:
-		return Button::W;
-	case SDLK_x:
-		return Button::X;
-	case SDLK_y:
-		return Button::Y;
-	case SDLK_z:
-		return Button::Z;
-	}
-
-	return Button::Undefined;
+	return detail::mainWindowIsMinimized;
 }

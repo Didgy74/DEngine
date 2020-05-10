@@ -1,6 +1,8 @@
 #include "Init.hpp"
 
-#include "DEngine/Gfx/Assert.hpp"
+#include "VulkanIncluder.hpp"
+
+#include "../Assert.hpp"
 
 #include "ImGui/imgui_impl_vulkan.h"
 
@@ -57,7 +59,7 @@ namespace DEngine::Gfx::Vk
 }
 
 DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVkInstance(
-	Cont::Span<char const*> requiredExtensions,
+	Std::Span<char const*> requiredExtensions,
 	bool enableLayers,
 	BaseDispatch const& baseDispatch,
 	ILog* logger)
@@ -67,7 +69,7 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 
 	// Build what extensions we are going to use
 	std::vector<char const*> totalRequiredExtensions;
-	totalRequiredExtensions.reserve(requiredExtensions.Size());
+	totalRequiredExtensions.reserve(requiredExtensions.Size() + Constants::requiredInstanceExtensions.size());
 	// First copy all required instance extensions
 	for (uSize i = 0; i < requiredExtensions.Size(); i++)
 		totalRequiredExtensions.push_back(requiredExtensions[i]);
@@ -84,42 +86,49 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 				break;
 			}
 		}
-		if (extensionAlreadyPresent == false)
-		{
+		if (!extensionAlreadyPresent)
 			totalRequiredExtensions.push_back(requiredExtension);
-		}
 	}
 
+	// Check if all the required extensions are also available
+	u32 instanceExtensionCount = 0;
+	vkResult = baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr);
+	if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
+		throw std::runtime_error("Vulkan: Unable to enumerate available instance extension properties.");
+	std::vector<vk::ExtensionProperties> availableExtensions(instanceExtensionCount);
+	baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableExtensions.data());
+	for (const char* required : totalRequiredExtensions)
 	{
-		// Check if all the required extensions are also available
-		u32 instanceExtensionCount = 0;
-		vkResult = baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr);
-		if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
-			throw std::runtime_error("Vulkan: Unable to enumerate available instance extension properties.");
-		std::vector<vk::ExtensionProperties> availableExtensions(instanceExtensionCount);
-		baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableExtensions.data());
-		for (const char* required : totalRequiredExtensions)
+		bool requiredExtensionIsAvailable = false;
+		for (const auto& available : availableExtensions)
 		{
-			bool requiredExtensionIsAvailable = false;
-			for (const auto& available : availableExtensions)
+			if (std::strcmp(required, available.extensionName) == 0)
 			{
-				if (std::strcmp(required, available.extensionName) == 0)
-				{
-					requiredExtensionIsAvailable = true;
-					break;
-				}
+				requiredExtensionIsAvailable = true;
+				break;
 			}
-			if (requiredExtensionIsAvailable == false)
-				throw std::runtime_error("Required Vulkan instance extension is not available.");
 		}
+		if (requiredExtensionIsAvailable == false)
+			throw std::runtime_error("Required Vulkan instance extension is not available.");
 	}
 
-	// Add Khronos validation layer if both it and debug_utils is available
-	Cont::FixedVector<const char*, 5> layersToUse{};
+	Std::StaticVector<const char*, 5> layersToUse{};
 	if constexpr (Constants::enableDebugUtils)
 	{
 		if (enableLayers)
 		{
+			// Check if debug utils is available through global list.
+			bool debugUtilsIsAvailable = false;
+			for (const auto& ext : availableExtensions)
+			{
+				if (std::strcmp(ext.extensionName, Constants::debugUtilsExtensionName) == 0)
+				{
+					debugUtilsIsAvailable = true;
+					break;
+				}
+			}
+
+
 			// First check if the Khronos validation layer is present
 			u32 availableLayerCount = 0;
 			vkResult = baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, nullptr);
@@ -128,54 +137,25 @@ DEngine::Gfx::Vk::Init::CreateVkInstance_Return DEngine::Gfx::Vk::Init::CreateVk
 			std::vector<vk::LayerProperties> availableLayers;
 			availableLayers.resize(availableLayerCount);
 			baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data());
-
 			bool layerIsAvailable = false;
 			for (const auto& availableLayer : availableLayers)
 			{
-				char const* wantedLayerName = Constants::preferredValidationLayer;
+				char const* wantedLayerName = Constants::khronosLayerName;
 				char const* availableLayerName = availableLayer.layerName;
 				if (std::strcmp(wantedLayerName, availableLayerName) == 0)
 				{
 					layerIsAvailable = true;
+					// If the layer is available, we know it implements debug utils.
+					debugUtilsIsAvailable = true;
 					break;
 				}
 			}
-			if (layerIsAvailable == true)
+			if (debugUtilsIsAvailable && layerIsAvailable)
 			{
-				// If the layer is available, we check if it implements VK_EXT_debug_utils
-				u32 layerExtensionCount = 0;
-				vkResult = baseDispatch.enumerateInstanceExtensionProperties(
-					Constants::preferredValidationLayer, 
-					&layerExtensionCount, 
-					nullptr);
-				if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
-					throw std::runtime_error("Vulkan: Unable to enumerate available instance extension properties.");
-				std::vector<vk::ExtensionProperties> availableExtensions;
-				availableExtensions.resize(layerExtensionCount);
-				baseDispatch.enumerateInstanceExtensionProperties(
-					Constants::preferredValidationLayer, 
-					&layerExtensionCount, 
-					availableExtensions.data());
+				totalRequiredExtensions.push_back(Constants::debugUtilsExtensionName);
+				layersToUse.PushBack(Constants::khronosLayerName);
 
-				bool debugUtilsIsAvailable = false;
-				for (auto const& availableLayerExtension : availableExtensions)
-				{
-					if (std::strcmp(availableLayerExtension.extensionName, Constants::debugUtilsExtensionName) == 0)
-					{
-						debugUtilsIsAvailable = true;
-						break;
-					}
-				}
-
-				if (debugUtilsIsAvailable)
-				{
-					// Debug utils and the Khronos validation layer is available.
-					// Push them onto the vectors
-					totalRequiredExtensions.push_back(Constants::debugUtilsExtensionName);
-					layersToUse.PushBack(Constants::preferredValidationLayer);
-
-					returnValue.debugUtilsEnabled = true;
-				}
+				returnValue.debugUtilsEnabled = true;
 			}
 		}
 	}
@@ -393,44 +373,33 @@ DEngine::Gfx::Vk::SurfaceInfo DEngine::Gfx::Vk::Init::BuildSurfaceInfo(
 	return returnVal;
 }
 
-void DEngine::Gfx::Vk::Init::RebuildSurfaceInfo(
-	InstanceDispatch const& instance,
-	PhysDeviceInfo const& physDevice,
-	vk::SurfaceKHR newSurface,
-	SurfaceInfo& outSurfaceInfo)
-{
-	instance.destroySurface(outSurfaceInfo.handle);
-	outSurfaceInfo.handle = newSurface;
-
-	outSurfaceInfo.capabilities = instance.getPhysicalDeviceSurfaceCapabilitiesKHR(physDevice.handle, outSurfaceInfo.handle);
-
-	// Check presentation support
-	bool presentSupport = instance.getPhysicalDeviceSurfaceSupportKHR(physDevice.handle, physDevice.queueIndices.graphics.familyIndex, outSurfaceInfo.handle);
-	if (presentSupport == false)
-		throw std::runtime_error("Vulkan: No presentation support for new surface");
-}
-
 DEngine::Gfx::Vk::SwapchainSettings DEngine::Gfx::Vk::Init::BuildSwapchainSettings(
 	InstanceDispatch const& instance,
 	vk::PhysicalDevice physDevice,
 	SurfaceInfo const& surfaceInfo,
+	u32 width,
+	u32 height,
 	ILog* logger)
 {
 	SwapchainSettings settings{};
 	settings.surface = surfaceInfo.handle;
-	settings.capabilities = surfaceInfo.capabilities;
-	settings.extents = settings.capabilities.currentExtent;
+	settings.extents = surfaceInfo.capabilities.currentExtent;
+
+
+		
 	settings.compositeAlphaFlag = surfaceInfo.compositeAlphaFlag;
+	settings.transform = vk::SurfaceTransformFlagBitsKHR::eIdentity;
 
 	// Handle swapchainData length
 	u32 swapchainLength = Constants::preferredSwapchainLength;
 	// If we need to, clamp the swapchainData length.
 	// Upper clamp only applies if maxImageCount != 0
-	if (settings.capabilities.maxImageCount != 0 && swapchainLength > settings.capabilities.maxImageCount)
-		swapchainLength = settings.capabilities.maxImageCount;
+	if (surfaceInfo.capabilities.maxImageCount != 0 && swapchainLength > surfaceInfo.capabilities.maxImageCount)
+		swapchainLength = surfaceInfo.capabilities.maxImageCount;
 	if (swapchainLength < 2)
 	{
-		logger->log("Vulkan: Vulkan backend doesn't support swapchainData length of 1.");
+		if (logger)
+			logger->log("Vulkan: Vulkan backend doesn't support swapchainData length of 1.");
 		std::abort();
 	}
 
@@ -488,7 +457,7 @@ vk::Device DEngine::Gfx::Vk::Init::CreateDevice(
 {
 	vk::Result vkResult{};
 
-	// Create logical physDevice
+	// CreateJob logical physDevice
 	vk::DeviceCreateInfo createInfo{};
 
 	// Feature configuration
@@ -504,7 +473,7 @@ vk::Device DEngine::Gfx::Vk::Init::CreateDevice(
 
 	// Queue configuration
 	f32 priority[3] = { 1.f, 1.f, 1.f };
-	Cont::FixedVector<vk::DeviceQueueCreateInfo, 10> queueCreateInfos{};
+	Std::StaticVector<vk::DeviceQueueCreateInfo, 10> queueCreateInfos{};
 
 	vk::DeviceQueueCreateInfo tempQueueCreateInfo{};
 
@@ -515,7 +484,7 @@ vk::Device DEngine::Gfx::Vk::Init::CreateDevice(
 	queueCreateInfos.PushBack(tempQueueCreateInfo);
 
 	// Add transfer queue if there is a separate one from graphics queue
-	if (physDevice.queueIndices.graphics.familyIndex != invalidIndex)
+	if (physDevice.queueIndices.transfer.familyIndex != invalidIndex)
 	{
 		tempQueueCreateInfo = vk::DeviceQueueCreateInfo{};
 		tempQueueCreateInfo.pQueuePriorities = priority;
@@ -557,12 +526,12 @@ vk::Device DEngine::Gfx::Vk::Init::CreateDevice(
 	return vkDevice;
 }
 
-DEngine::Cont::FixedVector<vk::Fence, DEngine::Gfx::Vk::Constants::maxResourceSets> DEngine::Gfx::Vk::Init::CreateMainFences(
+DEngine::Std::StaticVector<vk::Fence, DEngine::Gfx::Vk::Constants::maxResourceSets> DEngine::Gfx::Vk::Init::CreateMainFences(
 	DevDispatch const& device, 
 	u8 resourceSetCount,
 	DebugUtilsDispatch const* debugUtils)
 {
-	Cont::FixedVector<vk::Fence, Constants::maxResourceSets> returnVal{};
+	Std::StaticVector<vk::Fence, Constants::maxResourceSets> returnVal{};
 	returnVal.Resize(resourceSetCount);
 
 	for (uSize i = 0; i < returnVal.Size(); i += 1)
@@ -591,7 +560,7 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 	Vk::DeviceDispatch const& device,
 	QueueData const& queues,
 	DeletionQueue const& deletionQueue,
-	SwapchainSettings const& settings,
+	SwapchainSettings settings,
 	DebugUtilsDispatch const* debugUtils)
 {
 	vk::Result vkResult{};
@@ -630,11 +599,11 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 	}
 
 	u32 swapchainImageCount = 0;
-	vkResult = device.getSwapchainImagesKHR(swapchain.handle, &swapchainImageCount, (vk::Image*)nullptr);
+	vkResult = device.getSwapchainImagesKHR(swapchain.handle, &swapchainImageCount, nullptr);
 	if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 		throw std::runtime_error("Unable to grab swapchainData images from VkSwapchainKHR object.");
-	DENGINE_GFX_ASSERT(swapchainImageCount != 0);
-	DENGINE_GFX_ASSERT(swapchainImageCount == settings.numImages);
+	DENGINE_DETAIL_GFX_ASSERT(swapchainImageCount != 0);
+	DENGINE_DETAIL_GFX_ASSERT(swapchainImageCount == settings.numImages);
 	if (swapchainImageCount > swapchain.images.Capacity())
 		throw std::runtime_error("Unable to fit swapchainData image handles in allocated memory.");
 	swapchain.images.Resize(swapchainImageCount);
@@ -658,6 +627,7 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 	TransitionSwapchainImages(device, deletionQueue, queues, swapchain.images);
 
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
+	cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
 	swapchain.cmdPool = device.createCommandPool(cmdPoolInfo);
 	if (debugUtils != nullptr)
 	{
@@ -691,7 +661,10 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 	}
 
 	vk::SemaphoreCreateInfo semaphoreInfo{};
-	swapchain.imageAvailableSemaphore = device.createSemaphore(semaphoreInfo);
+	vk::ResultValue<vk::Semaphore> semaphoreResult = device.createSemaphore(semaphoreInfo);
+	if (semaphoreResult.result != vk::Result::eSuccess)
+		throw std::runtime_error("Unable to make semaphore.");
+	swapchain.imageAvailableSemaphore = semaphoreResult.value;
 	// Give name to the semaphore
 	if (debugUtils != nullptr)
 	{
@@ -708,26 +681,11 @@ DEngine::Gfx::Vk::SwapchainData DEngine::Gfx::Vk::Init::CreateSwapchain(
 
 void DEngine::Gfx::Vk::Init::RecreateSwapchain(
 	GlobUtils const& globUtils,
-	SurfaceInfo& surface,
+	SwapchainSettings settings,
 	SwapchainData& swapchain)
 {
 	// Query surface for new details
 	vk::Result vkResult{};
-
-	vk::SurfaceCapabilitiesKHR capabilities = globUtils.instance.getPhysicalDeviceSurfaceCapabilitiesKHR(
-		globUtils.physDevice.handle, 
-		surface.handle);
-	surface.capabilities = capabilities;
-
-	SwapchainSettings settings = {};
-	settings.surface = surface.handle;
-	settings.extents = surface.capabilities.currentExtent;
-	settings.numImages = static_cast<std::uint32_t>(swapchain.images.Size());
-	settings.presentMode = swapchain.presentMode;
-	settings.surfaceFormat = swapchain.surfaceFormat;
-	settings.capabilities = surface.capabilities;
-	settings.transform = surface.capabilities.currentTransform;
-	settings.compositeAlphaFlag = surface.compositeAlphaFlag;
 
 	// We have figured out the settings to build the new swapchainData, now we actually make it
 
@@ -743,7 +701,7 @@ void DEngine::Gfx::Vk::Init::RecreateSwapchain(
 	swapchainCreateInfo.imageSharingMode = vk::SharingMode::eExclusive;
 	swapchainCreateInfo.presentMode = settings.presentMode;
 	swapchainCreateInfo.surface = settings.surface;
-	swapchainCreateInfo.preTransform = vk::SurfaceTransformFlagBitsKHR::eIdentity;
+	swapchainCreateInfo.preTransform = settings.transform;
 	swapchainCreateInfo.clipped = 1;
 	swapchainCreateInfo.compositeAlpha = settings.compositeAlphaFlag;
 	swapchainCreateInfo.imageUsage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eColorAttachment;
@@ -785,7 +743,7 @@ void DEngine::Gfx::Vk::Init::RecreateSwapchain(
 	Init::TransitionSwapchainImages(globUtils.device, globUtils.deletionQueue, globUtils.queues, swapchain.images);
 
 	// Command cmdBuffers are not resettable, we deallocate the old ones and allocate new ones
-	globUtils.device.freeCommandBuffers(
+	globUtils.device.FreeCommandBuffers(
 		swapchain.cmdPool, 
 		{ (u32)swapchain.cmdBuffers.Size(), swapchain.cmdBuffers.Data() });
 
@@ -815,11 +773,12 @@ bool DEngine::Gfx::Vk::Init::TransitionSwapchainImages(
 	DeviceDispatch const& device,
 	DeletionQueue const& deletionQueue,
 	QueueData const& queues,
-	Cont::Span<const vk::Image> images)
+	Std::Span<const vk::Image> images)
 {
 	vk::Result vkResult{};
 
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
+	cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
 	vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
 
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
@@ -868,11 +827,53 @@ bool DEngine::Gfx::Vk::Init::TransitionSwapchainImages(
 	vk::SubmitInfo submitInfo{};
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &cmdBuffer;
-	queues.graphics.submit({ submitInfo }, fence);
+	queues.graphics.submit(submitInfo, fence);
 
 	deletionQueue.Destroy(fence, cmdPool);
 
 	return true;
+}
+
+vk::RenderPass DEngine::Gfx::Vk::Init::CreateGuiRenderPass(
+		DeviceDispatch const& device,
+		vk::Format swapchainFormat,
+		DebugUtilsDispatch const* debugUtils)
+{
+	vk::AttachmentDescription colorAttachment{};
+	colorAttachment.initialLayout = vk::ImageLayout::eTransferSrcOptimal;
+	colorAttachment.finalLayout = vk::ImageLayout::eTransferSrcOptimal;
+	colorAttachment.format = swapchainFormat;
+	colorAttachment.samples = vk::SampleCountFlagBits::e1;
+	colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+	colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
+	colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+	colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+	vk::AttachmentDescription attachments[1] = { colorAttachment };
+	vk::AttachmentReference colorAttachmentRef{};
+	colorAttachmentRef.attachment = 0;
+	colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
+	vk::SubpassDescription subpassDescription{};
+	subpassDescription.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+	subpassDescription.colorAttachmentCount = 1;
+	subpassDescription.pColorAttachments = &colorAttachmentRef;
+	// Set up render pass
+	vk::RenderPassCreateInfo createInfo{};
+	createInfo.attachmentCount = 1;
+	createInfo.pAttachments = attachments;
+	createInfo.subpassCount = 1;
+	createInfo.pSubpasses = &subpassDescription;
+
+	vk::RenderPass renderPass = device.createRenderPass(createInfo);
+	if (debugUtils != nullptr)
+	{
+		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+		nameInfo.objectHandle = (u64)(VkRenderPass)renderPass;
+		nameInfo.objectType = renderPass.objectType;
+		nameInfo.pObjectName = "GUI RenderPass";
+		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+	}
+
+	return renderPass;
 }
 
 DEngine::Gfx::Vk::GUIRenderTarget DEngine::Gfx::Vk::Init::CreateGUIRenderTarget(
@@ -974,7 +975,7 @@ DEngine::Gfx::Vk::GUIRenderTarget DEngine::Gfx::Vk::Init::CreateGUIRenderTarget(
 
 	// Transition the image
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
-	cmdPoolInfo.queueFamilyIndex = 0;
+	cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
 	vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
 	cmdBufferAllocInfo.commandPool = cmdPool;
@@ -1004,9 +1005,9 @@ DEngine::Gfx::Vk::GUIRenderTarget DEngine::Gfx::Vk::Init::CreateGUIRenderTarget(
 		vk::PipelineStageFlagBits::eTopOfPipe,
 		vk::PipelineStageFlagBits::eBottomOfPipe,
 		vk::DependencyFlags{},
-		{},
-		{},
-		{ imgMemoryBarrier });
+		nullptr,
+		nullptr,
+		imgMemoryBarrier);
 
 	device.endCommandBuffer(cmdBuffer);
 
@@ -1016,7 +1017,7 @@ DEngine::Gfx::Vk::GUIRenderTarget DEngine::Gfx::Vk::Init::CreateGUIRenderTarget(
 	vk::SubmitInfo submitInfo{};
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &cmdBuffer;
-	queues.graphics.submit({ submitInfo }, tempFence);
+	queues.graphics.submit(submitInfo, tempFence);
 	
 	deletionQueue.Destroy(tempFence, cmdPool);
 
@@ -1028,55 +1029,20 @@ DEngine::Gfx::Vk::GUIData DEngine::Gfx::Vk::Init::CreateGUIData(
 	VmaAllocator vma,
 	DeletionQueue const& deletionQueue,
 	QueueData const& queues,
+	vk::RenderPass guiRenderPass,
 	vk::Format swapchainFormat,
-	u8 resourceSetCount,
 	vk::Extent2D swapchainDimensions,
+	u8 resourceSetCount,
 	DebugUtilsDispatch const* debugUtils)
 {
 	vk::Result vkResult{};
 	GUIData returnVal{};
 
-	// Create the renderpass
-	{
-		vk::AttachmentDescription colorAttachment{};
-		colorAttachment.initialLayout = vk::ImageLayout::eTransferSrcOptimal;
-		colorAttachment.finalLayout = vk::ImageLayout::eTransferSrcOptimal;
-		colorAttachment.format = swapchainFormat;
-		colorAttachment.samples = vk::SampleCountFlagBits::e1;
-		colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
-		colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-		colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-		colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-		vk::AttachmentDescription attachments[1] = { colorAttachment };
-		vk::AttachmentReference colorAttachmentRef{};
-		colorAttachmentRef.attachment = 0;
-		colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
-		vk::SubpassDescription subpassDescription{};
-		subpassDescription.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
-		subpassDescription.colorAttachmentCount = 1;
-		subpassDescription.pColorAttachments = &colorAttachmentRef;
-		// Set up render pass
-		vk::RenderPassCreateInfo createInfo{};
-		createInfo.attachmentCount = 1;
-		createInfo.pAttachments = attachments;
-		createInfo.subpassCount = 1;
-		createInfo.pSubpasses = &subpassDescription;
-
-		returnVal.renderPass = device.createRenderPass(createInfo);
-		if (debugUtils != nullptr)
-		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkRenderPass)returnVal.renderPass;
-			nameInfo.objectType = returnVal.renderPass.objectType;
-			nameInfo.pObjectName = "GUI RenderPass";
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
-		}
-	}
-
-	// Create the commandbuffers
+	// CreateJob the commandbuffers
 	{
 		vk::CommandPoolCreateInfo cmdPoolInfo{};
 		cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+		cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
 		returnVal.cmdPool = device.createCommandPool(cmdPoolInfo);
 		if (debugUtils != nullptr)
 		{
@@ -1104,7 +1070,7 @@ DEngine::Gfx::Vk::GUIData DEngine::Gfx::Vk::Init::CreateGUIData(
 		queues, 
 		swapchainDimensions, 
 		swapchainFormat, 
-		returnVal.renderPass, 
+		guiRenderPass,
 		debugUtils);
 
 	return returnVal;
@@ -1141,9 +1107,9 @@ void DEngine::Gfx::Vk::Init::RecordSwapchainCmdBuffers(
 			vk::PipelineStageFlagBits::eColorAttachmentOutput,
 			vk::PipelineStageFlagBits::eTransfer,
 			vk::DependencyFlags{},
-			{},
-			{},
-			{ preTransfer_GuiBarrier });
+			nullptr,
+			nullptr,
+			preTransfer_GuiBarrier);
 
 		vk::ImageMemoryBarrier preTransfer_SwapchainBarrier{};
 		preTransfer_SwapchainBarrier.image = dstImage;
@@ -1159,9 +1125,9 @@ void DEngine::Gfx::Vk::Init::RecordSwapchainCmdBuffers(
 			vk::PipelineStageFlagBits::eColorAttachmentOutput,
 			vk::PipelineStageFlagBits::eTransfer,
 			vk::DependencyFlags{},
-			{},
-			{},
-			{ preTransfer_SwapchainBarrier });
+			nullptr,
+			nullptr,
+			preTransfer_SwapchainBarrier);
 
 		vk::ImageCopy copyRegion{};
 		copyRegion.extent = vk::Extent3D{ swapchainData.extents.width, swapchainData.extents.height, 1 };
@@ -1175,7 +1141,7 @@ void DEngine::Gfx::Vk::Init::RecordSwapchainCmdBuffers(
 			vk::ImageLayout::eTransferSrcOptimal,
 			dstImage,
 			vk::ImageLayout::eTransferDstOptimal,
-			{ copyRegion });
+			copyRegion);
 
 		vk::ImageMemoryBarrier postTransfer_SwapchainBarrier{};
 		postTransfer_SwapchainBarrier.image = dstImage;
@@ -1191,9 +1157,9 @@ void DEngine::Gfx::Vk::Init::RecordSwapchainCmdBuffers(
 			vk::PipelineStageFlagBits::eTransfer,
 			vk::PipelineStageFlagBits::eColorAttachmentOutput,
 			vk::DependencyFlags{},
-			{},
-			{},
-			{ postTransfer_SwapchainBarrier });
+			nullptr,
+			nullptr,
+			postTransfer_SwapchainBarrier);
 
 		// RenderPass handles transitioning rendered image back to color attachment output
 
@@ -1263,6 +1229,7 @@ void DEngine::Gfx::Vk::Init::TransitionGfxImage(
 	vk::Result vkResult{};
 
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
+	cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
 	vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
 
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
@@ -1285,12 +1252,17 @@ void DEngine::Gfx::Vk::Init::TransitionGfxImage(
 		imgBarrier.subresourceRange.layerCount = 1;
 		imgBarrier.subresourceRange.levelCount = 1;
 		imgBarrier.oldLayout = vk::ImageLayout::eUndefined;
+		// If we're in editor mode, we want to sample from the graphics viewport
+		// into the editor's GUI pass.
+		// If we're not in editor mode, we use a render-pass where this
+		// is the image that gets copied onto the swapchain. That render-pass
+		// requires the image to be in transferSrcOptimal layout.
 		if (useEditorPipeline)
 			imgBarrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 		else
 			imgBarrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
 		imgBarrier.srcAccessMask = {};
-		// We want to write to the image as a color-attachment
+		// We want to write to the image as a render-target
 		imgBarrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 
 		vk::PipelineStageFlags srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
@@ -1314,12 +1286,12 @@ void DEngine::Gfx::Vk::Init::TransitionGfxImage(
 	vk::SubmitInfo submitInfo{};
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &cmdBuffer;
-	queues.graphics.submit({ submitInfo }, fence);
+	queues.graphics.submit(submitInfo, fence);
 
 	deletionQueue.Destroy(fence, cmdPool);
 }
 
-DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewport(
+DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewportRenderTarget(
 	GlobUtils const& globUtils,
 	uSize viewportID,
 	vk::Extent2D viewportSize)
@@ -1329,7 +1301,6 @@ DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewport(
 	GfxRenderTarget returnVal{};
 	returnVal.extent = viewportSize;
 
-	// First we make a temp image that has max Size, so we won't have to re-allocate memory later when resizing this image.
 	vk::ImageCreateInfo imageInfo{};
 	imageInfo.arrayLayers = 1;
 	imageInfo.extent = vk::Extent3D{ viewportSize.width, viewportSize.height, 1 };
@@ -1348,7 +1319,7 @@ DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewport(
 	}
 
 	VmaAllocationCreateInfo vmaAllocInfo{};
-	vmaAllocInfo.flags = 0;
+	vmaAllocInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 	vmaAllocInfo.memoryTypeBits = 0;
 	vmaAllocInfo.pool = 0;
 	vmaAllocInfo.preferredFlags = 0;
@@ -1433,10 +1404,10 @@ DEngine::Gfx::Vk::GfxRenderTarget DEngine::Gfx::Vk::Init::InitializeGfxViewport(
 
 namespace DEngine::Gfx::Vk
 {
-	void imguiCheckVkResult(VkResult result)
+	static void imguiCheckVkResult(VkResult result)
 	{
 		if (static_cast<vk::Result>(result) != vk::Result::eSuccess)
-			throw std::runtime_error("");
+			throw std::runtime_error("Unknown ImGui Vulkan error.");
 	}
 }
 
@@ -1451,7 +1422,7 @@ void DEngine::Gfx::Vk::Init::InitializeImGui(
 {
 	vk::Result vkResult{};
 
-	// Create the descriptor pool for ImGui to use
+	// CreateJob the descriptor pool for ImGui to use
 	VkDescriptorPoolSize pool_sizes[] =
 	{
 			{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
@@ -1500,11 +1471,12 @@ void DEngine::Gfx::Vk::Init::InitializeImGui(
 	if (debugUtils)
 		imguiInfo.useDebugUtils = true;
 
-	bool imguiInitSuccess = ImGui_ImplVulkan_Init(&imguiInfo, static_cast<VkRenderPass>(apiData.guiData.renderPass));
+	bool imguiInitSuccess = ImGui_ImplVulkan_Init(&imguiInfo, static_cast<VkRenderPass>(apiData.globUtils.guiRenderPass));
 	if (!imguiInitSuccess)
 		throw std::runtime_error("Could not initialize the ImGui Vulkan stuff.");
 
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
+	cmdPoolInfo.queueFamilyIndex = apiData.globUtils.queues.graphics.FamilyIndex();
 	vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
 
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
@@ -1528,12 +1500,12 @@ void DEngine::Gfx::Vk::Init::InitializeImGui(
 	vk::SubmitInfo submitInfo{};
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &cmdBuffer;
-	apiData.globUtils.queues.graphics.submit({ submitInfo }, tempFence);
+	apiData.globUtils.queues.graphics.submit(submitInfo, tempFence);
 	
-	vkResult = apiData.globUtils.device.waitForFences({ tempFence }, true, std::numeric_limits<std::uint64_t>::max());
+	vkResult = apiData.globUtils.device.waitForFences(tempFence, true, std::numeric_limits<std::uint64_t>::max());
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("Vulkan: Could not wait for fence after submitting ImGui create-fonts cmdBuffer.");
-	device.destroyFence(tempFence);
-	device.destroyCommandPool(cmdPool);
+	device.Destroy(tempFence);
+	device.Destroy(cmdPool);
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }

@@ -625,7 +625,7 @@ To use custom memory pools:
 Example:
 
 \code
-// Create a pool that can have at most 2 blocks, 128 MiB each.
+// CreateJob a pool that can have at most 2 blocks, 128 MiB each.
 VmaPoolCreateInfo poolCreateInfo = {};
 poolCreateInfo.memoryTypeIndex = ...
 poolCreateInfo.blockSize = 128ull * 1024 * 1024;
@@ -886,7 +886,7 @@ for(uint32_t i = 0; i < allocCount; ++i)
         // Destroy buffer that is immutably bound to memory region which is no longer valid.
         vkDestroyBuffer(device, buffers[i], nullptr);
 
-        // Create new buffer with same parameters.
+        // CreateJob new buffer with same parameters.
         VkBufferCreateInfo bufferInfo = ...;
         vkCreateBuffer(device, &bufferInfo, nullptr, &buffers[i]);
             
@@ -964,7 +964,7 @@ for(uint32_t i = 0; i < allocCount; ++i)
         // Destroy buffer that is immutably bound to memory region which is no longer valid.
         vkDestroyBuffer(device, buffers[i], nullptr);
 
-        // Create new buffer with same parameters.
+        // CreateJob new buffer with same parameters.
         VkBufferCreateInfo bufferInfo = ...;
         vkCreateBuffer(device, &bufferInfo, nullptr, &buffers[i]);
             
@@ -1459,7 +1459,7 @@ e.g. images used as color attachments (aka "render targets"), depth-stencil atta
 images/buffers used as storage image/buffer (aka "Unordered Access View (UAV)").
 
 <b>What to do:</b>
-Create them in video memory that is fastest to access from GPU using
+CreateJob them in video memory that is fastest to access from GPU using
 #VMA_MEMORY_USAGE_GPU_ONLY.
 
 Consider using [VK_KHR_dedicated_allocation](@ref vk_khr_dedicated_allocation) extension
@@ -1476,7 +1476,7 @@ and then read frequently on GPU,
 e.g. textures, vertex and index buffers, constant buffers that don't change often.
 
 <b>What to do:</b>
-Create them in video memory that is fastest to access from GPU using
+CreateJob them in video memory that is fastest to access from GPU using
 #VMA_MEMORY_USAGE_GPU_ONLY.
 
 To initialize content of such resource, create a CPU-side (aka "staging") copy of it
@@ -1497,7 +1497,7 @@ Any resources that change frequently (aka "dynamic"), e.g. every frame or every 
 written on CPU, read on GPU.
 
 <b>What to do:</b>
-Create them using #VMA_MEMORY_USAGE_CPU_TO_GPU.
+CreateJob them using #VMA_MEMORY_USAGE_CPU_TO_GPU.
 You can map it and write to it directly on CPU, as well as read from it on GPU.
 
 This is a more complex situation. Different solutions are possible,
@@ -1512,7 +1512,7 @@ Resources that contain data written by GPU that you want to read back on CPU,
 e.g. results of some computations.
 
 <b>What to do:</b>
-Create them using #VMA_MEMORY_USAGE_GPU_TO_CPU.
+CreateJob them using #VMA_MEMORY_USAGE_GPU_TO_CPU.
 You can write to them directly on GPU, as well as map and read them on CPU.
 
 \section usage_patterns_advanced Advanced patterns
@@ -1535,11 +1535,11 @@ directly instead of submitting explicit transfer (see below).
 
 For resources that you frequently write on CPU and read on GPU, many solutions are possible:
 
--# Create one copy in video memory using #VMA_MEMORY_USAGE_GPU_ONLY,
+-# CreateJob one copy in video memory using #VMA_MEMORY_USAGE_GPU_ONLY,
    second copy in system memory using #VMA_MEMORY_USAGE_CPU_ONLY and submit explicit tranfer each time.
--# Create just single copy using #VMA_MEMORY_USAGE_CPU_TO_GPU, map it and fill it on CPU,
+-# CreateJob just single copy using #VMA_MEMORY_USAGE_CPU_TO_GPU, map it and fill it on CPU,
    read it directly on GPU.
--# Create just single copy using #VMA_MEMORY_USAGE_CPU_ONLY, map it and fill it on CPU,
+-# CreateJob just single copy using #VMA_MEMORY_USAGE_CPU_ONLY, map it and fill it on CPU,
    read it directly on GPU.
 
 Which solution is the most efficient depends on your resource and especially on the GPU.
@@ -1559,9 +1559,9 @@ Some general recommendations:
 Similarly, for resources that you frequently write on GPU and read on CPU, multiple
 solutions are possible:
 
--# Create one copy in video memory using #VMA_MEMORY_USAGE_GPU_ONLY,
+-# CreateJob one copy in video memory using #VMA_MEMORY_USAGE_GPU_ONLY,
    second copy in system memory using #VMA_MEMORY_USAGE_GPU_TO_CPU and submit explicit tranfer each time.
--# Create just single copy using #VMA_MEMORY_USAGE_GPU_TO_CPU, write to it directly on GPU,
+-# CreateJob just single copy using #VMA_MEMORY_USAGE_GPU_TO_CPU, write to it directly on GPU,
    map it and read it on CPU.
 
 You should take some measurements to decide which option is faster in case of your specific
@@ -2501,13 +2501,13 @@ typedef enum VmaAllocationCreateFlagBits {
     This flag is only allowed for custom pools created with #VMA_POOL_CREATE_LINEAR_ALGORITHM_BIT flag.
     */
     VMA_ALLOCATION_CREATE_UPPER_ADDRESS_BIT = 0x00000040,
-    /** Create both buffer/image and allocation, but don't bind them together.
+    /** CreateJob both buffer/image and allocation, but don't bind them together.
     It is useful when you want to bind yourself to do some more advanced binding, e.g. using some extensions.
     The flag is meaningful only with functions that bind by default: vmaCreateBuffer(), vmaCreateImage().
     Otherwise it is ignored.
     */
     VMA_ALLOCATION_CREATE_DONT_BIND_BIT = 0x00000080,
-    /** Create allocation only if additional device memory required for it, if any, won't exceed
+    /** CreateJob allocation only if additional device memory required for it, if any, won't exceed
     memory budget. Otherwise return `VK_ERROR_OUT_OF_DEVICE_MEMORY`.
     */
     VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT = 0x00000100,
@@ -4836,7 +4836,7 @@ template<typename... Types> T* VmaPoolAllocator<T>::Alloc(Types... args)
         }
     }
 
-    // No block has free item: Create new one and use it.
+    // No block has free item: CreateJob new one and use it.
     ItemBlock& newBlock = CreateNewBlock();
     Item* const pItem = &newBlock.pItems[0];
     newBlock.FirstFreeIndex = pItem->NextFreeIndex;
@@ -11358,7 +11358,7 @@ void VmaBlockMetadata_Buddy::Alloc(
          
         const uint32_t childrenLevel = currLevel + 1;
 
-        // Create two free sub-nodes.
+        // CreateJob two free sub-nodes.
         Node* leftChild = vma_new(GetAllocationCallbacks(), Node)();
         Node* rightChild = vma_new(GetAllocationCallbacks(), Node)();
 
@@ -12669,7 +12669,7 @@ VkResult VmaBlockVector::CreateBlock(VkDeviceSize blockSize, size_t* pNewBlockIn
 
     // New VkDeviceMemory successfully created.
 
-    // Create new Allocation for it.
+    // CreateJob new Allocation for it.
     VmaDeviceMemoryBlock* const pBlock = vma_new(m_hAllocator, VmaDeviceMemoryBlock)(m_hAllocator);
     pBlock->Init(
         m_hAllocator,
@@ -12834,7 +12834,7 @@ void VmaBlockVector::ApplyDefragmentationMovesGpu(
 
     VMA_ASSERT(pDefragCtx->res == VK_SUCCESS);
 
-    // Go over all blocks. Create and bind buffer for whole block if necessary.
+    // Go over all blocks. CreateJob and bind buffer for whole block if necessary.
     {
         VkBufferCreateInfo bufCreateInfo;
         VmaFillGpuDefragmentationBufferCreateInfo(bufCreateInfo);
@@ -13282,7 +13282,7 @@ VmaDefragmentationAlgorithm_Generic::VmaDefragmentationAlgorithm_Generic(
     m_AllocationsMoved(0),
     m_Blocks(VmaStlAllocator<BlockInfo*>(hAllocator->GetAllocationCallbacks()))
 {
-    // Create block info for each block.
+    // CreateJob block info for each block.
     const size_t blockCount = m_pBlockVector->m_Blocks.size();
     for(size_t blockIndex = 0; blockIndex < blockCount; ++blockIndex)
     {
@@ -14102,7 +14102,7 @@ void VmaDefragmentationContext_T::AddAllocations(
     VmaAllocation* pAllocations,
     VkBool32* pAllocationsChanged)
 {
-    // Dispatch pAllocations among defragmentators. Create them when necessary.
+    // Dispatch pAllocations among defragmentators. CreateJob them when necessary.
     for(uint32_t allocIndex = 0; allocIndex < allocationCount; ++allocIndex)
     {
         const VmaAllocation hAlloc = pAllocations[allocIndex];
@@ -16666,7 +16666,7 @@ uint32_t VmaAllocator_T::CalculateGpuDefragmentationMemoryTypeBits() const
 
     uint32_t memoryTypeBits = 0;
 
-    // Create buffer.
+    // CreateJob buffer.
     VkBuffer buf = VK_NULL_HANDLE;
     VkResult res = (*GetVulkanFunctions().vkCreateBuffer)(
         m_hDevice, &dummyBufCreateInfo, GetAllocationCallbacks(), &buf);
@@ -18070,7 +18070,7 @@ VMA_CALL_PRE VkResult VMA_CALL_POST vmaCreateBuffer(
     *pBuffer = VK_NULL_HANDLE;
     *pAllocation = VK_NULL_HANDLE;
 
-    // 1. Create VkBuffer.
+    // 1. CreateJob VkBuffer.
     VkResult res = (*allocator->GetVulkanFunctions().vkCreateBuffer)(
         allocator->m_hDevice,
         pBufferCreateInfo,
@@ -18207,7 +18207,7 @@ VMA_CALL_PRE VkResult VMA_CALL_POST vmaCreateImage(
     *pImage = VK_NULL_HANDLE;
     *pAllocation = VK_NULL_HANDLE;
 
-    // 1. Create VkImage.
+    // 1. CreateJob VkImage.
     VkResult res = (*allocator->GetVulkanFunctions().vkCreateImage)(
         allocator->m_hDevice,
         pImageCreateInfo,

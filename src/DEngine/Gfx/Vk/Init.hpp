@@ -14,7 +14,7 @@ namespace DEngine::Gfx::Vk::Init
 		bool debugUtilsEnabled = false;
 	};
 	[[nodiscard]] CreateVkInstance_Return CreateVkInstance(
-		Cont::Span<char const*> requiredExtensions,
+		Std::Span<char const*> requiredExtensions,
 		bool enableLayers,
 		BaseDispatch const& baseDispatch,
 		ILog* logger);
@@ -32,11 +32,13 @@ namespace DEngine::Gfx::Vk::Init
 		InstanceDispatch const& instance,
 		PhysDeviceInfo const& physDevice);
 
-	void InitializeVMA(
-		GlobUtils& globUtils,
-		DebugUtilsDispatch const* debugUtils);
+	[[nodiscard]] vk::ResultValue<VmaAllocator> InitializeVMA(
+		InstanceDispatch const& instance,
+		vk::PhysicalDevice physDeviceHandle,
+		DeviceDispatch const& device,
+		VMA_MemoryTrackingData* vma_trackingData);
 
-	[[nodiscard]] Cont::FixedVector<vk::Fence, Constants::maxResourceSets> CreateMainFences(
+	[[nodiscard]] Std::StaticVector<vk::Fence, Constants::maxResourceSets> CreateMainFences(
 		DevDispatch const& device,
 		u8 resourceSetCount,
 		DebugUtilsDispatch const* debugUtils);
@@ -47,40 +49,41 @@ namespace DEngine::Gfx::Vk::Init
 		vk::SurfaceKHR surface,
 		ILog* logger);
 
-	void RebuildSurfaceInfo(
-		InstanceDispatch const& instance,
-		PhysDeviceInfo const& physDevice,
-		vk::SurfaceKHR newSurface,
-		SurfaceInfo& outSurfaceInfo);
-
 	[[nodiscard]] SwapchainSettings BuildSwapchainSettings(
 		InstanceDispatch const& instance,
 		vk::PhysicalDevice physDevice,
-		SurfaceInfo const& surfaceCaps,
+		SurfaceInfo const& surfaceInfo,
+		u32 width,
+		u32 height,
 		ILog* logger);
 
 	[[nodiscard]] SwapchainData CreateSwapchain(
 		Vk::DeviceDispatch const& device,
 		QueueData const& queues,
 		DeletionQueue const& deletionQueue,
-		SwapchainSettings const& settings,
+		SwapchainSettings settings,
 		DebugUtilsDispatch const* debugUtilsOpt);
 
 	void RecreateSwapchain(
 		GlobUtils const& globUtils,
-		SurfaceInfo& surface,
+		SwapchainSettings settings,
 		SwapchainData& swapchain);
 
 	bool TransitionSwapchainImages(
 		DeviceDispatch const& device,
 		DeletionQueue const& deletionQueue,
 		QueueData const& queues,
-		Cont::Span<const vk::Image> images);
+		Std::Span<const vk::Image> images);
 
 	void RecordSwapchainCmdBuffers(
 		DeviceDispatch const& device,
 		SwapchainData const& swapchainData,
 		vk::Image srcImg);
+
+	[[nodiscard]] vk::RenderPass CreateGuiRenderPass(
+			DeviceDispatch const& device,
+			vk::Format swapchainFormat,
+			DebugUtilsDispatch const* debugUtils);
 
 	[[nodiscard]] GUIRenderTarget CreateGUIRenderTarget(
 		DeviceDispatch const& device,
@@ -93,14 +96,15 @@ namespace DEngine::Gfx::Vk::Init
 		DebugUtilsDispatch const* debugUtils);
 
 	[[nodiscard]] GUIData CreateGUIData(
-		DeviceDispatch const& device,
-		VmaAllocator vma,
-		DeletionQueue const& deletionQueue,
-		QueueData const& queues,
-		vk::Format swapchainFormat,
-		u8 resourceSetCount,
-		vk::Extent2D swapchainDimensions,
-		DebugUtilsDispatch const* debugUtils);
+			DeviceDispatch const& device,
+			VmaAllocator vma,
+			DeletionQueue const& deletionQueue,
+			QueueData const& queues,
+			vk::RenderPass guiRenderPass,
+			vk::Format swapchainFormat,
+			vk::Extent2D swapchainDimensions,
+			u8 resourceSetCount,
+			DebugUtilsDispatch const* debugUtils);
 
 	void InitializeImGui(
 		APIData& apiData,
@@ -120,7 +124,7 @@ namespace DEngine::Gfx::Vk::Init
 		vk::Image img,
 		bool useEditorPipeline);
 
-	[[nodiscard]] GfxRenderTarget InitializeGfxViewport(
+	[[nodiscard]] GfxRenderTarget InitializeGfxViewportRenderTarget(
 		GlobUtils const& globUtils,
 		uSize viewportID,
 		vk::Extent2D viewportSize);

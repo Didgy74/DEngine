@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
-  <Type Name="DEngine::Containers::Span&lt;*&gt;">
+  <Type Name="DEngine::Std::Span&lt;*&gt;">
     <DisplayString>{{ Size={m_size} }}</DisplayString>
     <Expand>
       <Item Name="Size" ExcludeView="simple">m_size</Item>
@@ -12,7 +12,7 @@
     </Expand>
   </Type>
 
-  <Type Name="DEngine::Containers::FixedVector&lt;*&gt;">
+  <Type Name="DEngine::Std::FixedVector&lt;*&gt;">
     <DisplayString>{{ Size={m_size} }}</DisplayString>
     <Expand>
       <Item Name="Size" ExcludeView="simple">m_size</Item>

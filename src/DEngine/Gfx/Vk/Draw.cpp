@@ -1,6 +1,5 @@
 #include "Vk.hpp"
-#include "../VkInterface.hpp"
-#include "DEngine/Gfx/Assert.hpp"
+#include "../Assert.hpp"
 
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_vulkan.h"
@@ -19,6 +18,8 @@ namespace DEngine::Gfx::Vk
 		std::uint_least8_t resourceSetIndex,
 		DebugUtilsDispatch const* debugUtils)
 	{
+		
+
 		// We need to name the command buffer every time we reset it
 		if (debugUtils)
 		{
@@ -76,7 +77,7 @@ namespace DEngine::Gfx::Vk
 			copyImageSubmitInfo.waitSemaphoreCount = 1;
 			copyImageSubmitInfo.pWaitSemaphores = &apiData.swapchain.imageAvailableSemaphore;
 			copyImageSubmitInfo.pWaitDstStageMask = &imgCopyDoneStage;
-			apiData.globUtils.queues.graphics.submit({ copyImageSubmitInfo }, vk::Fence());
+			apiData.globUtils.queues.graphics.submit(copyImageSubmitInfo, vk::Fence());
 
 			vk::PresentInfoKHR presentInfo{};
 			presentInfo.swapchainCount = 1;
@@ -85,57 +86,46 @@ namespace DEngine::Gfx::Vk
 			vkResult = apiData.globUtils.queues.graphics.presentKHR(presentInfo);
 			if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eSuboptimalKHR)
 			{
-				std::cout << "DEngine, Vulkan: Encountered bad present result." << std::endl;
+				apiData.logger->log("DEngine, Vulkan: Encountered bad present result.");
 			}
 		}
 		else if (imageIndexOpt.result == vk::Result::eSuboptimalKHR)
 		{
-			std::cout << "DEngine, Vulkan: Encountered suboptimal image-acquire result." << std::endl;
+			apiData.logger->log("DEngine, Vulkan: Encountered suboptimal image-acquire result.");
 		}
 		else
 		{
-			std::cout << "DEngine, Vulkan: Encountered bad image-acquire result." << std::endl;
+			apiData.logger->log("DEngine, Vulkan: Encountered bad image-acquire result.");
 		}
 	}
 
-	struct RecordGraphicsCmdBuffer_Params
-	{
-		APIData const* apiData = nullptr;
-		DevDispatch const* device = nullptr;
-		ViewportVkData const* gfxViewportData = nullptr;
-		u8 viewportID = 255;
-		u8 resourceSetIndex = 255;
-		u8 resourceSetCount = 255;
-		vk::RenderPass renderPass{};
-		bool useEditorPipeline = false;
-		vk::Pipeline testPipeline{};
-		DebugUtilsDispatch const* debugUtils = nullptr;
-	};
+	// Assumes the resource set is available
 	void RecordGraphicsCmdBuffer(
 		GlobUtils const& globUtils, 
-		vk::CommandBuffer cmdBuffer, 
-		uSize viewportID,
+		ViewportData const& viewportInfo,
+		ViewportUpdateData const& viewportUpdate,
+		DrawParams const& drawParams,
 		u8 resourceSetIndex,
-		ViewportVkData const& viewportInfo,
-		APIData& apiData,
-		float const* matrixPtr)
+		APIData& apiData)
 	{
+		std::memcpy(
+			(char*)viewportInfo.mappedMem + viewportInfo.camElementSize * resourceSetIndex,
+			&viewportUpdate.transform,
+			viewportInfo.camElementSize);
+
+		vk::CommandBuffer cmdBuffer = viewportInfo.cmdBuffers[resourceSetIndex];
+
 		// We need to rename the command buffer every time we record it
 		if (globUtils.UsingDebugUtils())
 		{
 			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
 			nameInfo.objectHandle = (u64)(VkCommandBuffer)cmdBuffer;
 			nameInfo.objectType = cmdBuffer.objectType;
-			std::string name = std::string("Graphics viewport #") + std::to_string(viewportID) + std::string(" - CmdBuffer #") + std::to_string(resourceSetIndex);
+			std::string name = std::string("Graphics viewport #") + std::to_string(viewportInfo.id) + 
+				std::string(" - CmdBuffer #") + std::to_string(resourceSetIndex);
 			nameInfo.pObjectName = name.data();
 			globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
 		}
-
-		char* ptr = (char*)apiData.test_mappedMem;
-		ptr += (uSize)apiData.test_camUboOffset * globUtils.resourceSetCount * viewportID;
-		ptr += apiData.test_camUboOffset * resourceSetIndex;
-
-		std::memcpy(ptr, matrixPtr, 64);
 
 		vk::CommandBufferBeginInfo beginInfo{};
 		beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
@@ -155,18 +145,30 @@ namespace DEngine::Gfx::Vk
 		vk::Viewport viewport{};
 		viewport.width = static_cast<float>(viewportInfo.renderTarget.extent.width);
 		viewport.height = static_cast<float>(viewportInfo.renderTarget.extent.height);
-		globUtils.device.cmdSetViewport(cmdBuffer, 0, { viewport });
+		globUtils.device.cmdSetViewport(cmdBuffer, 0, viewport);
 
-		vk::DescriptorSet descrSet = apiData.test_cameraDescrSets[(uSize)viewportID * globUtils.resourceSetCount + resourceSetIndex];
-		globUtils.device.cmdBindDescriptorSets(
-			cmdBuffer,
-			vk::PipelineBindPoint::eGraphics,
-			apiData.testPipelineLayout,
-			0,
-			descrSet,
-			{});
 		globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, apiData.testPipeline);
-		globUtils.device.cmdDraw(cmdBuffer, 4, 1, 0, 0);
+
+		for (uSize drawIndex = 0; drawIndex < drawParams.textureIDs.size(); drawIndex += 1)
+		{
+			Std::Array<vk::DescriptorSet, 3> descrSets = {
+				viewportInfo.camDataDescrSets[resourceSetIndex],
+				apiData.objectDataManager.descrSet,
+				apiData.textureManager.database.at(drawParams.textureIDs[drawIndex]).descrSet };
+
+			uSize objectDataBufferOffset = 0;
+			objectDataBufferOffset += apiData.objectDataManager.capacity * apiData.objectDataManager.elementSize * resourceSetIndex;
+			objectDataBufferOffset += apiData.objectDataManager.elementSize * drawIndex;
+
+			globUtils.device.cmdBindDescriptorSets(
+				cmdBuffer,
+				vk::PipelineBindPoint::eGraphics,
+				apiData.testPipelineLayout,
+				0,
+				{ (u32)descrSets.Size(), descrSets.Data() },
+				(u32)objectDataBufferOffset);
+			globUtils.device.cmdDraw(cmdBuffer, 4, 1, 0, 0);
+		}
 
 		globUtils.device.cmdEndRenderPass(cmdBuffer);
 
@@ -190,146 +192,42 @@ namespace DEngine::Gfx::Vk
 				vk::PipelineStageFlagBits::eColorAttachmentOutput,
 				vk::PipelineStageFlagBits::eFragmentShader,
 				vk::DependencyFlagBits(),
-				{},
-				{},
-				{ imgBarrier });
+				nullptr,
+				nullptr,
+				imgBarrier);
 		}
 
 		globUtils.device.endCommandBuffer(cmdBuffer);
 	}
 
-	// Assumes that the mutex for viewportmanager is already locked.
-	void HandleVirtualViewportEvents(
-		GlobUtils const& globUtils,
-		Cont::Span<ViewportUpdateData const> viewportUpdates,
-		ViewportManager& viewportManager)
-	{
-		vk::Result vkResult{};
-
-		// First we handle any viewportManager that need to be initialized, not resized.
-		for (uSize i = 0; i < viewportUpdates.Size(); i += 1)
-		{
-			Gfx::ViewportUpdateData updateData = viewportUpdates[i];
-			// Find the viewport with the ID
-			ViewportVkData* viewportPtr = nullptr;
-			for (auto& viewportItem : viewportManager.viewportDatas)
-			{
-				if (viewportItem.a == updateData.id)
-				{
-					viewportPtr = &viewportItem.b;
-					break;
-				}
-			}
-			DENGINE_GFX_ASSERT(viewportPtr != nullptr);
-
-			if (viewportPtr->renderTarget.img == vk::Image())
-			{
-				// We need to create this virtual viewport
-				viewportPtr->renderTarget = Init::InitializeGfxViewport(globUtils, updateData.id, { updateData.width, updateData.height });
-				ImGui_ImplVulkan_OverwriteTexture(
-					viewportPtr->imguiTextureID,
-					(VkImageView)viewportPtr->renderTarget.imgView,
-					(VkImageLayout)vk::ImageLayout::eShaderReadOnlyOptimal);
-
-				// make the command buffer stuff
-				vk::CommandPoolCreateInfo cmdPoolInfo{};
-				cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
-				cmdPoolInfo.queueFamilyIndex = 0;
-				viewportPtr->cmdPool = globUtils.device.createCommandPool(cmdPoolInfo);
-				vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
-				cmdBufferAllocInfo.commandBufferCount = globUtils.resourceSetCount;
-				cmdBufferAllocInfo.commandPool = viewportPtr->cmdPool;
-				cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
-				viewportPtr->cmdBuffers.Resize(cmdBufferAllocInfo.commandBufferCount);
-				vkResult = globUtils.device.allocateCommandBuffers(cmdBufferAllocInfo, viewportPtr->cmdBuffers.Data());
-
-				if (globUtils.UsingDebugUtils())
-				{
-					vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-					nameInfo.objectHandle = (u64)(VkCommandPool)viewportPtr->cmdPool;
-					nameInfo.objectType = viewportPtr->cmdPool.objectType;
-					std::string name = std::string("Graphics viewport #") + std::to_string(updateData.id) + " - Cmd Pool";
-					nameInfo.pObjectName = name.data();
-					globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
-				}
-			}
-		}
-
-		// Now we handle viewports that need to be resized, not initialized.
-		// We have to wait for the entire graphics queue because ImGui might have some
-		// extra OS windows that need to sample from the image later in the draw loop.
-		// Ideally we would have a deferred job queue here so we wouldn't have to stall the queue like this...
-
-		// First we check if any viewports needs to be resized
-		// This tells us if we need to wait for the fences at all
-		bool viewportNeedsResizing = false;
-		for (uSize i = 0; i < viewportUpdates.Size(); i += 1)
-		{
-			Gfx::ViewportUpdateData updateData = viewportUpdates[i];
-			ViewportVkData* viewportPtr = nullptr;
-			// Search for the viewport this update is referring
-			for (auto& [viewportID, viewport] : viewportManager.viewportDatas)
-			{
-				if (viewportID == updateData.id)
-				{
-					viewportPtr = &viewport;;
-					break;
-				}
-			}
-			DENGINE_GFX_ASSERT(viewportPtr != nullptr);
-			vk::Extent2D currentExtent = viewportPtr->renderTarget.extent;
-			if (updateData.width != currentExtent.width || updateData.height != currentExtent.height)
-			{
-				viewportNeedsResizing = true;
-				break;
-			}
-		}
-		if (viewportNeedsResizing)
-		{
-			globUtils.queues.graphics.waitIdle();
-			for (uSize i = 0; i < viewportUpdates.Size(); i += 1)
-			{
-				Gfx::ViewportUpdateData updateData = viewportUpdates[i];
-				ViewportVkData* viewportPtr = nullptr;
-				// Search for the viewport this update is referring
-				for (auto& [viewportID, viewport] : viewportManager.viewportDatas)
-				{
-					if (viewportID == updateData.id)
-					{
-						viewportPtr = &viewport;;
-						break;
-					}
-				}
-				DENGINE_GFX_ASSERT(viewportPtr != nullptr);
-
-				GfxRenderTarget& renderTarget = viewportPtr->renderTarget;
-				if (renderTarget.extent.width != updateData.width || renderTarget.extent.height != updateData.height)
-				{
-					globUtils.device.destroyFramebuffer(renderTarget.framebuffer);
-					globUtils.device.destroyImageView(renderTarget.imgView);
-					vmaDestroyImage(globUtils.vma, (VkImage)renderTarget.img, renderTarget.vmaAllocation);
-					renderTarget = Init::InitializeGfxViewport(globUtils, updateData.id, { updateData.width, updateData.height });
-					ImGui_ImplVulkan_OverwriteTexture(
-						viewportPtr->imguiTextureID,
-						(VkImageView)renderTarget.imgView,
-						(VkImageLayout)vk::ImageLayout::eShaderReadOnlyOptimal);
-				}
-			}
-		}
-	}
-
 	void HandleSwapchainResizeEvent(
+		u32 width,
+		u32 height,
+		IWsi& wsiInterface,
 		GlobUtils const& globUtils,
 		GUIData& guiData,
 		SurfaceInfo& surface,
 		SwapchainData& swapchain)
 	{
-		globUtils.queues.graphics.waitIdle();
+		globUtils.device.WaitIdle();
 
-		Init::RecreateSwapchain(globUtils, surface, swapchain);
+		surface = Init::BuildSurfaceInfo(
+			globUtils.instance,
+			globUtils.physDevice.handle,
+			surface.handle,
+			globUtils.logger);
 
-		globUtils.device.destroyFramebuffer(guiData.renderTarget.framebuffer);
-		globUtils.device.destroyImageView(guiData.renderTarget.imgView);
+		SwapchainSettings spSettings = Init::BuildSwapchainSettings(
+			globUtils.instance,
+			globUtils.physDevice.handle,
+			surface,
+			width,
+			height,
+			globUtils.logger);
+		Init::RecreateSwapchain(globUtils, spSettings, swapchain);
+
+		globUtils.device.Destroy(guiData.renderTarget.framebuffer);
+		globUtils.device.Destroy(guiData.renderTarget.imgView);
 		vmaDestroyImage(globUtils.vma, (VkImage)guiData.renderTarget.img, guiData.renderTarget.vmaAllocation);
 		guiData.renderTarget = Init::CreateGUIRenderTarget(
 			globUtils.device,
@@ -338,98 +236,178 @@ namespace DEngine::Gfx::Vk
 			globUtils.queues,
 			swapchain.extents,
 			swapchain.surfaceFormat.format,
-			guiData.renderPass,
+			globUtils.guiRenderPass,
 			globUtils.DebugUtilsPtr());
 
 		Init::RecordSwapchainCmdBuffers(globUtils.device, swapchain, guiData.renderTarget.img);
 	}
+
+	void HandleSurfaceRecreationEvent(
+		u32 width,
+		u32 height,
+		GlobUtils const& globUtils,
+		SurfaceInfo& surfaceInfo,
+		IWsi& wsiInterface,
+		SwapchainData& swapchainData,
+		GUIData& guiData)
+	{
+		globUtils.device.WaitIdle();		
+
+		globUtils.device.Destroy(swapchainData.handle);
+		swapchainData.handle = vk::SwapchainKHR();
+		globUtils.instance.Destroy(surfaceInfo.handle);
+		surfaceInfo.handle = vk::SurfaceKHR();
+		
+		// TODO: I don't think I like this code
+		// Create the VkSurface using the callback
+		vk::SurfaceKHR surface{};
+		vk::Result surfaceCreateResult = (vk::Result)wsiInterface.CreateVkSurface(
+			(u64)(VkInstance)globUtils.instance.handle, 
+			nullptr, 
+			*reinterpret_cast<u64*>(&surface));
+		if (surfaceCreateResult != vk::Result::eSuccess)
+			throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
+
+		surfaceInfo = Init::BuildSurfaceInfo(
+			globUtils.instance,
+			globUtils.physDevice.handle,
+			surface,
+			globUtils.logger);
+		
+		swapchainData.handle = vk::SwapchainKHR();
+
+		HandleSwapchainResizeEvent(
+			width,
+			height,
+			wsiInterface,
+			globUtils,
+			guiData,
+			surfaceInfo,
+			swapchainData);
+	}
 }
 
-void DEngine::Gfx::Vk::Draw(Data& gfxData, Draw_Params const& drawParams, void* apiDataBuffer)
+#include <unordered_map>
+#include <set>
+
+#include "Texas/Texas.hpp"
+#include "Texas/VkTools.hpp"
+#include "DEngine/Application.hpp"
+
+void DEngine::Gfx::Vk::APIData::Draw(Data& gfxData, DrawParams const& drawParams)
 {
 	vk::Result vkResult{};
-	APIData& apiData = *(reinterpret_cast<APIData*>(apiDataBuffer));
+	APIData& apiData = *this;
 	GlobUtils const& globUtils = apiData.globUtils;
 	DevDispatch const& device = globUtils.device;
 
-	std::lock_guard viewportManagerLockGuard{ apiData.viewportManager.viewportDataLock };
-
-	HandleVirtualViewportEvents(
-		globUtils, 
-		drawParams.viewportUpdates.ToSpan(), 
-		apiData.viewportManager);
+	// Handle surface recreation
+	if (drawParams.restoreEvent)
+		HandleSurfaceRecreationEvent(
+			drawParams.swapchainWidth,
+			drawParams.swapchainHeight,
+			globUtils,
+			apiData.surface,
+			*apiData.wsiInterface,
+			apiData.swapchain,
+			apiData.guiData);
 	// Handle swapchain resize
-	if (drawParams.resizeEvent)
+	else if (drawParams.swapchainWidth != apiData.swapchain.extents.width || drawParams.swapchainHeight != apiData.swapchain.extents.height)
 		HandleSwapchainResizeEvent(
+			drawParams.swapchainWidth,
+			drawParams.swapchainHeight,
+			*apiData.wsiInterface,
 			globUtils, 
 			apiData.guiData,
 			apiData.surface, 
 			apiData.swapchain);
 
+	// Deletes and creates viewports when needed.
+	ViewportManager::HandleEvents(
+		apiData.viewportManager,
+		globUtils,
+		{ drawParams.viewportUpdates.data(), drawParams.viewportUpdates.size() });
+	// Resizes the buffer if the new size is too large.
+	ObjectDataManager::HandleResizeEvent(
+		apiData.objectDataManager,
+		globUtils,
+		drawParams.transforms.size());
+	TextureManager::Update(
+		apiData.textureManager,
+		apiData.globUtils,
+		drawParams,
+		*apiData.test_textureAssetInterface);
 
 
-	// I did it like this because I don't want the increment operation at the bottom of the function.
-	std::uint_least8_t currentInFlightIndex = apiData.currentInFlightFrame;
-	apiData.currentInFlightFrame = (apiData.currentInFlightFrame + 1) % apiData.globUtils.resourceSetCount;
 
-	vkResult = apiData.globUtils.device.waitForFences({ apiData.mainFences[currentInFlightIndex] }, true, std::numeric_limits<std::uint64_t>::max());
+	u8 currentInFlightIndex = apiData.currentInFlightFrame;
+
+	vkResult = apiData.globUtils.device.waitForFences(
+		apiData.mainFences[currentInFlightIndex], 
+		true, 
+		static_cast<u64>(-1));
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("Vulkan: Failed to wait for cmd buffer fence.");
-	device.resetFences({ apiData.mainFences[currentInFlightIndex] });
+	device.resetFences(apiData.mainFences[currentInFlightIndex]);
 
-	Cont::FixedVector<vk::CommandBuffer, 10> cmdBuffersToSubmit{};
 
+	// Update object-data
+	ObjectDataManager::Update(
+		apiData.objectDataManager,
+		{ drawParams.transforms.data(), drawParams.transforms.size() },
+		currentInFlightIndex);
+
+
+	std::vector<vk::CommandBuffer> cmdBuffersToSubmit{};
 	for (auto const& viewportUpdate : drawParams.viewportUpdates)
 	{
-		//ViewportVkData const* viewport = apiData.viewportDatas[viewportUpdate.id];
-		ViewportVkData const* viewport = nullptr;
-		for (auto const& item : apiData.viewportManager.viewportDatas)
+		uSize viewportIndex = static_cast<uSize>(-1);
+		for (uSize i = 0; i < apiData.viewportManager.viewportData.size(); i += 1)
 		{
-			if (viewportUpdate.id == item.a)
+			if (viewportUpdate.id == apiData.viewportManager.viewportData[i].a)
 			{
-				viewport = &item.b;
+				viewportIndex = i;
 				break;
 			}
 		}
-		DENGINE_GFX_ASSERT(viewport != nullptr);
-		
-		vk::CommandBuffer cmdBuffer = viewport->cmdBuffers[currentInFlightIndex];
-		cmdBuffersToSubmit.PushBack(cmdBuffer);
+		ViewportData const& viewport = apiData.viewportManager.viewportData[viewportIndex].b;
+		vk::CommandBuffer cmdBuffer = viewport.cmdBuffers[currentInFlightIndex];
+		cmdBuffersToSubmit.push_back(cmdBuffer);
 		RecordGraphicsCmdBuffer(
 			apiData.globUtils,
-			cmdBuffer,
-			viewportUpdate.id,
+			viewport,
+			viewportUpdate,
+			drawParams,
 			currentInFlightIndex,
-			*viewport,
-			apiData,
-			viewportUpdate.transform.Data());
+			apiData);
 	}
+	
 
-	if (drawParams.presentMainWindow)
-	{
-		// First we re-record the GUI cmd buffer and submit it.
-		RecordGUICmdBuffer(
-			apiData.globUtils.device,
-			apiData.guiData.cmdBuffers[currentInFlightIndex],
-			apiData.guiData.renderTarget,
-			apiData.guiData.renderPass,
-			currentInFlightIndex,
-			apiData.globUtils.DebugUtilsPtr());
-		cmdBuffersToSubmit.PushBack(apiData.guiData.cmdBuffers[currentInFlightIndex]);
-	}
+
+	// First we re-record the GUI cmd buffer and submit it.
+	RecordGUICmdBuffer(
+		apiData.globUtils.device,
+		apiData.guiData.cmdBuffers[currentInFlightIndex],
+		apiData.guiData.renderTarget,
+		globUtils.guiRenderPass,
+		currentInFlightIndex,
+		apiData.globUtils.DebugUtilsPtr());
+	cmdBuffersToSubmit.push_back(apiData.guiData.cmdBuffers[currentInFlightIndex]);
 
 	// Submit the command cmdBuffers
 	vk::SubmitInfo submitInfo{};
-	submitInfo.commandBufferCount = (u32)cmdBuffersToSubmit.Size();
-	submitInfo.pCommandBuffers = cmdBuffersToSubmit.Data();
-	apiData.globUtils.queues.graphics.submit({ submitInfo }, apiData.mainFences[currentInFlightIndex]);
+	submitInfo.commandBufferCount = (u32)cmdBuffersToSubmit.size();
+	submitInfo.pCommandBuffers = cmdBuffersToSubmit.data();
+	apiData.globUtils.queues.graphics.submit(submitInfo, apiData.mainFences[currentInFlightIndex]);
 
 
-	if (drawParams.presentMainWindow)
-	{
-		// We query the next available swapchain image, so we know which image we need to copy to
-		PresentShit(apiData);
-	}
+	// We query the next available swapchain image, so we know which image we need to copy to
+	PresentShit(apiData);
+
+
 
 	DeletionQueue::ExecuteCurrentTick(apiData.globUtils.deletionQueue);
+	apiData.currentInFlightFrame = (apiData.currentInFlightFrame + 1) % apiData.globUtils.resourceSetCount;
+	apiData.globUtils.SetCurrentResourceSetIndex(apiData.currentInFlightFrame);
 }
+

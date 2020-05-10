@@ -3,23 +3,29 @@
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Span.hpp"
 #include "DEngine/Containers/Optional.hpp"
-#include "DEngine/Containers/FixedVector.hpp"
+#include "DEngine/Containers/StaticVector.hpp"
 
-#include "DEngine/Math/Matrix/Matrix.hpp"
+#include "DEngine/Math/Matrix.hpp"
 #include "DEngine/Math/Common.hpp"
+
+#include <vector>
 
 namespace DEngine::Gfx
 {
-	namespace Constants
-	{
-		constexpr u8 maxViewportCount = 8;
-	}
-
 	class IWsi;
 	class ILog;
 	struct InitInfo;
 	class ViewportRef;
-	struct Draw_Params;
+	struct DrawParams;
+	enum class TextureID : u64 {};
+
+	struct TextureAssetInterface
+	{
+	public:
+		virtual ~TextureAssetInterface() {};
+
+		virtual char const* get(TextureID id) const = 0;
+	};
 
 	struct ViewportUpdateData
 	{
@@ -29,24 +35,29 @@ namespace DEngine::Gfx
 		Math::Mat4 transform{};
 	};
 
-	struct Draw_Params
+	struct DrawParams
 	{
-		bool presentMainWindow = false;
-		bool resizeEvent = false;
-		
-		Cont::FixedVector<ViewportUpdateData, 10> viewportUpdates = {};
+		u32 swapchainWidth = 0;
+		u32 swapchainHeight = 0;
+		bool restoreEvent = false;
+
+		std::vector<TextureID> textureIDs;
+		std::vector<Math::Mat4> transforms;
+
+		std::vector<ViewportUpdateData> viewportUpdates;
 	};
 
 	class Data
 	{
 	public:
-		Data(Data&&) noexcept = default;
+		Data(Data&&) noexcept;
+		virtual ~Data();
 
 		ViewportRef NewViewport();
 		void DeleteViewport(uSize viewportID);
 		uSize GetViewportCount();
 
-		void Draw(Draw_Params const& params);
+		void Draw(DrawParams const& params);
 
 	private:
 		Data() = default;
@@ -54,10 +65,11 @@ namespace DEngine::Gfx
 
 		ILog* iLog = nullptr;
 		IWsi* iWsi = nullptr;
+		TextureAssetInterface const* texAssetInterface = nullptr;
 
-		void* apiDataBuffer{};
+		void* apiDataBuffer = nullptr;
 
-		friend Cont::Opt<Data> Initialize(const InitInfo& initInfo);
+		friend Std::Opt<Data> Initialize(const InitInfo& initInfo);
 	};
 
 	struct InitInfo
@@ -67,7 +79,8 @@ namespace DEngine::Gfx
 
 		ILog* optional_iLog = nullptr;
 		IWsi* iWsi = nullptr;
-		Cont::Span<char const*> requiredVkInstanceExtensions{};
+		TextureAssetInterface const* texAssetInterface = nullptr;
+		Std::Span<char const*> requiredVkInstanceExtensions{};
 	};
 
 	class ILog
@@ -88,7 +101,7 @@ namespace DEngine::Gfx
 		// Argument #1: VkInstance - The Vulkan instance handle
 		// Argument #2: VkAllocationCallbacks const* - Allocation callbacks for surface creation.
 		// Argument #3: VkSurfaceKHR* - The output surface handle
-		virtual i32 createVkSurface(u64 vkInstance, void const* allocCallbacks, u64* outSurface) = 0;
+		virtual i32 CreateVkSurface(uSize vkInstance, void const* allocCallbacks, u64& outSurface) = 0;
 	};
 
 	class ViewportRef
@@ -96,17 +109,18 @@ namespace DEngine::Gfx
 	public:
 		ViewportRef() = default;
 
-		[[nodiscard]] bool IsValid() const { return viewportID != 255; }
+		[[nodiscard]] bool IsValid() const { return viewportID != invalidID; }
 		[[nodiscard]] uSize ViewportID() const { return viewportID; }
 		[[nodiscard]] void* ImGuiTexID() const { return imguiTexID; }
 
 	private:
-		uSize viewportID = static_cast<uSize>(-1);
+		static constexpr uSize invalidID = static_cast<uSize>(-1);
+		uSize viewportID = invalidID;
 		void* imguiTexID = nullptr;
 
 		friend class Data;
 	};
 
 	
-	Cont::Opt<Data> Initialize(const InitInfo& initInfo);
+	Std::Opt<Data> Initialize(const InitInfo& initInfo);
 }

@@ -54,7 +54,7 @@
 #include <stdexcept>
 #include <mutex>
 std::mutex g_ImGui_descrSetLock{};
-// We start at 1 becuase we want 0 to be an error.
+// We start at 1 becuase we want 0 (becomes nullptr) to be an error.
 std::uint32_t imgui_imgID = 1;
 std::unordered_map<std::uint32_t, VkDescriptorSet> imgui_descrSets{};
 
@@ -522,7 +522,7 @@ void ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer comm
 
     VkResult err;
 
-    // Create or resize the vertex/index buffers
+    // CreateJob or resize the vertex/index buffers
     size_t vertex_size = draw_data->TotalVtxCount * sizeof(ImDrawVert);
     size_t index_size = draw_data->TotalIdxCount * sizeof(ImDrawIdx);
     if (rb->VertexBuffer == VK_NULL_HANDLE || rb->VertexBufferSize < vertex_size)
@@ -675,7 +675,7 @@ bool ImGui_ImplVulkan_CreateFontsTexture(VkCommandBuffer command_buffer)
 
     VkResult err;
 
-    // Create the Image:
+    // CreateJob the Image:
     {
         VkImageCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -733,7 +733,7 @@ bool ImGui_ImplVulkan_CreateFontsTexture(VkCommandBuffer command_buffer)
         check_vk_result(err);
     }
 
-    // Create the Image View:
+    // CreateJob the Image View:
     {
         VkImageViewCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -782,7 +782,7 @@ bool ImGui_ImplVulkan_CreateFontsTexture(VkCommandBuffer command_buffer)
     // Store our identifier
     io.Fonts->TexID = reinterpret_cast<void*>(static_cast<std::size_t>(font_descriptor_set_id));
 
-    // Create the Upload Buffer:
+    // CreateJob the Upload Buffer:
     {
         VkBufferCreateInfo buffer_info = {};
         buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -867,7 +867,7 @@ bool ImGui_ImplVulkan_CreateDeviceObjects()
     VkShaderModule vert_module;
     VkShaderModule frag_module;
 
-    // Create The Shader Modules:
+    // CreateJob The Shader Modules:
     {
         VkShaderModuleCreateInfo vert_info = {};
         vert_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -970,7 +970,7 @@ bool ImGui_ImplVulkan_CreateDeviceObjects()
     }
 
     /*
-    // Create Descriptor Set:
+    // CreateJob Descriptor Set:
     {
         VkDescriptorSetAllocateInfo alloc_info = {};
         alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1245,7 +1245,7 @@ ImTextureID ImGui_ImplVulkan_AddTexture(VkImageView image_view, VkImageLayout im
     std::uint32_t id = imgui_imgID;
     imgui_imgID += 1;
 
-    // Create Descriptor Set:
+    // CreateJob Descriptor Set:
     {
         VkDescriptorSetAllocateInfo alloc_info = {};
         alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1419,7 +1419,7 @@ void ImGui_ImplVulkanH_CreateWindowCommandBuffers(VkPhysicalDevice physical_devi
     (void)physical_device;
     (void)allocator;
 
-    // Create Command Buffers
+    // CreateJob Command Buffers
     VkResult err;
     for (uint32_t i = 0; i < wd->ImageCount; i++)
     {
@@ -1499,7 +1499,7 @@ void ImGui_ImplVulkanH_CreateWindowSwapChain(VkPhysicalDevice physical_device, V
     if (min_image_count == 0)
         min_image_count = ImGui_ImplVulkanH_GetMinImageCountFromPresentMode(wd->PresentMode);
 
-    // Create Swapchain
+    // CreateJob Swapchain
     {
         VkSwapchainCreateInfoKHR info = {};
         info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -1554,7 +1554,7 @@ void ImGui_ImplVulkanH_CreateWindowSwapChain(VkPhysicalDevice physical_device, V
     if (old_swapchain)
         g_Dispatcher.vkDestroySwapchainKHR(device, old_swapchain, allocator);
 
-    // Create the Render Pass
+    // CreateJob the Render Pass
     {
         VkAttachmentDescription attachment = {};
         attachment.format = wd->SurfaceFormat.format;
@@ -1591,7 +1591,7 @@ void ImGui_ImplVulkanH_CreateWindowSwapChain(VkPhysicalDevice physical_device, V
         check_vk_result(err);
     }
 
-    // Create The Image Views
+    // CreateJob The Image Views
     {
         VkImageViewCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1612,7 +1612,7 @@ void ImGui_ImplVulkanH_CreateWindowSwapChain(VkPhysicalDevice physical_device, V
         }
     }
 
-    // Create Framebuffer
+    // CreateJob Framebuffer
     {
         VkImageView attachment[1];
         VkFramebufferCreateInfo info = {};
@@ -1722,7 +1722,7 @@ static void ImGui_ImplVulkan_CreateWindow(ImGuiViewport* viewport)
     ImGui_ImplVulkanH_Window* wd = &Data->Window;
     ImGui_ImplVulkan_InitInfo* v = &g_VulkanInitInfo;
 
-    // Create surface
+    // CreateJob surface
     ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
     VkResult err = (VkResult)platform_io.Platform_CreateVkSurface(viewport, (ImU64)v->Instance, (const void*)v->Allocator, (ImU64*)&wd->Surface);
     check_vk_result(err);
@@ -1747,7 +1747,7 @@ static void ImGui_ImplVulkan_CreateWindow(ImGuiViewport* viewport)
     wd->PresentMode = ImGui_ImplVulkanH_SelectPresentMode(v->PhysicalDevice, wd->Surface, &present_modes[0], IM_ARRAYSIZE(present_modes));
     //printf("[vulkan] Secondary window selected PresentMode = %d\n", wd->PresentMode);
 
-    // Create SwapChain, RenderPass, Framebuffer, etc.
+    // CreateJob SwapChain, RenderPass, Framebuffer, etc.
     wd->ClearEnable = (viewport->Flags & ImGuiViewportFlags_NoRendererClear) ? false : true;
     ImGui_ImplVulkanH_CreateWindow(v->Instance, v->PhysicalDevice, v->Device, wd, v->QueueFamily, v->Allocator, (int)viewport->Size.x, (int)viewport->Size.y, v->MinImageCount);
     Data->WindowOwned = true;
