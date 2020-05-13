@@ -9,8 +9,6 @@
 
 #include "DEngine/Application.hpp"
 
-#include "ImGui/imgui.h"
-
 #include <iostream>
 #include <string>
 
@@ -26,6 +24,7 @@ namespace DEngine::Editor
 {
 	static void DrawLogWindow(EditorData& editorData)
 	{
+		/*
 		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
 
@@ -37,10 +36,12 @@ namespace DEngine::Editor
 			ImGui::Text("%s", editorData.log.c_str());
 		}
 		ImGui::End();
+		*/
 	}
 
 	static void DrawEntityWindow(EditorData& editorData, Scene& scene)
 	{
+		/*
 		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
 
@@ -75,10 +76,12 @@ namespace DEngine::Editor
 			}
 		}
 		ImGui::End();
+		*/
 	}
 
 	void DrawComponentsWindow(EditorData& editorData, Scene& scene)
 	{
+		/*
 		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
 
@@ -279,6 +282,7 @@ namespace DEngine::Editor
 			}
 		}
 		ImGui::End();
+		*/
 	}
 
 	static bool IsInsideRect(Math::Vec2 point, Math::Vec2 rectOffset, Math::Vec2 rectSize)
@@ -289,6 +293,7 @@ namespace DEngine::Editor
 
 	static void DrawMainMenuBar(EditorData& editorData)
 	{
+		/*
 		if (ImGui::BeginMainMenuBar())
 		{
 			editorData.mainMenuBarSize = ImGui::GetWindowSize();
@@ -324,10 +329,12 @@ namespace DEngine::Editor
 
 			ImGui::EndMainMenuBar();
 		}
+		*/
 	}
 
 	static void DrawViewportManager(EditorData& editorData)
 	{
+		/*
 		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
 
@@ -375,10 +382,13 @@ namespace DEngine::Editor
 			}
 		}
 		ImGui::End();
+
+		*/
 	}
 
 	static void DrawCameraManager(EditorData& editorData)
 	{
+		/*
 		ImGui::SetNextWindowDockID(editorData.dockSpaceID, ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSizeConstraints({ 250, 250 }, { 8192, 8192 });
 		ImGuiWindowFlags windowFlags = 0;
@@ -476,12 +486,14 @@ namespace DEngine::Editor
 			}
 		}
 		ImGui::End();
+		*/
 	}
 
 	static void RenderVirtualViewport_MenuBar(
 		Viewport& viewport,
 		Std::Span<Std::Pair<uSize, Camera> const> cameras)
 	{
+		/*
 		if (ImGui::BeginMenuBar())
 		{
 			if (ImGui::BeginMenu("Camera"))
@@ -521,8 +533,9 @@ namespace DEngine::Editor
 
 			ImGui::EndMenuBar();
 		}
+		*/
 	}
-
+	/*
 	// This also handles camera controls
 	static void InitializeVirtualViewport(
 		Viewport& viewport,
@@ -582,8 +595,9 @@ namespace DEngine::Editor
 			}
 		}
 	}
+	*/
 }
-
+/*
 // This also handles camera controls
 static void  DEngine::Editor::InitializeVirtualViewport(
 	Viewport& viewport,
@@ -598,7 +612,9 @@ static void  DEngine::Editor::InitializeVirtualViewport(
 	viewport.renderHeight = (u32)currentSize.y;
 	viewport.initialized = true;
 }
+*/
 
+/*
 static void DEngine::Editor::HandleVirtualViewportResizing(
 	Viewport& viewport,
 	ImVec2 currentSize)
@@ -615,7 +631,9 @@ static void DEngine::Editor::HandleVirtualViewportResizing(
 	viewport.width = (u32)currentSize.x;
 	viewport.height = (u32)currentSize.y;
 }
+*/
 
+/*
 static void DEngine::Editor::HandleViewportCameraMovement(
 	Camera& cam)
 {
@@ -659,7 +677,9 @@ static void DEngine::Editor::HandleViewportCameraMovement(
 			cam.position.y -= moveSpeed * Time::Delta();
 	}
 }
+*/
 
+/*
 static void DEngine::Editor::DrawAllVirtualViewports(EditorData& editorData, Gfx::Data& gfx)
 {
 	// We use signed integer because of the way we remove the mainImGuiViewport.
@@ -717,6 +737,7 @@ static void DEngine::Editor::DrawAllVirtualViewports(EditorData& editorData, Gfx
 
 
 }
+*/
 
 namespace DEngine::Editor
 {
@@ -728,16 +749,17 @@ DEngine::Editor::EditorData DEngine::Editor::Initialize()
 	EditorData returnVal{};
 
 	SetImGuiStyle();
-
+	/*
 	returnVal.deltaTimePoint = std::chrono::steady_clock::now();
 	returnVal.displayedDeltaTime = "0.016";
-
+	*/
 
 	return {};
 }
 
 void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Scene& scene, Gfx::Data& gfx)
 {
+	/*
 	ImGui::NewFrame();
 
 	editorData.dockSpaceID = ImGui::GetID("test");
@@ -1022,10 +1044,13 @@ void DEngine::Editor::RenderImGuiStuff(EditorData& editorData, Scene& scene, Gfx
 
 	ImGui::EndFrame();
 	ImGui::Render();
+
+	*/
 }
 
 static void DEngine::Editor::SetImGuiStyle()
 {
+	/*
 	ImGuiIO& io = ImGui::GetIO();
 	io.FontGlobalScale = 2.5f;
 	ImGuiStyle* style = &ImGui::GetStyle();
@@ -1095,4 +1120,6 @@ static void DEngine::Editor::SetImGuiStyle()
 	colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
 	colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
 	colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
+
+	*/
 }

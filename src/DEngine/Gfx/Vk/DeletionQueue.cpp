@@ -5,8 +5,6 @@
 
 #include "VMAIncluder.hpp"
 
-#include "ImGui/imgui_impl_vulkan.h"
-
 bool DEngine::Gfx::Vk::DeletionQueue::Init(
 	DeletionQueue& delQueue,
 	GlobUtils const* globUtilsIn,
@@ -104,16 +102,6 @@ void DEngine::Gfx::Vk::DeletionQueue::ExecuteCurrentTick(DeletionQueue& queue)
 
 	queue.currentResourceSetIndex = nextResourceSetIndex;
 	queue.currentFencedJobQueueIndex = !queue.currentFencedJobQueueIndex;
-}
-
-void DEngine::Gfx::Vk::DeletionQueue::DestroyImGuiTexture(void* texId) const
-{
-	TestCallback<void*> callback = [](GlobUtils const& globUtils, void* texId)
-	{
-		ImGui_ImplVulkan_RemoveTexture(texId);
-	};
-
-	DestroyTest(callback, texId);
 }
 
 void DEngine::Gfx::Vk::DeletionQueue::Destroy(VmaAllocation vmaAlloc, vk::Image img) const

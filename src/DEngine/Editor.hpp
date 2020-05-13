@@ -9,8 +9,6 @@
 #include "DEngine/Math/Vector.hpp"
 #include "DEngine/Math/UnitQuaternion.hpp"
 
-#include "ImGui/imgui.h"
-
 #include <vector>
 #include <chrono>
 #include <string>
@@ -70,26 +68,7 @@ namespace DEngine::Editor
 	{
 		std::string log;
 
-		u64 currentlySelectedEntity = static_cast<u64>(-1);
-
-		std::vector<Std::Pair<uSize, Viewport>> viewports{};
-		static constexpr uSize invalidViewportID = static_cast<uSize>(-1);
-
-		std::vector<Std::Pair<uSize,Camera>> cameras{};
-
-		ImGuiID dockSpaceID = 0;
-
-		ImVec2 mainMenuBarSize{};
-
-		std::chrono::steady_clock::time_point deltaTimePoint{};
-		std::string displayedDeltaTime{};
-		float deltaTimeRefreshTime = 0.25f;
-
-		float viewportFullscreenHoldTime = 1.f;
-		bool insideFullscreenViewport = false;
-		uSize fullscreenViewportID = invalidViewportID;
-		App::TouchInput::IDType fullscreen_posTouchID = App::TouchInput::invalidID;
-		App::TouchInput::IDType fullscreen_rotTouchID = App::TouchInput::invalidID;
+		
 	};
 
 	EditorData Initialize();

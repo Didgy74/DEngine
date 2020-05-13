@@ -102,21 +102,6 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	Time::Initialize();
 	App::detail::Initialize();
 
-	{
-		// Initialize ImGui stuff
-		IMGUI_CHECKVERSION();
-		ImGuiContext* imguiContext = ImGui::CreateContext();
-		ImGui::SetCurrentContext(imguiContext);
-		ImGuiIO& imguiIO = ImGui::GetIO();
-		imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_DockingEnable;
-
-		//if constexpr (App::targetOS == App::OS::Windows)
-			//imguiIO.ConfigFlags |= ImGuiConfigFlags_::ImGuiConfigFlags_ViewportsEnable
-
-		//ImGui::StyleColorsDark();
-		
-		App::detail::ImgGui_Initialize();
-	}
 	Editor::EditorData editorData = Editor::Initialize();
 	DEngine_Debug_globEditorData = &editorData;
 
@@ -163,6 +148,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		{
 			Gfx::DrawParams params{};
 
+			/*
 			for (auto const& [vpID, viewport] : editorData.viewports)
 			{
 				if (viewport.visible && !viewport.paused)
@@ -190,6 +176,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 					params.viewportUpdates.push_back(viewportData);
 				}
 			}
+			*/
 
 			for (auto item : myScene.textureIDs)
 			{

@@ -7,9 +7,6 @@
 
 #include "../Assert.hpp"
 
-#include "ImGui/imgui.h"
-#include "ImGui/imgui_impl_vulkan.h"
-
 namespace DEngine::Gfx::Vk
 {
 	// Assumes the viewportManager.viewportDatas is already locked.
@@ -29,10 +26,12 @@ namespace DEngine::Gfx::Vk
 
 		// We previously wrote a null image to this ImGui texture handle
 		// So we overwrite it with a valid value now.
+		/*
 		ImGui_ImplVulkan_OverwriteTexture(
 			imguiTexID,
 			(VkImageView)renderTarget.imgView,
 			(VkImageLayout)vk::ImageLayout::eShaderReadOnlyOptimal);
+			*/
 	}
 
 	// Assumes the viewportManager.viewportDatas is already locked.
@@ -54,10 +53,12 @@ namespace DEngine::Gfx::Vk
 			{ updateData.width, updateData.height });
 
 		globUtils.queues.graphics.waitIdle();
+		/*
 		ImGui_ImplVulkan_OverwriteTexture(
 			imguiTexID,
 			(VkImageView)renderTarget.imgView,
 			(VkImageLayout)vk::ImageLayout::eShaderReadOnlyOptimal);
+		*/
 	}
 
 	static ViewportData InitializeViewport(
@@ -268,7 +269,7 @@ void DEngine::Gfx::Vk::ViewportManager::NewViewport(uSize& viewportID, void*& im
 	// We just create an empty descriptor set in ImGui for now
 	// We overwrite this descriptor-set once we get to Draw() where we
 	// get the actual dimensions of the viewport.
-	createJob.imguiTexID = ImGui_ImplVulkan_AddTexture(VkImageView(), VkImageLayout());
+	//createJob.imguiTexID = ImGui_ImplVulkan_AddTexture(VkImageView(), VkImageLayout());
 	imguiTexID = createJob.imguiTexID;
 
 	std::lock_guard _{ this->mutexLock };

@@ -1,9 +1,6 @@
 #include "Vk.hpp"
 #include "../Assert.hpp"
 
-#include "ImGui/imgui.h"
-#include "ImGui/imgui_impl_vulkan.h"
-
 #include "Init.hpp"
 
 #include <iostream>
@@ -48,7 +45,7 @@ namespace DEngine::Gfx::Vk
 
 			device.cmdBeginRenderPass(cmdBuffer, rpBegin, vk::SubpassContents::eInline);
 			{
-				ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), VkCommandBuffer(cmdBuffer));
+				//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), VkCommandBuffer(cmdBuffer));
 			}
 			device.cmdEndRenderPass(cmdBuffer);
 

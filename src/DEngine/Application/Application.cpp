@@ -2,8 +2,6 @@
 #include "DEngine/Containers/StaticVector.hpp"
 #include "Assert.hpp"
 
-#include "ImGui/imgui.h"
-
 #include <iostream>
 #include <cstring>
 #include <chrono>
@@ -205,39 +203,6 @@ bool DEngine::Application::detail::Initialize()
 
 void DEngine::Application::detail::ImgGui_Initialize()
 {
-	// Setup back-end capabilities flags
-	ImGuiIO& io = ImGui::GetIO();
-	//io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // We can honor GetMouseCursor() values (optional)
-	//io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos; // We can honor io.WantSetMousePos requests (optional, rarely used)
-	//io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports; // We can create multi-viewports on the Platform side (optional)
-#if GLFW_HAS_GLFW_HOVERED && defined(_WIN32)
-	io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport; // We can set io.MouseHoveredViewport correctly (optional, not easy)
-#endif
-	io.BackendPlatformName = "DEngine";
-
-	// Keyboard mapping. ImGui will use those indices to peek into the io.KeysDown[] array.
-	io.KeyMap[ImGuiKey_Tab] = (int)Button::Tab;
-	io.KeyMap[ImGuiKey_LeftArrow] = (int)Button::Left;
-	io.KeyMap[ImGuiKey_RightArrow] = (int)Button::Right;
-	io.KeyMap[ImGuiKey_UpArrow] = (int)Button::Up;
-	io.KeyMap[ImGuiKey_DownArrow] = (int)Button::Down;
-	io.KeyMap[ImGuiKey_PageUp] = (int)Button::PageUp;
-	io.KeyMap[ImGuiKey_PageDown] = (int)Button::PageDown;
-	io.KeyMap[ImGuiKey_Home] = (int)Button::Home;
-	io.KeyMap[ImGuiKey_End] = (int)Button::End;
-	io.KeyMap[ImGuiKey_Insert] = (int)Button::Insert;
-	io.KeyMap[ImGuiKey_Delete] = (int)Button::Delete;
-	io.KeyMap[ImGuiKey_Backspace] = (int)Button::Backspace;
-	io.KeyMap[ImGuiKey_Space] = (int)Button::Space;
-	io.KeyMap[ImGuiKey_Enter] = (int)Button::Enter;
-	io.KeyMap[ImGuiKey_Escape] = (int)Button::Escape;
-	io.KeyMap[ImGuiKey_KeyPadEnter] = (int)Button::Enter;
-	io.KeyMap[ImGuiKey_A] = (int)Button::A;
-	io.KeyMap[ImGuiKey_C] = (int)Button::C;
-	io.KeyMap[ImGuiKey_V] = (int)Button::V;
-	io.KeyMap[ImGuiKey_X] = (int)Button::X;
-	io.KeyMap[ImGuiKey_Y] = (int)Button::Y;
-	io.KeyMap[ImGuiKey_Z] = (int)Button::Z;
 }
 
 void DEngine::Application::detail::ProcessEvents()
@@ -325,66 +290,6 @@ bool DEngine::Application::detail::ResizeEvent()
 bool DEngine::Application::detail::MainWindowSurfaceInitializeEvent()
 {
 	return mainWindowSurfaceInitializeEvent;
-}
-
-void DEngine::Application::detail::ImGui_NewFrame()
-{
-	// Update buttons
-	ImGuiIO& io = ImGui::GetIO();
-
-	io.DisplaySize = ImVec2((f32)detail::mainWindowSize[0], (f32)detail::mainWindowSize[1]);
-	if (io.DisplaySize.x > 0 && io.DisplaySize.y > 0)
-		io.DisplayFramebufferScale = ImVec2(
-			(float)detail::mainWindowFramebufferSize[0] / io.DisplaySize.x,
-			(float)detail::mainWindowFramebufferSize[1] / io.DisplaySize.y);
-		
-	// Copy keydown stuff
-	for (uSize i = 0; i < (uSize)Button::COUNT; i++)
-		io.KeysDown[i] = detail::buttonValues[i];
-	if (detail::buttonValues[(int)Button::Delete])
-		io.KeysDown[(int)Button::Backspace] = true;
-
-
-	// Char input stuff
-	auto charInputs = CharInputs();
-	for (auto item : charInputs)
-		io.AddInputCharacter(item);
-
-	for (uSize i = 0; i < IM_ARRAYSIZE(io.MouseDown); i += 1)
-		io.MouseDown[i] = false;
-	io.MousePos = ImVec2(-FLT_MAX, -FLT_MAX);
-
-	// Update mouse position
-	if (detail::mainWindowIsInFocus)
-	{
-		Std::Opt<CursorData> cursorOpt = Cursor();
-		if (cursorOpt.HasValue())
-		{
-			CursorData const& cursor = cursorOpt.Value();
-			io.MouseDown[0] = ButtonValue(Button::LeftMouse);
-			io.MouseDown[1] = ButtonValue(Button::RightMouse);
-			io.MousePos = ImVec2((float)cursor.posX, (float)cursor.posY);
-
-			io.MouseWheel = cursor.scrollDeltaY;
-		}
-
-		auto touchInputs = TouchInputs();
-		uSize primaryTouchIndex = static_cast<uSize>(-1);
-		for (uSize i = 0; i < touchInputs.Size(); i += 1)
-		{
-			if (touchInputs[i].id == 0)
-			{
-				primaryTouchIndex = i;
-				break;
-			}
-		}
-		if (primaryTouchIndex != static_cast<uSize>(-1) )
-		{
-			if (touchInputs[primaryTouchIndex].eventType != TouchEventType::Up)
-				io.MouseDown[0] = true;
-			io.MousePos = ImVec2(touchInputs[primaryTouchIndex].x, touchInputs[primaryTouchIndex].y);
-		}
-	}
 }
 
 void DEngine::Application::SetRelativeMouseMode(bool enabled)

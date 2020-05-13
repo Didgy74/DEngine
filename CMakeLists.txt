@@ -142,18 +142,9 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 # Include and link ImGui stuff
 # ----------------------------
 # START
-	set(IMGUI_ROOT_DIR "${DENGINE_ROOT_DIR}/external/ImGui")
-	set(IMGUI_SRC_DIR "${IMGUI_ROOT_DIR}/src")
-	set(IMGUI_INCLUDE_DIRS "${IMGUI_ROOT_DIR}/include")
-	file(GLOB_RECURSE IMGUI_SOURCE_FILES "${IMGUI_SRC_DIR}/*.cpp" )
-	add_library(IMGUI_LIB STATIC ${IMGUI_SOURCE_FILES})
-	target_include_directories(IMGUI_LIB PUBLIC ${IMGUI_INCLUDE_DIRS})
-	target_include_directories(IMGUI_LIB PRIVATE ${VULKAN_INCLUDE_DIRS})
-	if (MSVC)
-		target_compile_options(IMGUI_LIB PRIVATE /w)
-	endif()
-
-	target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI_LIB)
+	set(IMGUI_ROOT_DIR "${DENGINE_ROOT_DIR}/external/anton_imgui")
+	add_subdirectory(${IMGUI_ROOT_DIR})
+	target_link_libraries(${PROJECT_NAME} PUBLIC antom_imgui)
 #
 # END
 #
