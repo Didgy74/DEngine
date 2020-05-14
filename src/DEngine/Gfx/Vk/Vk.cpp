@@ -42,7 +42,7 @@ void DEngine::Gfx::Vk::APIData::NewViewport(uSize& viewportID, void*& imguiTexID
 
 void DEngine::Gfx::Vk::APIData::DeleteViewport(uSize id)
 {
-	vk::Result vkResult{};
+	//vk::Result vkResult{};
 	APIData& apiData = *this;
 
 	apiData.viewportManager.DeleteViewport(id);
@@ -74,7 +74,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	APIData& apiData = *static_cast<APIData*>(apiDataBuffer);
 	GlobUtils& globUtils = apiData.globUtils;
 
-	vk::Result vkResult{};
+	//vk::Result vkResult{};
 	bool boolResult = false;
 
 	apiData.logger = initInfo.optional_iLog;

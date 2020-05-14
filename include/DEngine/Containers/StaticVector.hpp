@@ -63,12 +63,7 @@ namespace DEngine::Std
     };
 
     template<typename T, uSize maxLength>
-    StaticVector<T, maxLength>::StaticVector() :
-        m_size(0),
-        m_unused()
-    {
-
-    }
+    StaticVector<T, maxLength>::StaticVector() {}
 
     template<typename T, uSize maxLength>
     StaticVector<T, maxLength>::StaticVector(uSize length) :

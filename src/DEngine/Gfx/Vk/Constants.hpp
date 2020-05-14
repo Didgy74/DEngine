@@ -34,11 +34,10 @@ namespace DEngine::Gfx::Vk::Constants
 		"VK_KHR_swapchain"
 	};
 
-	constexpr std::array<VkSurfaceFormatKHR, 2> preferredSurfaceFormats =
-	{
-		(VkFormat)vk::Format::eB8G8R8A8Unorm, (VkColorSpaceKHR)vk::ColorSpaceKHR::eSrgbNonlinear,
-		(VkFormat)vk::Format::eR8G8B8A8Unorm, (VkColorSpaceKHR)vk::ColorSpaceKHR::eSrgbNonlinear,
-	};
+	constexpr std::array<VkSurfaceFormatKHR, 2> preferredSurfaceFormats = { {
+		VkSurfaceFormatKHR{ (VkFormat)vk::Format::eB8G8R8A8Unorm, (VkColorSpaceKHR)vk::ColorSpaceKHR::eSrgbNonlinear },
+		VkSurfaceFormatKHR{ (VkFormat)vk::Format::eR8G8B8A8Unorm, (VkColorSpaceKHR)vk::ColorSpaceKHR::eSrgbNonlinear }
+	} };
 
 	constexpr u32 invalidIndex = static_cast<u32>(-1);
 }

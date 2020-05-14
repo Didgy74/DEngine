@@ -43,14 +43,11 @@ namespace DEngine::Math::LinearTransform3D
 		return newMat;
 	}
 
-	[[nodiscard]] constexpr Matrix<4, 4, f32> Translate(f32 x, f32 y, f32 z);
 	[[nodiscard]] constexpr Matrix<4, 4, f32> Translate(Vector<3, f32> const& input);
 	[[nodiscard]] constexpr Matrix<4, 3, f32> Translate_Reduced(f32 x, f32 y, f32 z);
 	[[nodiscard]] constexpr Matrix<4, 3, f32> Translate_Reduced(Vector<3, f32> const& input);
 
-	constexpr void SetTranslation(Matrix<4, 4, f32>& matrix, f32 x, f32 y, f32 z);
 	constexpr void SetTranslation(Matrix<4, 4, f32>& matrix, Vector<3, f32> const& input);
-	constexpr void SetTranslation(Matrix<4, 3, f32>& matrix, f32 x, f32 y, f32 z);
 	constexpr void SetTranslation(Matrix<4, 3, f32>& matrix, Vector<3, f32> const& input);
 	constexpr Vector<3, f32> GetTranslation(Matrix<4, 4, f32> const& input);
 	constexpr Vector<3, f32> GetTranslation(Matrix<4, 3, f32> const& input);
@@ -147,67 +144,40 @@ constexpr DEngine::Math::Matrix<4, 3, DEngine::f32> DEngine::Math::LinearTransfo
 	return newMatrix;
 }
 
-constexpr DEngine::Math::Mat4 DEngine::Math::LinearTransform3D::Translate(
-	f32 x, 
-	f32 y, 
-	f32 z)
+constexpr DEngine::Math::Matrix<4, 4, DEngine::f32> DEngine::Math::LinearTransform3D::Translate(Vector<3, f32> const& input)
 {
 	return Mat4
-	{
+	{ { {
 		1, 0, 0, 0,
 		0, 1, 0, 0,
 		0, 0, 1, 0,
-		x, y, z, 1
-	};
-}
-
-constexpr DEngine::Math::Matrix<4, 4, DEngine::f32> DEngine::Math::LinearTransform3D::Translate(Vector<3, f32> const& input)
-{
-	return Translate(input.x, input.y, input.z);
-}
-
-constexpr DEngine::Math::Matrix<4, 3> DEngine::Math::LinearTransform3D::Translate_Reduced(f32 x, f32 y, f32 z)
-{
-	return Matrix<4, 3>
-	{
-		1, 0, 0,
-		0, 1, 0,
-		0, 0, 1,
-		x, y, z,
-	};
+		input.x, input.y, input.z, 1
+	} } };
 }
 
 constexpr DEngine::Math::Matrix<4, 3, DEngine::f32> DEngine::Math::LinearTransform3D::Translate_Reduced(Vector<3, f32> const& input)
-{ 
-	return Translate_Reduced(input.x, input.y, input.z); 
-}
-
-constexpr void DEngine::Math::LinearTransform3D::SetTranslation(
-	Mat4& matrix, 
-	f32 x, 
-	f32 y, 
-	f32 z)
 {
-	matrix.At(3, 0) = x;
-	matrix.At(3, 1) = y;
-	matrix.At(3, 2) = z;
+	return Matrix<4, 3>
+	{ { {
+		1, 0, 0,
+		0, 1, 0,
+		0, 0, 1,
+		input.x, input.y, input.z,
+	} } };
 }
 
 constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 4, f32>& matrix, Vector<3, f32> const& input)
 {
-	SetTranslation(matrix, input.x, input.y, input.z);
-}
-
-constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 3>& matrix, f32 x, f32 y, f32 z)
-{
-	matrix.At(3, 0) = x;
-	matrix.At(3, 1) = y;
-	matrix.At(3, 2) = z;
+	matrix.At(3, 0) = input.x;
+	matrix.At(3, 1) = input.y;
+	matrix.At(3, 2) = input.z;
 }
 
 constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 3, f32>& matrix, Vector<3, f32> const& input)
 { 
-	SetTranslation(matrix, input.x, input.y, input.z);
+	matrix.At(3, 0) = input.x;
+	matrix.At(3, 1) = input.y;
+	matrix.At(3, 2) = input.z;
 }
 
 /*
@@ -285,11 +255,11 @@ constexpr DEngine::Math::Matrix<3, 3, DEngine::f32> DEngine::Math::LinearTransfo
 	f32 const& z = quat.Z();
 
 	return Matrix<3, 3, f32>
-	{
-		1 - 2 * Sqrd(y) - 2 * Sqrd(z), 2 * x* y + 2 * z * s, 2 * x* z - 2 * y * s,
-		2 * x* y - 2 * z * s, 1 - 2 * Sqrd(x) - 2 * Sqrd(z), 2 * y* z + 2 * x * s,
-		2 * x* z + 2 * y * s, 2 * y* z - 2 * x * s, 1 - 2 * Sqrd(x) - 2 * Sqrd(y),
-	};
+	{ { {
+		1 - 2 * Sqrd(y) - 2 * Sqrd(z), 2 * x * y + 2 * z * s, 2 * x * z - 2 * y * s,
+			2 * x * y - 2 * z * s, 1 - 2 * Sqrd(x) - 2 * Sqrd(z), 2 * y * z + 2 * x * s,
+			2 * x * z + 2 * y * s, 2 * y * z - 2 * x * s, 1 - 2 * Sqrd(x) - 2 * Sqrd(y),
+	} } };
 }
 
 constexpr DEngine::Math::Mat4 DEngine::Math::LinearTransform3D::Rotate_Homo(UnitQuat const& quat)

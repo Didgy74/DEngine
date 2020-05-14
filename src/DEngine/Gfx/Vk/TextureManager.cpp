@@ -302,7 +302,7 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 		// Delete unneeded stuff
 		for (auto iter = manager.database.begin(); iter != manager.database.end(); iter++)
 		{
-			auto& item = *iter;
+			//auto& item = *iter;
 
 		}
 	}

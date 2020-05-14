@@ -16,7 +16,7 @@ namespace DEngine::Gfx::Vk
 		GlobUtils const& globUtils,
 		ViewportUpdateData updateData)
 	{
-		vk::Result vkResult{};
+		//vk::Result vkResult{};
 
 		// We need to create this virtual viewport
 		renderTarget = Init::InitializeGfxViewportRenderTarget(
@@ -213,7 +213,7 @@ namespace DEngine::Gfx::Vk
 		ViewportManager& viewportManager,
 		GlobUtils const& globUtils)
 	{
-		vk::Result vkResult{};
+		//vk::Result vkResult{};
 
 		for (ViewportManager::CreateJob const& createJob : viewportManager.createQueue)
 		{
@@ -291,7 +291,7 @@ void DEngine::Gfx::Vk::ViewportManager::HandleEvents(
 	GlobUtils const& globUtils,
 	Std::Span<ViewportUpdateData const> viewportUpdates)
 {
-	vk::Result vkResult{};
+	//vk::Result vkResult{};
 
 	// Execute pending deletions
 	for (uSize id : vpManager.deleteQueue)

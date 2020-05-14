@@ -54,11 +54,13 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 	target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
 
+	target_compile_options(${PROJECT_NAME} PRIVATE "-Wno-everything")
+
 	if (MSVC)
-		target_compile_options(${PROJECT_NAME} PRIVATE /WX)
+		#target_compile_options(${PROJECT_NAME} PRIVATE /WX)
 	endif()
 
-		# Remove data folder from target binary directory
+	# Remove data folder from target binary directory
 	add_custom_command(
 		TARGET ${PROJECT_NAME} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E remove_directory
@@ -124,15 +126,16 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 	target_link_libraries(${PROJECT_NAME} PRIVATE DENGINE_APPLICATION)
 	target_include_directories(DENGINE_APPLICATION PRIVATE ${DENGINE_INCLUDE_DIRS})
 	target_include_directories(DENGINE_APPLICATION PRIVATE ${VULKAN_INCLUDE_DIRS})
-	if(WIN32)
-		set(glfw3_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/glfw3")
-	endif()
+	set(GLFW3_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/glfw3")
 	# GLFW3
-	find_package(glfw3 REQUIRED)
-	target_link_libraries(DENGINE_APPLICATION PRIVATE glfw)
-
+	set(GLFW_BUILD_EXAMPLES OFF)
+	set(GLFW_BUILD_TESTS OFF)
+	set(GLFW_BUILD_DOCS OFF)
+	set(GLFW_INSTALL OFF)
+	add_subdirectory(${GLFW3_DIR})
+	target_compile_options(glfw PRIVATE "-Wno-everything")
 	
-
+	target_link_libraries(DENGINE_APPLICATION PRIVATE glfw)
 
 #
 # END
@@ -151,23 +154,23 @@ set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 
 # GLFW3 binaries
-if(WIN32)
-	set(GLFW3_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/external/GLFW3")
-	if(MSVC)
-		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
-			set(GLFW3_BINDIR "${GLFW3_FOLDER}/MSVC x86")
-		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
-			set(GLFW3_BINDIR "${GLFW3_FOLDER}/MSVC x64")
-		endif()
-	else()
-		message(FATAL_ERROR "Platform not supported. Couldn't link GLFW.")
-	endif()
-	set(GLFW3_BINNAME glfw3.dll)
-	set(GLFW3_BINARY "${GLFW3_BINDIR}/${GLFW3_BINNAME}")
-	add_custom_command(
-		TARGET ${PROJECT_NAME} POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		"${GLFW3_BINARY}"
-		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/${GLFW3_BINNAME}"
-		)
-endif()
+#if(WIN32)
+#	set(GLFW3_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/external/GLFW3")
+#	if(MSVC)
+#		if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
+#			set(GLFW3_BINDIR "${GLFW3_FOLDER}/MSVC x86")
+#		elseif("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
+#			set(GLFW3_BINDIR "${GLFW3_FOLDER}/MSVC x64")
+#		endif()
+#	else()
+#		message(FATAL_ERROR "Platform not supported. Couldn't link GLFW.")
+#	endif()
+#	set(GLFW3_BINNAME glfw3.dll)
+#	set(GLFW3_BINARY "${GLFW3_BINDIR}/${GLFW3_BINNAME}")
+#	add_custom_command(
+#		TARGET ${PROJECT_NAME} POST_BUILD
+#		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#		"${GLFW3_BINARY}"
+#		"$<TARGET_FILE_DIR:${PROJECT_NAME}>/${GLFW3_BINNAME}"
+#		)
+#endif()

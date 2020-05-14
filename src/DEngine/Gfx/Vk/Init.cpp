@@ -197,8 +197,6 @@ vk::DebugUtilsMessengerEXT DEngine::Gfx::Vk::Init::CreateLayerMessenger(
 	debugMessengerInfo.pfnUserCallback = VulkanDebugCallback;
 	debugMessengerInfo.pUserData = const_cast<void*>(userData);
 
-	auto infoPtr = reinterpret_cast<VkDebugUtilsMessengerCreateInfoEXT const*>(&debugMessengerInfo);
-
 	return debugUtilsOpt->createDebugUtilsMessengerEXT(instanceHandle, debugMessengerInfo);
 }
 
@@ -1079,7 +1077,7 @@ void DEngine::Gfx::Vk::Init::RecordSwapchainCmdBuffers(
 	SwapchainData const& swapchainData,
 	vk::Image srcImage)
 {
-	vk::Result vkResult{};
+	//vk::Result vkResult{};
 
 	for (uSize i = 0; i < swapchainData.cmdBuffers.Size(); i++)
 	{
