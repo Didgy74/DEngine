@@ -1,5 +1,5 @@
 #include "detail_Application.hpp"
-#include "DEngine/Containers/StaticVector.hpp"
+#include <DEngine/Containers/StaticVector.hpp>
 #include "Assert.hpp"
 
 #include <iostream>
@@ -9,303 +9,447 @@
 
 namespace DEngine::Application::detail
 {
-	// Input
-	bool buttonValues[(int)Button::COUNT] = {};
-	std::chrono::high_resolution_clock::time_point buttonHeldStart[(int)Button::COUNT] = {};
-	f32 buttonHeldDuration[(int)Button::COUNT] = {};
-	KeyEventType buttonEvents[(int)Button::COUNT] = {};
-	Std::StaticVector<char, maxCharInputCount> charInputs{};
-	Std::Opt<CursorData> cursorOpt{};
-	Std::StaticVector<TouchInput, 10> touchInputs{};
-	Std::StaticVector<std::chrono::high_resolution_clock::time_point, touchInputs.Capacity()> touchInputStartTime{};
-
-	u32 displaySize[2] = {};
-	i32 mainWindowPos[2] = {};
-	u32 mainWindowSize[2] = {};
-	u32 mainWindowFramebufferSize[2] = {};
-	bool mainWindowIsInFocus = false;
-	bool mainWindowIsMinimized = false;
-	bool mainWindowRestoreEvent = false;
-	bool mainWindowResizeEvent = false;
-	bool shouldShutdown = false;
-
-	// Time related stuff
-	u64 tickCount = 0;
-	f32 deltaTime = 1.f / 60.f;
-	std::chrono::high_resolution_clock::time_point currentNow{};
-	std::chrono::high_resolution_clock::time_point previousNow{};
-
-	bool mainWindowSurfaceInitialized = false;
-	bool mainWindowSurfaceInitializeEvent = false;
-	bool mainWindowSurfaceTerminateEvent = false;
-
-	GamepadState gamepadState{};
-	bool gamepadConnected = false;
-	int gamepadID = 0;
-
+	AppData* pAppData = nullptr;
 	static bool IsValid(Button in);
 }
 
-static bool DEngine::Application::detail::IsValid(Button in)
+using namespace DEngine;
+
+Application::Extent Application::GetWindowSize(WindowID window)
+{
+	auto const& appData = *detail::pAppData;
+	auto windowNodeIt = std::find_if(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[window](detail::AppData::WindowNode const& val) -> bool {
+			return window == val.id; });
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	auto const& windowNode = *windowNodeIt;
+	return windowNode.windowData.size;
+}
+
+Math::Vec2Int Application::GetWindowPosition(WindowID window)
+{
+	auto const& appData = *detail::pAppData;
+	auto windowNodeIt = std::find_if(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[window](detail::AppData::WindowNode const& val) -> bool {
+			return window == val.id; });
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	auto const& windowNode = *windowNodeIt;
+	return windowNode.windowData.position;
+}
+
+bool Application::GetWindowMinimized(WindowID window)
+{
+	auto const& appData = *detail::pAppData;
+	auto windowNodeIt = std::find_if(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[window](detail::AppData::WindowNode const& val) -> bool { 
+			return window == val.id; });
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	auto const& windowNode = *windowNodeIt;
+	return windowNode.windowData.isMinimized;
+}
+
+Application::WindowEvents Application::GetWindowEvents(WindowID window)
+{
+	auto const& appData = *detail::pAppData;
+	auto windowNodeIt = std::find_if(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[window](detail::AppData::WindowNode const& val) -> bool {
+			return window == val.id; });
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	auto const& windowNode = *windowNodeIt;
+	return windowNode.events;
+}
+
+static bool Application::detail::IsValid(Button in)
 {
 	return static_cast<u64>(in) < static_cast<u64>(Button::COUNT);
 }
 
-DEngine::u64 DEngine::Application::TickCount()
+u64 Application::TickCount()
 {
-	return detail::tickCount;
+	return detail::pAppData->tickCount;
 }
 
-bool DEngine::Application::ButtonValue(Button input)
+bool Application::ButtonValue(Button input)
 {
 	if (!detail::IsValid(input))
 		throw std::runtime_error("Called DEngine::Application::ButtonValue with invalid Button value.");
-	return detail::buttonValues[(int)input];
+	return detail::pAppData->buttonValues[(int)input];
 }
 
-void DEngine::Application::detail::UpdateButton(
+void Application::detail::UpdateButton(
 	Button button, 
 	bool pressed)
 {
 	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(button));
 
-	detail::buttonValues[(int)button] = pressed;
-	detail::buttonEvents[(int)button] = pressed ? KeyEventType::Pressed : KeyEventType::Unpressed;
+	auto& appData = *detail::pAppData;
+
+	appData.buttonValues[(int)button] = pressed;
+	appData.buttonEvents[(int)button] = pressed ? KeyEventType::Pressed : KeyEventType::Unpressed;
 
 	if (pressed)
 	{
-		detail::buttonHeldStart[(int)button] = detail::currentNow;
+		appData.buttonHeldStart[(int)button] = appData.currentNow;
 	}
 	else
 	{
-		detail::buttonHeldStart[(int)button] = std::chrono::high_resolution_clock::time_point();
+		appData.buttonHeldStart[(int)button] = std::chrono::high_resolution_clock::time_point();
+	}
+
+	for (EventInterface* eventCallback : appData.eventCallbacks)
+		eventCallback->ButtonEvent(button, pressed);
+
+	
+	if (appData.buttonEvents[(int)button] == KeyEventType::Pressed && (button == Button::Backspace || button == Button::Delete))
+	{
+		for (EventInterface* eventCallback : appData.eventCallbacks)
+			eventCallback->CharRemoveEvent();
 	}
 }
 
-DEngine::Application::KeyEventType DEngine::Application::ButtonEvent(Button input)
+void Application::detail::PushCharInput(u32 charValue)
+{
+	auto& appData = *detail::pAppData;
+
+	appData.charInputs.push_back(charValue);
+
+	for (EventInterface* eventCallback : appData.eventCallbacks)
+		eventCallback->CharEvent(charValue);
+}
+
+void Application::detail::PushCharRemoveEvent()
+{
+	auto& appData = *detail::pAppData;
+	for (EventInterface* eventCallback : appData.eventCallbacks)
+		eventCallback->CharRemoveEvent();
+
+}
+
+Application::KeyEventType Application::ButtonEvent(Button input)
 {
 	if (!detail::IsValid(input))
 		throw std::runtime_error("Called DEngine::Application::ButtonEvent with invalid Button value.");
-	return detail::buttonEvents[(int)input];
+	return detail::pAppData->buttonEvents[(int)input];
 }
 
-DEngine::f32 DEngine::Application::ButtonDuration(Button input)
+f32 Application::ButtonDuration(Button input)
 {
 	if (!detail::IsValid(input))
 		throw std::runtime_error("Called DEngine::Application::ButtonDuration with invalid Button value.");
-	return detail::buttonHeldDuration[(int)input];
+	return detail::pAppData->buttonHeldDuration[(int)input];
 }
 
-DEngine::Std::StaticVector<char, DEngine::Application::maxCharInputCount> DEngine::Application::CharInputs()
+Std::Opt<Application::CursorData> Application::Cursor()
 {
-	return detail::charInputs;
-}
-
-DEngine::Std::Opt<DEngine::Application::CursorData> DEngine::Application::Cursor()
-{
-	return detail::cursorOpt;
-}
-
-void DEngine::Application::detail::UpdateCursor(u32 posX, u32 posY, i32 deltaX, i32 deltaY)
-{
-	CursorData& cursorData = detail::cursorOpt.Value();
-	cursorData.posDeltaX = deltaX;
-	cursorData.posDeltaY = deltaY;
-
-	cursorData.posX = posX;
-	cursorData.posY = posY;
-}
-
-void DEngine::Application::detail::UpdateCursor(u32 posX, u32 posY)
-{
-	CursorData& cursorData = detail::cursorOpt.Value();
-
-	// We compare it with the previous values to get delta.
-	cursorData.posDeltaX = (i32)posX - (i32)cursorData.posX;
-	cursorData.posDeltaY = (i32)posY - (i32)cursorData.posY;
-
-	cursorData.posX = posX;
-	cursorData.posY = posY;
+	return detail::pAppData->cursorOpt;
 }
 
 namespace DEngine::Application::detail
 {
 	static bool TouchInputIDExists(u8 id)
 	{
-		for (uSize i = 0; i < detail::touchInputs.Size(); i += 1)
+		for (auto const& item : detail::pAppData->touchInputs)
 		{
-			if (detail::touchInputs[i].id == id)
+			if (item.id == id)
 				return true;
 		}
 		return false;
 	}
 }
 
-void DEngine::Application::detail::UpdateTouchInput_Down(u8 id, f32 x, f32 y)
+Std::StaticVector<Application::TouchInput, 10> Application::TouchInputs()
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(!TouchInputIDExists(id));
-
-	TouchInput newValue{};
-	newValue.eventType = TouchEventType::Down;
-	newValue.id = id;
-	newValue.x = x;
-	newValue.y = y;
-
-	detail::touchInputs.PushBack(newValue);
-	detail::touchInputStartTime.PushBack(detail::currentNow);
+	return detail::pAppData->touchInputs;
 }
 
-void DEngine::Application::detail::UpdateTouchInput_Move(u8 id, f32 x, f32 y)
+bool Application::detail::Initialize()
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(TouchInputIDExists(id));
-	
-	for (auto& item : detail::touchInputs)
-	{
-		if (item.id == id)
-		{
-			item.eventType = TouchEventType::Moved;
-			item.x = x;
-			item.y = y;
+	pAppData = new AppData();
 
-			break;
-		}
-	}
-}
-
-void DEngine::Application::detail::UpdateTouchInput_Up(u8 id, f32 x, f32 y)
-{
-	DENGINE_DETAIL_APPLICATION_ASSERT(TouchInputIDExists(id));
-
-	for (auto& item : detail::touchInputs)
-	{
-		if (item.id == id)
-		{
-			item.eventType = TouchEventType::Up;
-			item.x = x;
-			item.y = y;
-
-			break;
-		}
-	}
-}
-
-DEngine::Std::StaticVector<DEngine::Application::TouchInput, 10> DEngine::Application::TouchInputs()
-{
-	return detail::touchInputs;
-}
-
-bool DEngine::Application::detail::Initialize()
-{
 	Backend_Initialize();
 
 	return true;
 }
 
-void DEngine::Application::detail::ImgGui_Initialize()
+void Application::detail::ProcessEvents()
 {
-}
+	auto& appData = *detail::pAppData;
 
-void DEngine::Application::detail::ProcessEvents()
-{
-	detail::previousNow = detail::currentNow;
-	detail::currentNow = std::chrono::high_resolution_clock::now();
-	if (detail::tickCount > 0)
-		detail::deltaTime = std::chrono::duration<f32>(detail::currentNow - detail::previousNow).count();
+	appData.previousNow = detail::pAppData->currentNow;
+	appData.currentNow = std::chrono::high_resolution_clock::now();
+	if (appData.tickCount > 0)
+		appData.deltaTime = std::chrono::duration<f32>(appData.currentNow - appData.previousNow).count();
+
+	// Window stuff
+	// Clear event-style values.
+	for (auto& window : appData.windows)
+		window.events = WindowEvents();
+	appData.orientationEvent = false;
 
 	// Input stuff
 	// Clear event-style values.
-	for (auto& item : detail::buttonEvents)
+	for (auto& item : detail::pAppData->buttonEvents)
 		item = KeyEventType::Unchanged;
-	detail::charInputs.Clear();
-	if (detail::cursorOpt.HasValue())
+	appData.charInputs.clear();
+	if (appData.cursorOpt.HasValue())
 	{
-		CursorData& cursorData = detail::cursorOpt.Value();
-		cursorData.posDeltaX = 0;
-		cursorData.posDeltaY = 0;
+		CursorData& cursorData = appData.cursorOpt.Value();
+		cursorData.positionDelta = {};
 		cursorData.scrollDeltaY = 0;
 	}
-
-	for (uSize i = 0; i < detail::touchInputs.Size(); i += 1)
+	// Handle touch input stuff
+	for (uSize i = 0; i < appData.touchInputs.Size(); i += 1)
 	{
-		if (detail::touchInputs[i].eventType == TouchEventType::Up)
+		if (appData.touchInputs[i].eventType == TouchEventType::Up)
 		{
-			detail::touchInputs.Erase(i);
-			detail::touchInputStartTime.Erase(i);
+			appData.touchInputs.Erase(i);
+			appData.touchInputStartTime.Erase(i);
 			i -= 1;
 		}
 		else
-			detail::touchInputs[i].eventType = TouchEventType::Unchanged;
+			appData.touchInputs[i].eventType = TouchEventType::Unchanged;
 	}
-	// Window stuff
-	detail::mainWindowSurfaceInitializeEvent = false;
-	detail::mainWindowSurfaceTerminateEvent = false;
-	detail::mainWindowRestoreEvent = false;
-	detail::mainWindowResizeEvent = false;
 
 	Backend_ProcessEvents();
 
 	// Calculate duration for each button being held.
 	for (uSize i = 0; i < (uSize)Button::COUNT; i += 1)
 	{
-		if (detail::buttonValues[i])
-			detail::buttonHeldDuration[i] = std::chrono::duration<f32>(detail::currentNow - detail::buttonHeldStart[i]).count();
+		if (appData.buttonValues[i])
+			appData.buttonHeldDuration[i] = std::chrono::duration<f32>(appData.currentNow - appData.buttonHeldStart[i]).count();
 		else
-			detail::buttonHeldDuration[i] = 0.f;
+			appData.buttonHeldDuration[i] = 0.f;
 	}
 	// Calculate duration for each touch input.
-	for (uSize i = 0; i < detail::touchInputs.Size(); i += 1)
+	for (uSize i = 0; i < appData.touchInputs.Size(); i += 1)
 	{
-		if (detail::touchInputs[i].eventType != TouchEventType::Up)
-			detail::touchInputs[i].duration = std::chrono::duration<f32>(detail::currentNow - detail::touchInputStartTime[i]).count();
+		if (appData.touchInputs[i].eventType != TouchEventType::Up)
+			appData.touchInputs[i].duration = std::chrono::duration<f32>(appData.currentNow - appData.touchInputStartTime[i]).count();
 	}
 
-	detail::tickCount += 1;
+	appData.tickCount += 1;
 }
 
-bool DEngine::Application::detail::ShouldShutdown()
+void Application::detail::SetLogCallback(LogCallback callback)
 {
-	return shouldShutdown;
+	detail::pAppData->logCallback = callback;
 }
 
-bool DEngine::Application::detail::IsMinimized()
+void Application::detail::UpdateWindowSize(
+	void* platformHandle,
+	Extent newSize)
 {
-	return mainWindowIsMinimized;
+	auto& windowNode = *std::find_if(
+		pAppData->windows.begin(),
+		pAppData->windows.end(),
+		[platformHandle](AppData::WindowNode const& val) -> bool {
+			return val.platformHandle == platformHandle; });
+
+	windowNode.windowData.size = newSize;
+	windowNode.events.resize = true;
+	for (EventInterface* eventCallback : pAppData->eventCallbacks)
+		eventCallback->WindowResize(windowNode.id, newSize);
 }
 
-bool DEngine::Application::detail::IsRestored()
+void Application::detail::UpdateWindowPosition(
+	void* platformHandle, 
+	Math::Vec2Int newPosition)
 {
-	return mainWindowRestoreEvent;
+	auto& windowNode = *std::find_if(
+		pAppData->windows.begin(),
+		pAppData->windows.end(),
+		[platformHandle](AppData::WindowNode const& val) -> bool {
+			return val.platformHandle == platformHandle; });
+
+	windowNode.windowData.position = newPosition;
+	windowNode.events.move = true;
+	for (EventInterface* eventCallback : pAppData->eventCallbacks)
+		eventCallback->WindowMove(windowNode.id, newPosition);
 }
 
-bool DEngine::Application::detail::MainWindowRestoreEvent()
+void Application::detail::UpdateWindowFocus(
+	void* platformHandle,
+	bool focused)
 {
-	return detail::mainWindowRestoreEvent;
+	auto& windowNode = *std::find_if(
+		pAppData->windows.begin(),
+		pAppData->windows.end(),
+		[platformHandle](AppData::WindowNode const& val) -> bool {
+			return val.platformHandle == platformHandle; });
+
+	windowNode.events.focus = focused;
+	if (focused)
+		windowNode.events.focus = true;
+	else
+		windowNode.events.unfocus = true;
+	for (EventInterface* eventCallback : pAppData->eventCallbacks)
+		eventCallback->WindowFocus(windowNode.id, focused);
 }
 
-bool DEngine::Application::detail::ResizeEvent()
+void Application::detail::UpdateWindowMinimized(
+	void* platformHandle,
+	bool minimized)
 {
-	return mainWindowResizeEvent;
+	auto& appData = *detail::pAppData;
+	auto windowNodeIt = std::find_if(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[platformHandle](AppData::WindowNode const& val) -> bool {
+			return val.platformHandle == platformHandle; });
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	auto& windowNode = *windowNodeIt;
+	windowNode.windowData.isMinimized = minimized;
+	if (minimized)
+		windowNode.events.minimize = true;
+	else
+		windowNode.events.restore = true;
+	for (EventInterface* eventCallback : appData.eventCallbacks)
+		eventCallback->WindowMinimize(windowNode.id, minimized);
 }
 
-bool DEngine::Application::detail::MainWindowSurfaceInitializeEvent()
+void Application::detail::UpdateWindowCursorEnter(
+	void* platformHandle, 
+	bool entered)
 {
-	return mainWindowSurfaceInitializeEvent;
+	auto& appData = *detail::pAppData;
+	auto windowNodeIt = std::find_if(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[platformHandle](AppData::WindowNode const& val) -> bool {
+			return val.platformHandle == platformHandle; });
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	auto& windowNode = *windowNodeIt;
+	if (entered)
+		windowNode.events.cursorEnter = true;
+	else
+		windowNode.events.cursorExit = true;
+	for (EventInterface* eventCallback : pAppData->eventCallbacks)
+		eventCallback->WindowCursorEnter(windowNode.id, entered);
 }
 
-void DEngine::Application::SetRelativeMouseMode(bool enabled)
+void Application::detail::UpdateOrientation(Orientation newOrient)
 {
-
+	DENGINE_DETAIL_APPLICATION_ASSERT(newOrient != Orientation::Invalid);
+	auto& appData = *detail::pAppData;
+	appData.currentOrientation = newOrient;
+	appData.orientationEvent = true;
 }
 
-DEngine::Std::Optional<DEngine::Application::GamepadState> DEngine::Application::GetGamepad()
+void Application::detail::UpdateCursor(
+	void* platformHandle,
+	Math::Vec2Int pos,
+	Math::Vec2Int delta)
 {
-	if (detail::gamepadConnected)
-		return detail::gamepadState;
+	auto const& windowNode = *std::find_if(
+		pAppData->windows.begin(),
+		pAppData->windows.end(),
+		[platformHandle](AppData::WindowNode const& val) -> bool {
+			return val.platformHandle == platformHandle; });
+
+	Math::Vec2Int newPosition = {
+		pos.x + windowNode.windowData.position.x,
+		pos.y + windowNode.windowData.position.y };
+
+	CursorData& cursorData = pAppData->cursorOpt.Value();
+	cursorData.position = newPosition;
+	cursorData.positionDelta = delta;
+	
+	for (EventInterface* eventCallback : pAppData->eventCallbacks)
+		eventCallback->CursorMove(cursorData.position, cursorData.positionDelta);
+}
+
+void Application::detail::UpdateCursor(
+	void* platformHandle,
+	Math::Vec2Int pos)
+{
+	auto const& windowNode = *std::find_if(
+		pAppData->windows.begin(),
+		pAppData->windows.end(),
+		[platformHandle](AppData::WindowNode const& val) -> bool {
+			return val.platformHandle == platformHandle; });
+
+	Math::Vec2Int newPosition = {
+		pos.x + windowNode.windowData.position.x,
+		pos.y + windowNode.windowData.position.y };
+
+	CursorData& cursorData = pAppData->cursorOpt.Value();
+	cursorData.positionDelta = newPosition - cursorData.position;
+	cursorData.position = newPosition;
+
+	for (EventInterface* eventCallback : pAppData->eventCallbacks)
+		eventCallback->CursorMove(cursorData.position, cursorData.positionDelta);
+}
+
+void Application::detail::UpdateTouchInput(TouchEventType type, u8 id, f32 x, f32 y)
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(type != TouchEventType::Unchanged);
+	auto& appData = *detail::pAppData;
+
+	if (type == TouchEventType::Down)
+	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(appData.touchInputs.CanPushBack());
+		TouchInput newValue{};
+		newValue.eventType = TouchEventType::Down;
+		newValue.id = id;
+		newValue.x = x;
+		newValue.y = y;
+		appData.touchInputs.PushBack(newValue);
+		appData.touchInputStartTime.PushBack(appData.currentNow);
+	}
+	else
+	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(TouchInputIDExists(id));
+		for (auto& item : appData.touchInputs)
+		{
+			if (item.id == id)
+			{
+				item.eventType = type;
+				item.x = x;
+				item.y = y;
+				break;
+			}
+		}
+	}
+
+	for (EventInterface* eventCallback : pAppData->eventCallbacks)
+		eventCallback->TouchEvent(id, type, { x, y });
+}
+
+Std::Optional<Application::GamepadState> Application::GetGamepad()
+{
+	if (detail::pAppData->gamepadConnected)
+		return detail::pAppData->gamepadState;
 	else
 		return {};
 }
 
-bool DEngine::Application::MainWindowMinimized()
+void Application::Log(char const* msg)
 {
-	return detail::mainWindowIsMinimized;
+	if (detail::pAppData->logCallback)
+		detail::pAppData->logCallback(msg);
+	else
+		detail::Backend_Log(msg);
+}
+
+void Application::InsertEventInterface(EventInterface& in)
+{
+	detail::pAppData->eventCallbacks.push_back(&in);
+}
+
+void Application::RemoveEventInterface(EventInterface& in)
+{
+	auto callbackIt = std::find_if(
+		detail::pAppData->eventCallbacks.begin(),
+		detail::pAppData->eventCallbacks.end(),
+		[&in](EventInterface* const val) -> bool {
+			return val == &in; });
+	detail::pAppData->eventCallbacks.erase(callbackIt);
 }

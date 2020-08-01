@@ -3,21 +3,64 @@
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Span.hpp"
 #include "DEngine/Containers/Optional.hpp"
-#include "DEngine/Containers/StaticVector.hpp"
 
 #include "DEngine/Math/Matrix.hpp"
+#include "DEngine/Math/Vector.hpp"
 #include "DEngine/Math/Common.hpp"
 
 #include <vector>
+#include <cstddef>
 
 namespace DEngine::Gfx
 {
-	class IWsi;
-	class ILog;
+	class WsiInterface;
+	class LogInterface;
+	struct TextureAssetInterface;
 	struct InitInfo;
 	class ViewportRef;
 	struct DrawParams;
-	enum class TextureID : u64 {};
+	enum class TextureID : u32 {};
+	constexpr TextureID noTextureID = TextureID(-1);
+	enum class ViewportID : u32 { Invalid = u32(-1) };
+	enum class NativeWindowID : u32 { Invalid = u32(-1) };
+	enum class NativeWindowEvent : u32;
+
+	class Context
+	{
+	public:
+		Context(Context&&) noexcept;
+		virtual ~Context();
+
+		// Thread safe
+		NativeWindowID NewNativeWindow(WsiInterface& wsiConnection);
+		void DeleteNativeWindow(NativeWindowID);
+
+		// Thread safe
+		void NewFontTexture(
+			u32 id,
+			u32 width,
+			u32 height,
+			u32 pitch,
+			Std::Span<std::byte const> data);
+
+		// Thread safe
+		ViewportRef NewViewport();
+		// Thread safe
+		void DeleteViewport(ViewportID viewportID);
+
+		void Draw(DrawParams const& params);
+
+	private:
+		Context() = default;
+		Context(Context const&) = delete;
+
+		LogInterface* logger = nullptr;
+		TextureAssetInterface const* texAssetInterface = nullptr;
+
+		void* apiDataBuffer = nullptr;
+
+		friend Std::Opt<Context> Initialize(const InitInfo& initInfo);
+	};
 
 	struct TextureAssetInterface
 	{
@@ -27,74 +70,108 @@ namespace DEngine::Gfx
 		virtual char const* get(TextureID id) const = 0;
 	};
 
-	struct ViewportUpdateData
+	struct ViewportUpdate
 	{
-		uSize id = static_cast<uSize>(-1);
-		u32 width = 0;
-		u32 height = 0;
-		Math::Mat4 transform{};
+		ViewportID id;
+		u32 width;
+		u32 height;
+		Math::Mat4 transform;
+	};
+
+	struct GuiVertex
+	{
+		Math::Vec2 position;
+		Math::Vec2 uv;
+	};
+
+	struct GuiDrawCmd
+	{
+		enum class Type
+		{
+			FilledMesh,
+			TextGlyph,
+			Viewport
+		};
+		Type type;
+		struct MeshSpan
+		{
+			u32 indexCount;
+			u32 vertexOffset;
+			u32 indexOffset;
+		};
+		struct FilledMesh
+		{
+			MeshSpan mesh;
+			Math::Vec4 color;
+		};
+		struct TextGlyph
+		{
+			u32 utfValue;
+			Math::Vec4 color;
+		};
+		struct Viewport
+		{
+			ViewportID id;
+		};
+		union
+		{
+			FilledMesh filledMesh;
+			TextGlyph textGlyph;
+			Viewport viewport;
+		};
+		Math::Vec2 rectPosition;
+		Math::Vec2 rectExtent;
+	};
+
+	struct NativeWindowUpdate
+	{
+		NativeWindowID id;
+		NativeWindowEvent event;
+		Math::Vec4 clearColor;
+		u32 drawCmdOffset;
+		u32 drawCmdCount;
 	};
 
 	struct DrawParams
 	{
-		u32 swapchainWidth = 0;
-		u32 swapchainHeight = 0;
-		bool restoreEvent = false;
-
+		// Scene specific stuff
 		std::vector<TextureID> textureIDs;
 		std::vector<Math::Mat4> transforms;
 
-		std::vector<ViewportUpdateData> viewportUpdates;
-	};
-
-	class Data
-	{
-	public:
-		Data(Data&&) noexcept;
-		virtual ~Data();
-
-		ViewportRef NewViewport();
-		void DeleteViewport(uSize viewportID);
-		uSize GetViewportCount();
-
-		void Draw(DrawParams const& params);
-
-	private:
-		Data() = default;
-		Data(Data const&) = delete;
-
-		ILog* iLog = nullptr;
-		IWsi* iWsi = nullptr;
-		TextureAssetInterface const* texAssetInterface = nullptr;
-
-		void* apiDataBuffer = nullptr;
-
-		friend Std::Opt<Data> Initialize(const InitInfo& initInfo);
+		std::vector<GuiVertex> guiVerts;
+		std::vector<u32> guiIndices;
+		std::vector<GuiDrawCmd> guiDrawCmds;
+		std::vector<ViewportUpdate> viewportUpdates;
+		std::vector<NativeWindowUpdate> nativeWindowUpdates;
 	};
 
 	struct InitInfo
 	{
-		u32 maxWidth = 0;
-		u32 maxHeight = 0;
+		WsiInterface* initialWindowConnection = nullptr;
 
-		ILog* optional_iLog = nullptr;
-		IWsi* iWsi = nullptr;
+		LogInterface* optional_logger = nullptr;
+		
 		TextureAssetInterface const* texAssetInterface = nullptr;
 		Std::Span<char const*> requiredVkInstanceExtensions{};
 	};
 
-	class ILog
+	class LogInterface
 	{
 	public:
-		virtual ~ILog() {};
+		virtual ~LogInterface() {};
 
-		virtual void log(char const* msg) = 0;
+		enum class Level
+		{
+			Info,
+			Fatal
+		};
+		virtual void log(Level level, char const* msg) = 0;
 	};
 
-	class IWsi
+	class WsiInterface
 	{
 	public:
-		virtual ~IWsi() {};
+		virtual ~WsiInterface() {};
 
 		// Return type is VkResult
 		//
@@ -109,18 +186,21 @@ namespace DEngine::Gfx
 	public:
 		ViewportRef() = default;
 
-		[[nodiscard]] bool IsValid() const { return viewportID != invalidID; }
-		[[nodiscard]] uSize ViewportID() const { return viewportID; }
-		[[nodiscard]] void* ImGuiTexID() const { return imguiTexID; }
+		[[nodiscard]] bool IsValid() const { return viewportID != ViewportID::Invalid; }
+		[[nodiscard]] Gfx::ViewportID ViewportID() const { return viewportID; }
 
 	private:
-		static constexpr uSize invalidID = static_cast<uSize>(-1);
-		uSize viewportID = invalidID;
-		void* imguiTexID = nullptr;
+		Gfx::ViewportID viewportID = Gfx::ViewportID::Invalid;
 
-		friend class Data;
+		friend class Context;
 	};
-
 	
-	Std::Opt<Data> Initialize(const InitInfo& initInfo);
+	Std::Opt<Context> Initialize(InitInfo const& initInfo);
 }
+
+enum class DEngine::Gfx::NativeWindowEvent : DEngine::u32
+{
+	None,
+	Resize,
+	Restore
+};

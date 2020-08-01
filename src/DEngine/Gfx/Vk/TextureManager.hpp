@@ -12,7 +12,7 @@
 
 namespace DEngine::Gfx::Vk
 {
-	struct GlobUtils;
+	class GlobUtils;
 
 	struct TextureManager
 	{

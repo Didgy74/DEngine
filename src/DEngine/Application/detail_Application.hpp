@@ -7,6 +7,7 @@
 #include "DEngine/Containers/StaticVector.hpp"
 
 #include <chrono>
+#include <vector>
 
 #if defined(__ANDROID__)
 #	define DENGINE_APP_MAIN_ENTRYPOINT dengine_app_detail_main
@@ -17,63 +18,96 @@
 namespace DEngine::Application::detail
 {
 	bool Initialize();
-	bool Backend_Initialize();
-
 	void ProcessEvents();
+
+	bool Backend_Initialize();
 	void Backend_ProcessEvents();
+	void Backend_Log(char const* msg);
 
-	bool ShouldShutdown();
-	bool IsMinimized();
-	bool IsRestored();
-	bool MainWindowRestoreEvent();
-	bool ResizeEvent();
-	bool MainWindowSurfaceInitializeEvent();
+	using LogCallback = void(*)(char const*);
+	void SetLogCallback(LogCallback callback);
 
-	void ImgGui_Initialize();
-	void ImGui_NewFrame();
+	void UpdateWindowSize(
+		void* platformHandle,
+		Extent newSize);
+	void UpdateWindowPosition(
+		void* platformHandle,
+		Math::Vec2Int newPosition);
+	void UpdateWindowFocus(
+		void* platformHandle,
+		bool focused);
+	void UpdateWindowMinimized(
+		void* platformHandle,
+		bool minimized);
+	void UpdateWindowCursorEnter(
+		void* platformHandle,
+		bool entered);
+	void UpdateOrientation(Orientation newOrient);
 
-	Std::StaticVector<char const*, 5> GetRequiredVulkanInstanceExtensions();
-	bool CreateVkSurface(uSize vkInstance, void const* vkAllocationCallbacks, void* userData, u64& vkSurface);
+	void UpdateCursor(
+		void* platformHandle,
+		Math::Vec2Int pos,
+		Math::Vec2Int delta);
+	void UpdateCursor(
+		void* platformHandle,
+		Math::Vec2Int pos);
 
-	// Input
-	extern bool buttonValues[(int)Button::COUNT];
-	extern std::chrono::high_resolution_clock::time_point buttonHeldStart[(int)Button::COUNT];
-	extern f32 buttonHeldDuration[(int)Button::COUNT];
-	extern KeyEventType buttonEvents[(int)Button::COUNT];
+	void UpdateTouchInput(TouchEventType type, u8 id, f32 x, f32 y);
+
 	void UpdateButton(Button button, bool pressed);
-	extern Std::StaticVector<char, maxCharInputCount> charInputs;
+	void PushCharInput(u32 charValue);
+	void PushCharRemoveEvent();
 
-	extern Std::Opt<CursorData> cursorOpt;
-	extern Std::StaticVector<TouchInput, 10> touchInputs;
-	void UpdateCursor(u32 posX, u32 posY, i32 deltaX, i32 deltaY);
-	void UpdateCursor(u32 posX, u32 posY);
-	void UpdateTouchInput_Down(u8 id, f32 x, f32 y);
-	void UpdateTouchInput_Move(u8 id, f32 x, f32 y);
-	void UpdateTouchInput_Up(u8 id, f32 x, f32 y);
+	struct WindowData
+	{
+		Extent size;
+		Math::Vec2Int position;
+		bool isMinimized = false;
+		bool shouldShutdown = false;
+	};
 
-	extern u32 displaySize[2];
-	extern i32 mainWindowPos[2];
-	extern u32 mainWindowSize[2];
-	extern u32 mainWindowFramebufferSize[2];
-	extern bool mainWindowIsInFocus;
-	extern bool mainWindowIsMinimized;
-	extern bool mainWindowRestoreEvent;
-	extern bool mainWindowResizeEvent;
-	extern bool shouldShutdown;
+	struct AppData
+	{
+		LogCallback logCallback = nullptr;
 
-	// Time related stuff
-	extern u64 tickCount;
-	extern f32 deltaTime;
-	extern std::chrono::high_resolution_clock::time_point currentNow;
-	extern std::chrono::high_resolution_clock::time_point previousNow;
+		u64 windowIdTracker = 0;
+		struct WindowNode
+		{
+			WindowID id;
+			WindowData windowData;
+			WindowEvents events;
+			void* platformHandle;
+		};
+		std::vector<WindowNode> windows;
 
-	extern bool mainWindowSurfaceInitialized;
-	extern bool mainWindowSurfaceInitializeEvent;
-	extern bool mainWindowSurfaceTerminateEvent;
+		Orientation currentOrientation = Orientation::Invalid;
+		bool orientationEvent = false;
+
+		// Input
+		bool buttonValues[(int)Button::COUNT] = {};
+		std::chrono::high_resolution_clock::time_point buttonHeldStart[(int)Button::COUNT] = {};
+		f32 buttonHeldDuration[(int)Button::COUNT] = {};
+		KeyEventType buttonEvents[(int)Button::COUNT] = {};
+		std::vector<u32> charInputs{};
+
+		Std::Opt<CursorData> cursorOpt{};
+
+		Std::StaticVector<TouchInput, maxTouchEventCount> touchInputs{};
+		Std::StaticVector<std::chrono::high_resolution_clock::time_point, decltype(touchInputs)::Capacity()> touchInputStartTime{};
 
 
+		// Time related stuff
+		u64 tickCount = 0;
+		f32 deltaTime = 1.f / 60.f;
+		std::chrono::high_resolution_clock::time_point currentNow{};
+		std::chrono::high_resolution_clock::time_point previousNow{};
 
-	extern GamepadState gamepadState;
-	extern bool gamepadConnected;
-	extern int gamepadID;
+		GamepadState gamepadState{};
+		bool gamepadConnected = false;
+		int gamepadID = 0;
+
+		std::vector<EventInterface*> eventCallbacks;
+	};
+
+	extern AppData* pAppData;
 }

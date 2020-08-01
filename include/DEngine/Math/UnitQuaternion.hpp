@@ -1,8 +1,9 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Math/Trigonometric.hpp"
-#include "DEngine/Math/Vector.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Math/Constant.hpp>
+#include <DEngine/Math/Trigonometric.hpp>
+#include <DEngine/Math/Vector.hpp>
 
 namespace DEngine::Math
 {
@@ -24,7 +25,7 @@ namespace DEngine::Math
 		[[nodiscard]] constexpr UnitQuaternion<T> GetInverse() const;
 
 		[[nodiscard]] static constexpr UnitQuaternion<T> FromEulerAngles(T x, T y, T z);
-		[[nodiscard]] static constexpr UnitQuaternion<T> FromVector(Vector<3, T> const& axis, T degrees);
+		[[nodiscard]] static constexpr UnitQuaternion<T> FromVector(Vector<3, T> const& axis, T radians);
 
 	private:
 		constexpr UnitQuaternion(T s, T x, T y, T z);
@@ -96,12 +97,12 @@ namespace DEngine::Math
 	template<typename T>
 	constexpr UnitQuaternion<T> UnitQuaternion<T>::FromEulerAngles(T x, T y, T z)
 	{
-		T c1 = Cos<AngleUnit::Degrees>(y / 2.f);
-		T c2 = Cos<AngleUnit::Degrees>(x / 2.f);
-		T c3 = Cos<AngleUnit::Degrees>(z / 2.f);
-		T s1 = Sin<AngleUnit::Degrees>(y / 2.f);
-		T s2 = Sin<AngleUnit::Degrees>(x / 2.f);
-		T s3 = Sin<AngleUnit::Degrees>(z / 2.f);
+		T c1 = Cos(y * degToRad / 2.f);
+		T c2 = Cos(x * degToRad / 2.f);
+		T c3 = Cos(z * degToRad / 2.f);
+		T s1 = Sin(y * degToRad / 2.f);
+		T s2 = Sin(x * degToRad / 2.f);
+		T s3 = Sin(z * degToRad / 2.f);
 
 		UnitQuaternion<T> returnVal{};
 		returnVal.s = c1 * c2 * c3 - s1 * s2 * s3;
@@ -112,15 +113,15 @@ namespace DEngine::Math
 	}
 
 	template<typename T>
-	constexpr UnitQuaternion<T> UnitQuaternion<T>::FromVector(Vector<3, T> const& axis, T degrees)
+	constexpr UnitQuaternion<T> UnitQuaternion<T>::FromVector(Vector<3, T> const& axis, T radians)
 	{
 		UnitQuaternion<T> returnVal{};
 
-		returnVal.s = Cos<AngleUnit::Degrees>(degrees / 2);
+		returnVal.s = Cos(radians / 2);
 
 		//assert(axis.Magnitude() > 0.f);
 		Vector<3, T> const normalizedAxis = axis.Normalized();
-		T const  sin = Sin<AngleUnit::Degrees>(degrees / 2);
+		T const  sin = Sin(radians / 2);
 		returnVal.x = normalizedAxis.x * sin;
 		returnVal.y = normalizedAxis.y * sin;
 		returnVal.z = normalizedAxis.z * sin;

@@ -1,12 +1,12 @@
 #include "Vk.hpp"
-#include "../Assert.hpp"
+#include <DEngine/Gfx/detail/Assert.hpp>
 #include "Init.hpp"
 
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/Span.hpp"
-#include "DEngine/Containers/StaticVector.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Containers/Span.hpp>
+#include <DEngine/Containers/StaticVector.hpp>
 // For file IO
-#include "DEngine/Application.hpp"
+#include <DEngine/Application.hpp>
 
 #include <string>
 
@@ -14,7 +14,7 @@
 
 namespace DEngine::Gfx::Vk
 {
-	bool InitializeBackend(Data& gfxData, InitInfo const& initInfo, void*& apiDataBuffer);
+	bool InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& apiDataBuffer);
 
 	namespace Init
 	{
@@ -30,17 +30,17 @@ DEngine::Gfx::Vk::APIData::~APIData()
 {
 	APIData& apiData = *this;
 
-	apiData.globUtils.device.WaitIdle();
+	apiData.globUtils.device.waitIdle();
 }
 
-void DEngine::Gfx::Vk::APIData::NewViewport(uSize& viewportID, void*& imguiTexID)
+void DEngine::Gfx::Vk::APIData::NewViewport(ViewportID& viewportID)
 {
 	APIData& apiData = *this;
 
-	apiData.viewportManager.NewViewport(viewportID, imguiTexID);
+	apiData.viewportManager.NewViewport(viewportID);
 }
 
-void DEngine::Gfx::Vk::APIData::DeleteViewport(uSize id)
+void DEngine::Gfx::Vk::APIData::DeleteViewport(ViewportID id)
 {
 	//vk::Result vkResult{};
 	APIData& apiData = *this;
@@ -48,27 +48,30 @@ void DEngine::Gfx::Vk::APIData::DeleteViewport(uSize id)
 	apiData.viewportManager.DeleteViewport(id);
 }
 
+void DEngine::Gfx::Vk::APIData::NewFontTexture(
+	u32 id,
+	u32 width,
+	u32 height,
+	u32 pitch,
+	Std::Span<std::byte const> data)
+{
+	APIData& apiData = *this;
+
+	GuiResourceManager::NewFontTexture(
+		apiData.guiResourceManager,
+		apiData.globUtils,
+		id,
+		width,
+		height,
+		pitch,
+		data);
+}
+
 DEngine::Gfx::Vk::GlobUtils::GlobUtils()
 {
 }
 
-DEngine::u8 DEngine::Gfx::Vk::GlobUtils::CurrentResourceSetIndex_Async()
-{
-	u8 index = static_cast<u8>(-1);
-	{
-		std::lock_guard _{ currentResourceSetIndex_Lock };
-		index = currentResourceSetIndex_Var;
-	}
-	return index;
-}
-
-void DEngine::Gfx::Vk::GlobUtils::SetCurrentResourceSetIndex(u8 index)
-{
-	std::lock_guard _{ currentResourceSetIndex_Lock };
-	currentResourceSetIndex_Var = index;
-}
-
-bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo, void*& apiDataBuffer)
+bool DEngine::Gfx::Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& apiDataBuffer)
 {
 	apiDataBuffer = new APIData;
 	APIData& apiData = *static_cast<APIData*>(apiDataBuffer);
@@ -77,95 +80,82 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	//vk::Result vkResult{};
 	bool boolResult = false;
 
-	apiData.logger = initInfo.optional_iLog;
-	apiData.globUtils.logger = initInfo.optional_iLog;
-	apiData.wsiInterface = initInfo.iWsi;
+	apiData.logger = initInfo.optional_logger;
+	apiData.globUtils.logger = initInfo.optional_logger;
 	apiData.test_textureAssetInterface = initInfo.texAssetInterface;
 
-	globUtils.resourceSetCount = 2;
-	apiData.currentInFlightFrame = 0;
-	globUtils.useEditorPipeline = true;
+	globUtils.inFlightCount = 2;
+	apiData.currInFlightIndex = 0;
+	globUtils.editorMode = true;
 
 	// Make the VkInstance
 	PFN_vkGetInstanceProcAddr instanceProcAddr = Vk::loadInstanceProcAddressPFN();
-	BaseDispatch baseDispatch = BaseDispatch::Build(instanceProcAddr);
+	BaseDispatch baseDispatch;
+	BaseDispatch::BuildInPlace(baseDispatch, instanceProcAddr);
 	Init::CreateVkInstance_Return createVkInstanceResult = Init::CreateVkInstance(
 		initInfo.requiredVkInstanceExtensions, 
 		true, 
 		baseDispatch, 
 		apiData.logger);
-	InstanceDispatch instance = InstanceDispatch::Build(createVkInstanceResult.instanceHandle, instanceProcAddr);
-	globUtils.instance = instance;
+	InstanceDispatch::BuildInPlace(
+		globUtils.instance, 
+		createVkInstanceResult.instanceHandle, 
+		instanceProcAddr);
 
 	// Enable DebugUtils functionality.
 	// If we enabled debug utils, we build the debug utils dispatch table and the debug utils messenger.
 	if (createVkInstanceResult.debugUtilsEnabled)
 	{
-		globUtils.debugUtils = DebugUtilsDispatch::Build(globUtils.instance.handle, instanceProcAddr);
+		DebugUtilsDispatch::BuildInPlace(
+			globUtils.debugUtils,
+			globUtils.instance.handle, 
+			instanceProcAddr);
 		globUtils.debugMessenger = Init::CreateLayerMessenger(
 			globUtils.instance.handle, 
 			globUtils.DebugUtilsPtr(), 
-			initInfo.optional_iLog);
+			initInfo.optional_logger);
 	}
 
 	// TODO: I don't think I like this code
 	// Create the VkSurface using the callback
 	vk::SurfaceKHR surface{};
-	vk::Result surfaceCreateResult = (vk::Result)apiData.wsiInterface->CreateVkSurface(
-		(u64)(VkInstance)instance.handle, 
+	vk::Result surfaceCreateResult = (vk::Result)initInfo.initialWindowConnection->CreateVkSurface(
+		(uSize)static_cast<VkInstance>(globUtils.instance.handle), 
 		nullptr, 
 		*reinterpret_cast<u64*>(&surface));
 	if (surfaceCreateResult != vk::Result::eSuccess)
 		throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
 
 	// Pick our phys device and load the info for it
-	apiData.globUtils.physDevice = Init::LoadPhysDevice(instance, surface);
+	apiData.globUtils.physDevice = Init::LoadPhysDevice(globUtils.instance, surface);
 
-	// Build the surface info now that we have our physical device.
-	apiData.surface = Init::BuildSurfaceInfo(instance, globUtils.physDevice.handle, surface, apiData.logger);
+	SurfaceInfo::BuildInPlace(
+		globUtils.surfaceInfo,
+		surface,
+		globUtils.instance,
+		apiData.globUtils.physDevice.handle);
 
-	// Build the settings we will use to build the swapchain.
-	SwapchainSettings swapchainSettings = Init::BuildSwapchainSettings(
-		instance,
-		globUtils.physDevice.handle,
-		apiData.surface,
-		apiData.surface.capabilities.currentExtent.width,
-		apiData.surface.capabilities.currentExtent.height,
-		apiData.logger);
-
-	PFN_vkGetDeviceProcAddr deviceProcAddr = (PFN_vkGetDeviceProcAddr)instanceProcAddr((VkInstance)instance.handle, "vkGetDeviceProcAddr");
-
-	// CreateJob the device and the dispatch table for it.
-	vk::Device deviceHandle = Init::CreateDevice(instance, globUtils.physDevice);
-	globUtils.device.copy(DeviceDispatch::Build(deviceHandle, deviceProcAddr));
-	globUtils.device.m_queueDataPtr = &globUtils.queues;
-
-	boolResult = ViewportManager::Init(
-		apiData.viewportManager,
+	PFN_vkGetDeviceProcAddr deviceProcAddr = (PFN_vkGetDeviceProcAddr)instanceProcAddr((VkInstance)globUtils.instance.handle, "vkGetDeviceProcAddr");
+	// Create the device and the dispatch table for it.
+	vk::Device deviceHandle = Init::CreateDevice(globUtils.instance, globUtils.physDevice);
+	DeviceDispatch::BuildInPlace(
 		globUtils.device,
-		globUtils.physDevice.properties.limits.minUniformBufferOffsetAlignment,
-		globUtils.DebugUtilsPtr());
-	if (!boolResult)
-		throw std::runtime_error("DEngine - Vulkan: Failed to initialize ViewportManager.");
-
-	boolResult = DeletionQueue::Init(
-		globUtils.deletionQueue,
-		&globUtils,
-		globUtils.resourceSetCount);
-	if (!boolResult)
-		throw std::runtime_error("DEngine - Vulkan: Failed to initialize DeletionQueue");
+		deviceHandle,
+		deviceProcAddr);
 
 	QueueData::Init(
 		globUtils.queues,
-		globUtils.device, 
-		globUtils.physDevice.queueIndices, 
+		globUtils.device,
+		globUtils.physDevice.queueIndices,
 		globUtils.DebugUtilsPtr());
 
-	TextureManager::Init(
-		apiData.textureManager,
-		globUtils.device,
-		globUtils.queues,
-		globUtils.DebugUtilsPtr());
+	globUtils.device.m_queueDataPtr = &globUtils.queues;
+
+	boolResult = DeletionQueue::Init(
+		globUtils.deletionQueue,
+		globUtils.inFlightCount);
+	if (!boolResult)
+		throw std::runtime_error("DEngine - Vulkan: Failed to initialize DeletionQueue");
 
 	// Init VMA
 	apiData.vma_trackingData.deviceHandle = globUtils.device.handle;
@@ -180,10 +170,30 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 	else
 		globUtils.vma = vmaResult.value;
 
+	NativeWindowManager::Initialize(
+		apiData.nativeWindowManager,
+		globUtils.device,
+		globUtils.queues,
+		globUtils.DebugUtilsPtr());
+
+	boolResult = ViewportManager::Init(
+		apiData.viewportManager,
+		globUtils.device,
+		globUtils.physDevice.properties.limits.minUniformBufferOffsetAlignment,
+		globUtils.DebugUtilsPtr());
+	if (!boolResult)
+		throw std::runtime_error("DEngine - Vulkan: Failed to initialize ViewportManager.");
+
+	TextureManager::Init(
+		apiData.textureManager,
+		globUtils.device,
+		globUtils.queues,
+		globUtils.DebugUtilsPtr());
+
 	boolResult = ObjectDataManager::Init(
 		apiData.objectDataManager,
 		globUtils.physDevice.properties.limits.minUniformBufferOffsetAlignment,
-		globUtils.resourceSetCount,
+		globUtils.inFlightCount,
 		globUtils.vma,
 		globUtils.device,
 		globUtils.DebugUtilsPtr());
@@ -191,65 +201,50 @@ bool DEngine::Gfx::Vk::InitializeBackend(Data& gfxData, InitInfo const& initInfo
 		throw std::runtime_error("DEngine - Vulkan: Failed to initialize ObjectDataManager.");
 
 
-	// Build our swapchain on our device
-	apiData.swapchain = Init::CreateSwapchain(
-		apiData.globUtils.device, 
-		apiData.globUtils.queues,
-		apiData.globUtils.deletionQueue,
-		swapchainSettings,
-		apiData.globUtils.DebugUtilsPtr());
-
-
 	// Create our main fences
 	apiData.mainFences = Init::CreateMainFences(
-		apiData.globUtils.device,
-		apiData.globUtils.resourceSetCount,
-		apiData.globUtils.DebugUtilsPtr());
+		globUtils.device,
+		globUtils.inFlightCount,
+		globUtils.DebugUtilsPtr());
 
-
+	
 	apiData.globUtils.guiRenderPass = Init::CreateGuiRenderPass(
-			apiData.globUtils.device,
-			apiData.swapchain.surfaceFormat.format,
+			globUtils.device,
+			globUtils.surfaceInfo.surfaceFormatToUse.format,
 			globUtils.DebugUtilsPtr());
-	// Create the resources for rendering GUI
-	apiData.guiData = Init::CreateGUIData(
-		apiData.globUtils.device,
-		apiData.globUtils.vma,
-		apiData.globUtils.deletionQueue,
-		apiData.globUtils.queues,
+
+	NativeWindowManager::BuildInitialNativeWindow(
+		apiData.nativeWindowManager,
+		globUtils.instance,
+		globUtils.device,
+		globUtils.physDevice.handle,
+		globUtils.queues,
+		globUtils.deletionQueue,
+		globUtils.surfaceInfo,
+		globUtils.vma,
+		globUtils.inFlightCount,
+		*initInfo.initialWindowConnection,
+		surface,
 		globUtils.guiRenderPass,
-		apiData.swapchain.surfaceFormat.format,
-		apiData.swapchain.extents,
-		apiData.globUtils.resourceSetCount,
-		apiData.globUtils.DebugUtilsPtr());
+		globUtils.DebugUtilsPtr());
 
-	// Record the copy-image command cmdBuffers that go from render-target to swapchain
-	Init::RecordSwapchainCmdBuffers(
-		apiData.globUtils.device, 
-		apiData.swapchain, 
-		apiData.guiData.renderTarget.img);
-
-	// Initialize ImGui stuff
-	Init::InitializeImGui(
-		apiData, apiData.globUtils.device, 
-		instanceProcAddr, 
-		apiData.globUtils.DebugUtilsPtr());
 
 	// Create the main render stuff
-	apiData.globUtils.gfxRenderPass = Init::BuildMainGfxRenderPass(
-		apiData.globUtils.device,
+	globUtils.gfxRenderPass = Init::BuildMainGfxRenderPass(
+		globUtils.device,
 		true, 
-		apiData.globUtils.DebugUtilsPtr());
-
-
-	
-
-
-
-
+		globUtils.DebugUtilsPtr());
 
 	Init::Test(apiData);
-	
+
+
+	GuiResourceManager::Init(
+		apiData.guiResourceManager, 
+		globUtils.device,
+		globUtils.vma, 
+		globUtils.inFlightCount, 
+		globUtils.guiRenderPass,
+		globUtils.DebugUtilsPtr());
 
 	return true;
 }
@@ -379,7 +374,7 @@ void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("Unable to make graphics pipeline.");
 
-	apiData.globUtils.device.Destroy(vertModule);
-	apiData.globUtils.device.Destroy(fragModule);
+	apiData.globUtils.device.destroy(vertModule);
+	apiData.globUtils.device.destroy(fragModule);
 	
 }

@@ -9,5 +9,6 @@
 #include <vulkan/vulkan.hpp>
 #undef max
 #undef min
+#undef CreateWindow
 
 #pragma warning( pop )

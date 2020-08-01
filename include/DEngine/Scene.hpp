@@ -1,18 +1,19 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/Pair.hpp"
-#include "DEngine/Containers/StaticVector.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Containers/Pair.hpp>
+#include <DEngine/Containers/StaticVector.hpp>
 
 // Temp
-#include "DEngine/Math/Vector.hpp"
-#include "DEngine/Math/UnitQuaternion.hpp"
-#include "DEngine/Gfx/Gfx.hpp"
-#include "DEngine/Physics.hpp"
+#include <DEngine/Math/Vector.hpp>
+#include <DEngine/Math/UnitQuaternion.hpp>
+#include <DEngine/Gfx/Gfx.hpp>
+#include <DEngine/Physics.hpp>
 
 namespace DEngine
 {
 	enum class Entity : u64;
+	constexpr Entity invalidEntity = Entity(-1);
 
 	class Scene;
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
 
 namespace DEngine::Time
 {

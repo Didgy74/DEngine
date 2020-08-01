@@ -1,9 +1,11 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/Array.hpp"
-#include "DEngine/Containers/StaticVector.hpp"
-#include "DEngine/Containers/Optional.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Containers/Array.hpp>
+#include <DEngine/Containers/StaticVector.hpp>
+#include <DEngine/Containers/Optional.hpp>
+
+#include <DEngine/Math/Vector.hpp>
 
 #if defined(_WIN32) || defined(_WIN64)
 #	define DENGINE_OS_WINDOWS
@@ -17,8 +19,41 @@
 
 namespace DEngine::Application
 {
-	constexpr uSize maxTouchEventCount = 10;
-	constexpr uSize maxCharInputCount = 10;
+	enum class WindowID : u64;
+	struct Extent
+	{
+		u32 width;
+		u32 height;
+	};
+	struct WindowEvents
+	{
+		bool resize;
+		bool move;
+		bool focus;
+		bool unfocus;
+		bool cursorEnter;
+		bool cursorExit;
+		bool minimize;
+		bool restore;
+	};
+	
+	WindowID CreateWindow(
+		char const* title, 
+		Extent extents);
+	void DestroyWindow(WindowID);
+	Extent GetWindowSize(WindowID);
+	Math::Vec2Int GetWindowPosition(WindowID);
+	bool GetWindowMinimized(WindowID);
+	WindowEvents GetWindowEvents(WindowID);
+	Std::StaticVector<char const*, 5> RequiredVulkanInstanceExtensions();
+	Std::Opt<u64> CreateVkSurface(
+		WindowID window,
+		uSize vkInstance,
+		void const* vkAllocationCallbacks);
+
+	enum class Orientation : u8;
+	Orientation GetOrientation();
+	bool GetOrientationEvent();
 
 	u64 TickCount();
 
@@ -31,11 +66,11 @@ namespace DEngine::Application
 	KeyEventType ButtonEvent(Button input);
 	f32 ButtonDuration(Button input);
 
-	Std::StaticVector<char, maxCharInputCount> CharInputs();
-
 	struct CursorData;
 	Std::Opt<CursorData> Cursor();
+	void LockCursor(bool state);
 
+	constexpr uSize maxTouchEventCount = 10;
 	enum class TouchEventType : u8;
 	struct TouchInput;
 	Std::StaticVector<TouchInput, maxTouchEventCount> TouchInputs();
@@ -49,8 +84,9 @@ namespace DEngine::Application
 
 	void Log(char const* msg);
 
-	bool MainWindowMinimized();
-	void SetRelativeMouseMode(bool enabled);
+	class EventInterface;
+	void InsertEventInterface(EventInterface&);
+	void RemoveEventInterface(EventInterface&);
 
 	void OpenSoftInput();
 
@@ -61,6 +97,13 @@ namespace DEngine
 {
 	namespace App = Application;
 }
+
+enum class DEngine::Application::Orientation : DEngine::u8
+{
+	Invalid,
+	Landscape,
+	Portrait
+};
 
 enum class DEngine::Application::OS : DEngine::u8
 {
@@ -125,10 +168,8 @@ enum class DEngine::Application::Button : DEngine::u16
 
 struct DEngine::Application::CursorData
 {
-	u32 posX;
-	u32 posY;
-	i32 posDeltaX;
-	i32 posDeltaY;
+	Math::Vec2Int position;
+	Math::Vec2Int positionDelta;
 	
 	f32 scrollDeltaY;
 };
@@ -170,8 +211,12 @@ public:
 		Start,
 		End
 	};
-	bool Seek(i64 offset, SeekOrigin origin = SeekOrigin::Current);
-	bool Read(char* output, u64 size);
+	bool Seek(
+		i64 offset,
+		SeekOrigin origin = SeekOrigin::Current);
+	bool Read(
+		char* output, 
+		u64 size);
 	Std::Opt<u64> Tell() const;
 	bool IsOpen() const;
 	bool Open(char const* path);
@@ -181,3 +226,50 @@ private:
 	// Might not be safe, dunno yet
 	alignas(8) char m_buffer[16] = {};
 };
+
+class DEngine::Application::EventInterface
+{
+public:
+	inline virtual ~EventInterface() = 0;
+
+	virtual void WindowResize(
+		WindowID window, 
+		Extent extent) {}
+	virtual void WindowMove(
+		WindowID window, 
+		Math::Vec2Int position) {}
+	virtual void WindowMinimize(
+		WindowID window,
+		bool wasMinimized) {}
+	virtual void WindowFocus(
+		WindowID window,
+		bool focused) {}
+	virtual void WindowCursorEnter(
+		WindowID window,
+		bool entered) {}
+
+	virtual void CursorMove(
+		Math::Vec2Int position,
+		Math::Vec2Int positionDelta) {}
+
+	virtual void TouchEvent(
+		u8 id,
+		TouchEventType type,
+		Math::Vec2 position) {}
+
+
+	virtual void ButtonEvent(
+		Button button,
+		bool state) {};
+	virtual void CharEvent(
+		u32 utfValue) {};
+	virtual void CharRemoveEvent() {}
+
+	
+	virtual void Log(char const* msg) {};
+};
+
+inline DEngine::Application::EventInterface::~EventInterface()
+{
+
+}

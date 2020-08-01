@@ -9,8 +9,8 @@
 
 namespace DEngine::Gfx::Vk::Constants
 {
-	constexpr u32 maxResourceSets = 4;
-	constexpr u32 preferredResourceSetCount = 3;
+	constexpr u32 maxInFlightCount = 4;
+	constexpr u32 preferredInFlightCount = 3;
 
 	constexpr vk::PresentModeKHR preferredPresentMode = vk::PresentModeKHR::eFifo;
 	constexpr u32 maxSwapchainLength = 4;

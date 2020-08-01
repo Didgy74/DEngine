@@ -2,8 +2,8 @@
 
 #include <android/window.h>
 #include <android/log.h>
-#include <android_native_app_glue.h>
 #include <jni.h>
+#include <android_native_app_glue.h>
 
 #define VK_USE_PLATFORM_ANDROID_KHR
 #include "vulkan/vulkan.h"
@@ -11,158 +11,176 @@
 #include <dlfcn.h>
 
 #include <string>
-
-void DEngine_Debug_Log(char const* msg);
+#include <vector>
+#include <mutex>
 
 extern int dengine_app_detail_main(int argc, char** argv);
 
 namespace DEngine::Application::detail
 {
-	static android_app* Backend_app = nullptr;
-	static bool Backend_androidAppReady = false;
-	static bool Backend_androidWindowReady = false;
-	static bool Backend_configChangedThisTick = false;
-	static u32 Backend_initialWindowResolution[2] = {};
+	struct CustomEvent
+	{
+		enum class Type
+		{
+			CharInput,
+			CharRemove,
+		};
+		Type type;
+		union
+		{
+			u32 charInput;
+		};
+	};
 
-	static JNIEnv* Backend_jniEnv = nullptr;
-	static jclass Backend_jniActivity = nullptr;
-	static jmethodID Backend_jniGetCurrentOrientation{};
-	static jmethodID Backend_jniOpenSoftInput{};
+	struct BackendData
+	{
+		android_app* app = nullptr;
+		bool androidAppReady = false;
+		bool androidWindowReady = false;
+		bool configChangedThisTick = false;
+
+		std::vector<CustomEvent> customEventQueue;
+		std::mutex customEventQueueLock;
+
+		JNIEnv* jniEnv = nullptr;
+		jclass jniActivity = nullptr;
+		jmethodID jniGetCurrentOrientation{};
+		jmethodID jniOpenSoftInput{};
+	};
+
+	BackendData* pBackendData = nullptr;
+
 	static bool Backend_initJNI();
 
-	enum class Backend_Orientation
-	{
-		Invalid,
-		Portrait,
-		Landscape
-	};
-	static Backend_Orientation Backend_ToOrientation(int aconfiguration_orientation);
-	static Backend_Orientation Backend_initialOrientation = Backend_Orientation::Invalid;
-	static Backend_Orientation Backend_currentOrientation = Backend_Orientation::Invalid;
-	static Backend_Orientation Backend_GetUpdatedOrientation();
-
+	static Orientation Backend_ToOrientation(int aconfiguration_orientation);
+	static Orientation Backend_GetUpdatedOrientation();
 
 	static Button Backend_AndroidKeyCodeToButton(int32_t in);
-
-	static TouchEventType Backend_Android_MotionActionToTouchEventType(int32_t in);
 
 	static void Backend_HandleConfigChanged_Deferred();
 
 	static void HandleCmd(android_app* app, int32_t cmd);
-
 	// Return 1 if you have handled the event, 0 for any default
 	// dispatching.
-	static int32_t HandleInputEvents(
+	static int32_t HandleInput(
 			android_app* app,
 			AInputEvent* event);
+
 	static bool HandleInputEvents_Motion(
 			AInputEvent* event,
 			int32_t source);
 	static bool HandleInputKeyEvents_Key(
 			AInputEvent* event,
 			int32_t source);
+
+	static void Backend_HandleWindowInitializeEvent();
+	static void Backend_HandleWindowTerminateEvent();
 }
 
-static DEngine::Application::detail::Backend_Orientation DEngine::Application::detail::Backend_ToOrientation(int aconfiguration_orientation)
+using namespace DEngine;
+
+static void Application::detail::Backend_HandleWindowInitializeEvent()
+{
+	auto& backendData = *detail::pBackendData;
+	backendData.androidWindowReady = true;
+
+	if (!detail::pAppData->windows.empty())
+	{
+		Log("ANDROID TESTING!!! Window restore event");
+		detail::pAppData->windows.front().platformHandle = backendData.app->window;
+		detail::UpdateWindowMinimized(backendData.app->window, false);
+	}
+}
+
+static void Application::detail::Backend_HandleWindowTerminateEvent()
+{
+	auto& backendData = *detail::pBackendData;
+
+	detail::UpdateWindowMinimized(backendData.app->window, true);
+}
+
+static Application::Orientation Application::detail::Backend_ToOrientation(int aconfiguration_orientation)
 {
 	switch (aconfiguration_orientation)
 	{
 		case ACONFIGURATION_ORIENTATION_PORT:
-			return Backend_Orientation::Portrait;
+			return Orientation::Portrait;
 		case ACONFIGURATION_ORIENTATION_LAND:
-			return Backend_Orientation::Landscape;
+			return Orientation::Landscape;
 		default:
-			return Backend_Orientation::Invalid;
+			return Orientation::Invalid;
 	}
 }
 
-static bool DEngine::Application::detail::Backend_initJNI()
+static bool Application::detail::Backend_initJNI()
 {
 	return true;
 }
 
-static DEngine::Application::detail::Backend_Orientation DEngine::Application::detail::Backend_GetUpdatedOrientation()
+static Application::Orientation Application::detail::Backend_GetUpdatedOrientation()
 {
-	int a = Backend_jniEnv->CallIntMethod(Backend_app->activity->clazz, Backend_jniGetCurrentOrientation);
-	Backend_Orientation b = Backend_ToOrientation(a);
+	auto const& backendData = *detail::pBackendData;
+	int a = backendData.jniEnv->CallIntMethod(
+			backendData.app->activity->clazz,
+			backendData.jniGetCurrentOrientation);
+	Orientation b = Backend_ToOrientation(a);
+	if (b == Orientation::Invalid)
+		throw std::runtime_error("DEngine - Application: Tried to get new updated device orientation, but it failed.");
 	return b;
 }
 
-static void DEngine::Application::detail::HandleCmd(android_app* app, int32_t cmd)
+static void Application::detail::HandleCmd(android_app* app, int32_t cmd)
 {
+	auto& backendData = *detail::pBackendData;
 	switch (cmd)
 	{
 	case APP_CMD_INIT_WINDOW:
-		Log("Init window");
-		detail::mainWindowSurfaceInitialized = true;
-		detail::mainWindowSurfaceInitializeEvent = true;
-
-		detail::Backend_androidWindowReady = true;
-
-		if (detail::tickCount > 0)
-			detail::mainWindowRestoreEvent = true;
+		Log("ANDROID TESTING!!!! Init window event");
+		Backend_HandleWindowInitializeEvent();
 		break;
 	case APP_CMD_TERM_WINDOW:
-		Log("Terminate window");
-		detail::mainWindowSurfaceInitialized = false;
-		detail::mainWindowSurfaceTerminateEvent = true;
-
-		detail::Backend_androidWindowReady = false;
+		Log("ANDROID TESTING!!!! Terminate window event");
+		Backend_HandleWindowTerminateEvent();
 		break;
 	case APP_CMD_LOST_FOCUS:
-		Log("Lost focus");
-		detail::mainWindowIsInFocus = false;
 		break;
 	case APP_CMD_GAINED_FOCUS:
-		Log("Gained focus");
-		detail::mainWindowIsInFocus = true;
 		break;
 	case APP_CMD_CONFIG_CHANGED:
-		Log("Config changed");
-		detail::Backend_configChangedThisTick = true;
+		backendData.configChangedThisTick = true;
 		break;
 	case APP_CMD_CONTENT_RECT_CHANGED:
-		Log("Content rect changed");
+		Log("ANDROID TESTING!!!! Content rect changed");
 		break;
 	case APP_CMD_WINDOW_RESIZED:
-		Log("Window resized");
 		break;
 	case APP_CMD_START:
-		Log("Start");
-		detail::Backend_androidAppReady = true;
+		backendData.androidAppReady = true;
+		Log("ANDROID TESTING!!!! App start event");
 		break;
 	case APP_CMD_STOP:
-		Log("Stop");
-		detail::Backend_androidAppReady = false;
+		Log("ANDROID TESTING!!!! App stop event");
 		break;
 	case APP_CMD_PAUSE:
-		detail::mainWindowIsMinimized = true;
-		Log("Pause");
+		Log("ANDROID TESTING!!!! App pause event");
 		break;
 	case APP_CMD_RESUME:
-		detail::mainWindowIsMinimized = false;
-		Log("Resume");
-		detail::mainWindowSurfaceInitialized = true;
-		detail::mainWindowSurfaceInitializeEvent = true;
+		Log("ANDROID TESTING!!!! App resume event");
 		break;
 	case APP_CMD_WINDOW_REDRAW_NEEDED:
-		Log("Window redraw needed");
 		break;
 	case APP_CMD_INPUT_CHANGED:
-		Log("Input changed");
-		DEngine_Debug_Log("Input changed");
 		break;
 	case APP_CMD_DESTROY:
-		Log("Destroy");
-		detail::shouldShutdown = true;
+		Log("ANDROID TESTING!!!! App destroy event");
+		std::exit(0);
 		break;
 	case APP_CMD_SAVE_STATE:
-		Log("Save state");
 		break;
 	}
 }
 
-static bool DEngine::Application::detail::HandleInputEvents_Motion(AInputEvent* event, int32_t source)
+static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, int32_t source)
 {
 	bool handled = false;
 
@@ -179,7 +197,7 @@ static bool DEngine::Application::detail::HandleInputEvents_Motion(AInputEvent* 
 				f32 x = AMotionEvent_getX(event, index);
 				f32 y = AMotionEvent_getY(event, index);
 				i32 id = AMotionEvent_getPointerId(event, index);
-				detail::UpdateTouchInput_Down((u8) id, x, y);
+				detail::UpdateTouchInput(TouchEventType::Down, (u8)id, x, y);
 				handled = true;
 				break;
 			}
@@ -192,7 +210,7 @@ static bool DEngine::Application::detail::HandleInputEvents_Motion(AInputEvent* 
 					f32 x = AMotionEvent_getX(event, i);
 					f32 y = AMotionEvent_getY(event, i);
 					i32 id = AMotionEvent_getPointerId(event, i);
-					detail::UpdateTouchInput_Move((u8) id, x, y);
+					detail::UpdateTouchInput(TouchEventType::Moved, (u8)id, x, y);
 				}
 				handled = true;
 				break;
@@ -204,7 +222,7 @@ static bool DEngine::Application::detail::HandleInputEvents_Motion(AInputEvent* 
 				f32 x = AMotionEvent_getX(event, index);
 				f32 y = AMotionEvent_getY(event, index);
 				i32 id = AMotionEvent_getPointerId(event, index);
-				detail::UpdateTouchInput_Up((u8) id, x, y);
+				detail::UpdateTouchInput(TouchEventType::Up, (u8)id, x, y);
 				handled = true;
 				break;
 			}
@@ -217,7 +235,7 @@ static bool DEngine::Application::detail::HandleInputEvents_Motion(AInputEvent* 
 	return handled;
 }
 
-static bool DEngine::Application::detail::HandleInputKeyEvents_Key(
+static bool Application::detail::HandleInputKeyEvents_Key(
 		AInputEvent* event,
 		int32_t source)
 {
@@ -239,32 +257,15 @@ static bool DEngine::Application::detail::HandleInputKeyEvents_Key(
 	default:
 		break;
 	}
-	int32_t keyCode = AKeyEvent_getKeyCode(event);
-	Button buttonCode = Backend_AndroidKeyCodeToButton(keyCode);
-	if (buttonCode != Button::Undefined)
-	{
-		if (keyAction == AKEY_EVENT_ACTION_UP)
-		{
-			if (buttonCode == Button::Zero)
-				detail::charInputs.PushBack(48);
-			if (buttonCode == Button::One)
-				detail::charInputs.PushBack(49);
-			if (buttonCode == Button::Two)
-				detail::charInputs.PushBack(50);
-			if (buttonCode == Button::Three)
-				detail::charInputs.PushBack(51);
-		}
-
-		detail::UpdateButton(buttonCode, buttonValue);
-		handled = true;
-	}
 
 	return handled;
 }
 
 // Return 1 if you have handled the event, 0 for any default
 // dispatching.
-static int32_t DEngine::Application::detail::HandleInputEvents(android_app* app, AInputEvent* event)
+static int32_t Application::detail::HandleInput(
+		android_app* app,
+		AInputEvent* event)
 {
 	bool handled = false;
 
@@ -277,44 +278,33 @@ static int32_t DEngine::Application::detail::HandleInputEvents(android_app* app,
 		handled = detail::HandleInputKeyEvents_Key(event, source);
 		break;
 	case AINPUT_EVENT_TYPE_MOTION:
-		DEngine_Debug_Log("Motion input");
 		handled = detail::HandleInputEvents_Motion(event, source);
 		break;
+	default:
+		throw std::runtime_error("Error. Unexpected Android input event.");
 	}
 
 	return handled ? 1 : 0;
 }
 
-static void DEngine::Application::detail::Backend_HandleConfigChanged_Deferred()
+static void Application::detail::Backend_HandleConfigChanged_Deferred()
 {
+	auto& appData = *detail::pAppData;
+	auto& backendData = *detail::pBackendData;
+
 	// AConfiguration_getOrientation is broken
 	// So we use JNI.
-	Backend_Orientation newOrientation = Backend_GetUpdatedOrientation();
-	if (newOrientation != Backend_currentOrientation)
+	Orientation newOrientation = Backend_GetUpdatedOrientation();
+	if (newOrientation == Orientation::Invalid)
+		throw std::runtime_error("DEngine - App: Unable to query for updated Android orientation.");
+
+	detail::UpdateOrientation(newOrientation);
+	// If we had a reorientation and the window is non-square,
+	// we need to resize the window.
+	if (appData.orientationEvent && !appData.windows.empty())
 	{
-		// Our orientation changed
-		Backend_currentOrientation = newOrientation;
-		// TODO: Add an orientation event to the front-end. Then fill it out here.
-
-		// We had a reorientation, so we need to update resolution.
-		// Normally we would use `ANativeWindow_getWidth` but
-		// it will only report the *previous* value it was holding.
-		// It's probably bugged...
-		// So we use a workaround.
-		// Since we either went from portrait->landscape or viceversa, we just
-		// mirror the existing dimensions.
-		u32 tempSize[2] = { detail::displaySize[0], detail::displaySize[1] };
-		detail::displaySize[0] = tempSize[1];
-		detail::displaySize[1] = tempSize[0];
-		detail::mainWindowSize[0] = tempSize[1];
-		detail::mainWindowSize[1] = tempSize[0];
-		detail::mainWindowFramebufferSize[0] = tempSize[1];
-		detail::mainWindowFramebufferSize[1] = tempSize[0];
-
-		detail::mainWindowResizeEvent = true;
-
-		std::string a = std::string("Queried dims are: ") + std::to_string(detail::displaySize[0]) + ", " + std::to_string(detail::displaySize[1]);
-		Log(a.c_str());
+		Extent windowExtent = appData.windows.front().windowData.size;
+		detail::UpdateWindowSize(backendData.app->window, { windowExtent.height, windowExtent.width });
 	}
 }
 
@@ -322,157 +312,185 @@ static void DEngine::Application::detail::Backend_HandleConfigChanged_Deferred()
 // This gets ran by the new thread that our Android app starts.
 void android_main(android_app* app)
 {
-	DEngine::Application::detail::Backend_app = app;
+	Application::detail::pBackendData = new Application::detail::BackendData;
+	auto& backendData = *Application::detail::pBackendData;
+	backendData.app = app;
 	dengine_app_detail_main(0, nullptr);
 }
 
-bool DEngine::Application::detail::Backend_Initialize()
+bool Application::detail::Backend_Initialize()
 {
-	Backend_app->activity->vm->AttachCurrentThread(&Backend_jniEnv, nullptr);
+	auto& appData = *detail::pAppData;
+	auto& backendData = *detail::pBackendData;
 
-	jclass clazz = Backend_jniEnv->GetObjectClass(Backend_app->activity->clazz);
-	jmethodID getApplication = Backend_jniEnv->GetMethodID(clazz, "getApplication", "()Landroid/app/Application;");
-	jobject application = Backend_jniEnv->CallObjectMethod(Backend_app->activity->clazz, getApplication);
+	// First we attach this thread to the JVM
+	backendData.app->activity->vm->AttachCurrentThread(&backendData.jniEnv, nullptr);
 
-	jclass applicationClass = Backend_jniEnv->GetObjectClass(application);
-	jmethodID getApplicationContext = Backend_jniEnv->GetMethodID(applicationClass, "getApplicationContext", "()Landroid/content/Context;");
-	jobject context = Backend_jniEnv->CallObjectMethod(application, getApplicationContext);
+	// I have no idea how this code works.
+	// It does some crazy JNI bullshit to get some handles,
+	// which in turn we need to grab Java function-pointer/handles
+	// to our Java-side functions.
+	//
+	// I think this code can be shortened by reusing some values
+	// inside the android_app struct. I don't actually know.
+	jclass clazz = backendData.jniEnv->GetObjectClass(backendData.app->activity->clazz);
+	jmethodID getApplication = backendData.jniEnv->GetMethodID(clazz,
+			"getApplication",
+			"()Landroid/app/Application;");
+	jobject application = backendData.jniEnv->CallObjectMethod(backendData.app->activity->clazz, getApplication);
+	jclass applicationClass = backendData.jniEnv->GetObjectClass(application);
+	jmethodID getApplicationContext = backendData.jniEnv->GetMethodID(
+			applicationClass,
+			"getApplicationContext",
+			"()Landroid/content/Context;");
+	jobject context = backendData.jniEnv->CallObjectMethod(application, getApplicationContext);
+	jclass contextClass = backendData.jniEnv->GetObjectClass(context);
+	jmethodID getClassLoader = backendData.jniEnv->GetMethodID(
+			contextClass,
+			"getClassLoader",
+			"()Ljava/lang/ClassLoader;");
+	jobject classLoader = backendData.jniEnv->CallObjectMethod(context, getClassLoader);
+	jclass classLoaderClass = backendData.jniEnv->GetObjectClass(classLoader);
+	jmethodID loadClass = backendData.jniEnv->GetMethodID(
+			classLoaderClass,
+			"loadClass",
+			"(Ljava/lang/String;)Ljava/lang/Class;");
+	jstring activityName = backendData.jniEnv->NewStringUTF("didgy.dengine.editor.DEngineActivity");
+	backendData.jniActivity = static_cast<jclass>(backendData.jniEnv->CallObjectMethod(
+			classLoader,
+			loadClass,
+			activityName));
+	backendData.jniGetCurrentOrientation = backendData.jniEnv->GetMethodID(
+			backendData.jniActivity,
+			"getCurrentOrientation",
+			"()I");
+	backendData.jniOpenSoftInput = backendData.jniEnv->GetMethodID(
+			backendData.jniActivity,
+			"openSoftInput",
+			"()V");
 
-
-	jclass contextClass = Backend_jniEnv->GetObjectClass(context);
-	jmethodID getClassLoader = Backend_jniEnv->GetMethodID(contextClass, "getClassLoader", "()Ljava/lang/ClassLoader;");
-	jobject classLoader = Backend_jniEnv->CallObjectMethod(context, getClassLoader);
-
-	jclass classLoaderClass = Backend_jniEnv->GetObjectClass(classLoader);
-	jmethodID loadClass = Backend_jniEnv->GetMethodID(classLoaderClass, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
-
-
-	jstring activityName = Backend_jniEnv->NewStringUTF("didgy.dengine.editor.DEngineActivity");
-	Backend_jniActivity = static_cast<jclass>(Backend_jniEnv->CallObjectMethod(classLoader, loadClass, activityName));
-
-	Backend_jniGetCurrentOrientation = Backend_jniEnv->GetMethodID(Backend_jniActivity, "getCurrentOrientation", "()I");
-	Backend_jniOpenSoftInput = Backend_jniEnv->GetMethodID(Backend_jniActivity, "openSoftInput", "()V");
-
-
+	// Figure out current orientation
+	appData.currentOrientation = Backend_GetUpdatedOrientation();
 
 	// Set the callback to process system events
-	detail::Backend_app->onAppCmd = HandleCmd;
-	while (!detail::Backend_androidAppReady || !detail::Backend_androidWindowReady)
+	backendData.app->onAppCmd = HandleCmd;
+	while (!backendData.androidWindowReady)
 	{
 		// Keep polling events until the window is ready
 		int fileDescriptors = 0; // What even is this?
 		android_poll_source* source = nullptr;
-		if (ALooper_pollAll(-1, nullptr, &fileDescriptors, (void**)&source) >= 0)
+		int pollResult = ALooper_pollAll(
+				0,
+				nullptr,
+				&fileDescriptors,
+				(void**)&source);
+		if (pollResult >= 0)
 		{
 			if (source != nullptr)
 			{
-				source->process(detail::Backend_app, source);
+				source->process(backendData.app, source);
 			}
 		}
 	}
 
-	int width = ANativeWindow_getWidth(Backend_app->window);
-	int height = ANativeWindow_getHeight(Backend_app->window);
-	std::string a = std::string("Queried dims are: ") + std::to_string(width) + ", " + std::to_string(height);
-	Log(a.c_str());
-
-	Backend_initialWindowResolution[0] = (u32)width;
-	Backend_initialWindowResolution[1] = (u32)height;
-	detail::displaySize[0] = (u32)width;
-	detail::displaySize[1] = (u32)height;
-	detail::mainWindowPos[0] = 0;
-	detail::mainWindowPos[1] = 0;
-	detail::mainWindowSize[0] = (u32)width;
-	detail::mainWindowSize[1] = (u32)height;
-	detail::mainWindowFramebufferSize[0] = (u32)width;
-	detail::mainWindowFramebufferSize[1] = (u32)height;
-
-	detail::mainWindowIsInFocus = true;
-	detail::mainWindowIsMinimized = false;
-
-	detail::Backend_app->onAppCmd = HandleCmd;
-	detail::Backend_app->onInputEvent = HandleInputEvents;
-
-	Backend_initialOrientation = Backend_GetUpdatedOrientation();
-	Backend_currentOrientation = Backend_initialOrientation;
-
-	uint32_t addWindowFlags = 0;
-	//addWindowFlags |= AWINDOW_FLAG_FORCE_NOT_FULLSCREEN;
-	//addWindowFlags |= AWINDOW_FLAG_FULLSCREEN;
-	uint32_t remWindowFlags = 0;
-	//remWindowFlags |= AWINDOW_FLAG_FULLSCREEN;
-	//remWindowFlags |= AWINDOW_FLAG_LAYOUT_IN_SCREEN;
-
-	ANativeActivity_setWindowFlags(Backend_app->activity, addWindowFlags, remWindowFlags);
+	backendData.app->onInputEvent = HandleInput;
 
 	return true;
 }
 
-void DEngine::Application::detail::Backend_ProcessEvents()
+void Application::detail::Backend_ProcessEvents()
 {
-	if (!detail::Backend_androidWindowReady)
-	{
-		while (!detail::Backend_androidWindowReady)
-		{
-			// Keep polling events until the window is ready
-			int events = 0; // What even is this?
-			android_poll_source* source = nullptr;
-			if (ALooper_pollAll(-1, nullptr, &events, (void**)&source) >= 0)
-			{
-				if (source != nullptr)
-				{
-					source->process(detail::Backend_app, source);
-				}
-			}
+	auto& backendData = *detail::pBackendData;
 
-			if (detail::shouldShutdown)
-				break;
-		}
-	}
-	else
+
+	int fileDescriptors = 0; // What even is this?
+	android_poll_source* source = nullptr;
+	int pollResult = ALooper_pollAll(
+			0,
+			nullptr,
+			&fileDescriptors,
+			(void**)&source);
+	if (pollResult >= 0)
 	{
-		int fileDescriptors = 0; // What even is this?
-		android_poll_source* source = nullptr;
-		if (ALooper_pollAll(0, nullptr, &fileDescriptors, (void**)&source) >= 0)
+		if (source != nullptr)
 		{
-			if (source != nullptr)
-			{
-				source->process(detail::Backend_app, source);
-			}
+			source->process(backendData.app, source);
 		}
 	}
 
-	if (detail::Backend_configChangedThisTick)
+	if (backendData.configChangedThisTick)
 		Backend_HandleConfigChanged_Deferred();
-	detail::Backend_configChangedThisTick = false;
+	backendData.configChangedThisTick = false;
+
+	{
+		// Process our custom events
+		std::lock_guard _{ backendData.customEventQueueLock};
+		for (auto const& event : backendData.customEventQueue)
+		{
+			switch (event.type)
+			{
+			case CustomEvent::Type::CharInput:
+				detail::PushCharInput(event.charInput);
+				break;
+			case CustomEvent::Type::CharRemove:
+				detail::PushCharRemoveEvent();
+				break;
+			default:
+				break;
+			}
+		}
+
+		backendData.customEventQueue.clear();
+	}
 }
 
-bool DEngine::Application::detail::CreateVkSurface(
-	uSize vkInstance,
-	void const* vkAllocationCallbacks, 
-	void* userData, 
-	u64& vkSurface)
+Application::WindowID Application::CreateWindow(
+		char const* title,
+		Extent extents)
+{
+	auto& appData = *detail::pAppData;
+	auto& backendData = *detail::pBackendData;
+
+	detail::AppData::WindowNode newNode{};
+	newNode.id = (App::WindowID)appData.windowIdTracker;
+	appData.windowIdTracker++;
+	newNode.platformHandle = backendData.app->window;
+
+	int width = ANativeWindow_getWidth(backendData.app->window);
+	int height = ANativeWindow_getHeight(backendData.app->window);
+	newNode.windowData.size.width = (u32)width;
+	newNode.windowData.size.height = (u32)height;
+
+	appData.windows.push_back(newNode);
+
+	return newNode.id;
+}
+
+Std::Opt<u64> Application::CreateVkSurface(
+		WindowID window,
+		uSize vkInstance,
+		void const* vkAllocationCallbacks)
 {
 	PFN_vkGetInstanceProcAddr procAddr = nullptr;
 	void* lib = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
 	if (lib == nullptr)
-		return false;
+		return Std::nullOpt;
 	procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(lib, "vkGetInstanceProcAddr"));
 	int closeReturnCode = dlclose(lib);
 	lib = nullptr;
-	if (procAddr == nullptr && closeReturnCode != 0)
-		return false;
+	if (procAddr == nullptr || closeReturnCode != 0)
+		return Std::nullOpt;
 
-	PFN_vkCreateAndroidSurfaceKHR funcPtr = reinterpret_cast<PFN_vkCreateAndroidSurfaceKHR>(
+	auto funcPtr = reinterpret_cast<PFN_vkCreateAndroidSurfaceKHR>(
 			procAddr(
 					*reinterpret_cast<VkInstance*>(&vkInstance),
 					"vkCreateAndroidSurfaceKHR"));
 	if (funcPtr == nullptr)
-		return false;
+		return Std::nullOpt;
 
 	VkAndroidSurfaceCreateInfoKHR createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
-	createInfo.window = detail::Backend_app->window;
+	createInfo.window = detail::pBackendData->app->window;
 
 	VkSurfaceKHR returnVal{};
 	VkResult result = funcPtr(
@@ -481,14 +499,14 @@ bool DEngine::Application::detail::CreateVkSurface(
 			reinterpret_cast<VkAllocationCallbacks const*>(vkAllocationCallbacks),
 			&returnVal);
 	if (result != VK_SUCCESS || returnVal == VkSurfaceKHR())
-		return false;
+		return Std::nullOpt;
 
-	vkSurface = *reinterpret_cast<u64 const*>(&returnVal);
+	u64 temp = *reinterpret_cast<u64*>(&returnVal);
 
-	return true;
+	return { temp };
 }
 
-DEngine::Std::StaticVector<char const*, 5> DEngine::Application::detail::GetRequiredVulkanInstanceExtensions()
+Std::StaticVector<char const*, 5> Application::RequiredVulkanInstanceExtensions()
 {
 	Std::StaticVector<char const*, 5> returnVal{};
 	returnVal.PushBack("VK_KHR_surface");
@@ -496,28 +514,12 @@ DEngine::Std::StaticVector<char const*, 5> DEngine::Application::detail::GetRequ
 	return returnVal;
 }
 
-void DEngine::Application::Log(char const* msg)
+void Application::detail::Backend_Log(char const* msg)
 {
 	__android_log_print(ANDROID_LOG_ERROR, "DEngine: ", "%s", msg);
 }
 
-static DEngine::Application::TouchEventType DEngine::Application::detail::Backend_Android_MotionActionToTouchEventType(int32_t in)
-{
-	int32_t test = in & AMOTION_EVENT_ACTION_MASK;
-	switch (test)
-	{
-		case AMOTION_EVENT_ACTION_DOWN:
-		case AMOTION_EVENT_ACTION_POINTER_DOWN:
-			return TouchEventType::Down;
-		case AMOTION_EVENT_ACTION_MOVE:
-			return TouchEventType::Moved;
-	}
-
-	throw std::runtime_error("Unexpected motion-action");
-	return TouchEventType(-1);
-}
-
-static DEngine::Application::Button DEngine::Application::detail::Backend_AndroidKeyCodeToButton(int32_t in)
+static Application::Button Application::detail::Backend_AndroidKeyCodeToButton(int32_t in)
 {
 	switch (in)
 	{
@@ -551,12 +553,68 @@ static DEngine::Application::Button DEngine::Application::detail::Backend_Androi
 	}
 }
 
-void DEngine::Application::OpenSoftInput()
+void Application::OpenSoftInput()
 {
-	detail::Backend_jniEnv->CallVoidMethod(detail::Backend_app->activity->clazz, detail::Backend_jniOpenSoftInput);
-
-	//detail::Backend_jniEnv->CallIntMethod(detail::Backend_app->activity->clazz, detail::Backend_jniGetCurrentOrientation);
+	const auto& backendData = *detail::pBackendData;
+	backendData.jniEnv->CallVoidMethod(backendData.app->activity->clazz, backendData.jniOpenSoftInput);
 }
+
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_didgy_dengine_editor_DEngineActivity_nativeTestFunc(
+	JNIEnv *env,
+	jobject thiz,
+	int utfValue)
+{
+		using namespace DEngine::Application;
+		using namespace DEngine::Application::detail;
+		auto& backendData = *Application::detail::pBackendData;
+
+		std::lock_guard _(backendData.customEventQueueLock );
+
+		CustomEvent event{};
+		event.type = CustomEvent::Type::CharInput;
+		event.charInput = utfValue;
+
+		backendData.customEventQueue.push_back(event);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_didgy_dengine_editor_DEngineActivity_charRemoveEventNative(
+		JNIEnv *env,
+		jobject thiz)
+{
+	// TODO: implement charRemoveEventNative()
+	using namespace DEngine::Application;
+	using namespace DEngine::Application::detail;
+	auto& backendData = *Application::detail::pBackendData;
+
+	std::lock_guard _(backendData.customEventQueueLock );
+
+	CustomEvent event{};
+	event.type = CustomEvent::Type::CharRemove;
+
+	backendData.customEventQueue.push_back(event);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_didgy_dengine_MainActivity_nativeTestFunc(
+		JNIEnv *env,
+		jobject thiz)
+{
+	// TODO: implement nativeTestFunc()
+
+	int x = 0;
+	if (x > 2)
+	{
+
+	}
+}
+
+
 
 
 //
@@ -687,7 +745,8 @@ bool DEngine::Application::FileInputStream::Open(char const* path)
 
 	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
-	implData.file = AAssetManager_open(detail::Backend_app->activity->assetManager, path, AASSET_MODE_RANDOM);
+	auto const& backendData = *detail::pBackendData;
+	implData.file = AAssetManager_open(backendData.app->activity->assetManager, path, AASSET_MODE_RANDOM);
 	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
 	return implData.file != nullptr;
 }

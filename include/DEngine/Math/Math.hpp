@@ -1,29 +1,12 @@
 #pragma once
 
-/*
-
-TO DO LIST:
-Linear Equation class
-Polynomial2D class
-Interpolation to Polynomial2D
-Inverse matrix
-
-*/
-
-#include "Setup.hpp"
-
-#include "Trait.hpp"
-#include "Common.hpp"
-#include "Constant.hpp"
-#include "Enum.hpp"
-#include "Trigonometric.hpp"
-
-#include "Matrix\Matrix.hpp"
-
-#include "Vector\Vector.hpp"
-
-#include "LinearTransform.hpp"
-
-#include "LinearEquation.hpp"
-
-#include "Quaternion.hpp"
+#include <DEngine/Math/Common.hpp>
+#include <DEngine/Math/Constant.hpp>
+#include <DEngine/Math/Enums.hpp>
+#include <DEngine/Math/LinearTransform2D.hpp>
+#include <DEngine/Math/LinearTransform3D.hpp>
+#include <DEngine/Math/Matrix.hpp>
+#include <DEngine/Math/Trait.hpp>
+#include <DEngine/Math/Trigonometric.hpp>
+#include <DEngine/Math/UnitQuaternion.hpp>
+#include <DEngine/Math/Vector.hpp>

@@ -1,5 +1,5 @@
 #include "Vk.hpp"
-#include "../Assert.hpp"
+#include <DEngine/Gfx/detail/Assert.hpp>
 
 #include "Init.hpp"
 
@@ -8,24 +8,30 @@
 namespace DEngine::Gfx::Vk
 {
 	void RecordGUICmdBuffer(
-		DeviceDispatch const& device,
+		GlobUtils const& globUtils,
+		GuiResourceManager const& guiResourceManager,
+		ViewportManager const& viewportManager,
+		WindowGuiData const& guiData,
 		vk::CommandBuffer cmdBuffer,
-		GUIRenderTarget const& renderTarget,
-		vk::RenderPass renderPass,
-		std::uint_least8_t resourceSetIndex,
-		DebugUtilsDispatch const* debugUtils)
+		NativeWindowUpdate const& windowUpdate,
+		Std::Span<GuiDrawCmd const> guiDrawCmds,
+		u8 inFlightIndex)
 	{
-		
+		DeviceDispatch const& device = globUtils.device;
 
 		// We need to name the command buffer every time we reset it
-		if (debugUtils)
+		if (globUtils.UsingDebugUtils())
 		{
 			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
 			nameInfo.objectHandle = (u64)(VkCommandBuffer)cmdBuffer;
 			nameInfo.objectType = cmdBuffer.objectType;
-			std::string name = std::string("GUI CmdBuffer #") + std::to_string(resourceSetIndex);
+			std::string name;
+			name += "Native Window #";
+			name += std::to_string((u64)windowUpdate.id);
+			name += " - GUI CmdBuffer #";
+			name += std::to_string(inFlightIndex);
 			nameInfo.pObjectName = name.data();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			globUtils.debugUtils.setDebugUtilsObjectNameEXT(device.handle, nameInfo);
 		}
 
 		{
@@ -34,83 +40,172 @@ namespace DEngine::Gfx::Vk
 			device.beginCommandBuffer(cmdBuffer, beginInfo);
 
 			vk::RenderPassBeginInfo rpBegin{};
-			rpBegin.framebuffer = renderTarget.framebuffer;
-			rpBegin.renderPass = renderPass;
-			rpBegin.renderArea.extent = renderTarget.extent;
+			rpBegin.framebuffer = guiData.framebuffer;
+			rpBegin.renderPass = globUtils.guiRenderPass;
+			rpBegin.renderArea.extent = guiData.extent;
 			rpBegin.clearValueCount = 1;
 			vk::ClearColorValue clearVal{};
-			clearVal.setFloat32({ 0.5f, 0.f, 0.f, 1.f });
+			for (uSize i = 0; i < 4; i++)
+				clearVal.float32[i] = windowUpdate.clearColor[i];
 			vk::ClearValue test = clearVal;
 			rpBegin.pClearValues = &test;
 
 			device.cmdBeginRenderPass(cmdBuffer, rpBegin, vk::SubpassContents::eInline);
+
+			vk::Viewport viewport{};
+			viewport.width = (float)guiData.extent.width;
+			viewport.height = (float)guiData.extent.height;
+			device.cmdSetViewport(cmdBuffer, 0, viewport);
+
+			for (GuiDrawCmd const& drawCmd : guiDrawCmds)
 			{
-				//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), VkCommandBuffer(cmdBuffer));
+				switch (drawCmd.type)
+				{
+				case GuiDrawCmd::Type::FilledMesh:
+				{
+					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResourceManager.filledMeshPipeline);
+					GuiResourceManager::FilledMeshPushConstant pushConstant{};
+					pushConstant.color = drawCmd.filledMesh.color;
+					pushConstant.orientation = guiData.rotation;
+					pushConstant.rectExtent = drawCmd.rectExtent;
+					pushConstant.rectOffset = drawCmd.rectPosition;
+					device.cmdPushConstants(
+						cmdBuffer,
+						guiResourceManager.filledMeshPipelineLayout,
+						vk::ShaderStageFlagBits::eVertex,
+						0,
+						32,
+						&pushConstant);
+					device.cmdPushConstants(
+						cmdBuffer,
+						guiResourceManager.filledMeshPipelineLayout,
+						vk::ShaderStageFlagBits::eFragment,
+						32,
+						sizeof(pushConstant.color),
+						&pushConstant.color);
+					device.cmdBindVertexBuffers(
+						cmdBuffer,
+						0,
+						guiResourceManager.vertexBuffer,
+						(guiResourceManager.vertexCapacity * inFlightIndex + drawCmd.filledMesh.mesh.vertexOffset) * sizeof(GuiVertex));
+					device.cmdBindIndexBuffer(
+						cmdBuffer,
+						guiResourceManager.indexBuffer,
+						(guiResourceManager.indexCapacity * inFlightIndex + drawCmd.filledMesh.mesh.indexOffset) * sizeof(u32),
+						vk::IndexType::eUint32);
+					device.cmdDrawIndexed(
+						cmdBuffer,
+						drawCmd.filledMesh.mesh.indexCount,
+						1,
+						0,
+						0,
+						0);
+				}
+					break;
+
+				case GuiDrawCmd::Type::TextGlyph:
+				{
+					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResourceManager.font_pipeline);
+					GuiResourceManager::FontPushConstant pushConstant{};
+					pushConstant.color = drawCmd.textGlyph.color;
+					pushConstant.orientation = guiData.rotation;
+					pushConstant.rectExtent = drawCmd.rectExtent;
+					pushConstant.rectOffset = drawCmd.rectPosition;
+					device.cmdPushConstants(
+						cmdBuffer,
+						guiResourceManager.font_pipelineLayout,
+						vk::ShaderStageFlagBits::eVertex,
+						0,
+						32,
+						&pushConstant);
+					device.cmdPushConstants(
+						cmdBuffer,
+						guiResourceManager.font_pipelineLayout,
+						vk::ShaderStageFlagBits::eFragment,
+						32,
+						sizeof(pushConstant.color),
+						&pushConstant.color);
+
+					auto glyphDataIt = guiResourceManager.glyphDatas.find((u32)drawCmd.textGlyph.utfValue);
+					if (glyphDataIt == guiResourceManager.glyphDatas.end())
+						throw std::runtime_error("DEngine - Vulkan: Unable to find glyph.");
+					auto const& glyphData = glyphDataIt->second;
+					device.cmdBindDescriptorSets(
+						cmdBuffer,
+						vk::PipelineBindPoint::eGraphics,
+						guiResourceManager.font_pipelineLayout,
+						0,
+						glyphData.descrSet,
+						nullptr);
+					device.cmdDraw(
+						cmdBuffer,
+						6,
+						1,
+						0,
+						0);
+				}
+					break;
+
+				case GuiDrawCmd::Type::Viewport:
+				{
+					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResourceManager.viewportPipeline);
+					GuiResourceManager::ViewportPushConstant pushConstant{};
+					pushConstant.orientation = guiData.rotation;
+					pushConstant.rectExtent = drawCmd.rectExtent;
+					pushConstant.rectOffset = drawCmd.rectPosition;
+					device.cmdPushConstants(
+						cmdBuffer,
+						guiResourceManager.viewportPipelineLayout,
+						vk::ShaderStageFlagBits::eVertex,
+						0,
+						sizeof(pushConstant),
+						&pushConstant);
+					auto const& viewportData = *std::find_if(
+						viewportManager.viewportData.begin(),
+						viewportManager.viewportData.end(),
+						[&drawCmd](decltype(viewportManager.viewportData)::value_type const& val) -> bool {
+							return drawCmd.viewport.id == val.id; });
+					device.cmdBindDescriptorSets(
+						cmdBuffer,
+						vk::PipelineBindPoint::eGraphics,
+						guiResourceManager.viewportPipelineLayout,
+						0,
+						viewportData.viewport.descrSet,
+						nullptr);
+					device.cmdDraw(
+						cmdBuffer,
+						6,
+						1,
+						0,
+						0);
+				}
+					break;
+				}
 			}
+
 			device.cmdEndRenderPass(cmdBuffer);
 
 			device.endCommandBuffer(cmdBuffer);
 		}
 	}
 
-	void PresentShit(APIData& apiData)
-	{
-		vk::Result vkResult{};
-
-		vk::ResultValue<std::uint32_t> imageIndexOpt = apiData.globUtils.device.acquireNextImageKHR(
-			apiData.swapchain.handle,
-			std::numeric_limits<u64>::max(),
-			apiData.swapchain.imageAvailableSemaphore,
-			vk::Fence());
-		// Submit the copy-to-swapchainData operation and present image.
-		if (imageIndexOpt.result == vk::Result::eSuccess)
-		{
-			u32 const nextSwapchainImgIndex = imageIndexOpt.value;
-			// We don't need semaphore (I think) between this cmd buffer and the rendering one, it's handled by barriers
-			vk::SubmitInfo copyImageSubmitInfo{};
-			copyImageSubmitInfo.commandBufferCount = 1;
-			copyImageSubmitInfo.pCommandBuffers = &apiData.swapchain.cmdBuffers[nextSwapchainImgIndex];
-			vk::PipelineStageFlags const imgCopyDoneStage = vk::PipelineStageFlagBits::eTransfer;
-			copyImageSubmitInfo.waitSemaphoreCount = 1;
-			copyImageSubmitInfo.pWaitSemaphores = &apiData.swapchain.imageAvailableSemaphore;
-			copyImageSubmitInfo.pWaitDstStageMask = &imgCopyDoneStage;
-			apiData.globUtils.queues.graphics.submit(copyImageSubmitInfo, vk::Fence());
-
-			vk::PresentInfoKHR presentInfo{};
-			presentInfo.swapchainCount = 1;
-			presentInfo.pSwapchains = &apiData.swapchain.handle;
-			presentInfo.pImageIndices = &nextSwapchainImgIndex;
-			vkResult = apiData.globUtils.queues.graphics.presentKHR(presentInfo);
-			if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eSuboptimalKHR)
-			{
-				apiData.logger->log("DEngine, Vulkan: Encountered bad present result.");
-			}
-		}
-		else if (imageIndexOpt.result == vk::Result::eSuboptimalKHR)
-		{
-			apiData.logger->log("DEngine, Vulkan: Encountered suboptimal image-acquire result.");
-		}
-		else
-		{
-			apiData.logger->log("DEngine, Vulkan: Encountered bad image-acquire result.");
-		}
-	}
-
 	// Assumes the resource set is available
 	void RecordGraphicsCmdBuffer(
 		GlobUtils const& globUtils, 
+		ObjectDataManager const& objectDataManager,
+		TextureManager const& textureManager,
 		ViewportData const& viewportInfo,
-		ViewportUpdateData const& viewportUpdate,
+		ViewportUpdate const& viewportUpdate,
 		DrawParams const& drawParams,
-		u8 resourceSetIndex,
+		u8 inFlightIndex,
 		APIData& apiData)
 	{
 		std::memcpy(
-			(char*)viewportInfo.mappedMem + viewportInfo.camElementSize * resourceSetIndex,
+			(char*)viewportInfo.camDataMappedMem + viewportInfo.camElementSize * inFlightIndex,
 			&viewportUpdate.transform,
 			viewportInfo.camElementSize);
 
-		vk::CommandBuffer cmdBuffer = viewportInfo.cmdBuffers[resourceSetIndex];
+		vk::CommandBuffer cmdBuffer = viewportInfo.cmdBuffers[inFlightIndex];
 
 		// We need to rename the command buffer every time we record it
 		if (globUtils.UsingDebugUtils())
@@ -118,10 +213,12 @@ namespace DEngine::Gfx::Vk
 			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
 			nameInfo.objectHandle = (u64)(VkCommandBuffer)cmdBuffer;
 			nameInfo.objectType = cmdBuffer.objectType;
-			std::string name = std::string("Graphics viewport #") + std::to_string(viewportInfo.id) + 
+			/*
+			std::string name = std::string("Graphics viewport #") + std::to_string((u64)viewportInfo.id) + 
 				std::string(" - CmdBuffer #") + std::to_string(resourceSetIndex);
 			nameInfo.pObjectName = name.data();
 			globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+			*/
 		}
 
 		vk::CommandBufferBeginInfo beginInfo{};
@@ -149,13 +246,13 @@ namespace DEngine::Gfx::Vk
 		for (uSize drawIndex = 0; drawIndex < drawParams.textureIDs.size(); drawIndex += 1)
 		{
 			Std::Array<vk::DescriptorSet, 3> descrSets = {
-				viewportInfo.camDataDescrSets[resourceSetIndex],
-				apiData.objectDataManager.descrSet,
-				apiData.textureManager.database.at(drawParams.textureIDs[drawIndex]).descrSet };
+				viewportInfo.camDataDescrSets[inFlightIndex],
+				objectDataManager.descrSet,
+				textureManager.database.at(drawParams.textureIDs[drawIndex]).descrSet };
 
 			uSize objectDataBufferOffset = 0;
-			objectDataBufferOffset += apiData.objectDataManager.capacity * apiData.objectDataManager.elementSize * resourceSetIndex;
-			objectDataBufferOffset += apiData.objectDataManager.elementSize * drawIndex;
+			objectDataBufferOffset += objectDataManager.capacity * objectDataManager.elementSize * inFlightIndex;
+			objectDataBufferOffset += objectDataManager.elementSize * drawIndex;
 
 			globUtils.device.cmdBindDescriptorSets(
 				cmdBuffer,
@@ -170,7 +267,7 @@ namespace DEngine::Gfx::Vk
 		globUtils.device.cmdEndRenderPass(cmdBuffer);
 
 		// We need a barrier for the render-target if we are going to sample from it in the gui pass
-		if (globUtils.useEditorPipeline)
+		if (globUtils.editorMode)
 		{
 			vk::ImageMemoryBarrier imgBarrier{};
 			imgBarrier.image = viewportInfo.renderTarget.img;
@@ -196,134 +293,25 @@ namespace DEngine::Gfx::Vk
 
 		globUtils.device.endCommandBuffer(cmdBuffer);
 	}
-
-	void HandleSwapchainResizeEvent(
-		u32 width,
-		u32 height,
-		IWsi& wsiInterface,
-		GlobUtils const& globUtils,
-		GUIData& guiData,
-		SurfaceInfo& surface,
-		SwapchainData& swapchain)
-	{
-		globUtils.device.WaitIdle();
-
-		surface = Init::BuildSurfaceInfo(
-			globUtils.instance,
-			globUtils.physDevice.handle,
-			surface.handle,
-			globUtils.logger);
-
-		SwapchainSettings spSettings = Init::BuildSwapchainSettings(
-			globUtils.instance,
-			globUtils.physDevice.handle,
-			surface,
-			width,
-			height,
-			globUtils.logger);
-		Init::RecreateSwapchain(globUtils, spSettings, swapchain);
-
-		globUtils.device.Destroy(guiData.renderTarget.framebuffer);
-		globUtils.device.Destroy(guiData.renderTarget.imgView);
-		vmaDestroyImage(globUtils.vma, (VkImage)guiData.renderTarget.img, guiData.renderTarget.vmaAllocation);
-		guiData.renderTarget = Init::CreateGUIRenderTarget(
-			globUtils.device,
-			globUtils.vma,
-			globUtils.deletionQueue,
-			globUtils.queues,
-			swapchain.extents,
-			swapchain.surfaceFormat.format,
-			globUtils.guiRenderPass,
-			globUtils.DebugUtilsPtr());
-
-		Init::RecordSwapchainCmdBuffers(globUtils.device, swapchain, guiData.renderTarget.img);
-	}
-
-	void HandleSurfaceRecreationEvent(
-		u32 width,
-		u32 height,
-		GlobUtils const& globUtils,
-		SurfaceInfo& surfaceInfo,
-		IWsi& wsiInterface,
-		SwapchainData& swapchainData,
-		GUIData& guiData)
-	{
-		globUtils.device.WaitIdle();		
-
-		globUtils.device.Destroy(swapchainData.handle);
-		swapchainData.handle = vk::SwapchainKHR();
-		globUtils.instance.Destroy(surfaceInfo.handle);
-		surfaceInfo.handle = vk::SurfaceKHR();
-		
-		// TODO: I don't think I like this code
-		// Create the VkSurface using the callback
-		vk::SurfaceKHR surface{};
-		vk::Result surfaceCreateResult = (vk::Result)wsiInterface.CreateVkSurface(
-			(u64)(VkInstance)globUtils.instance.handle, 
-			nullptr, 
-			*reinterpret_cast<u64*>(&surface));
-		if (surfaceCreateResult != vk::Result::eSuccess)
-			throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
-
-		surfaceInfo = Init::BuildSurfaceInfo(
-			globUtils.instance,
-			globUtils.physDevice.handle,
-			surface,
-			globUtils.logger);
-		
-		swapchainData.handle = vk::SwapchainKHR();
-
-		HandleSwapchainResizeEvent(
-			width,
-			height,
-			wsiInterface,
-			globUtils,
-			guiData,
-			surfaceInfo,
-			swapchainData);
-	}
 }
 
-#include <unordered_map>
-#include <set>
-
-#include "Texas/Texas.hpp"
-#include "Texas/VkTools.hpp"
-#include "DEngine/Application.hpp"
-
-void DEngine::Gfx::Vk::APIData::Draw(Data& gfxData, DrawParams const& drawParams)
+void DEngine::Gfx::Vk::APIData::Draw(Context& gfxData, DrawParams const& drawParams)
 {
 	vk::Result vkResult{};
 	APIData& apiData = *this;
 	GlobUtils const& globUtils = apiData.globUtils;
 	DevDispatch const& device = globUtils.device;
 
-	// Handle surface recreation
-	if (drawParams.restoreEvent)
-		HandleSurfaceRecreationEvent(
-			drawParams.swapchainWidth,
-			drawParams.swapchainHeight,
-			globUtils,
-			apiData.surface,
-			*apiData.wsiInterface,
-			apiData.swapchain,
-			apiData.guiData);
-	// Handle swapchain resize
-	else if (drawParams.swapchainWidth != apiData.swapchain.extents.width || drawParams.swapchainHeight != apiData.swapchain.extents.height)
-		HandleSwapchainResizeEvent(
-			drawParams.swapchainWidth,
-			drawParams.swapchainHeight,
-			*apiData.wsiInterface,
-			globUtils, 
-			apiData.guiData,
-			apiData.surface, 
-			apiData.swapchain);
-
+	NativeWindowManager::Update(
+		apiData.nativeWindowManager,
+		globUtils,
+		{ drawParams.nativeWindowUpdates.data(), drawParams.nativeWindowUpdates.size() });
 	// Deletes and creates viewports when needed.
 	ViewportManager::HandleEvents(
 		apiData.viewportManager,
 		globUtils,
-		{ drawParams.viewportUpdates.data(), drawParams.viewportUpdates.size() });
+		{ drawParams.viewportUpdates.data(), drawParams.viewportUpdates.size() },
+		guiResourceManager);
 	// Resizes the buffer if the new size is too large.
 	ObjectDataManager::HandleResizeEvent(
 		apiData.objectDataManager,
@@ -331,18 +319,20 @@ void DEngine::Gfx::Vk::APIData::Draw(Data& gfxData, DrawParams const& drawParams
 		drawParams.transforms.size());
 	TextureManager::Update(
 		apiData.textureManager,
-		apiData.globUtils,
+		globUtils,
 		drawParams,
 		*apiData.test_textureAssetInterface);
 
 
+	u8 currentInFlightIndex = apiData.currInFlightIndex;
 
-	u8 currentInFlightIndex = apiData.currentInFlightFrame;
 
-	vkResult = apiData.globUtils.device.waitForFences(
+
+	// Wait for fences, so we know the resources are available.
+	vkResult = globUtils.device.waitForFences(
 		apiData.mainFences[currentInFlightIndex], 
 		true, 
-		static_cast<u64>(-1));
+		5000000000); // Added a 5s timeout for testing purposes
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("Vulkan: Failed to wait for cmd buffer fence.");
 	device.resetFences(apiData.mainFences[currentInFlightIndex]);
@@ -353,25 +343,29 @@ void DEngine::Gfx::Vk::APIData::Draw(Data& gfxData, DrawParams const& drawParams
 		apiData.objectDataManager,
 		{ drawParams.transforms.data(), drawParams.transforms.size() },
 		currentInFlightIndex);
+	// Update GUI vertices and indices
+	GuiResourceManager::Update(
+		apiData.guiResourceManager,
+		globUtils,
+		{ drawParams.guiVerts.data(), drawParams.guiVerts.size() },
+		{ drawParams.guiIndices.data(), drawParams.guiIndices.size() },
+		currentInFlightIndex);
 
-
-	std::vector<vk::CommandBuffer> cmdBuffersToSubmit{};
+	std::vector<vk::CommandBuffer> graphicsCmdBuffers{};
 	for (auto const& viewportUpdate : drawParams.viewportUpdates)
 	{
-		uSize viewportIndex = static_cast<uSize>(-1);
-		for (uSize i = 0; i < apiData.viewportManager.viewportData.size(); i += 1)
-		{
-			if (viewportUpdate.id == apiData.viewportManager.viewportData[i].a)
-			{
-				viewportIndex = i;
-				break;
-			}
-		}
-		ViewportData const& viewport = apiData.viewportManager.viewportData[viewportIndex].b;
+		auto viewportDataIt = std::find_if(
+			apiData.viewportManager.viewportData.begin(),
+			apiData.viewportManager.viewportData.end(),
+			[&viewportUpdate](decltype(apiData.viewportManager.viewportData)::value_type const& val) -> bool {
+				return viewportUpdate.id == val.id; });
+		ViewportData const& viewport = viewportDataIt->viewport;
 		vk::CommandBuffer cmdBuffer = viewport.cmdBuffers[currentInFlightIndex];
-		cmdBuffersToSubmit.push_back(cmdBuffer);
+		graphicsCmdBuffers.push_back(cmdBuffer);
 		RecordGraphicsCmdBuffer(
-			apiData.globUtils,
+			globUtils,
+			apiData.objectDataManager,
+			apiData.textureManager,
 			viewport,
 			viewportUpdate,
 			drawParams,
@@ -379,32 +373,104 @@ void DEngine::Gfx::Vk::APIData::Draw(Data& gfxData, DrawParams const& drawParams
 			apiData);
 	}
 	
+	// Record all the GUI shit.
+	std::vector<NativeWindowData const*> windowsToPresent;
+	for (auto& windowUpdate : drawParams.nativeWindowUpdates)
+	{
+		auto& manager = apiData.nativeWindowManager;
+		// First find the window in the database
+		auto windowDataIt = std::find_if(
+			manager.nativeWindows.begin(),
+			manager.nativeWindows.end(),
+			[&windowUpdate](NativeWindowManager::Node const& node) -> bool { return node.id == windowUpdate.id; });
+		auto const& nativeWindow = *windowDataIt;
+		windowsToPresent.push_back(&nativeWindow.windowData);
+
+		vk::CommandBuffer cmdBuffer = nativeWindow.gui.cmdBuffers[currentInFlightIndex];
+		graphicsCmdBuffers.push_back(cmdBuffer);
+
+		Std::Span<GuiDrawCmd const> drawCmds;
+		if (!drawParams.guiDrawCmds.empty())
+			drawCmds = { &drawParams.guiDrawCmds[windowUpdate.drawCmdOffset], windowUpdate.drawCmdCount };
+
+		RecordGUICmdBuffer(
+			globUtils,
+			apiData.guiResourceManager,
+			apiData.viewportManager,
+			nativeWindow.gui,
+			cmdBuffer,
+			windowUpdate,
+			drawCmds,
+			currentInFlightIndex);
+	}
+
+	// Submit the graphics cmdBuffers
+	if (!graphicsCmdBuffers.empty())
+	{
+		vk::SubmitInfo submitInfo{};
+		submitInfo.commandBufferCount = (u32)graphicsCmdBuffers.size();
+		submitInfo.pCommandBuffers = graphicsCmdBuffers.data();
+		globUtils.queues.graphics.submit(submitInfo, vk::Fence());
+	}
+
+	// Setup swapchain copy cmd buffers.
+	std::vector<u32> presentIndices;
+	std::vector<vk::SwapchainKHR> swapchains;
+	std::vector<vk::CommandBuffer> swapchainCopyCmdBuffers;
+	std::vector<vk::Semaphore> swapchainImageReadySemaphores;
+	std::vector<vk::PipelineStageFlags> swapchainCopyWaitStages;
+	for (uSize i = 0; i < windowsToPresent.size(); i += 1)
+	{
+		vk::ResultValue<u32> acquireResult = device.acquireNextImageKHR(
+			windowsToPresent[i]->swapchain,
+			std::numeric_limits<u64>::max(),
+			windowsToPresent[i]->swapchainImageReady,
+			vk::Fence());
+		if (acquireResult.result != vk::Result::eSuccess)
+			throw std::runtime_error("DEngine - Vulkan: Acquiring next swapchain image did not return success result.");
+		u32 index = acquireResult.value;
 
 
-	// First we re-record the GUI cmd buffer and submit it.
-	RecordGUICmdBuffer(
-		apiData.globUtils.device,
-		apiData.guiData.cmdBuffers[currentInFlightIndex],
-		apiData.guiData.renderTarget,
-		globUtils.guiRenderPass,
-		currentInFlightIndex,
-		apiData.globUtils.DebugUtilsPtr());
-	cmdBuffersToSubmit.push_back(apiData.guiData.cmdBuffers[currentInFlightIndex]);
+		presentIndices.push_back(index);
+		swapchains.push_back(windowsToPresent[i]->swapchain);
+		swapchainCopyCmdBuffers.push_back(windowsToPresent[i]->copyCmdBuffers[index]);
+		swapchainImageReadySemaphores.push_back(windowsToPresent[i]->swapchainImageReady);
+		swapchainCopyWaitStages.push_back(vk::PipelineStageFlagBits::eTransfer);
+	}
 
-	// Submit the command cmdBuffers
 	vk::SubmitInfo submitInfo{};
-	submitInfo.commandBufferCount = (u32)cmdBuffersToSubmit.size();
-	submitInfo.pCommandBuffers = cmdBuffersToSubmit.data();
-	apiData.globUtils.queues.graphics.submit(submitInfo, apiData.mainFences[currentInFlightIndex]);
+	submitInfo.commandBufferCount = (u32)swapchainCopyCmdBuffers.size();
+	submitInfo.pCommandBuffers = swapchainCopyCmdBuffers.data();
+	submitInfo.pWaitDstStageMask = swapchainCopyWaitStages.data();
+	submitInfo.pWaitSemaphores = swapchainImageReadySemaphores.data();
+	submitInfo.waitSemaphoreCount = (u32)swapchainImageReadySemaphores.size();
 
+	globUtils.queues.graphics.submit(submitInfo, apiData.mainFences[currentInFlightIndex]);
 
-	// We query the next available swapchain image, so we know which image we need to copy to
-	PresentShit(apiData);
+	if (!presentIndices.empty())
+	{
+		vk::PresentInfoKHR presentInfo{};
+		presentInfo.pImageIndices = presentIndices.data();
+		presentInfo.pSwapchains = swapchains.data();
+		presentInfo.swapchainCount = (u32)swapchains.size();
+		vkResult = globUtils.queues.graphics.presentKHR(presentInfo);
+		if (vkResult != vk::Result::eSuccess)
+			throw std::runtime_error("DEngine - Vulkan: Presentation submission did not return success result.");
+	}
 
+	DeletionQueue::ExecuteCurrentTick(
+		apiData.globUtils.deletionQueue, 
+		globUtils,
+		currentInFlightIndex);
+	apiData.currInFlightIndex = (apiData.currInFlightIndex + 1) % apiData.globUtils.inFlightCount;
+}
 
+DEngine::Gfx::NativeWindowID DEngine::Gfx::Vk::APIData::NewNativeWindow(WsiInterface& wsiConnection)
+{
+	APIData& apiData = *this;
 
-	DeletionQueue::ExecuteCurrentTick(apiData.globUtils.deletionQueue);
-	apiData.currentInFlightFrame = (apiData.currentInFlightFrame + 1) % apiData.globUtils.resourceSetCount;
-	apiData.globUtils.SetCurrentResourceSetIndex(apiData.currentInFlightFrame);
+	return NativeWindowManager::PushCreateWindowJob(
+		apiData.nativeWindowManager,
+		wsiConnection);
 }
 

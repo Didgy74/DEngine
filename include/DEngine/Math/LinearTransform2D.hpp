@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Setup.hpp"
-#include "Matrix/Matrix.hpp"
-#include "Vector/Vector.hpp"
-#include "UnitQuaternion.hpp"
-#include "Trigonometric.hpp"
-#include "Common.hpp"
+#include <DEngine/Math/Setup.hpp>
+#include <DEngine/Math/Matrix.hpp>
+#include <DEngine/Math/Vector.hpp>
+#include <DEngine/Math/UnitQuaternion.hpp>
+#include <DEngine/Math/Trigonometric.hpp>
+#include <DEngine/Math/Common.hpp>
 
 namespace Math
 {

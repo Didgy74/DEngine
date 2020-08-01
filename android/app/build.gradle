@@ -12,7 +12,7 @@ android {
         externalNativeBuild {
             cmake {
                 //arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=c++_static'
-                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+                abiFilters 'armeabi-v7a', 'arm64-v8a'//, 'x86', 'x86_64'
             }
         }
     }
@@ -32,7 +32,12 @@ android {
     sourceSets {
         main {
             jniLibs.srcDirs "src/lib"
+            assets.srcDirs "../../data"
         }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_7
+        targetCompatibility JavaVersion.VERSION_1_7
     }
 }
 

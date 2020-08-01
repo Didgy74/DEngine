@@ -1,7 +1,7 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/Span.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Containers/Span.hpp>
 
 namespace DEngine::Std
 {
@@ -9,63 +9,65 @@ namespace DEngine::Std
 	class Array
 	{
 	public:
+		using ValueType = T;
+
 		// Please don't use this field directly
-		T m_unused[length] = {};
+		T data[length];
 
 		
 
-		[[nodiscard]] inline constexpr uSize Size() const noexcept;
+		[[nodiscard]] constexpr uSize Size() const noexcept;
 
-		[[nodiscard]] inline constexpr T* Data() noexcept;
-		[[nodiscard]] inline constexpr T const* Data() const noexcept;
+		[[nodiscard]] constexpr T* Data() noexcept;
+		[[nodiscard]] constexpr T const* Data() const noexcept;
 
-		[[nodiscard]] inline constexpr Span<T> ToSpan() noexcept;
-		[[nodiscard]] inline constexpr Span<T const> ToSpan() const noexcept;
+		[[nodiscard]] constexpr Span<T> ToSpan() noexcept;
+		[[nodiscard]] constexpr Span<T const> ToSpan() const noexcept;
 
 		[[nodiscard]] T& At(uSize i);
 		[[nodiscard]] T const& At(uSize i) const;
-		[[nodiscard]] inline constexpr T& operator[](uSize i) noexcept;
-		[[nodiscard]] inline constexpr T const& operator[](uSize i) const noexcept;
+		[[nodiscard]] T& operator[](uSize i) noexcept;
+		[[nodiscard]] T const& operator[](uSize i) const noexcept;
 
-		inline constexpr void Fill(const T& value) noexcept;
+		constexpr void Fill(T const& value) noexcept;
 
-		[[nodiscard]] inline constexpr T* begin() noexcept;
+		[[nodiscard]] constexpr T* begin() noexcept;
 
-		[[nodiscard]] inline constexpr T const* begin() const noexcept;
+		[[nodiscard]] constexpr T const* begin() const noexcept;
 
-		[[nodiscard]] inline constexpr T* end() noexcept;
+		[[nodiscard]] constexpr T* end() noexcept;
 
-		[[nodiscard]] inline constexpr T const* end() const noexcept;
+		[[nodiscard]] constexpr T const* end() const noexcept;
 	};
 
 	template<typename T, uSize length>
-	inline constexpr uSize Array<T, length>::Size() const noexcept
+	constexpr uSize Array<T, length>::Size() const noexcept
 	{
 		return length;
 	}
 
 	template<typename T, uSize length>
-	inline constexpr T* Array<T, length>::Data() noexcept
+	constexpr T* Array<T, length>::Data() noexcept
 	{
-		return m_unused;
+		return data;
 	}
 
 	template<typename T, uSize length>
-	inline constexpr T const* Array<T, length>::Data() const noexcept
+	constexpr T const* Array<T, length>::Data() const noexcept
 	{
-		return m_unused;
+		return data;
 	}
 
 	template<typename T, uSize length>
-	inline constexpr Span<T> Array<T, length>::ToSpan() noexcept
+	constexpr Span<T> Array<T, length>::ToSpan() noexcept
 	{
-		return Span<T>(m_unused, length);
+		return { data, length };
 	}
 
 	template<typename T, uSize length>
-	inline constexpr Span<T const> Array<T, length>::ToSpan() const noexcept
+	constexpr Span<T const> Array<T, length>::ToSpan() const noexcept
 	{
-		return Span<T const>(m_unused, length);
+		return { data, length };
 	}
 
 	template<typename T, uSize length>
@@ -73,7 +75,7 @@ namespace DEngine::Std
 	{
 		if (i >= length)
 			throw std::out_of_range("Attempted to .At() an Array with an index out of bounds.");
-		return m_unused[i];
+		return data[i];
 	}
 
 	template<typename T, uSize length>
@@ -81,49 +83,49 @@ namespace DEngine::Std
 	{
 		if (i >= length)
 			throw std::out_of_range("Attempted to .At() an Array with an index out of bounds.");
-		return m_unused[i];
+		return data[i];
 	}
 
 	template<typename T, uSize length>
-	inline constexpr T& Array<T, length>::operator[](uSize i) noexcept
+	T& Array<T, length>::operator[](uSize i) noexcept
 	{
 		return At(i);
 	}
 
 	template<typename T, uSize length>
-	inline constexpr const T& Array<T, length>::operator[](uSize i) const noexcept
+	T const& Array<T, length>::operator[](uSize i) const noexcept
 	{
 		return At(i);
 	}
 
 	template<typename T, uSize length>
-	inline constexpr void Array<T, length>::Fill(const T& value) noexcept
+	constexpr void Array<T, length>::Fill(T const& value) noexcept
 	{
 		for (auto& item : (*this))
 			item = value;
 	}
 
 	template<typename T, uSize length>
-	inline constexpr T* Array<T, length>::begin() noexcept
+	constexpr T* Array<T, length>::begin() noexcept
 	{
-		return m_unused;
+		return data;
 	}
 
 	template<typename T, uSize length>
-	inline constexpr const T* Array<T, length>::begin() const noexcept
+	constexpr T const* Array<T, length>::begin() const noexcept
 	{
-		return m_unused;
+		return data;
 	}
 
 	template<typename T, uSize length>
-	inline constexpr T* Array<T, length>::end() noexcept
+	constexpr T* Array<T, length>::end() noexcept
 	{
-		return m_unused + length;
+		return data + length;
 	}
 
 	template<typename T, uSize length>
-	inline constexpr const T* Array<T, length>::end() const noexcept
+	constexpr T const* Array<T, length>::end() const noexcept
 	{
-		return m_unused + length;
+		return data + length;
 	}
 }

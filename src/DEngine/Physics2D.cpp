@@ -31,9 +31,8 @@ void DEngine::Physics::Update(Scene& scene, f32 deltaTime)
 		Rigidbody2D& rb = scene.rigidbodies[i].b;
 
 		// First check if this entity has a position
-		auto leftPosIndex = scene.transforms.FindIf([entity](Std::Pair<Entity, Transform> const& val) -> bool {
-			return val.a == entity;
-			});
+		auto leftPosIndex = scene.transforms.FindIf(
+			[entity](Std::Pair<Entity, Transform> const& val) -> bool { return val.a == entity; });
 		if (!leftPosIndex.HasValue())
 			continue;
 		auto& transform = scene.transforms[leftPosIndex.Value()].b;

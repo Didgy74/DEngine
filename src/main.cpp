@@ -1,26 +1,24 @@
 
-#include "DEngine/Scene.hpp"
+#include <DEngine/Scene.hpp>
 #include "DEngine/Application/detail_Application.hpp"
-#include "DEngine/Time.hpp"
-#include "DEngine/Editor.hpp"
+#include <DEngine/Time.hpp>
+#include "DEngine/Editor/Editor.hpp"
 
 #include "DEngine/Gfx/Gfx.hpp"
-#include "DEngine/FixedWidthTypes.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
 #include "DEngine/Utility.hpp"
-#include "DEngine/Math/Vector.hpp"
-#include "DEngine/Math/UnitQuaternion.hpp"
-#include "DEngine/Math/LinearTransform3D.hpp"
+#include <DEngine/Math/Vector.hpp>
+#include <DEngine/Math/UnitQuaternion.hpp>
+#include <DEngine/Math/LinearTransform3D.hpp>
 
 #include <iostream>
 #include <vector>
 #include <string>
 
-extern DEngine::Editor::EditorData* DEngine_Debug_globEditorData;
-
-class GfxLogger : public DEngine::Gfx::ILog
+class GfxLogger : public DEngine::Gfx::LogInterface
 {
 public:
-	virtual void log(const char* msg) override 
+	virtual void log(DEngine::Gfx::LogInterface::Level level, const char* msg) override 
 	{
 		DEngine::App::Log(msg);
 	}
@@ -28,28 +26,6 @@ public:
 	virtual ~GfxLogger() override
 	{
 
-	}
-};
-
-class GfxWsiInterfacer : public DEngine::Gfx::IWsi
-{
-public:
-	virtual ~GfxWsiInterfacer() 
-	{
-	};
-
-	// Return type is VkResult
-	//
-	// Argument #1: VkInstance - The Vulkan instance handle
-	// Argument #2: VkAllocationCallbacks const* - Allocation callbacks for surface creation.
-	// Argument #3: VkSurfaceKHR* - The output surface handle
-	virtual DEngine::i32 CreateVkSurface(DEngine::uSize vkInstance, void const* allocCallbacks, DEngine::u64& outSurface) override
-	{
-		 bool result = DEngine::App::detail::CreateVkSurface(vkInstance, allocCallbacks, nullptr, outSurface);
-		 if (result)
-			 return 0; // 0 is VkResult_Success
-		 else
-			 return -1;
 	}
 };
 
@@ -67,8 +43,7 @@ class GfxTexAssetInterfacer : public DEngine::Gfx::TextureAssetInterface
 void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 {
 	auto rbIndex = scene.rigidbodies.FindIf(
-		[entity](Std::Pair<Entity, Physics::Rigidbody2D> const& val) -> bool {
-			return entity == val.a; });
+		[entity](Std::Pair<Entity, Physics::Rigidbody2D> const& val) -> bool { return entity == val.a; });
 	if (!rbIndex.HasValue())
 		return;
 
@@ -95,6 +70,36 @@ void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 	}
 }
 
+namespace DEngine::detail
+{
+	struct GfxWsiConnection : public Gfx::WsiInterface
+	{
+		App::WindowID appWindowID{};
+
+		// Return type is VkResult
+		//
+		// Argument #1: VkInstance - The Vulkan instance handle
+		// Argument #2: VkAllocationCallbacks const* - Allocation callbacks for surface creation.
+		// Argument #3: VkSurfaceKHR* - The output surface handle
+		virtual i32 CreateVkSurface(uSize vkInstance, void const* allocCallbacks, u64& outSurface) override
+		{
+			auto resultOpt = App::CreateVkSurface(appWindowID, vkInstance, nullptr);
+			if (resultOpt.HasValue())
+			{
+				outSurface = resultOpt.Value();
+				return 0; // 0 is VK_RESULT_SUCCESS
+			}
+			else
+				return -1;
+		}
+	};
+
+	void SubmitRendering(
+		Gfx::Context& gfxData,
+		Editor::Context& editorData,
+		Scene& scene);
+}
+
 int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
@@ -102,107 +107,91 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	Time::Initialize();
 	App::detail::Initialize();
 
-	Editor::EditorData editorData = Editor::Initialize();
-	DEngine_Debug_globEditorData = &editorData;
+	App::WindowID mainWindow = App::CreateWindow(
+		"Main window",
+		{ 500, 500 });
 
-
+	auto gfxWsiConnection = new detail::GfxWsiConnection;
+	gfxWsiConnection->appWindowID = mainWindow;
 
 	// Initialize the renderer
-	auto requiredInstanceExtensions = App::detail::GetRequiredVulkanInstanceExtensions();
+	auto requiredInstanceExtensions = App::RequiredVulkanInstanceExtensions();
 	GfxLogger gfxLogger{};
-	GfxWsiInterfacer gfxWsiInterface{};
 	GfxTexAssetInterfacer gfxTexAssetInterfacer{};
 	Gfx::InitInfo rendererInitInfo{};
-	rendererInitInfo.iWsi = &gfxWsiInterface;
+	rendererInitInfo.initialWindowConnection = gfxWsiConnection;
 	rendererInitInfo.texAssetInterface = &gfxTexAssetInterfacer;
-	rendererInitInfo.optional_iLog = &gfxLogger;
+	rendererInitInfo.optional_logger = &gfxLogger;
 	rendererInitInfo.requiredVkInstanceExtensions = requiredInstanceExtensions.ToSpan();
-	Std::Opt<Gfx::Data> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
+	Std::Opt<Gfx::Context> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
 	if (!rendererDataOpt.HasValue())
 	{
 		std::cout << "Could not initialize renderer." << std::endl;
 		std::abort();
 	}
-	Gfx::Data rendererData = Std::Move(rendererDataOpt.Value());
-
+	Gfx::Context gfxCtx = Std::Move(rendererDataOpt.Value());
 
 	Scene myScene;
 
+	Editor::Context editorCtx = Editor::Context::Create(
+		mainWindow,
+		&myScene,
+		&gfxCtx);
+
+	
 
 	while (true)
 	{
 		Time::TickStart();
 		App::detail::ProcessEvents();
-		if (App::detail::ShouldShutdown())
-			break;
-		App::detail::ImGui_NewFrame();
 
-		Editor::RenderImGuiStuff(editorData, myScene, rendererData);
+		editorCtx.ProcessEvents();
 
 		Physics::Update(myScene, Time::Delta());
 
 		for (auto item : myScene.moves)
 			item.b.Update(item.a, myScene, Time::Delta());
 
-		if (!App::MainWindowMinimized())
-		{
-			Gfx::DrawParams params{};
-
-			/*
-			for (auto const& [vpID, viewport] : editorData.viewports)
-			{
-				if (viewport.visible && !viewport.paused)
-				{
-					Gfx::ViewportUpdateData viewportData{};
-					viewportData.id = viewport.gfxViewportRef.ViewportID();
-					viewportData.width = viewport.renderWidth;
-					viewportData.height = viewport.renderHeight;
-					uSize camIndex = static_cast<uSize>(-1);
-					for (uSize i = 0; i < editorData.cameras.size(); i += 1)
-					{
-						if (viewport.cameraID == editorData.cameras[i].a)
-						{
-							camIndex = i;
-							break;
-						}
-					}
-					Editor::Camera const& cam = camIndex == static_cast<uSize>(-1) ? viewport.camera : editorData.cameras[camIndex].b;
-					Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(cam.rotation);
-					camMat = Math::LinTran3D::Translate(cam.position) * camMat;
-					camMat = camMat.GetInverse().Value();
-					f32 aspectRatio = (f32)viewport.width / viewport.height;
-					camMat = Math::LinTran3D::Perspective_RH_ZO(cam.fov, aspectRatio, cam.zNear, cam.zFar) * camMat;
-					viewportData.transform = camMat;
-					params.viewportUpdates.push_back(viewportData);
-				}
-			}
-			*/
-
-			for (auto item : myScene.textureIDs)
-			{
-				auto& entity = item.a;
-
-				// First check if this entity has a position
-				auto posIndex = myScene.transforms.FindIf([&entity](Std::Pair<Entity, Transform> const& val) -> bool {
-					return val.a == entity;
-					});
-				if (!posIndex.HasValue())
-					continue;
-				auto& transform = myScene.transforms[posIndex.Value()].b;
-
-				params.textureIDs.push_back(item.b);
-				params.transforms.push_back(Math::LinTran3D::Translate(transform.position));
-			}
-
-
-			params.swapchainWidth = App::detail::mainWindowSize[0];
-			params.swapchainHeight = App::detail::mainWindowSize[1];
-			if (App::detail::MainWindowRestoreEvent())
-				params.restoreEvent = true;
-
-			rendererData.Draw(params);
-		}
+		
+		detail::SubmitRendering(
+			gfxCtx, 
+			editorCtx, 
+			myScene);
+			
 	}
 
 	return 0;
+}
+
+void DEngine::detail::SubmitRendering(
+	Gfx::Context& gfxData,
+	Editor::Context& editorCtx,
+	Scene& scene)
+{
+	Gfx::DrawParams params{};
+
+	for (auto item : scene.textureIDs)
+	{
+		auto& entity = item.a;
+
+		// First check if this entity has a position
+		auto posIndex = scene.transforms.FindIf([&entity](decltype(scene.transforms)::ValueType const& val) -> bool {
+			return val.a == entity; });
+		if (!posIndex.HasValue())
+			continue;
+		auto& transform = scene.transforms[posIndex.Value()].b;
+
+		params.textureIDs.push_back(item.b);
+		params.transforms.push_back(Math::LinTran3D::Translate(transform.position));
+	}
+
+	auto editorDrawData = editorCtx.GetDrawInfo();
+	params.guiVerts = editorDrawData.vertices;
+	params.guiIndices = editorDrawData.indices;
+	params.guiDrawCmds = editorDrawData.drawCmds;
+	params.nativeWindowUpdates = editorDrawData.windowUpdates;
+	params.viewportUpdates = editorDrawData.viewportUpdates;
+	
+
+	gfxData.Draw(params);
 }

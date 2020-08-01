@@ -1,10 +1,10 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
 
-#include "DEngine/Math/detail/MatrixBase.hpp"
-#include "DEngine/Math/Trait.hpp"
-#include "DEngine/Containers/Optional.hpp"
+#include <DEngine/Math/detail/MatrixBase.hpp>
+#include <DEngine/Math/Trait.hpp>
+#include <DEngine/Containers/Optional.hpp>
 
 namespace DEngine::Math
 {
