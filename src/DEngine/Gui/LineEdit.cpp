@@ -9,7 +9,7 @@ void LineEdit::Render(
 	Rect widgetRect,
 	DrawInfo& drawInfo) const
 {
-	Gfx::GuiDrawCmd cmd;
+	Gfx::GuiDrawCmd cmd{};
 	cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
 	cmd.filledMesh.color = { 0.25f, 0.25f, 0.25f, 1.f };
 	cmd.filledMesh.mesh = drawInfo.GetQuadMesh();

@@ -25,7 +25,7 @@ namespace DEngine::Math
 		[[nodiscard]] constexpr UnitQuaternion<T> GetInverse() const;
 
 		[[nodiscard]] static constexpr UnitQuaternion<T> FromEulerAngles(T x, T y, T z);
-		[[nodiscard]] static constexpr UnitQuaternion<T> FromVector(Vector<3, T> const& axis, T radians);
+		[[nodiscard]] static constexpr UnitQuaternion<T> FromVector(Vector<3, T> const& axis, f32 radians);
 
 	private:
 		constexpr UnitQuaternion(T s, T x, T y, T z);
@@ -77,7 +77,7 @@ namespace DEngine::Math
 	}
 
 	template<typename T>
-	constexpr UnitQuaternion<T> UnitQuaternion<T>::operator*(const UnitQuaternion<T>& right) const
+	constexpr UnitQuaternion<T> UnitQuaternion<T>::operator*(UnitQuaternion<T> const& right) const
 	{
 		return UnitQuaternion<T>
 		{
@@ -113,7 +113,7 @@ namespace DEngine::Math
 	}
 
 	template<typename T>
-	constexpr UnitQuaternion<T> UnitQuaternion<T>::FromVector(Vector<3, T> const& axis, T radians)
+	constexpr UnitQuaternion<T> UnitQuaternion<T>::FromVector(Vector<3, T> const& axis, f32 radians)
 	{
 		UnitQuaternion<T> returnVal{};
 

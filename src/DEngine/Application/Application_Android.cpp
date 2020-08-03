@@ -614,7 +614,10 @@ Java_didgy_dengine_MainActivity_nativeTestFunc(
 	}
 }
 
+void Application::LockCursor(bool state)
+{
 
+}
 
 
 //

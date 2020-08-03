@@ -90,7 +90,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Context& gfxData, InitInfo const& initI
 
 	// Make the VkInstance
 	PFN_vkGetInstanceProcAddr instanceProcAddr = Vk::loadInstanceProcAddressPFN();
-	BaseDispatch baseDispatch;
+	BaseDispatch baseDispatch{};
 	BaseDispatch::BuildInPlace(baseDispatch, instanceProcAddr);
 	Init::CreateVkInstance_Return createVkInstanceResult = Init::CreateVkInstance(
 		initInfo.requiredVkInstanceExtensions, 

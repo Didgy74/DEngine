@@ -36,6 +36,7 @@ namespace DEngine::Editor
 		bool isCurrentlyClicked = false;
 
 		int joystickPixelRadius = 75;
+		int joystickPixelDeadZone = 10;
 		struct JoyStick
 		{
 			Std::Opt<u8> touchID{};
@@ -48,8 +49,8 @@ namespace DEngine::Editor
 
 		struct Camera
 		{
-			Math::Vec3 position{ 0.f, 0.f, 5.f };
-			Math::UnitQuat rotation{};
+			Math::Vec3 position{ 0.f, 0.f, 2.f };
+			Math::UnitQuat rotation = Math::UnitQuat::FromEulerAngles(0, 180.f, 0.f);
 			f32 verticalFov = 60.f;
 		};
 		Camera cam{};
@@ -76,6 +77,8 @@ namespace DEngine::Editor
 			Math::Vec2Int cursorPos,
 			Gui::CursorClickEvent event) override
 		{
+			UpdateCircleStartPosition(widgetRect);
+
 			if (event.button == Gui::CursorButton::Right && event.clicked && !isCurrentlyClicked)
 			{
 				bool isInside = widgetRect.PointIsInside(cursorPos);
@@ -127,20 +130,8 @@ namespace DEngine::Editor
 			if (isCurrentlyClicked)
 			{
 				f32 sensitivity = 0.25f;
-				i32 amountX = event.positionDelta.x;
-				// Apply left and right rotation
-				cam.rotation = Math::UnitQuat::FromVector(Math::Vec3::Up(), -sensitivity * amountX * Math::degToRad) * cam.rotation;
-				i32 amountY = event.positionDelta.y;
-				// Limit rotation up and down
-				Math::Vec3 forward = Math::LinTran3D::ForwardVector(cam.rotation);
-				float dot = Math::Vec3::Dot(forward, Math::Vec3::Up());
-				if (dot <= -0.9f)
-					amountY = Math::Min(0, amountY);
-				else if (dot >= 0.9f)
-					amountY = Math::Max(0, amountY);
-				// Apply up and down rotation
-				Math::Vec3 right = Math::LinTran3D::RightVector(cam.rotation);
-				cam.rotation = Math::UnitQuat::FromVector(right, -sensitivity * amountY * Math::degToRad) * cam.rotation;
+				Math::Vec2 amount = { (f32)event.positionDelta.x, (f32)-event.positionDelta.y };
+				ApplyCameraRotation(amount * sensitivity * Math::degToRad);
 			}
 
 			for (auto& joystick : joysticks)
@@ -158,7 +149,91 @@ namespace DEngine::Editor
 					}
 				}
 			}
+		}
 
+		virtual void TouchEvent(
+			Gui::Rect widgetRect,
+			Gui::TouchEvent touch) override
+		{
+			UpdateCircleStartPosition(widgetRect);
+			if (touch.id == 0 || touch.id == 1)
+			{
+				if (touch.type == Gui::TouchEventType::Down)
+				{
+					for (auto& joystick : joysticks)
+					{
+						if (joystick.touchID.HasValue())
+							continue;
+						Math::Vec2Int fingerPos = { (i32)touch.position.x, (i32)touch.position.y };
+						Math::Vec2Int relativeVector = fingerPos - joystick.startPosition;
+						if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelRadius))
+						{
+							// Cursor is inside circle
+							joystick.touchID = touch.id;
+							joystick.currentPosition = fingerPos;
+						}
+					}
+				}
+				else if (touch.type == Gui::TouchEventType::Moved)
+				{
+					for (auto& joystick : joysticks)
+					{
+						if (joystick.touchID.HasValue() && joystick.touchID.Value() == touch.id)
+						{
+							joystick.currentPosition = { (i32)Math::Round(touch.position.x), (i32)Math::Round(touch.position.y) };
+							Math::Vec2Int relativeVector = joystick.currentPosition - joystick.startPosition;
+							Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
+							if (relativeVectorFloat.MagnitudeSqrd() >= Math::Sqrd(joystickPixelRadius))
+							{
+								relativeVectorFloat = relativeVectorFloat.Normalized() * joystickPixelRadius;
+								joystick.currentPosition.x = joystick.startPosition.x + Math::Round(relativeVectorFloat.x);
+								joystick.currentPosition.y = joystick.startPosition.y + Math::Round(relativeVectorFloat.y);
+							}
+						}
+					}
+				}
+				else if (touch.type == Gui::TouchEventType::Up)
+				{
+					for (auto& joystick : joysticks)
+					{
+						if (joystick.touchID.HasValue() && joystick.touchID.Value() == touch.id)
+						{
+							joystick.touchID = Std::nullOpt;
+							joystick.currentPosition = joystick.startPosition;
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		void ApplyCameraRotation(Math::Vec2 input)
+		{
+			cam.rotation = Math::UnitQuat::FromVector(Math::Vec3::Up(), -input.x) * cam.rotation;
+			// Limit rotation up and down
+			Math::Vec3 forward = Math::LinTran3D::ForwardVector(cam.rotation);
+			f32 dot = Math::Vec3::Dot(forward, Math::Vec3::Up());
+			constexpr f32 upDownDotProductLimit = 0.9f;
+			if (dot <= -upDownDotProductLimit && input.y < 0 || dot >= upDownDotProductLimit && input.y > 0)
+				input.y = 0;
+			cam.rotation = Math::UnitQuat::FromVector(Math::LinTran3D::RightVector(cam.rotation), -input.y) * cam.rotation;
+		}
+
+		void ApplyCameraMovement(Math::Vec3 move, f32 speed)
+		{
+			if (move.MagnitudeSqrd() > 0.f)
+			{
+				if (move.MagnitudeSqrd() > 1.f)
+					move.Normalize();
+				Math::Vec3 moveVector{};
+				moveVector += Math::LinTran3D::ForwardVector(cam.rotation) * move.z;
+				moveVector += Math::LinTran3D::RightVector(cam.rotation) * -move.x;
+				moveVector += Math::Vec3::Up() * move.y;
+				
+				if (moveVector.MagnitudeSqrd() > 1.f)
+					moveVector.Normalize();
+				cam.position += moveVector * speed;
+			}
 		}
 
 		virtual void Tick(
@@ -167,41 +242,51 @@ namespace DEngine::Editor
 		{
 			currentExtent = widgetRect.extent;
 			UpdateCircleStartPosition(widgetRect);
-			
 
 			// Handle camera movement
 			if (isCurrentlyClicked)
 			{
 				f32 moveSpeed = 5.f;
+				Math::Vec3 moveVector{};
 				if (App::ButtonValue(App::Button::W))
-					cam.position -= moveSpeed * Math::LinTran3D::ForwardVector(cam.rotation) * Time::Delta();
+					moveVector.z += 1;
 				if (App::ButtonValue(App::Button::S))
-					cam.position += moveSpeed * Math::LinTran3D::ForwardVector(cam.rotation) * Time::Delta();
+					moveVector.z -= 1;
 				if (App::ButtonValue(App::Button::D))
-					cam.position += moveSpeed * Math::LinTran3D::RightVector(cam.rotation) * Time::Delta();
+					moveVector.x += 1;
 				if (App::ButtonValue(App::Button::A))
-					cam.position -= moveSpeed * Math::LinTran3D::RightVector(cam.rotation) * Time::Delta();
+					moveVector.x -= 1;
 				if (App::ButtonValue(App::Button::Space))
-					cam.position.y += moveSpeed * Time::Delta();
+					moveVector.y += 1;
 				if (App::ButtonValue(App::Button::LeftCtrl))
-					cam.position.y -= moveSpeed * Time::Delta();
+					moveVector.y -= 1;
+				ApplyCameraMovement(moveVector, moveSpeed * Time::Delta());
 			}
 
-			for (auto& joystick : joysticks)
+			for (uSize i = 0; i < 2; i++)
 			{
-				if (joystick.isClicked)
+				auto& joystick = joysticks[i];
+				if (joystick.isClicked || joystick.touchID.HasValue())
 				{
 					// Find vector between circle start position, and current position
 					// Then apply the logic
 					Math::Vec2Int relativeVector = joystick.currentPosition - joystick.startPosition;
+					if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelDeadZone))
+						continue;
 					Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
 					relativeVectorFloat.x /= joystickPixelRadius;
 					relativeVectorFloat.y /= joystickPixelRadius;
 
-					f32 moveSpeed = 5.f;
-					relativeVectorFloat *= Time::Delta() * moveSpeed;
-					cam.position.x += relativeVectorFloat.x;
-					cam.position.z += relativeVectorFloat.y;
+					if (i == 0)
+					{
+						f32 moveSpeed = 5.f;
+						ApplyCameraMovement({ relativeVectorFloat.x, 0.f, -relativeVectorFloat.y }, moveSpeed * Time::Delta());
+					}
+					else
+					{
+						f32 sensitivity = 1.5f;
+						ApplyCameraRotation(Math::Vec2{ relativeVectorFloat.x, -relativeVectorFloat.y } * Time::Delta());
+					}
 				}
 				else
 					joystick.currentPosition = joystick.startPosition;
@@ -236,7 +321,7 @@ namespace DEngine::Editor
 				for (uSize i = 0; i < circleVertexCount; i++)
 				{
 					Gfx::GuiVertex newVertex{};
-					f32 currentRadians = 2 * Math::pi / circleVertexCount * (i-1);
+					f32 currentRadians = 2 * Math::pi / circleVertexCount * i;
 					newVertex.position.x += Math::Sin(currentRadians);
 					newVertex.position.y += Math::Cos(currentRadians);
 					drawInfo.vertices.push_back(newVertex);
@@ -255,9 +340,22 @@ namespace DEngine::Editor
 			// Draw both joysticks using said circle mesh
 			for (auto const& joystick : joysticks)
 			{
+				{
+					Gfx::GuiDrawCmd cmd{};
+					cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
+					cmd.filledMesh.color = { 0.f, 0.f, 0.f, 0.25f };
+					cmd.filledMesh.mesh = circleMeshSpan;
+					cmd.rectPosition.x = (f32)joystick.startPosition.x / framebufferExtent.width;
+					cmd.rectPosition.y = (f32)joystick.startPosition.y / framebufferExtent.height;
+					cmd.rectExtent.x = (f32)joystickPixelRadius * 2 / framebufferExtent.width;
+					cmd.rectExtent.y = (f32)joystickPixelRadius * 2 / framebufferExtent.height;
+					drawInfo.drawCmds.push_back(cmd);
+				}
+
+
 				Gfx::GuiDrawCmd cmd{};
 				cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-				cmd.filledMesh.color = { 1.f, 1.f, 1.f, 1.f };
+				cmd.filledMesh.color = { 1.f, 1.f, 1.f, 0.75f };
 				cmd.filledMesh.mesh = circleMeshSpan;
 				cmd.rectPosition.x = (f32)joystick.currentPosition.x / framebufferExtent.width;
 				cmd.rectPosition.y = (f32)joystick.currentPosition.y / framebufferExtent.height;
@@ -811,11 +909,29 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 		update.width = implData.viewportWidget->currentExtent.width;
 		update.height = implData.viewportWidget->currentExtent.height;
 
-		Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(implData.viewportWidget->cam.rotation);
+		Math::Mat4 test = Math::Mat4::Identity();
+		test.At(0, 0) = -1;
+		//test.At(1, 1) = -1;
+		test.At(2, 2) = -1;
+		
+		Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(implData.viewportWidget->cam.rotation) * test;
 		Math::LinTran3D::SetTranslation(camMat, implData.viewportWidget->cam.position);
+
+		Math::Mat4 test2 = Math::Mat4::Identity();
+		//test2.At(0, 0) = -1;
+		//test2.At(1, 1) = -1;
+		//test2.At(2, 2) = -1;
+		camMat = test2 * camMat;
+
+
 		camMat = camMat.GetInverse().Value();
 		f32 aspectRatio = (f32)update.width / update.height;
+
 		camMat = Math::LinTran3D::Perspective_RH_ZO(implData.viewportWidget->cam.verticalFov * Math::degToRad, aspectRatio, 0.1f, 100.f) * camMat;
+
+
+		//camMat = test * camMat;
+
 		update.transform = camMat;
 
 		returnVal.viewportUpdates.push_back(update);

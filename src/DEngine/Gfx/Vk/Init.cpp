@@ -112,7 +112,7 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 				break;
 			}
 		}
-		if (requiredExtensionIsAvailable == false)
+		if (!requiredExtensionIsAvailable)
 			throw std::runtime_error("Required Vulkan instance extension is not available.");
 	}
 
