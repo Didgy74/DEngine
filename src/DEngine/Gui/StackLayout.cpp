@@ -1,58 +1,340 @@
-#include "DEngine/Gui/StackLayout.hpp"
+#include <DEngine/Gui/StackLayout.hpp>
+#include <DEngine/Gui/impl/Assert.hpp>
 
-#include "DEngine/Math/Common.hpp"
+#include <DEngine/Math/Common.hpp>
+
+namespace DEngine::Gui
+{
+	template<bool tick, typename T, typename Callable>
+	void IterateOverChildren(
+		Context const& ctx,
+		T& layout,
+		Rect widgetRect,
+		Callable const& callable)
+	{
+		static_assert(Std::Trait::IsSame<decltype(layout), StackLayout&> || Std::Trait::IsSame<decltype(layout), StackLayout const&>);
+		
+		u32 childCount = layout.children.size();;
+		if (childCount == 0)
+			return;
+
+		// The internal extent of the parent widget with padding and spacing applied.
+		Extent const innerExtent = {
+			widgetRect.extent.width - layout.padding * 2,
+			widgetRect.extent.height - layout.padding * 2 };
+		
+		// Go over each cilds size hint
+		// Find the biggest size in non-direction
+		// Find the sum of sizes in direction
+		Extent sumChildPreferredSize{};
+		
+		for (uSize i = 0; i < childCount; i += 1)
+		{
+			auto& child = layout.children[i];
+			auto& childSizeHint = child.lastKnownSizeHint;
+			if constexpr (tick)
+			{
+				if (child.type == StackLayout::LayoutItem::Type::Layout)
+					childSizeHint = child.layout->SizeHint_Tick(ctx);
+				else
+					childSizeHint = child.widget->SizeHint_Tick(ctx);
+			}
+			else
+			{
+				if (child.type == StackLayout::LayoutItem::Type::Layout)
+					childSizeHint = child.layout->SizeHint(ctx);
+				else
+					childSizeHint = child.widget->SizeHint(ctx);
+			}
+
+
+			if (!childSizeHint.expand)
+			{
+				u32& directionLength = layout.direction == StackLayout::Direction::Horizontal ? 
+					sumChildPreferredSize.width : 
+					sumChildPreferredSize.height;
+				u32 const& childDirectionLength = layout.direction == StackLayout::Direction::Horizontal ? 
+					childSizeHint.preferred.width : 
+					childSizeHint.preferred.height;
+				directionLength += childDirectionLength;
+
+				u32& nonDirectionLength = layout.direction == StackLayout::Direction::Vertical ? sumChildPreferredSize.width : sumChildPreferredSize.height;
+				u32 const& childNonDirectionLength = layout.direction == StackLayout::Direction::Vertical ? 
+					childSizeHint.preferred.width : 
+					childSizeHint.preferred.height;
+				nonDirectionLength = Math::Max(nonDirectionLength, childNonDirectionLength);
+			}
+		}
+
+		i32 remainingDirectionSpace = 0;
+		if (layout.direction == StackLayout::Direction::Horizontal)
+		{
+			remainingDirectionSpace = innerExtent.width - sumChildPreferredSize.width;
+		}
+		else
+		{
+			remainingDirectionSpace = innerExtent.height - sumChildPreferredSize.height;
+		}
+
+		Rect childRect{};
+		childRect.position.x += widgetRect.position.x + layout.padding;
+		childRect.position.y += widgetRect.position.y + layout.padding;
+		if (layout.direction == StackLayout::Direction::Horizontal)
+			childRect.extent.height = innerExtent.height;
+		else
+			childRect.extent.width = innerExtent.width;
+		for (uSize i = 0; i < childCount; i++)
+		{
+			SizeHint childSizeHint = layout.children[i].lastKnownSizeHint;
+			if (childSizeHint.expand)
+			{
+				if (layout.direction == StackLayout::Direction::Horizontal)
+					childRect.extent.width = remainingDirectionSpace;
+				else
+					childRect.extent.height = remainingDirectionSpace;
+			}
+			else
+			{
+				if (layout.direction == StackLayout::Direction::Horizontal)
+					childRect.extent.width = childSizeHint.preferred.width;
+				else
+					childRect.extent.height = childSizeHint.preferred.height;
+			}
+
+			auto& child = layout.children[i];
+			if (child.widget || child.layout)
+				callable(child, childRect);
+
+			i32& childPosDirection = layout.direction == StackLayout::Direction::Horizontal ? childRect.position.x : childRect.position.y;
+			u32 const& childExtentDirection = layout.direction == StackLayout::Direction::Horizontal ? childRect.extent.width : childRect.extent.height;
+			childPosDirection += childExtentDirection + layout.spacing;
+		}
+	}
+
+}
 
 using namespace DEngine;
 using namespace DEngine::Gui;
 
-// Callable needs to have signature void(Stack::LayoutItem const& child, Rect childRect)
-template<typename T, typename Callable>
-static void Test(
-	T& layout,
-	Rect widgetRect,
-	Callable callable)
+StackLayout::~StackLayout()
 {
-	// The internal extent of the parent widget with padding and spacing applied.
-	Extent innerExtent = {
-		widgetRect.extent.width - layout.padding * 2,
-		widgetRect.extent.height - layout.padding * 2 };
-	u32 const innerExtentDirection = (layout.direction == StackLayout::Direction::Horizontal ?
-		innerExtent.width : 
-		innerExtent.height) - (layout.spacing * ((u32)layout.children.size() - 1));
+}
 
-	Rect childRect = widgetRect;
-	childRect.position.x += layout.padding;
-	childRect.position.y += layout.padding;
-	i32& childPosDirection = layout.direction == StackLayout::Direction::Horizontal ? childRect.position.x : childRect.position.y;
-
-	// The last widget might not perfectly align with the total widget size,
-// so we need the last one to use all the remaining space.
-// This means the final widget will be at most 1 pixel too wide/narrow.
-	u32 remainingSpace = innerExtentDirection;
-	for (uSize i = 0; i < layout.children.size(); i++)
+u32 StackLayout::ChildCount() const
+{
+	uSize count = children.size();
+	for (auto const& child : children)
 	{
-		auto& child = layout.children[i];
-		childRect.extent = innerExtent;
-		u32& childExtentDirection = layout.direction == StackLayout::Direction::Horizontal ? childRect.extent.width : childRect.extent.height;
-		// We check that we are not at the final item.
-		if (i < layout.children.size() - 1)
-			childExtentDirection = (u32)Math::Round(innerExtentDirection * child.relativeSize);
-		else
-			childExtentDirection = remainingSpace;
-		remainingSpace -= childExtentDirection;
-
-		callable(child, childRect);
-
-		childPosDirection += childExtentDirection + layout.spacing;
+		if (!child.layout && !child.widget)
+			count -= 1;
 	}
+	return (u32)count;
+}
+
+StackLayout::Test StackLayout::At(u32 index)
+{
+	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
+	auto& child = children[index];
+	
+	DENGINE_IMPL_GUI_ASSERT(child.layout || child.widget);
+
+	Test returnVal{};
+	if (child.type == LayoutItem::Type::Layout)
+	{
+		returnVal.type = Test::Type::Layout;
+		returnVal.layout = child.layout.Get();
+	}
+	else
+	{
+		returnVal.type = Test::Type::Widget;
+		returnVal.widget = child.widget.Get();
+	}
+
+	return returnVal;
+}
+
+StackLayout::Test2 StackLayout::At(u32 index) const
+{
+	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
+
+	auto& child = children[index];
+
+	DENGINE_IMPL_GUI_ASSERT(child.layout || child.widget);
+
+	Test2 returnVal{};
+	if (child.type == LayoutItem::Type::Layout)
+	{
+		returnVal.type = Test2::Type::Layout;
+		returnVal.layout = child.layout.Get();
+	}
+	else
+	{
+		returnVal.type = Test2::Type::Widget;
+		returnVal.widget = child.widget.Get();
+	}
+	return returnVal;
+}
+
+void StackLayout::AddWidget2(Std::Box<Widget>&& in)
+{
+	DENGINE_IMPL_GUI_ASSERT(in);
+
+	InsertRemoveJob newJob{};
+	newJob.type = InsertRemoveJob::Type::Insert;
+	newJob.insert.index = InsertRemoveJob::Insert::pushBackIndex;
+	newJob.insert.item.type = LayoutItem::Type::Widget;
+	newJob.insert.item.widget = static_cast<Std::Box<Widget>&&>(in);
+
+	addWidgetJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+}
+
+void StackLayout::AddLayout2(Std::Box<Layout>&& in)
+{
+	DENGINE_IMPL_GUI_ASSERT(in);
+
+	InsertRemoveJob newJob{};
+	newJob.type = InsertRemoveJob::Type::Insert;
+	newJob.insert.index = InsertRemoveJob::Insert::pushBackIndex;
+	newJob.insert.item.type = LayoutItem::Type::Layout;
+	newJob.insert.item.layout = static_cast<Std::Box<Layout>&&>(in);
+	addWidgetJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+}
+
+void StackLayout::InsertLayout(u32 index, Std::Box<Layout>&& in)
+{
+	DENGINE_IMPL_GUI_ASSERT(index < children.size());
+	DENGINE_IMPL_GUI_ASSERT(in);
+
+	InsertRemoveJob newJob{};
+	newJob.type = InsertRemoveJob::Type::Insert;
+	newJob.insert.index = index;
+	newJob.insert.item.type = LayoutItem::Type::Layout;
+	newJob.insert.item.layout = static_cast<Std::Box<Layout>&&>(in);
+	addWidgetJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+}
+
+void StackLayout::RemoveItem(u32 index)
+{
+	DENGINE_IMPL_GUI_ASSERT(index < children.size());
+
+	children[index].layout = {};
+	children[index].widget = {};
+
+	InsertRemoveJob newJob{};
+	newJob.type = InsertRemoveJob::Type::Remove;
+	newJob.remove.index = index;
+	addWidgetJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+}
+
+void StackLayout::ClearChildren()
+{
+	children.clear();
+}
+
+SizeHint StackLayout::SizeHint(
+	Context const& ctx) const
+{
+	Gui::SizeHint returnVal{};
+	u32 childCount = 0;
+	for (auto const& child : children)
+	{
+		if (!child.widget && !child.layout)
+			continue;
+
+		childCount += 1;
+
+		Gui::SizeHint childSizeHint{};
+		if (child.type == LayoutItem::Type::Layout)
+			childSizeHint = child.layout->SizeHint(ctx);
+		else
+			childSizeHint = child.widget->SizeHint(ctx);
+
+		u32& directionLength = direction == Direction::Horizontal ? returnVal.preferred.width : returnVal.preferred.height;
+		u32& childDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.width : childSizeHint.preferred.height;
+		directionLength += childDirectionLength;
+
+		u32& nonDirectionLength = direction == Direction::Horizontal ? returnVal.preferred.height : returnVal.preferred.width;
+		u32& childNonDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.height : childSizeHint.preferred.width;
+		nonDirectionLength = Math::Max(nonDirectionLength, childNonDirectionLength);
+	}
+	// Add spacing
+	if (childCount > 1)
+	{
+		if (direction == Direction::Horizontal)
+		{
+			returnVal.preferred.width += spacing * (childCount - 1);
+		}
+		else
+		{
+			returnVal.preferred.height += spacing * (childCount - 1);
+		}
+	}
+
+	if (test_expand)
+		returnVal.expand = true;
+
+	return returnVal;
+}
+
+SizeHint StackLayout::SizeHint_Tick(Context const& ctx)
+{
+	ResolveWidgetAddRemoves();
+	Gui::SizeHint returnVal{};
+	u32 childCount = 0;
+	for (auto& child : children)
+	{
+		if (!child.widget && !child.layout)
+			continue;
+
+		childCount += 1;
+
+		Gui::SizeHint childSizeHint{};
+		if (child.type == LayoutItem::Type::Layout)
+			childSizeHint = child.layout->SizeHint_Tick(ctx);
+		else
+			childSizeHint = child.widget->SizeHint_Tick(ctx);
+
+		u32& directionLength = direction == Direction::Horizontal ? returnVal.preferred.width : returnVal.preferred.height;
+		u32 const& childDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.width : childSizeHint.preferred.height;
+		directionLength += childDirectionLength;
+
+		u32& nonDirectionLength = direction == Direction::Horizontal ? returnVal.preferred.height : returnVal.preferred.width;
+		u32 const& childNonDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.height : childSizeHint.preferred.width;
+		nonDirectionLength = Math::Max(nonDirectionLength, childNonDirectionLength);
+	}
+	// Add spacing
+	if (childCount > 1)
+	{
+		if (direction == Direction::Horizontal)
+		{
+			returnVal.preferred.width += spacing * (childCount - 1);
+		}
+		else
+		{
+			returnVal.preferred.height += spacing * (childCount - 1);
+		}
+	}
+
+	if (test_expand)
+		returnVal.expand = true;
+
+	return returnVal;
 }
 
 void StackLayout::Render(
-	Context& ctx,
+	Context const& ctx,
 	Extent framebufferExtent,
 	Rect widgetRect,
+	Rect visibleRect,
 	DrawInfo& drawInfo) const
 {
+	ParentType::Render(
+		ctx,
+		framebufferExtent,
+		widgetRect,
+		visibleRect,
+		drawInfo);
+
 	// Only draw the quad of the layout if the alpha of the color is high enough to be visible.
 	if (color.w > 0.01f)
 	{
@@ -67,247 +349,44 @@ void StackLayout::Render(
 		drawInfo.drawCmds.push_back(cmd);
 	}
 
-	if (children.empty())
-		return;
-
-	Test(
+	IterateOverChildren<false>(
+		ctx,
 		*this,
 		widgetRect,
-		[=, &ctx, &drawInfo](LayoutItem const& child, Rect childRect)
+		[&ctx, framebufferExtent, &drawInfo, visibleRect](LayoutItem const& child, Rect childRect)
 		{
-			if (child.type == LayoutItem::ItemType::Layout)
+			Rect childVisibleRect = Rect::Intersection(childRect, visibleRect);
+			if (childVisibleRect.IsNothing())
+				return;
+
+			if (child.type == LayoutItem::Type::Layout)
 				child.layout->Render(
 					ctx,
 					framebufferExtent,
 					childRect,
+					childVisibleRect,
 					drawInfo);
 			else
 				child.widget->Render(
 					ctx,
 					framebufferExtent,
 					childRect,
+					childVisibleRect,
 					drawInfo);
 		});
-
-	/*
-	// The internal extent of the parent widget with padding and spacing applied.
-	Extent innerExtent = {
-		widgetRect.extent.width - padding * 2,
-		widgetRect.extent.height - padding * 2 };
-	u32 const innerExtentDirection = (direction == Direction::Horizontal ? innerExtent.width : innerExtent.height) - 
-							   (spacing * ((u32)children.size() - 1));
-
-	Rect childRect = widgetRect;
-	childRect.position.x += padding;
-	childRect.position.y += padding;
-	i32& childPosDirection = direction == Direction::Horizontal ? childRect.position.x : childRect.position.y;
-
-
-	// The last widget might not perfectly align with the total widget size,
-	// so we need the last one to use all the remaining space.
-	// This means the final widget will be at most 1 pixel too wide/narrow.
-	u32 remainingSpace = innerExtentDirection;
-	for (uSize i = 0; i < children.size(); i++)
-	{
-		auto const& child = children[i];
-		childRect.extent = innerExtent;
-		u32& childExtentDirection = direction == Direction::Horizontal ? childRect.extent.width : childRect.extent.height;
-		// We check that we are not at the final item.
-		if (i < children.size() - 1)
-			childExtentDirection = (u32)Math::Round(innerExtentDirection * child.relativeSize);
-		else
-			childExtentDirection = remainingSpace;
-		remainingSpace -= childExtentDirection;
-
-		if (child.type == LayoutItem::ItemType::Layout)
-			child.layout->Render(
-				ctx,
-				framebufferExtent,
-				childRect,
-				drawInfo);
-		else
-			child.widget->Render(
-				ctx,
-				framebufferExtent,
-				childRect,
-				drawInfo);
-
-		childPosDirection += childExtentDirection + spacing;
-	}
-	*/
-}
-
-void StackLayout::SetChildRelativeSize(u32 index, f32 input, bool locked)
-{
-	DENGINE_DETAIL_ASSERT(index < children.size());
-	auto& targetChild = children[index];
-
-	f32 sumLockedSizes = 0.f;
-	uSize unlockedChildrenCount = children.size();
-	for (LayoutItem& child : children)
-	{
-		if (child.sizeLocked)
-		{
-			sumLockedSizes += child.relativeSize;
-			unlockedChildrenCount -= 1;
-		}
-	}
-
-	f32 previousAvailableSize = 1.f - sumLockedSizes - targetChild.relativeSize;
-	f32 childSizeDifference = input - targetChild.relativeSize;
-	f32 newAvailableSize = previousAvailableSize - childSizeDifference;
-	f32 availableSizeFactor = newAvailableSize / previousAvailableSize;
-
-	for (LayoutItem& child : children)
-	{
-		if (!child.sizeLocked)
-			child.relativeSize *= availableSizeFactor;
-	}
-	
-	targetChild.relativeSize = input;
-	targetChild.sizeLocked = locked;
-}
-
-void StackLayout::AddWidget2(Std::Box<Widget>&& in)
-{
-	// Check if Box is not nullptr, then crash.
-
-	f32 sumLockedSizes = 0.f;
-	// We do +1 to account for the child we're about to insert.
-	uSize unlockedChildrenCount = children.size() + 1;
-	for (LayoutItem& child : children)
-	{
-		if (child.sizeLocked)
-		{
-			sumLockedSizes += child.relativeSize;
-			unlockedChildrenCount -= 1;
-		}
-	}
-
-	f32 previousAvailableSize = 1.f - sumLockedSizes;
-	f32 newChildSize = previousAvailableSize / unlockedChildrenCount;
-	f32 newAvailableSize = previousAvailableSize - newChildSize;
-	f32 availableSizeFactor = newAvailableSize / previousAvailableSize;
-
-	for (LayoutItem& child : children)
-	{
-		if (!child.sizeLocked)
-			child.relativeSize *= availableSizeFactor;
-	}
-
-	LayoutItem newItem;
-	newItem.type = LayoutItem::ItemType::Widget;
-	newItem.widget = static_cast<Std::Box<Widget>&&>(in);
-	newItem.sizeLocked = false;
-	newItem.relativeSize = newChildSize;
-	children.emplace_back(static_cast<LayoutItem&&>(newItem));
-}
-
-void StackLayout::AddLayout2(Std::Box<Layout>&& newLayout)
-{
-	f32 sumLockedSizes = 0.f;
-	// We do +1 to account for the child we're about to insert.
-	uSize unlockedChildrenCount = children.size() + 1;
-	for (LayoutItem& child : children)
-	{
-		if (child.sizeLocked)
-		{
-			sumLockedSizes += child.relativeSize;
-			unlockedChildrenCount -= 1;
-		}
-	}
-
-	f32 previousAvailableSize = 1.f - sumLockedSizes;
-	f32 newChildSize = previousAvailableSize / unlockedChildrenCount;
-	f32 newAvailableSize = previousAvailableSize - newChildSize;
-	f32 availableSizeFactor = newAvailableSize / previousAvailableSize;
-
-	for (LayoutItem& child : children)
-	{
-		if (!child.sizeLocked)
-			child.relativeSize *= availableSizeFactor;
-	}
-
-	LayoutItem newItem;
-	newItem.type = LayoutItem::ItemType::Layout;
-	newItem.layout = static_cast<Std::Box<Layout>&&>(newLayout);
-	newItem.sizeLocked = false;
-	newItem.relativeSize = newChildSize;
-	children.emplace_back(static_cast<LayoutItem&&>(newItem));
-}
-
-void StackLayout::InsertLayout(u32 index, Std::Box<Layout>&& newLayout)
-{
-	f32 sumLockedSizes = 0.f;
-	// We do +1 to account for the child we're about to insert.
-	uSize unlockedChildrenCount = children.size() + 1;
-	for (LayoutItem& child : children)
-	{
-		if (child.sizeLocked)
-		{
-			sumLockedSizes += child.relativeSize;
-			unlockedChildrenCount -= 1;
-		}
-	}
-
-	f32 previousAvailableSize = 1.f - sumLockedSizes;
-	f32 newChildSize = previousAvailableSize / unlockedChildrenCount;
-	f32 newAvailableSize = previousAvailableSize - newChildSize;
-	f32 availableSizeFactor = newAvailableSize / previousAvailableSize;
-
-	for (LayoutItem& child : children)
-	{
-		if (!child.sizeLocked)
-			child.relativeSize *= availableSizeFactor;
-	}
-
-	LayoutItem newItem;
-	newItem.type = LayoutItem::ItemType::Layout;
-	newItem.layout = static_cast<Std::Box<Layout>&&>(newLayout);
-	newItem.sizeLocked = false;
-	newItem.relativeSize = newChildSize;
-	children.insert(children.begin() + index, static_cast<LayoutItem&&>(newItem));
-}
-
-void StackLayout::RemoveItem(u32 index)
-{
-	// Assert index < children.size()
-
-	LayoutItem& item = children[index];
-
-	f32 sumLockedSizes = 0.f;
-	uSize unlockedChildrenCount = children.size();
-	for (LayoutItem& child : children)
-	{
-		if (child.sizeLocked)
-		{
-			sumLockedSizes += child.relativeSize;
-			unlockedChildrenCount -= 1;
-		}
-	}
-
-	f32 previousAvailableSize = 1.f - sumLockedSizes - item.relativeSize;
-	f32 newAvailableSize = previousAvailableSize + item.relativeSize;
-	f32 availableSizeFactor = newAvailableSize / previousAvailableSize;
-	for (LayoutItem& child : children)
-	{
-		if (!child.sizeLocked)
-			child.relativeSize *= availableSizeFactor;
-	}
-
-	children.erase(children.begin() + index);
-}
-
-void StackLayout::ClearChildren()
-{
-	children.clear();
 }
 
 void StackLayout::CharEvent(Context& ctx, u32 utfValue)
 {
+	ParentType::CharEvent(
+		ctx,
+		utfValue);
+
+	ResolveWidgetAddRemoves();
+
 	for (auto& child : children)
 	{
-		if (child.type == LayoutItem::ItemType::Layout)
+		if (child.type == LayoutItem::Type::Layout)
 		{
 			child.layout->CharEvent(ctx, utfValue);
 		}
@@ -320,9 +399,13 @@ void StackLayout::CharEvent(Context& ctx, u32 utfValue)
 
 void StackLayout::CharRemoveEvent(Context& ctx)
 {
+	ParentType::CharRemoveEvent(ctx);
+
+	ResolveWidgetAddRemoves();
+
 	for (auto& child : children)
 	{
-		if (child.type == LayoutItem::ItemType::Layout)
+		if (child.type == LayoutItem::Type::Layout)
 		{
 			child.layout->CharRemoveEvent(ctx);
 		}
@@ -334,267 +417,167 @@ void StackLayout::CharRemoveEvent(Context& ctx)
 }
 
 void StackLayout::CursorMove(
+	Context& ctx,
 	Rect widgetRect,
+	Rect visibleRect,
 	CursorMoveEvent event)
 {
-	if (children.empty())
-		return;
+	ParentType::CursorMove(
+		ctx,
+		widgetRect,
+		visibleRect,
+		event);
 
-	Test(
+	ResolveWidgetAddRemoves();
+
+	IterateOverChildren<false>(
+		ctx,
 		*this,
 		widgetRect,
-		[=](LayoutItem& child, Rect childRect)
+		[&ctx, visibleRect, event](LayoutItem& child, Rect childRect)
 		{
-			if (child.type == LayoutItem::ItemType::Layout)
+			if (child.type == LayoutItem::Type::Layout)
 				child.layout->CursorMove(
+					ctx,
 					childRect,
+					Rect::Intersection(childRect, visibleRect),
 					event);
 			else
 				child.widget->CursorMove(
+					ctx,
 					childRect,
+					Rect::Intersection(childRect, visibleRect),
 					event);
 		});
-
-	/*
-	// The internal extent of the parent widget with padding and spacing applied.
-	Extent innerExtent = {
-		widgetRect.extent.width - padding * 2,
-		widgetRect.extent.height - padding * 2 };
-	u32 const innerExtentDirection = (direction == Direction::Horizontal ? innerExtent.width : innerExtent.height) -
-		(spacing * ((u32)children.size() - 1));
-
-	Rect childRect = widgetRect;
-	childRect.position.x += padding;
-	childRect.position.y += padding;
-	i32& childPosDirection = direction == Direction::Horizontal ? childRect.position.x : childRect.position.y;
-
-	// The last widget might not perfectly align with the total widget size,
-	// so we need the last one to use all the remaining space.
-	// This means the final widget will be at most 1 pixel too wide/narrow.
-	u32 remainingSpace = innerExtentDirection;
-	for (uSize i = 0; i < children.size(); i++)
-	{
-		auto const& child = children[i];
-		childRect.extent = innerExtent;
-		u32& childExtentDirection = direction == Direction::Horizontal ? childRect.extent.width : childRect.extent.height;
-		// We check that we are not at the final item.
-		if (i < children.size() - 1)
-			childExtentDirection = (u32)Math::Round(innerExtentDirection * child.relativeSize);
-		else
-			childExtentDirection = remainingSpace;
-		remainingSpace -= childExtentDirection;
-
-		if (child.type == LayoutItem::ItemType::Layout)
-			child.layout->CursorMove(
-				childRect,
-				event);
-		else if (child.type == LayoutItem::ItemType::Widget)
-			child.widget->CursorMove(
-				childRect,
-				event);
-
-		childPosDirection += childExtentDirection + spacing;
-	}
-	*/
 }
 
 void StackLayout::CursorClick(
+	Context& ctx,
 	Rect widgetRect,
+	Rect visibleRect,
 	Math::Vec2Int cursorPos,
 	CursorClickEvent event)
 {
-	if (children.empty())
-		return;
+	ParentType::CursorClick(
+		ctx,
+		widgetRect,
+		visibleRect,
+		cursorPos,
+		event);
 
-	Test(
+	ResolveWidgetAddRemoves();
+
+	IterateOverChildren<false>(
+		ctx,
 		*this,
 		widgetRect,
-		[=](LayoutItem& child, Rect childRect)
+		[&ctx, visibleRect, cursorPos, event](LayoutItem& child, Rect childRect)
 		{
-			if (child.type == LayoutItem::ItemType::Layout)
+			if (child.type == LayoutItem::Type::Layout)
 				child.layout->CursorClick(
+					ctx,
 					childRect,
+					Rect::Intersection(childRect, visibleRect),
 					cursorPos,
 					event);
 			else
 				child.widget->CursorClick(
+					ctx,
 					childRect,
+					Rect::Intersection(childRect, visibleRect),
 					cursorPos,
 					event);
 		});
-
-	/*
-
-	// The internal extent of the parent widget with padding and spacing applied.
-	Extent innerExtent = {
-		widgetRect.extent.width - padding * 2,
-		widgetRect.extent.height - padding * 2 };
-	u32 const innerExtentDirection = (direction == Direction::Horizontal ? innerExtent.width : innerExtent.height) -
-		(spacing * ((u32)children.size() - 1));
-
-	Rect childRect = widgetRect;
-	childRect.position.x += padding;
-	childRect.position.y += padding;
-	i32& childPosDirection = direction == Direction::Horizontal ? childRect.position.x : childRect.position.y;
-
-	// The last widget might not perfectly align with the total widget size,
-	// so we need the last one to use all the remaining space.
-	// This means the final widget will be at most 1 pixel too wide/narrow.
-	u32 remainingSpace = innerExtentDirection;
-	for (uSize i = 0; i < children.size(); i++)
-	{
-		auto const& child = children[i];
-		childRect.extent = innerExtent;
-		u32& childExtentDirection = direction == Direction::Horizontal ? childRect.extent.width : childRect.extent.height;
-		// We check that we are not at the final item.
-		if (i < children.size() - 1)
-			childExtentDirection = (u32)Math::Round(innerExtentDirection * child.relativeSize);
-		else
-			childExtentDirection = remainingSpace;
-		remainingSpace -= childExtentDirection;
-
-		if (child.type == LayoutItem::ItemType::Layout)
-			child.layout->CursorClick(
-				childRect,
-				cursorPos,
-				event);
-		else if (child.type == LayoutItem::ItemType::Widget)
-			child.widget->CursorClick(
-				childRect,
-				cursorPos,
-				event);
-
-		childPosDirection += childExtentDirection + spacing;
-	}
-	*/
 }
 
 void StackLayout::TouchEvent(
+	Context& ctx,
 	Rect widgetRect,
-	Gui::TouchEvent touch)
+	Rect visibleRect,
+	Gui::TouchEvent event)
 {
-	if (children.empty())
-		return;
+	ParentType::TouchEvent(
+		ctx,
+		widgetRect,
+		visibleRect,
+		event);
 
-	Test(
+	ResolveWidgetAddRemoves();
+
+	IterateOverChildren<false>(
+		ctx,
 		*this,
 		widgetRect,
-		[=](LayoutItem& child, Rect childRect)
+		[&ctx, visibleRect, event](LayoutItem& child, Rect childRect)
 		{
-			if (child.type == LayoutItem::ItemType::Layout)
+			if (child.type == LayoutItem::Type::Layout)
 				child.layout->TouchEvent(
+					ctx,
 					childRect,
-					touch);
+					Rect::Intersection(childRect, visibleRect),
+					event);
 			else
 				child.widget->TouchEvent(
+					ctx,
 					childRect,
-					touch);
+					Rect::Intersection(childRect, visibleRect),
+					event);
 		});
-
-	/*
-	// The internal extent of the parent widget with padding and spacing applied.
-	Extent innerExtent = {
-		widgetRect.extent.width - padding * 2,
-		widgetRect.extent.height - padding * 2 };
-	u32 const innerExtentDirection = (direction == Direction::Horizontal ? innerExtent.width : innerExtent.height) -
-		(spacing * ((u32)children.size() - 1));
-
-	Rect childRect = widgetRect;
-	childRect.position.x += padding;
-	childRect.position.y += padding;
-	i32& childPosDirection = direction == Direction::Horizontal ? childRect.position.x : childRect.position.y;
-
-	// The last widget might not perfectly align with the total widget size,
-	// so we need the last one to use all the remaining space.
-	// This means the final widget will be at most 1 pixel too wide/narrow.
-	u32 remainingSpace = innerExtentDirection;
-	for (uSize i = 0; i < children.size(); i++)
-	{
-		auto const& child = children[i];
-		childRect.extent = innerExtent;
-		u32& childExtentDirection = direction == Direction::Horizontal ? childRect.extent.width : childRect.extent.height;
-		// We check that we are not at the final item.
-		if (i < children.size() - 1)
-			childExtentDirection = (u32)Math::Round(innerExtentDirection * child.relativeSize);
-		else
-			childExtentDirection = remainingSpace;
-		remainingSpace -= childExtentDirection;
-
-		if (child.type == LayoutItem::ItemType::Layout)
-			child.layout->TouchEvent(
-				childRect,
-				touch);
-		else if (child.type == LayoutItem::ItemType::Widget)
-			child.widget->TouchEvent(
-				childRect,
-				touch);
-
-		childPosDirection += childExtentDirection + spacing;
-	}
-	*/
 }
 
 void StackLayout::Tick(
 	Context& ctx,
-	Rect widgetRect)
+	Rect widgetRect,
+	Rect visibleRect)
 {
-	if (children.empty())
-		return;
+	ParentType::Tick(
+		ctx,
+		widgetRect,
+		visibleRect);
 
-	Test(
+	ResolveWidgetAddRemoves();
+
+	IterateOverChildren<true>(
+		ctx,
 		*this,
 		widgetRect,
-		[=, &ctx](LayoutItem& child, Rect childRect)
+		[&ctx, visibleRect](LayoutItem& child, Rect childRect)
 		{
-			if (child.type == LayoutItem::ItemType::Layout)
+			if (child.type == LayoutItem::Type::Layout)
 				child.layout->Tick(
 					ctx,
-					childRect);
+					childRect,
+					Rect::Intersection(visibleRect, childRect));
 			else
 				child.widget->Tick(
 					ctx,
-					childRect);
+					childRect,
+					Rect::Intersection(visibleRect, childRect));
 		});
+}
 
-	/*
-	// The internal extent of the parent widget with padding and spacing applied.
-	Extent innerExtent = {
-		widgetRect.extent.width - padding * 2,
-		widgetRect.extent.height - padding * 2 };
-	u32 const innerExtentDirection = (direction == Direction::Horizontal ? innerExtent.width : innerExtent.height) -
-		(spacing * ((u32)children.size() - 1));
-
-	Rect childRect = widgetRect;
-	childRect.position.x += padding;
-	childRect.position.y += padding;
-	i32& childPosDirection = direction == Direction::Horizontal ? childRect.position.x : childRect.position.y;
-
-	// The last widget might not perfectly align with the total widget size,
-	// so we need the last one to use all the remaining space.
-	// This means the final widget will be at most 1 pixel too wide/narrow.
-	u32 remainingSpace = innerExtentDirection;
-	for (uSize i = 0; i < children.size(); i++)
+void StackLayout::ResolveWidgetAddRemoves()
+{
+	for (auto& job : addWidgetJobs)
 	{
-		auto const& child = children[i];
-		childRect.extent = innerExtent;
-		u32& childExtentDirection = direction == Direction::Horizontal ? childRect.extent.width : childRect.extent.height;
-		// We check that we are not at the final item.
-		if (i < children.size() - 1)
-			childExtentDirection = (u32)Math::Round(innerExtentDirection * child.relativeSize);
-		else
-			childExtentDirection = remainingSpace;
-		remainingSpace -= childExtentDirection;
+		DENGINE_IMPL_GUI_ASSERT(
+			job.type == InsertRemoveJob::Type::Insert ||
+			job.type == InsertRemoveJob::Type::Remove);
 
-		if (child.type == LayoutItem::ItemType::Layout)
-			child.layout->Tick(
-				ctx,
-				childRect);
-		else if (child.type == LayoutItem::ItemType::Widget)
-			child.widget->Tick(
-				ctx,
-				childRect);
+		if (job.type == InsertRemoveJob::Type::Insert)
+		{
+			auto& insert = job.insert;
+			if (insert.index == InsertRemoveJob::Insert::pushBackIndex)
+				children.emplace_back(static_cast<LayoutItem&&>(insert.item));
+			else
+				children.emplace(children.begin() + insert.index, static_cast<LayoutItem&&>(insert.item));
+		}
+		else if (job.type == InsertRemoveJob::Type::Remove)
+		{
+			auto& remove = job.remove;
 
-		childPosDirection += childExtentDirection + spacing;
+			children.erase(children.begin() + remove.index);
+		}
 	}
-	*/
+	addWidgetJobs.clear();
 }

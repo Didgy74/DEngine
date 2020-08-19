@@ -1,5 +1,7 @@
 #pragma once
 
+#include <DEngine/Math/detail/Assert.hpp>
+
 namespace DEngine::Math
 {
 	constexpr Vector<3, i32> Vector<2, i32>::AsVec3(i32 zValue) const
@@ -59,6 +61,21 @@ namespace DEngine::Math
 	constexpr Vector<2, i32> Vector<2, i32>::Right()
 	{
 		return Vector<2, i32>{i32(1), i32(0)};
+	}
+
+	inline i32& Vector<2, i32>::operator[](uSize i) noexcept
+	{
+		DENGINE_DETAIL_MATH_ASSERT_MSG(
+			i < 2,
+			"Attempted to index into a Vec<2, i32> with an index out of bounds.");
+		return (&x)[i];
+	}
+	inline i32 Vector<2, i32>::operator[](uSize i) const noexcept
+	{
+		DENGINE_DETAIL_MATH_ASSERT_MSG(
+			i < 2,
+			"Attempted to index into a Vec<2, i32> with an index out of bounds.");
+		return (&x)[i];
 	}
 
 	constexpr Vector<2, i32>& Vector<2, i32>::operator+=(Vector<2, i32> const& rhs)

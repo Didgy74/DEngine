@@ -2,7 +2,7 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Pair.hpp"
-#include "DEngine/Containers/StaticVector.hpp"
+#include "DEngine/Containers/StackVec.hpp"
 #include "DEngine/Containers/Span.hpp"
 #include "DEngine/Gfx/Gfx.hpp"
 
@@ -32,10 +32,10 @@ namespace DEngine::Gfx::Vk
 	{
 		GfxRenderTarget renderTarget{};
 		vk::CommandPool cmdPool{};
-		Std::StaticVector<vk::CommandBuffer, Constants::maxInFlightCount> cmdBuffers{};
+		Std::StackVec<vk::CommandBuffer, Constants::maxInFlightCount> cmdBuffers{};
 
 		vk::DescriptorPool cameraDescrPool{};
-		Std::StaticVector<vk::DescriptorSet, Constants::maxInFlightCount> camDataDescrSets{};
+		Std::StackVec<vk::DescriptorSet, Constants::maxInFlightCount> camDataDescrSets{};
 		VmaAllocation camVmaAllocation{};
 		vk::Buffer camDataBuffer{};
 		void* camDataMappedMem = nullptr;

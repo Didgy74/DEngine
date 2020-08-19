@@ -12,6 +12,8 @@ namespace DEngine::Math
 	template<>
 	struct Vector<2, f32>
 	{
+		using ValueType = f32;
+
 		f32 x;
 		f32 y;
 

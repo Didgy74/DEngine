@@ -116,7 +116,7 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 			throw std::runtime_error("Required Vulkan instance extension is not available.");
 	}
 
-	Std::StaticVector<const char*, 5> layersToUse{};
+	Std::StackVec<const char*, 5> layersToUse{};
 	if constexpr (Constants::enableDebugUtils)
 	{
 		if (enableLayers)
@@ -426,7 +426,7 @@ vk::Device Vk::Init::CreateDevice(
 
 	// Queue configuration
 	f32 priority[3] = { 1.f, 1.f, 1.f };
-	Std::StaticVector<vk::DeviceQueueCreateInfo, 10> queueCreateInfos{};
+	Std::StackVec<vk::DeviceQueueCreateInfo, 10> queueCreateInfos{};
 
 	vk::DeviceQueueCreateInfo tempQueueCreateInfo{};
 
@@ -479,12 +479,12 @@ vk::Device Vk::Init::CreateDevice(
 	return vkDevice;
 }
 
-Std::StaticVector<vk::Fence, Vk::Constants::maxInFlightCount> Vk::Init::CreateMainFences(
+Std::StackVec<vk::Fence, Vk::Constants::maxInFlightCount> Vk::Init::CreateMainFences(
 	DevDispatch const& device, 
 	u8 resourceSetCount,
 	DebugUtilsDispatch const* debugUtils)
 {
-	Std::StaticVector<vk::Fence, Constants::maxInFlightCount> returnVal{};
+	Std::StackVec<vk::Fence, Constants::maxInFlightCount> returnVal{};
 	returnVal.Resize(resourceSetCount);
 
 	for (uSize i = 0; i < returnVal.Size(); i += 1)

@@ -9,7 +9,7 @@ namespace DEngine::Gfx::Vk
 {
 	void RecordGUICmdBuffer(
 		GlobUtils const& globUtils,
-		GuiResourceManager const& guiResourceManager,
+		GuiResourceManager const& guiResManager,
 		ViewportManager const& viewportManager,
 		WindowGuiData const& guiData,
 		vk::CommandBuffer cmdBuffer,
@@ -52,18 +52,55 @@ namespace DEngine::Gfx::Vk
 
 			device.cmdBeginRenderPass(cmdBuffer, rpBegin, vk::SubpassContents::eInline);
 
-			vk::Viewport viewport{};
-			viewport.width = (float)guiData.extent.width;
-			viewport.height = (float)guiData.extent.height;
-			device.cmdSetViewport(cmdBuffer, 0, viewport);
+			{			
+				vk::Viewport viewport{};
+				viewport.width = (float)guiData.extent.width;
+				viewport.height = (float)guiData.extent.height;
+				device.cmdSetViewport(cmdBuffer, 0, viewport);
+				vk::Rect2D scissor{};
+				scissor.extent = guiData.extent;
+				device.cmdSetScissor(cmdBuffer, 0, scissor);
+			}
 
 			for (GuiDrawCmd const& drawCmd : guiDrawCmds)
 			{
 				switch (drawCmd.type)
 				{
+				case GuiDrawCmd::Type::Scissor:
+				{
+					vk::Rect2D scissor{};
+					scissor.extent.width = drawCmd.scissor.width;
+					scissor.extent.height = drawCmd.scissor.height;
+					if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eIdentity)
+					{
+						scissor.offset.x = drawCmd.scissor.position.x;
+						scissor.offset.y = drawCmd.scissor.position.y;
+					}
+					else if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90)
+					{
+						scissor.offset.x = guiData.extent.width - scissor.extent.height - drawCmd.scissor.position.y;
+						scissor.offset.y = drawCmd.scissor.position.x;
+					}
+					else if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)
+					{
+						scissor.offset.x = drawCmd.scissor.position.y;
+						scissor.offset.y = guiData.extent.height - scissor.extent.width - drawCmd.scissor.position.x;
+					}
+					else if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate180)
+					{
+						scissor.offset.x = guiData.extent.width - scissor.extent.width - drawCmd.scissor.position.x;
+						scissor.offset.y = guiData.extent.height - scissor.extent.height - drawCmd.scissor.position.y;
+					}
+					if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90 ||
+							guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)
+						std::swap(scissor.extent.width, scissor.extent.height);
+					device.cmdSetScissor(cmdBuffer, 0, scissor);
+				}
+				break;
+
 				case GuiDrawCmd::Type::FilledMesh:
 				{
-					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResourceManager.filledMeshPipeline);
+					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResManager.filledMeshPipeline);
 					GuiResourceManager::FilledMeshPushConstant pushConstant{};
 					pushConstant.color = drawCmd.filledMesh.color;
 					pushConstant.orientation = guiData.rotation;
@@ -71,14 +108,14 @@ namespace DEngine::Gfx::Vk
 					pushConstant.rectOffset = drawCmd.rectPosition;
 					device.cmdPushConstants(
 						cmdBuffer,
-						guiResourceManager.filledMeshPipelineLayout,
+						guiResManager.filledMeshPipelineLayout,
 						vk::ShaderStageFlagBits::eVertex,
 						0,
 						32,
 						&pushConstant);
 					device.cmdPushConstants(
 						cmdBuffer,
-						guiResourceManager.filledMeshPipelineLayout,
+						guiResManager.filledMeshPipelineLayout,
 						vk::ShaderStageFlagBits::eFragment,
 						32,
 						sizeof(pushConstant.color),
@@ -86,12 +123,12 @@ namespace DEngine::Gfx::Vk
 					device.cmdBindVertexBuffers(
 						cmdBuffer,
 						0,
-						guiResourceManager.vertexBuffer,
-						(guiResourceManager.vertexCapacity * inFlightIndex + drawCmd.filledMesh.mesh.vertexOffset) * sizeof(GuiVertex));
+						guiResManager.vertexBuffer,
+						(guiResManager.vertexCapacity * inFlightIndex + drawCmd.filledMesh.mesh.vertexOffset) * sizeof(GuiVertex));
 					device.cmdBindIndexBuffer(
 						cmdBuffer,
-						guiResourceManager.indexBuffer,
-						(guiResourceManager.indexCapacity * inFlightIndex + drawCmd.filledMesh.mesh.indexOffset) * sizeof(u32),
+						guiResManager.indexBuffer,
+						(guiResManager.indexCapacity * inFlightIndex + drawCmd.filledMesh.mesh.indexOffset) * sizeof(u32),
 						vk::IndexType::eUint32);
 					device.cmdDrawIndexed(
 						cmdBuffer,
@@ -105,7 +142,7 @@ namespace DEngine::Gfx::Vk
 
 				case GuiDrawCmd::Type::TextGlyph:
 				{
-					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResourceManager.font_pipeline);
+					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResManager.font_pipeline);
 					GuiResourceManager::FontPushConstant pushConstant{};
 					pushConstant.color = drawCmd.textGlyph.color;
 					pushConstant.orientation = guiData.rotation;
@@ -113,27 +150,36 @@ namespace DEngine::Gfx::Vk
 					pushConstant.rectOffset = drawCmd.rectPosition;
 					device.cmdPushConstants(
 						cmdBuffer,
-						guiResourceManager.font_pipelineLayout,
+						guiResManager.font_pipelineLayout,
 						vk::ShaderStageFlagBits::eVertex,
 						0,
 						32,
 						&pushConstant);
 					device.cmdPushConstants(
 						cmdBuffer,
-						guiResourceManager.font_pipelineLayout,
+						guiResManager.font_pipelineLayout,
 						vk::ShaderStageFlagBits::eFragment,
 						32,
 						sizeof(pushConstant.color),
 						&pushConstant.color);
+					GuiResourceManager::GlyphData glyphData{};
+					if (drawCmd.textGlyph.utfValue < GuiResourceManager::lowUtfGlyphDatasSize)
+					{
+						glyphData = guiResManager.lowUtfGlyphDatas[drawCmd.textGlyph.utfValue];
+					}
+					else
+					{
+						auto glyphDataIt = guiResManager.glyphDatas.find((u32)drawCmd.textGlyph.utfValue);
+						if (glyphDataIt == guiResManager.glyphDatas.end())
+							throw std::runtime_error("DEngine - Vulkan: Unable to find glyph.");
+						glyphData = glyphDataIt->second;
+					}
 
-					auto glyphDataIt = guiResourceManager.glyphDatas.find((u32)drawCmd.textGlyph.utfValue);
-					if (glyphDataIt == guiResourceManager.glyphDatas.end())
-						throw std::runtime_error("DEngine - Vulkan: Unable to find glyph.");
-					auto const& glyphData = glyphDataIt->second;
+					
 					device.cmdBindDescriptorSets(
 						cmdBuffer,
 						vk::PipelineBindPoint::eGraphics,
-						guiResourceManager.font_pipelineLayout,
+						guiResManager.font_pipelineLayout,
 						0,
 						glyphData.descrSet,
 						nullptr);
@@ -148,14 +194,14 @@ namespace DEngine::Gfx::Vk
 
 				case GuiDrawCmd::Type::Viewport:
 				{
-					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResourceManager.viewportPipeline);
+					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResManager.viewportPipeline);
 					GuiResourceManager::ViewportPushConstant pushConstant{};
 					pushConstant.orientation = guiData.rotation;
 					pushConstant.rectExtent = drawCmd.rectExtent;
 					pushConstant.rectOffset = drawCmd.rectPosition;
 					device.cmdPushConstants(
 						cmdBuffer,
-						guiResourceManager.viewportPipelineLayout,
+						guiResManager.viewportPipelineLayout,
 						vk::ShaderStageFlagBits::eVertex,
 						0,
 						sizeof(pushConstant),
@@ -168,7 +214,7 @@ namespace DEngine::Gfx::Vk
 					device.cmdBindDescriptorSets(
 						cmdBuffer,
 						vk::PipelineBindPoint::eGraphics,
-						guiResourceManager.viewportPipelineLayout,
+						guiResManager.viewportPipelineLayout,
 						0,
 						viewportData.viewport.descrSet,
 						nullptr);

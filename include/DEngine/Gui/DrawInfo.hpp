@@ -1,9 +1,6 @@
 #pragma once
 
 #include <DEngine/Gfx/Gfx.hpp>
-
-#include <DEngine/Containers/Optional.hpp>
-
 #include <vector>
 
 namespace DEngine::Gui
@@ -13,8 +10,6 @@ namespace DEngine::Gui
 		std::vector<Gfx::GuiVertex>& vertices;
 		std::vector<u32>& indices;
 		std::vector<Gfx::GuiDrawCmd>& drawCmds;
-
-
 
 		DrawInfo(
 			std::vector<Gfx::GuiVertex>& verticesIn,

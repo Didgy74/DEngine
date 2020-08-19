@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Containers/IteratorPair.hpp>
 
 namespace DEngine::Std
 {
@@ -22,10 +23,26 @@ namespace DEngine::Std
 	template<typename T>
 	T&& Move(T& in) noexcept;
 
-	template<typename InputIt, typename BoolFunc>
-	bool AllOf(InputIt begin, InputIt end, BoolFunc func);
-	template<typename InputIt, typename BoolFunc>
-	bool AnyOf(InputIt begin, InputIt end, BoolFunc func);
+	template<typename Iterator, typename BoolCallable>
+	bool AllOf(
+		Iterator begin,
+		Iterator end,
+		BoolCallable const& callable);
+	template<typename Iterator, typename BoolCallable>
+	bool AnyOf(
+		Iterator begin,
+		Iterator end,
+		BoolCallable const& callable);
+
+	template<typename Iterator, typename BoolCallable>
+	constexpr Iterator FindIf(
+		Iterator begin,
+		Iterator end,
+		BoolCallable const& callable);
+	template<typename Iterator, typename BoolCallable>
+	constexpr Iterator FindIf(
+		Range<Iterator> range,
+		BoolCallable const& callable);
 }
 
 template<typename T>
@@ -40,24 +57,52 @@ T&& DEngine::Std::Move(T& in) noexcept
 	return static_cast<T&&>(in);
 }
 
-template<typename InputIt, typename BoolFunc>
-bool DEngine::Std::AllOf(InputIt begin, InputIt end, BoolFunc func)
+template<typename Iterator, typename BoolCallable>
+bool DEngine::Std::AllOf(
+	Iterator begin,
+	Iterator end,
+	BoolCallable const& callable)
 {
 	for (;begin != end; begin++)
 	{
-		if (!func(*begin))
+		if (!callable(*begin))
 			return false;
 	}
 	return true;
 }
 
-template<typename InputIt, typename BoolFunc>
-bool DEngine::Std::AnyOf(InputIt begin, InputIt end, BoolFunc func)
+template<typename Iterator, typename BoolCallable>
+bool DEngine::Std::AnyOf(
+	Iterator begin,
+	Iterator end,
+	BoolCallable const& callable)
 {
-	for (InputIt it = begin; it != end; it++)
+	for (; begin != end; begin++)
 	{
-		if (func(*it))
+		if (callable(*begin))
 			return true;
 	}
 	return false;
+}
+
+template<typename Iterator, typename BoolFunc>
+constexpr Iterator DEngine::Std::FindIf(
+	Iterator begin,
+	Iterator end,
+	BoolFunc const& callable)
+{
+	for (; begin != end; begin++)
+	{
+		if (callable(*begin))
+			return begin;
+	}
+	return end;
+}
+
+template<typename Iterator, typename BoolCallable>
+constexpr Iterator DEngine::Std::FindIf(
+	Range<Iterator> range,
+	BoolCallable const& callable)
+{
+	return FindIf(range.begin, range.end, callable);
 }

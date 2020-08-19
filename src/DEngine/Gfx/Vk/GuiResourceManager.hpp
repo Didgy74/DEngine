@@ -3,8 +3,9 @@
 #include "VulkanIncluder.hpp"
 #include "VMAIncluder.hpp"
 
-#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Containers/Array.hpp>
 #include <DEngine/Containers/Span.hpp>
+#include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Matrix.hpp>
 #include <DEngine/Math/Vector.hpp>
 
@@ -54,6 +55,8 @@ namespace DEngine::Gfx::Vk
 			vk::DescriptorSet descrSet{};
 		};
 		std::unordered_map<u32, GlyphData> glyphDatas;
+		static constexpr uSize lowUtfGlyphDatasSize = 256;
+		Std::Array<GlyphData, lowUtfGlyphDatasSize> lowUtfGlyphDatas;
 		struct FontPushConstant
 		{
 			Math::Mat2 orientation;
@@ -96,7 +99,7 @@ namespace DEngine::Gfx::Vk
 		static void NewFontTexture(
 			GuiResourceManager& manager,
 			GlobUtils const& globUtils,
-			u32 id,
+			u32 utfValue,
 			u32 width,
 			u32 height,
 			u32 pitch,

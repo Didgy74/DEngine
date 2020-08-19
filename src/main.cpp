@@ -42,12 +42,15 @@ class GfxTexAssetInterfacer : public DEngine::Gfx::TextureAssetInterface
 
 void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 {
-	auto rbIndex = scene.rigidbodies.FindIf(
+	auto rbIt = std::find_if(
+		scene.rigidbodies.begin(),
+		scene.rigidbodies.end(),
 		[entity](Std::Pair<Entity, Physics::Rigidbody2D> const& val) -> bool { return entity == val.a; });
-	if (!rbIndex.HasValue())
+
+	if (rbIt == scene.rigidbodies.end())
 		return;
 
-	Physics::Rigidbody2D& rb = scene.rigidbodies[rbIndex.Value()].b;
+	Physics::Rigidbody2D& rb = rbIt->b;
 
 	Math::Vec2 addAcceleration{};
 
@@ -133,6 +136,12 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	Scene myScene;
 
+	//for (uSize i = 0; i < 250; i++)
+		//myScene.NewEntity();
+
+	//myScene.transforms.push_back({ (Entity)0, {} });
+	//myScene.textureIDs.push_back({ (Entity)0, {} });
+
 	Editor::Context editorCtx = Editor::Context::Create(
 		mainWindow,
 		&myScene,
@@ -175,11 +184,13 @@ void DEngine::detail::SubmitRendering(
 		auto& entity = item.a;
 
 		// First check if this entity has a position
-		auto posIndex = scene.transforms.FindIf([&entity](decltype(scene.transforms)::ValueType const& val) -> bool {
-			return val.a == entity; });
-		if (!posIndex.HasValue())
+		auto posIt = std::find_if(
+			scene.transforms.begin(),
+			scene.transforms.end(),
+			[&entity](decltype(scene.transforms)::value_type const& val) -> bool { return val.a == entity; });
+		if (posIt == scene.transforms.end())
 			continue;
-		auto& transform = scene.transforms[posIndex.Value()].b;
+		auto& transform = posIt->b;
 
 		params.textureIDs.push_back(item.b);
 		params.transforms.push_back(Math::LinTran3D::Translate(transform.position));
@@ -191,7 +202,6 @@ void DEngine::detail::SubmitRendering(
 	params.guiDrawCmds = editorDrawData.drawCmds;
 	params.nativeWindowUpdates = editorDrawData.windowUpdates;
 	params.viewportUpdates = editorDrawData.viewportUpdates;
-	
 
 	gfxData.Draw(params);
 }

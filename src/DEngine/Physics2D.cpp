@@ -1,15 +1,17 @@
-#include "DEngine/Physics.hpp"
+#include <DEngine/Physics.hpp>
 
-#include "DEngine/Scene.hpp"
+#include <DEngine/Scene.hpp>
+
+#include <DEngine/Utility.hpp>
 
 
 namespace DEngine::Physics
 {
 	void Resolve_Circle_Circle(
-		Std::Span<decltype(Scene::rigidbodies)::ValueType> rigidbodies,
-		Std::Span<decltype(Scene::transforms)::ValueType const> transforms,
-		Std::Span<decltype(Scene::circleColliders)::ValueType const> circleColliders,
-		Std::Span<decltype(Scene::boxColliders)::ValueType const> boxColliders);
+		Std::Span<decltype(Scene::rigidbodies)::value_type> rigidbodies,
+		Std::Span<decltype(Scene::transforms)::value_type const> transforms,
+		Std::Span<decltype(Scene::circleColliders)::value_type const> circleColliders,
+		Std::Span<decltype(Scene::boxColliders)::value_type const> boxColliders);
 	void Resolve_Circle_OBB(
 		Std::Span<Transform> transforms,
 		Std::Span<CircleCollider2D const> circleColliders,
@@ -20,22 +22,23 @@ namespace DEngine::Physics
 void DEngine::Physics::Update(Scene& scene, f32 deltaTime)
 {
 	Resolve_Circle_Circle(
-		scene.rigidbodies,
-		scene.transforms,
-		scene.circleColliders,
-		scene.boxColliders);
+		{ scene.rigidbodies.data(), scene.rigidbodies.size() },
+		{ scene.transforms.data(), scene.transforms.size() },
+		{ scene.circleColliders.data(), scene.circleColliders.size() },
+		{ scene.boxColliders.data(), scene.circleColliders.size() });
 
-	for (uSize i = 0; i < scene.rigidbodies.Size(); i += 1)
+	for (uSize i = 0; i < scene.rigidbodies.size(); i += 1)
 	{
 		Entity const& entity = scene.rigidbodies[i].a;
 		Rigidbody2D& rb = scene.rigidbodies[i].b;
 
-		// First check if this entity has a position
-		auto leftPosIndex = scene.transforms.FindIf(
-			[entity](Std::Pair<Entity, Transform> const& val) -> bool { return val.a == entity; });
-		if (!leftPosIndex.HasValue())
+		auto leftPosIt = std::find_if(
+			scene.transforms.begin(),
+			scene.transforms.end(),
+			[entity](decltype(Scene::transforms)::value_type const& val) -> bool { return val.a == entity; });
+		if (leftPosIt == scene.transforms.end())
 			continue;
-		auto& transform = scene.transforms[leftPosIndex.Value()].b;
+		auto& transform = leftPosIt->b;
 
 		rb.velocity *= Math::Pow(rb.linearDamp, deltaTime);
 		rb.velocity += rb.acceleration * deltaTime;
@@ -47,30 +50,31 @@ void DEngine::Physics::Update(Scene& scene, f32 deltaTime)
 }
 
 void DEngine::Physics::Resolve_Circle_Circle(
-	Std::Span<decltype(Scene::rigidbodies)::ValueType> rigidbodies,
-	Std::Span<decltype(Scene::transforms)::ValueType const> transforms,
-	Std::Span<decltype(Scene::circleColliders)::ValueType const> circleColliders,
-	Std::Span<decltype(Scene::boxColliders)::ValueType const> boxColliders)
+	Std::Span<decltype(Scene::rigidbodies)::value_type> rigidbodies,
+	Std::Span<decltype(Scene::transforms)::value_type const> transforms,
+	Std::Span<decltype(Scene::circleColliders)::value_type const> circleColliders,
+	Std::Span<decltype(Scene::boxColliders)::value_type const> boxColliders)
 {
 	for (uSize leftIndex = 0; leftIndex < circleColliders.Size(); leftIndex += 1)
 	{
 		Entity const& leftEntity = circleColliders[leftIndex].a;
 		CircleCollider2D const& leftCollider = circleColliders[leftIndex].b;
 
-		// First check if this entity has a position
-		auto leftPosIndex = transforms.FindIf([leftEntity](Std::Pair<Entity, Transform> const& val) -> bool {
-			return val.a == leftEntity;
-			});
-
-		if (!leftPosIndex.HasValue())
+		// First check if this entity has a transform
+		auto leftTransIt = Std::FindIf(
+			transforms.AsRange(),
+			[leftEntity](decltype(transforms)::ValueType const& val) -> bool {
+				return val.a == leftEntity; });
+		if (leftTransIt == transforms.end())
 			continue;
-		auto& leftTransform = transforms[leftPosIndex.Value()].b;
+		auto& leftTransform = leftTransIt->b;
 
 		// Check if this entity has a rigidbody
-		auto leftRbIndex = rigidbodies.FindIf([&leftEntity](Std::Pair<Entity, Rigidbody2D> const& val) -> bool {
-			return val.a == leftEntity;
-			});
-		Rigidbody2D* leftRb = leftRbIndex.HasValue() ? &rigidbodies[leftRbIndex.Value()].b : nullptr;
+		auto leftRbIt = Std::FindIf(
+			rigidbodies.AsRange(),
+			[leftEntity](decltype(rigidbodies)::ValueType const& val) -> bool {
+				return val.a == leftEntity; });
+		Rigidbody2D* leftRb = leftRbIt ? &leftRbIt->b : nullptr;
 
 		for (uSize rightIndex = leftIndex + 1; rightIndex < circleColliders.Size(); rightIndex += 1)
 		{
@@ -78,18 +82,21 @@ void DEngine::Physics::Resolve_Circle_Circle(
 			CircleCollider2D const& rightCollider = circleColliders[rightIndex].b;
 
 			// First check if this entity has a position
-			auto rightPosIndex = transforms.FindIf([rightEntity](Std::Pair<Entity, Transform> const& val) -> bool {
-				return val.a == rightEntity;
-				});
-			if (!rightPosIndex.HasValue())
+			auto rightTransIt = Std::FindIf(
+				transforms.AsRange(),
+				[rightEntity](decltype(transforms)::ValueType const& val) -> bool {
+					return val.a == rightEntity; });
+			if (rightTransIt == transforms.end())
 				continue;
-			auto& rightTransform = transforms[rightPosIndex.Value()].b;
+			auto& rightTransform = rightTransIt->b;
 
 			// Check if this entity has a rigidbody
-			auto rightRbIndex = rigidbodies.FindIf([&rightEntity](Std::Pair<Entity, Rigidbody2D> const& val) -> bool {
-				return val.a == rightEntity;
-				});
-			Rigidbody2D* rightRb = rightRbIndex.HasValue() ? &rigidbodies[rightRbIndex.Value()].b : nullptr;
+			auto rightRbIt = Std::FindIf(
+				rigidbodies.AsRange(),
+				[rightEntity](decltype(rigidbodies)::ValueType const& val) -> bool {
+					return val.a == rightEntity; });
+			Rigidbody2D* rightRb = rightRbIt ? &rightRbIt->b : nullptr;
+
 			if (leftRb == nullptr && rightRb == nullptr)
 				continue;
 

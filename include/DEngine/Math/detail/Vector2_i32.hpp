@@ -12,6 +12,8 @@ namespace DEngine::Math
 	template<>
 	struct Vector<2, i32>
 	{
+		using ValueType = i32;
+
 		i32 x;
 		i32 y;
 
@@ -34,6 +36,9 @@ namespace DEngine::Math
 		[[nodiscard]] static constexpr Vector<2, i32> Down();
 		[[nodiscard]] static constexpr Vector<2, i32> Left();
 		[[nodiscard]] static constexpr Vector<2, i32> Right();
+
+		[[nodiscard]] i32& operator[](uSize i) noexcept;
+		[[nodiscard]] i32 operator[](uSize i) const noexcept;
 
 		constexpr Vector<2, i32>& operator+=(Vector<2, i32> const& rhs);
 		constexpr Vector<2, i32>& operator-=(Vector<2, i32> const& rhs);

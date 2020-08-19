@@ -10,7 +10,11 @@
 
 namespace DEngine::detail
 {
-	[[noreturn]] void Assert(char const* conditionString, char const* file, unsigned long long line, char const* msg);
+	[[noreturn]] void Assert(
+		char const* conditionString,
+		char const* file,
+		unsigned long long line,
+		char const* msg);
 }
 
 #define DENGINE_DETAIL_ASSERT(expression) \

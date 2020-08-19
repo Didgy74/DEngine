@@ -72,9 +72,9 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
 		}
 
-		vk::DynamicState dynamicStates[1] = { vk::DynamicState::eViewport };
+		vk::DynamicState dynamicStates[2] = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
 		vk::PipelineDynamicStateCreateInfo dynamicState{};
-		dynamicState.dynamicStateCount = 1;
+		dynamicState.dynamicStateCount = 2;
 		dynamicState.pDynamicStates = dynamicStates;
 		vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState{};
 		inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
@@ -260,9 +260,9 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
 		}
 
-		vk::DynamicState dynamicStates[1] = { vk::DynamicState::eViewport };
+		vk::DynamicState dynamicStates[2] = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
 		vk::PipelineDynamicStateCreateInfo dynamicState{};
-		dynamicState.dynamicStateCount = 1;
+		dynamicState.dynamicStateCount = 2;
 		dynamicState.pDynamicStates = dynamicStates;
 		vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState{};
 		inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
@@ -374,10 +374,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		DebugUtilsDispatch const* debugUtils)
 	{
 		vk::DescriptorPoolSize sampledImgDescrPoolSize{};
-		sampledImgDescrPoolSize.descriptorCount = 50;
+		sampledImgDescrPoolSize.descriptorCount = 512;
 		sampledImgDescrPoolSize.type = vk::DescriptorType::eCombinedImageSampler;
 		vk::DescriptorPoolCreateInfo descrPoolInfo{};
-		descrPoolInfo.maxSets = 50;
+		descrPoolInfo.maxSets = 512;
 		descrPoolInfo.poolSizeCount = 1;
 		descrPoolInfo.pPoolSizes = &sampledImgDescrPoolSize;
 		manager.font_descrPool = device.createDescriptorPool(descrPoolInfo);
@@ -456,9 +456,9 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
 		}
 
-		vk::DynamicState dynamicStates[1] = { vk::DynamicState::eViewport };
+		vk::DynamicState dynamicStates[2] = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
 		vk::PipelineDynamicStateCreateInfo dynamicState{};
-		dynamicState.dynamicStateCount = 1;
+		dynamicState.dynamicStateCount = 2;
 		dynamicState.pDynamicStates = dynamicStates;
 		vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState{};
 		inputAssemblyState.topology = vk::PrimitiveTopology::eTriangleList;
@@ -683,7 +683,7 @@ void Vk::GuiResourceManager::Update(
 void Vk::GuiResourceManager::NewFontTexture(
 	GuiResourceManager& manager,
 	GlobUtils const& globUtils,
-	u32 id,
+	u32 utfValue,
 	u32 width,
 	u32 height,
 	u32 pitch,
@@ -748,7 +748,7 @@ void Vk::GuiResourceManager::NewFontTexture(
 		nameInfo.objectHandle = (u64)(VkImage)newGlyphData.img;
 		nameInfo.objectType = newGlyphData.img.objectType;
 		std::string name = "GuiResourceManager - GlyphID #";
-		name += std::to_string(id);
+		name += std::to_string(utfValue);
 		name += " - Img";
 		nameInfo.pObjectName = name.c_str();
 		globUtils.debugUtils.setDebugUtilsObjectNameEXT(device.handle, nameInfo);
@@ -768,7 +768,7 @@ void Vk::GuiResourceManager::NewFontTexture(
 		nameInfo.objectHandle = (u64)(VkImageView)newGlyphData.imgView;
 		nameInfo.objectType = newGlyphData.imgView.objectType;
 		std::string name = "GuiResourceManager - GlyphID #";
-		name += std::to_string(id);
+		name += std::to_string(utfValue);
 		name += " - ImgView";
 		nameInfo.pObjectName = name.c_str();
 		globUtils.debugUtils.setDebugUtilsObjectNameEXT(device.handle, nameInfo);
@@ -787,7 +787,7 @@ void Vk::GuiResourceManager::NewFontTexture(
 		nameInfo.objectHandle = (u64)(VkDescriptorSet)newGlyphData.descrSet;
 		nameInfo.objectType = newGlyphData.descrSet.objectType;
 		std::string name = "GuiResourceManager - GlyphID #";
-		name += std::to_string(id);
+		name += std::to_string(utfValue);
 		name += " - DescrSet";
 		nameInfo.pObjectName = name.c_str();
 		globUtils.debugUtils.setDebugUtilsObjectNameEXT(device.handle, nameInfo);
@@ -891,7 +891,15 @@ void Vk::GuiResourceManager::NewFontTexture(
 	device.destroy(fence);
 	device.destroy(cmdPool);
 
-	auto insertResult = manager.glyphDatas.insert({ id, newGlyphData });
-	if (!insertResult.second)
-		throw std::runtime_error("DEngine - Vulkan: Unable to insert new glyph.");
+	if (utfValue < lowUtfGlyphDatasSize)
+	{
+		manager.lowUtfGlyphDatas[utfValue] = newGlyphData;
+	}
+	else
+	{
+		auto insertResult = manager.glyphDatas.insert({ utfValue, newGlyphData });
+		if (!insertResult.second)
+			throw std::runtime_error("DEngine - Vulkan: Unable to insert new glyph.");
+	}
+
 }

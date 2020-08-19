@@ -12,6 +12,8 @@
 
 #include <iostream>
 #include <cstdio>
+#include <algorithm>
+#include <cstring>
 
 namespace DEngine::Application::detail
 {
@@ -373,16 +375,16 @@ Std::Opt<u64> Application::CreateVkSurface(
 	if (err != 0)
 		return {};
 	else
-		return (u64)newSurface;
+		return Std::Opt{ (u64)newSurface };
 }
 
-Std::StaticVector<char const*, 5> Application::RequiredVulkanInstanceExtensions()
+Std::StackVec<char const*, 5> Application::RequiredVulkanInstanceExtensions()
 {
 	uint32_t count = 0;
 
 	char const** exts = glfwGetRequiredInstanceExtensions(&count);
 
-	Std::StaticVector<char const*, 5> returnVal{};
+	Std::StackVec<char const*, 5> returnVal{};
 	returnVal.Resize(count);
 	std::memcpy(returnVal.Data(), exts, count * sizeof(char const*));
 
@@ -527,7 +529,7 @@ Std::Opt<u64> Application::FileInputStream::Tell() const
 		// Handle error
 		return {};
 	else
-		return static_cast<u64>(result);
+		return Std::Opt{ static_cast<u64>(result) };
 }
 
 bool Application::FileInputStream::IsOpen() const

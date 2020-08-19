@@ -85,7 +85,7 @@ namespace DEngine::Gfx::Vk::NativeWindowManagerImpl
 		vk::SwapchainKHR oldSwapchain,
 		DebugUtilsDispatch const* debugUtils);
 
-	static Std::StaticVector<vk::Image, Constants::maxSwapchainLength> GetSwapchainImages(
+	static Std::StackVec<vk::Image, Constants::maxSwapchainLength> GetSwapchainImages(
 		DeviceDispatch const& device,
 		NativeWindowID windowID,
 		vk::SwapchainKHR swapchain,
@@ -97,7 +97,7 @@ namespace DEngine::Gfx::Vk::NativeWindowManagerImpl
 		QueueData const& queues,
 		Std::Span<const vk::Image> images);
 
-	static Std::StaticVector<vk::CommandBuffer, Constants::maxSwapchainLength> AllocateSwapchainCopyCmdBuffers(
+	static Std::StackVec<vk::CommandBuffer, Constants::maxSwapchainLength> AllocateSwapchainCopyCmdBuffers(
 		DeviceDispatch const& device,
 		NativeWindowID windowID,
 		vk::CommandPool cmdPool,
@@ -156,7 +156,7 @@ namespace DEngine::Gfx::Vk::NativeWindowManagerImpl
 		NativeWindowID windowID,
 		DebugUtilsDispatch const* debugUtils);
 
-	static Std::StaticVector<vk::CommandBuffer, Constants::maxInFlightCount> AllocGuiCmdBuffers(
+	static Std::StackVec<vk::CommandBuffer, Constants::maxInFlightCount> AllocGuiCmdBuffers(
 		DeviceDispatch const& device,
 		NativeWindowID windowID,
 		u8 inFlightCount,
@@ -326,6 +326,7 @@ void Vk::NativeWindowManager::BuildInitialNativeWindow(
 
 	gui.extent = swapchainSettings.extents;
 	gui.rotation = NativeWindowManagerImpl::RotationToMatrix(swapchainSettings.transform);
+	gui.surfaceRotation = swapchainSettings.transform;
 
 	vk::Format guiFormat = surfaceInfo.surfaceFormatToUse.format;
 	auto createGuiImgResult = NativeWindowManagerImpl::CreateGuiImg(
@@ -442,14 +443,14 @@ static vk::SwapchainKHR Vk::NativeWindowManagerImpl::CreateSwapchain(
 	return swapchain;
 }
 
-Std::StaticVector<vk::Image, Vk::Constants::maxSwapchainLength> Vk::NativeWindowManagerImpl::GetSwapchainImages(
+Std::StackVec<vk::Image, Vk::Constants::maxSwapchainLength> Vk::NativeWindowManagerImpl::GetSwapchainImages(
 	DeviceDispatch const& device, 
 	NativeWindowID windowID, 
 	vk::SwapchainKHR swapchain, 
 	DebugUtilsDispatch const* debugUtils)
 {
 	vk::Result vkResult{};
-	Std::StaticVector<vk::Image, Constants::maxSwapchainLength> returnVal;
+	Std::StackVec<vk::Image, Constants::maxSwapchainLength> returnVal;
 
 	u32 swapchainImageCount = 0;
 	vkResult = device.getSwapchainImagesKHR(swapchain, &swapchainImageCount, nullptr);
@@ -548,14 +549,14 @@ static bool Vk::NativeWindowManagerImpl::TransitionSwapchainImages(
 }
 
 
-static Std::StaticVector<vk::CommandBuffer, Vk::Constants::maxSwapchainLength> Vk::NativeWindowManagerImpl::AllocateSwapchainCopyCmdBuffers(
+static Std::StackVec<vk::CommandBuffer, Vk::Constants::maxSwapchainLength> Vk::NativeWindowManagerImpl::AllocateSwapchainCopyCmdBuffers(
 	DeviceDispatch const& device,
 	NativeWindowID windowID,
 	vk::CommandPool cmdPool,
 	uSize swapchainImgCount,
 	DebugUtilsDispatch const* debugUtils)
 {
-	Std::StaticVector<vk::CommandBuffer, Constants::maxSwapchainLength> returnVal;
+	Std::StackVec<vk::CommandBuffer, Constants::maxSwapchainLength> returnVal;
 	vk::Result vkResult{};
 
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
@@ -902,7 +903,7 @@ vk::CommandPool DEngine::Gfx::Vk::NativeWindowManagerImpl::CreateGuiCmdPool(
 	return cmdPool;
 }
 
-Std::StaticVector<vk::CommandBuffer, Vk::Constants::maxInFlightCount> Vk::NativeWindowManagerImpl::AllocGuiCmdBuffers(
+Std::StackVec<vk::CommandBuffer, Vk::Constants::maxInFlightCount> Vk::NativeWindowManagerImpl::AllocGuiCmdBuffers(
 	DeviceDispatch const& device, 
 	NativeWindowID windowID, 
 	u8 inFlightCount, 
@@ -910,7 +911,7 @@ Std::StaticVector<vk::CommandBuffer, Vk::Constants::maxInFlightCount> Vk::Native
 	DebugUtilsDispatch const* debugUtils)
 {
 	vk::Result vkResult{};
-	Std::StaticVector<vk::CommandBuffer, Vk::Constants::maxInFlightCount> returnVal;
+	Std::StackVec<vk::CommandBuffer, Vk::Constants::maxInFlightCount> returnVal;
 
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
 	cmdBufferAllocInfo.commandBufferCount = inFlightCount;
@@ -1022,6 +1023,7 @@ static void Vk::NativeWindowManagerImpl::HandleCreationJobs(
 
 		gui.extent = swapchainSettings.extents;
 		gui.rotation = NativeWindowManagerImpl::RotationToMatrix(swapchainSettings.transform);
+		gui.surfaceRotation = swapchainSettings.transform;
 
 		vk::Format guiFormat = globUtils.surfaceInfo.surfaceFormatToUse.format;
 		auto createGuiImgResult = NativeWindowManagerImpl::CreateGuiImg(
@@ -1135,6 +1137,7 @@ void Vk::NativeWindowManagerImpl::HandleWindowResize(
 	WindowGuiData& gui = windowNode.gui;
 	gui.extent = swapchainSettings.extents;
 	gui.rotation = NativeWindowManagerImpl::RotationToMatrix(swapchainSettings.transform);
+	gui.surfaceRotation = swapchainSettings.transform;
 
 	vmaDestroyImage(globUtils.vma, (VkImage)gui.img, gui.vmaAllocation);
 	vk::Format guiFormat = globUtils.surfaceInfo.surfaceFormatToUse.format;

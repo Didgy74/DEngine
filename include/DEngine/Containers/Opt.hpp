@@ -13,23 +13,22 @@ namespace DEngine::Std
 	constexpr NullOpt_T nullOpt = {};
 
 	template<typename T>
-	class Optional
+	class Opt
 	{	
 	public:
 		using ValueType = T;
 
-		constexpr Optional();
-		constexpr Optional(Optional<T> const&);
-		constexpr Optional(Optional<T>&&) noexcept;
-		constexpr Optional(NullOpt_T nullOpt) noexcept;
-		constexpr Optional(T const&);
-		constexpr Optional(T&&) noexcept;
-		~Optional();
+		constexpr Opt(NullOpt_T = nullOpt) noexcept;
+		constexpr Opt(Opt const&);
+		constexpr Opt(Opt&&) noexcept;
+		explicit constexpr Opt(T const&);
+		explicit constexpr Opt(T&&) noexcept;
+		~Opt();
 
-		Optional<T>& operator=(Optional<T> const&);
-		Optional<T>& operator=(Optional<T>&&) noexcept;
-		Optional<T>& operator=(T const&);
-		Optional<T>& operator=(T&&) noexcept;
+		Opt& operator=(Opt const&);
+		Opt& operator=(Opt&&) noexcept;
+		Opt& operator=(T const&);
+		Opt& operator=(T&&) noexcept;
 
 		[[nodiscard]] bool HasValue() const;
 
@@ -39,24 +38,20 @@ namespace DEngine::Std
 		[[nodiscard]] T const* ToPtr() const;
 		[[nodiscard]] T* ToPtr();
 
-
 	private:
 		bool hasValue = false;
 		union
 		{
-			unsigned char unusedChar{};
+			unsigned char unusedChar = 0;
 			T value;
 		};
 	};
 
 	template<typename T>
-	using Opt = Optional<T>;
+	constexpr Opt<T>::Opt(NullOpt_T) noexcept {}
 
 	template<typename T>
-	constexpr Optional<T>::Optional() {}
-
-	template<typename T>
-	constexpr Optional<T>::Optional(Optional<T> const& other)
+	constexpr Opt<T>::Opt(Opt const& other)
 	{
 		if (other.hasValue)
 		{
@@ -66,7 +61,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	constexpr Optional<T>::Optional(Optional<T>&& other) noexcept
+	constexpr Opt<T>::Opt(Opt&& other) noexcept
 	{
 		if (other.hasValue)
 		{
@@ -79,31 +74,28 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	constexpr Optional<T>::Optional(NullOpt_T nullOpt) noexcept {}
-
-	template<typename T>
-	constexpr Optional<T>::Optional(T const& other) :
+	constexpr Opt<T>::Opt(T const& other) :
 		hasValue(true)
 	{
 		new(&value) T(other);
 	}
 
 	template<typename T>
-	constexpr Optional<T>::Optional(T&& other) noexcept :
+	constexpr Opt<T>::Opt(T&& other) noexcept :
 		hasValue(true)
 	{
 		new(&value) T(static_cast<T&&>(other));
 	}
 
 	template<typename T>
-	Optional<T>::~Optional()
+	Opt<T>::~Opt()
 	{
 		if (hasValue)
 			value.~T();
 	}
 
 	template<typename T>
-	Optional<T>& Optional<T>::operator=(Optional<T> const& other)
+	Opt<T>& Opt<T>::operator=(Opt const& other)
 	{
 		if (this == &other)
 			return *this;
@@ -121,7 +113,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	Optional<T>& Optional<T>::operator=(Optional<T>&& other) noexcept
+	Opt<T>& Opt<T>::operator=(Opt&& other) noexcept
 	{
 		if (this == &other)
 			return *this;
@@ -141,7 +133,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	Optional<T>& Optional<T>::operator=(T const& right)
+	Opt<T>& Opt<T>::operator=(T const& right)
 	{
 		if (hasValue)
 			value = right;
@@ -154,7 +146,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	Optional<T>& Optional<T>::operator=(T&& right) noexcept
+	Opt<T>& Opt<T>::operator=(T&& right) noexcept
 	{
 		if (hasValue)
 			value = static_cast<T&&>(right);
@@ -167,29 +159,29 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	bool Optional<T>::HasValue() const
+	bool Opt<T>::HasValue() const
 	{
 		return hasValue;
 	}
 
 	template<typename T>
-	T const& Optional<T>::Value() const
+	T const& Opt<T>::Value() const
 	{
 		if (!hasValue)
-			throw std::runtime_error("Tried to deference Optional-variable without Value.");
+			throw std::runtime_error("Tried to deference Opt-variable without Value.");
 		return value;
 	}
 
 	template<typename T>
-	T& Optional<T>::Value()
+	T& Opt<T>::Value()
 	{
 		if (!hasValue)
-			throw std::runtime_error("Tried to deference Optional-variable without Value.");
+			throw std::runtime_error("Tried to deference Opt-variable without Value.");
 		return value;
 	}
 
 	template<typename T>
-	T const* Optional<T>::ToPtr() const
+	T const* Opt<T>::ToPtr() const
 	{
 		if (hasValue)
 			return &value;
@@ -198,7 +190,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	T* Optional<T>::ToPtr()
+	T* Opt<T>::ToPtr()
 	{
 		if (hasValue)
 			return &value;

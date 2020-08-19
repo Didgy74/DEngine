@@ -38,7 +38,7 @@ namespace DEngine::Gfx::Vk::Init
 		DeviceDispatch const& device,
 		VMA_MemoryTrackingData* vma_trackingData);
 
-	[[nodiscard]] Std::StaticVector<vk::Fence, Constants::maxInFlightCount> CreateMainFences(
+	[[nodiscard]] Std::StackVec<vk::Fence, Constants::maxInFlightCount> CreateMainFences(
 		DevDispatch const& device,
 		u8 resourceSetCount,
 		DebugUtilsDispatch const* debugUtils);

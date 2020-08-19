@@ -8,13 +8,14 @@ using namespace DEngine::Gui;
 
 Button::Button()
 {
-	textWidget.text = "Button";
+	textWidget.String_Set("Button");
 }
 
 void Button::Render(
-	Context& ctx,
+	Context const& ctx,
 	Extent framebufferExtent,
 	Rect widgetRect,
+	Rect visibleRect,
 	DrawInfo& drawInfo) const
 {
 	Math::Vec4 currentColor{};
@@ -55,7 +56,7 @@ void Button::Render(
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	impl::TextManager::RenderText(
 		implData.textManager,
-		textWidget.text,
+		textWidget.StringView(),
 		currentTextColor,
 		framebufferExtent,
 		widgetRect,
@@ -117,10 +118,12 @@ bool Button::GetToggled() const
 }
 
 void Button::CursorMove(
+	Context& ctx,
 	Rect widgetRect,
+	Rect visibleRect,
 	CursorMoveEvent event)
 {
-	bool temp = widgetRect.PointIsInside(event.position);
+	bool temp = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
 	if (temp)
 	{
 		if (state != State::Pressed)
@@ -136,13 +139,16 @@ void Button::CursorMove(
 }
 
 void Button::CursorClick(
+	Context& ctx,
 	Rect widgetRect,
+	Rect visibleRect,
 	Math::Vec2Int cursorPos,
 	CursorClickEvent event)
 {
 	if (event.button == CursorButton::Left)
 	{
-		bool temp = widgetRect.PointIsInside(cursorPos);
+		bool temp = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
+			
 		if (temp)
 		{
 			if (event.clicked)
@@ -157,21 +163,22 @@ void Button::CursorClick(
 			}
 		}
 	}
-
 }
 
 void Button::TouchEvent(
+	Context& ctx,
 	Rect widgetRect,
-	Gui::TouchEvent touch)
+	Rect visibleRect,
+	Gui::TouchEvent event)
 {
-	if (touch.id == 0)
+	if (event.id == 0)
 	{
-		bool temp = widgetRect.PointIsInside(touch.position);
+		bool temp = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
 		if (temp)
 		{
-			if (touch.type == TouchEventType::Down)
+			if (event.type == TouchEventType::Down)
 				SetState(State::Pressed);
-			else if (touch.type == TouchEventType::Up)
+			else if (event.type == TouchEventType::Up)
 			{
 				if (state == State::Pressed)
 					Activate();
@@ -183,4 +190,16 @@ void Button::TouchEvent(
 			SetState(State::Normal);
 		}
 	}
+}
+
+SizeHint Button::SizeHint(
+	Context const& ctx) const
+{
+	return textWidget.SizeHint(ctx);
+}
+
+SizeHint Button::SizeHint_Tick(
+	Context const& ctx)
+{
+	return textWidget.SizeHint_Tick(ctx);
 }

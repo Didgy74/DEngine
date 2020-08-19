@@ -59,6 +59,7 @@ namespace DEngine::Gfx::Vk
 		PFN_vkCmdNextSubpass vkCmdNextSubpass;
 		PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
 		PFN_vkCmdPushConstants vkCmdPushConstants;
+		PFN_vkCmdSetScissor vkCmdSetScissor;
 		PFN_vkCmdSetViewport vkCmdSetViewport;
 		PFN_vkCreateBuffer vkCreateBuffer;
 		PFN_vkCreateBufferView vkCreateBufferView;
@@ -413,6 +414,11 @@ namespace DEngine::Gfx::Vk
 			std::uint32_t offset,
 			std::uint32_t size,
 			void const* pValues) const;
+
+		void cmdSetScissor(
+			vk::CommandBuffer commandBuffer,
+			std::uint32_t firstScissor,
+			vk::ArrayProxy<vk::Rect2D const> scissors) const;
 
 		void cmdSetViewport(
 			vk::CommandBuffer commandBuffer,

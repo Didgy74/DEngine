@@ -4,9 +4,10 @@ using namespace DEngine;
 using namespace DEngine::Gui;
 
 void LineEdit::Render(
-	Context& ctx,
+	Context const& ctx,
 	Extent framebufferExtent,
 	Rect widgetRect,
+	Rect visibleRect,
 	DrawInfo& drawInfo) const
 {
 	Gfx::GuiDrawCmd cmd{};
@@ -24,6 +25,7 @@ void LineEdit::Render(
 		ctx,
 		framebufferExtent,
 		widgetRect,
+		visibleRect,
 		drawInfo);
 }
 
@@ -34,7 +36,7 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 		if (type == Type::Float)
 		{
 			bool hasPeriod = false;
-			for (auto item : text)
+			for (u32 item : StringView())
 			{
 				if (item == '.')
 				{
@@ -44,13 +46,13 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 			}
 			if ((48 <= charEvent && charEvent <= 58) || (!hasPeriod && charEvent == '.'))
 			{
-				this->text.push_back((u8)charEvent);
+				String_PushBack((u8)charEvent);
 				if (textChangedPfn)
 					textChangedPfn(*this);
 			}
-			else if (charEvent == '-' && text.empty())
+			else if (charEvent == '-' && StringView().empty())
 			{
-				this->text.push_back((u8)charEvent);
+				String_PushBack((u8)charEvent);
 				if (textChangedPfn)
 					textChangedPfn(*this);
 			}
@@ -60,13 +62,13 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 		{
 			if (48 <= charEvent && charEvent <= 58)
 			{
-				this->text.push_back((u8)charEvent);
+				String_PushBack((u8)charEvent);
 				if (textChangedPfn)
 					textChangedPfn(*this);
 			}
-			else if (charEvent == '-' && text.empty())
+			else if (charEvent == '-' && StringView().empty())
 			{
-				this->text.push_back((u8)charEvent);
+				String_PushBack((u8)charEvent);
 				if (textChangedPfn)
 					textChangedPfn(*this);
 			}
@@ -76,16 +78,18 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 
 void LineEdit::CharRemoveEvent(Context& ctx)
 {
-	if (selected && !text.empty())
+	if (selected && !StringView().empty())
 	{
-		text.pop_back();
+		String_PopBack();
 		if (textChangedPfn)
 			textChangedPfn(*this);
 	}
 }
 
 void LineEdit::CursorClick(
+	Context& ctx,
 	Rect widgetRect,
+	Rect visibleRect,
 	Math::Vec2Int cursorPos,
 	CursorClickEvent event)
 {
@@ -96,14 +100,13 @@ void LineEdit::CursorClick(
 		if (cursorIsInside && event.clicked && !selected)
 		{
 			selected = true;
-			//text.clear();
 		}
 		else if (!cursorIsInside && event.clicked && selected)
 		{
 			selected = false;
-			if (text.empty())
+			if (StringView().empty())
 			{
-				text = '0';
+				String_Set("0");
 				if (textChangedPfn)
 					textChangedPfn(*this);
 			}
@@ -114,12 +117,14 @@ void LineEdit::CursorClick(
 #include <DEngine/Application.hpp>
 
 void LineEdit::TouchEvent(
+	Context& ctx,
 	Rect widgetRect,
-	Gui::TouchEvent touch)
+	Rect visibleRect,
+	Gui::TouchEvent event)
 {
-	bool cursorIsInside = widgetRect.PointIsInside(touch.position);
+	bool cursorIsInside = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
 
-	if (touch.id == 0 && touch.type == TouchEventType::Down && cursorIsInside && !selected)
+	if (event.id == 0 && event.type == TouchEventType::Down && cursorIsInside && !selected)
 	{
 		selected = true;
 		//text.clear();

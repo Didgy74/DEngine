@@ -1,33 +1,67 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Gui/impl/Assert.hpp>
 
+#include <DEngine/Math/Common.hpp>
 #include <DEngine/Math/Vector.hpp>
 
 namespace DEngine::Gui
 {
 	struct Extent
 	{
-		u32 width;
-		u32 height;
+		u32 width{};
+		u32 height{};
+
+		[[nodiscard]] constexpr u32& operator[](uSize index) noexcept
+		{
+			DENGINE_IMPL_GUI_ASSERT_MSG(
+				index < 2,
+				"Attempted to index into an Extent with an index out of bounds.");
+			return (&width)[index];
+		}
+		[[nodiscard]] constexpr u32 operator[](uSize index) const noexcept
+		{
+			DENGINE_IMPL_GUI_ASSERT_MSG(
+				index < 2,
+				"Attempted to index into an Extent with an index out of bounds.");
+			return (&width)[index];
+		}
 	};
 
 	struct Rect
 	{
-		Math::Vec2Int position;
-		Extent extent;
+		Math::Vec2Int position{};
+		Extent extent{};
 
-		bool PointIsInside(Math::Vec2Int point) const
-		{
-			return point.x >= position.x && point.x < position.x + (i32)extent.width &&
-				point.y >= position.y && point.y < position.y + (i32)extent.height;
-		}
+		[[nodiscard]] constexpr bool IsNothing() const noexcept { return extent.width == 0 || extent.height == 0; }
 
-		bool PointIsInside(Math::Vec2 point) const
+		[[nodiscard]] constexpr bool PointIsInside(Math::Vec2Int point) const noexcept;
+		[[nodiscard]] constexpr bool PointIsInside(Math::Vec2 point) const noexcept;
+
+		[[nodiscard]] constexpr static Rect Intersection(Rect const& a, Rect const& b) noexcept
 		{
-			return point.x >= (f32)position.x && point.x < (f32)position.x + (f32)extent.width &&
-				point.y >= (f32)position.y && point.y < (f32)position.y + (f32)extent.height;
+			Rect returnVal{};
+			for (uSize i = 0; i < 2; i += 1)
+			{
+				i32 minPoint = Math::Max(a.position[i], b.position[i]);
+				returnVal.position[i] = minPoint;
+				i32 maxPoint = Math::Min(a.position[i] + (i32)a.extent[i], b.position[i] + (i32)b.extent[i]);
+				returnVal.extent[i] = (u32)Math::Max(0, maxPoint - returnVal.position[i]);
+			}
+			return returnVal;
 		}
 	};
+}
 
+constexpr bool DEngine::Gui::Rect::PointIsInside(Math::Vec2Int point) const noexcept
+{
+	return point.x >= position.x && point.x < position.x + (i32)extent.width &&
+		point.y >= position.y && point.y < position.y + (i32)extent.height;
+}
+
+constexpr bool DEngine::Gui::Rect::PointIsInside(Math::Vec2 point) const noexcept
+{
+	return point.x >= (f32)position.x && point.x < (f32)position.x + (f32)extent.width &&
+		point.y >= (f32)position.y && point.y < (f32)position.y + (f32)extent.height;
 }

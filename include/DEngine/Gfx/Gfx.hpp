@@ -2,7 +2,7 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Span.hpp"
-#include "DEngine/Containers/Optional.hpp"
+#include "DEngine/Containers/Opt.hpp"
 
 #include "DEngine/Math/Matrix.hpp"
 #include "DEngine/Math/Vector.hpp"
@@ -90,7 +90,8 @@ namespace DEngine::Gfx
 		{
 			FilledMesh,
 			TextGlyph,
-			Viewport
+			Viewport,
+			Scissor
 		};
 		Type type;
 		struct MeshSpan
@@ -113,13 +114,22 @@ namespace DEngine::Gfx
 		{
 			ViewportID id;
 		};
+		struct Scissor
+		{
+			Math::Vec2Int position;
+			u32 width;
+			u32 height;
+		};
 		union
 		{
 			FilledMesh filledMesh;
 			TextGlyph textGlyph;
 			Viewport viewport;
+			Scissor scissor;
 		};
+		// In the range of 0-1
 		Math::Vec2 rectPosition;
+		// In the range of 0-1
 		Math::Vec2 rectExtent;
 	};
 

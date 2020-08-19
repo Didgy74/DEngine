@@ -12,9 +12,10 @@ namespace DEngine::Gui
 		Gfx::TextureID textureID = Gfx::noTextureID;
 
 		virtual void Render(
-			Context& ctx,
+			Context const& ctx,
 			Extent framebufferExtent,
 			Rect widgetRect,
+			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 	};
 }

@@ -3,8 +3,8 @@
 
 #include "DEngine/Application.hpp"
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/Optional.hpp"
-#include "DEngine/Containers/StaticVector.hpp"
+#include "DEngine/Containers/Opt.hpp"
+#include "DEngine/Containers/StackVec.hpp"
 
 #include <chrono>
 #include <vector>
@@ -92,8 +92,8 @@ namespace DEngine::Application::detail
 
 		Std::Opt<CursorData> cursorOpt{};
 
-		Std::StaticVector<TouchInput, maxTouchEventCount> touchInputs{};
-		Std::StaticVector<std::chrono::high_resolution_clock::time_point, decltype(touchInputs)::Capacity()> touchInputStartTime{};
+		Std::StackVec<TouchInput, maxTouchEventCount> touchInputs{};
+		Std::StackVec<std::chrono::high_resolution_clock::time_point, decltype(touchInputs)::Capacity()> touchInputStartTime{};
 
 
 		// Time related stuff

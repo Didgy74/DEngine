@@ -12,7 +12,7 @@
     </Expand>
   </Type>
 
-  <Type Name="DEngine::Std::StaticVector&lt;*&gt;">
+  <Type Name="DEngine::Std::StackVec&lt;*&gt;">
     <DisplayString>{{ Size={size} }}</DisplayString>
     <Expand>
       <Item Name="Size" ExcludeView="simple">size</Item>

@@ -25,9 +25,10 @@ namespace DEngine::Gui
 		std::function<void(LineEdit& widget)> textChangedPfn = nullptr;
 
 		virtual void Render(
-			Context& ctx,
+			Context const& ctx,
 			Extent framebufferExtent,
 			Rect widgetRect,
+			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
 		virtual void CharEvent(
@@ -38,12 +39,16 @@ namespace DEngine::Gui
 			Context& ctx) override;
 
 		virtual void CursorClick(
+			Context& ctx,
 			Rect widgetRect,
+			Rect visibleRect,
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
 		virtual void TouchEvent(
+			Context& ctx,
 			Rect widgetRect,
+			Rect visibleRect,
 			Gui::TouchEvent touch) override;
 	};
 }

@@ -5,6 +5,7 @@
 #include <DEngine/Utility.hpp>
 
 #include <vector>
+#include <algorithm>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
@@ -20,44 +21,9 @@ Context Context::Create(Gfx::Context* gfxCtx)
 	newCtx.pImplData = new impl::ImplData;
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(newCtx.pImplData);
 	
-	// Initialize text manager stuff.
-	{
-		implData.textManager.gfxCtx = gfxCtx;
-		FT_Error ftError = FT_Init_FreeType(&implData.textManager.ftLib);
-		if (ftError != FT_Err_Ok)
-			throw std::runtime_error("DEngine - Editor: Unable to initialize FreeType");
-
-		App::FileInputStream fontFile("data/gui/arial.ttf");
-		if (!fontFile.IsOpen())
-			throw std::runtime_error("DEngine - Editor: Unable to open font file.");
-		fontFile.Seek(0, App::FileInputStream::SeekOrigin::End);
-		u64 fileSize = fontFile.Tell().Value();
-		implData.textManager.fontFileData.resize(fileSize);
-		fontFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		fontFile.Read((char*)implData.textManager.fontFileData.data(), fileSize);
-		fontFile.Close();
-
-		ftError = FT_New_Memory_Face(
-			implData.textManager.ftLib,
-			(FT_Byte const*)implData.textManager.fontFileData.data(),
-			(FT_Long)fileSize,
-			0,
-			&implData.textManager.face);
-
-		if (ftError != FT_Err_Ok)
-			throw std::runtime_error("DEngine - Editor: Unable to load font");
-
-		implData.textManager.dpi = 72;
-		ftError = FT_Set_Char_Size(
-			implData.textManager.face,    /* handle to face object           */
-			0,       /* char_width in 1/64th of points  */
-			24 * 64,   /* char_height in 1/64th of points */
-			implData.textManager.dpi,     /* horizontal device resolution    */
-			implData.textManager.dpi);   /* vertical device resolution      */
-		if (ftError != FT_Err_Ok)
-			throw std::runtime_error("DEngine - Editor: Unable to set pixel sizes");
-	}
-	// Text manager stuff end
+	impl::TextManager::Initialize(
+		implData.textManager,
+		gfxCtx);
 
 	{
 		// Add the test first window shit
@@ -184,7 +150,7 @@ void Context::PushEvent(WindowResizeEvent event)
 
 namespace DEngine::Gui::impl
 {
-	void DispatchEvent(ImplData& implData, WindowCursorEnterEvent resize)
+	static void DispatchEvent(ImplData& implData, WindowCursorEnterEvent resize)
 	{
 		auto windowIt = std::find_if(
 			implData.windows.begin(),
@@ -194,7 +160,7 @@ namespace DEngine::Gui::impl
 		auto& windowData = windowIt->data;
 	}
 
-	void DispatchEvent(ImplData& implData, WindowMinimizeEvent minimize)
+	static void DispatchEvent(ImplData& implData, WindowMinimizeEvent minimize)
 	{
 		auto windowIt = std::find_if(
 			implData.windows.begin(),
@@ -205,7 +171,7 @@ namespace DEngine::Gui::impl
 		windowData.isMinimized = minimize.wasMinimized;
 	}
 
-	void DispatchEvent(ImplData& implData, WindowMoveEvent move)
+	static void DispatchEvent(ImplData& implData, WindowMoveEvent move)
 	{
 		auto windowIt = std::find_if(
 			implData.windows.begin(),
@@ -216,7 +182,7 @@ namespace DEngine::Gui::impl
 		windowData.rect.position = move.position;
 	}
 
-	void DispatchEvent(ImplData& implData, WindowResizeEvent resize)
+	static void DispatchEvent(ImplData& implData, WindowResizeEvent resize)
 	{
 		auto windowIt = std::find_if(
 			implData.windows.begin(),
@@ -227,7 +193,7 @@ namespace DEngine::Gui::impl
 		windowData.rect.extent = resize.extent;
 	}
 
-	void DispatchWindowEvents(ImplData& implData, Event::Window windowEvent)
+	static void DispatchWindowEvents(ImplData& implData, Event::Window windowEvent)
 	{
 		switch (windowEvent.type)
 		{
@@ -246,7 +212,7 @@ namespace DEngine::Gui::impl
 		}
 	}
 
-	void DispatchEvent(Context& ctx, ImplData& implData, CharEvent event)
+	static void DispatchEvent(Context& ctx, ImplData& implData, CharEvent event)
 	{
 		for (auto& windowNode : implData.windows)
 		{
@@ -259,7 +225,7 @@ namespace DEngine::Gui::impl
 		}
 	}
 
-	void DispatchEvent(Context& ctx, ImplData& implData, CharRemoveEvent event)
+	static void DispatchEvent(Context& ctx, ImplData& implData, CharRemoveEvent event)
 	{
 		for (auto& windowNode : implData.windows)
 		{
@@ -270,13 +236,15 @@ namespace DEngine::Gui::impl
 		}
 	}
 
-	void DispatchEvent(ImplData& implData, CursorClickEvent event)
+	static void DispatchEvent(Context& ctx, ImplData& implData, CursorClickEvent event)
 	{
 		for (auto& windowNode : implData.windows)
 		{
 			if (windowNode.data.topLayout)
 			{
 				windowNode.data.topLayout->CursorClick(
+					ctx,
+					{ { 0, 0 }, windowNode.data.rect.extent },
 					{ { 0, 0 }, windowNode.data.rect.extent },
 					implData.cursorPosition - windowNode.data.rect.position,
 					event);
@@ -284,7 +252,7 @@ namespace DEngine::Gui::impl
 		}
 	}
 
-	void DispatchEvent(ImplData& implData, CursorMoveEvent event)
+	static void DispatchEvent(Context& ctx, ImplData& implData, CursorMoveEvent event)
 	{
 		implData.cursorPosition = event.position;
 		for (auto& windowNode : implData.windows)
@@ -296,26 +264,30 @@ namespace DEngine::Gui::impl
 				modifiedEvent.positionDelta = event.positionDelta;
 
 				windowNode.data.topLayout->CursorMove(
+					ctx,
+					{ { 0, 0 }, windowNode.data.rect.extent },
 					{ { 0, 0 }, windowNode.data.rect.extent },
 					modifiedEvent);
 			}
 		}
 	}
 
-	void DispatchEvent(ImplData& implData, TouchEvent event)
+	static void DispatchEvent(Context& ctx, ImplData& implData, TouchEvent event)
 	{
 		for (auto& windowNode : implData.windows)
 		{
 			if (windowNode.data.topLayout)
 			{
 				windowNode.data.topLayout->TouchEvent(
+					ctx,
+					{ { 0, 0 }, windowNode.data.rect.extent },
 					{ { 0, 0 }, windowNode.data.rect.extent },
 					event);
 			}
 		}
 	}
 
-	void ProcessInputEvent(Context& ctx, ImplData& implData, Event::Input inputEvent)
+	static void ProcessInputEvent(Context& ctx, ImplData& implData, Event::Input inputEvent)
 	{
 		switch (inputEvent.type)
 		{
@@ -326,13 +298,13 @@ namespace DEngine::Gui::impl
 			DispatchEvent(ctx, implData, inputEvent.charRemove);
 			break;
 		case Event::Input::Type::CursorClick:
-			DispatchEvent(implData, inputEvent.cursorClick);
+			DispatchEvent(ctx, implData, inputEvent.cursorClick);
 			break;
 		case Event::Input::Type::CursorMove:
-			DispatchEvent(implData, inputEvent.cursorMove);
+			DispatchEvent(ctx, implData, inputEvent.cursorMove);
 			break;
 		case Event::Input::Type::Touch:
-			DispatchEvent(implData, inputEvent.touch);
+			DispatchEvent(ctx, implData, inputEvent.touch);
 			break;
 		}
 	}
@@ -353,6 +325,20 @@ namespace DEngine::Gui::impl
 		}
 		implData.eventQueue.clear();
 	}
+
+	void Tick(Context& ctx, ImplData& implData)
+	{
+		for (auto& windowNode : implData.windows)
+		{
+			if (windowNode.data.topLayout)
+			{
+				windowNode.data.topLayout->Tick(
+					ctx,
+					{ {}, windowNode.data.rect.extent },
+					{ {}, windowNode.data.rect.extent });
+			}
+		}
+	}
 }
 
 void Context::ProcessEvents()
@@ -360,21 +346,21 @@ void Context::ProcessEvents()
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 
 	impl::ProcessEvents(*this, implData);
-	for (auto& windowNode : implData.windows)
-	{
-		if (windowNode.data.topLayout)
-		{
-			windowNode.data.topLayout->Tick(
-				*this,
-				{ {}, windowNode.data.rect.extent });
-		}
-	}
+
+	impl::Tick(*this, implData);
 
 	// Render stuff
-	this->vertices.clear();
-	this->indices.clear();
-	this->drawCmds.clear();
-	this->windowUpdates.clear();
+	Render();
+}
+
+void Context::Render() const
+{
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+
+	vertices.clear();
+	indices.clear();
+	drawCmds.clear();
+	windowUpdates.clear();
 	for (auto& windowNode : implData.windows)
 	{
 		if (windowNode.data.isMinimized)
@@ -391,6 +377,7 @@ void Context::ProcessEvents()
 			windowNode.data.topLayout->Render(
 				*this,
 				windowNode.data.rect.extent,
+				Gui::Rect{ { 0, 0 }, windowNode.data.rect.extent },
 				Gui::Rect{ { 0, 0 }, windowNode.data.rect.extent },
 				drawInfo);
 		}
@@ -412,73 +399,142 @@ void Context::ProcessEvents()
 	}
 }
 
+namespace DEngine::Gui::impl
+{
+	TextManager::GlyphData LoadNewGlyph(
+		TextManager& manager,
+		u32 utfValue)
+	{
+		if (utfValue == 0)
+			return {};
+
+		// Load glyph data
+		FT_UInt glyphIndex = FT_Get_Char_Index(manager.face, utfValue);
+		if (glyphIndex == 0) // 0 is an error index
+			//throw std::runtime_error("Unable to load glyph index");
+			return {};
+
+		FT_Error ftError = FT_Load_Glyph(
+			manager.face,
+			glyphIndex,
+			FT_LOAD_DEFAULT);
+		if (ftError != FT_Err_Ok)
+			throw std::runtime_error("Unable to load glyph");
+
+		ftError = FT_Render_Glyph(manager.face->glyph, FT_RENDER_MODE_NORMAL);
+		if (ftError != FT_Err_Ok)
+			throw std::runtime_error("Unable to render glyph");
+
+		if (manager.face->glyph->bitmap.buffer != nullptr)
+		{
+			manager.gfxCtx->NewFontTexture(
+				utfValue,
+				manager.face->glyph->bitmap.width,
+				manager.face->glyph->bitmap.rows,
+				manager.face->glyph->bitmap.pitch,
+				{ (std::byte const*)manager.face->glyph->bitmap.buffer,
+					(uSize)manager.face->glyph->bitmap.pitch * manager.face->glyph->bitmap.rows });
+		}
+
+		TextManager::GlyphData newData{};
+		newData.hasBitmap = manager.face->glyph->bitmap.buffer != nullptr;
+		newData.bitmapWidth = manager.face->glyph->bitmap.width;
+		newData.bitmapHeight = manager.face->glyph->bitmap.rows;
+		newData.advanceX = manager.face->glyph->advance.x / 64;
+		newData.posOffset = Math::Vec2Int{ (i32)manager.face->glyph->metrics.horiBearingX / 64, (i32)-manager.face->glyph->metrics.horiBearingY / 64 };
+		return newData;
+	}
+
+	TextManager::GlyphData const& GetGlyphData(
+		TextManager& manager,
+		u32 utfValue)
+	{
+		if (utfValue < manager.lowGlyphDatas.Size())
+		{
+			// ASCII values are already loaded, so don't need to check if it is.
+			return manager.lowGlyphDatas[utfValue];
+		}
+		else
+		{
+			auto glyphDataIt = manager.glyphDatas.find(utfValue);
+			if (glyphDataIt == manager.glyphDatas.end())
+			{
+				glyphDataIt = manager.glyphDatas.insert({ utfValue, LoadNewGlyph(manager, utfValue) }).first;
+			}
+
+			return glyphDataIt->second;
+		}
+	}
+}
+
+
+void impl::TextManager::Initialize(
+	TextManager& manager,
+	Gfx::Context* gfxCtx)
+{
+	manager.gfxCtx = gfxCtx;
+	FT_Error ftError = FT_Init_FreeType(&manager.ftLib);
+	if (ftError != FT_Err_Ok)
+		throw std::runtime_error("DEngine - Editor: Unable to initialize FreeType");
+
+	App::FileInputStream fontFile("data/gui/arial.ttf");
+	if (!fontFile.IsOpen())
+		throw std::runtime_error("DEngine - Editor: Unable to open font file.");
+	fontFile.Seek(0, App::FileInputStream::SeekOrigin::End);
+	u64 fileSize = fontFile.Tell().Value();
+	manager.fontFileData.resize(fileSize);
+	fontFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
+	fontFile.Read((char*)manager.fontFileData.data(), fileSize);
+	fontFile.Close();
+
+	ftError = FT_New_Memory_Face(
+		manager.ftLib,
+		(FT_Byte const*)manager.fontFileData.data(),
+		(FT_Long)fileSize,
+		0,
+		&manager.face);
+	if (ftError != FT_Err_Ok)
+		throw std::runtime_error("DEngine - Editor: Unable to load font");
+
+	ftError = FT_Set_Char_Size(
+		manager.face,    /* handle to face object           */
+		0,       /* char_width in 1/64th of points  */
+		32 * 64,   /* char_height in 1/64th of points */
+		0,     /* horizontal device resolution    */
+		0);   /* vertical device resolution      */
+	if (ftError != FT_Err_Ok)
+		throw std::runtime_error("DEngine - Editor: Unable to set pixel sizes");
+
+	manager.lineheight = manager.face->size->metrics.height / 64;
+	manager.lineMinY = Math::Abs((i32)manager.face->bbox.yMin / 64);
+
+
+	// Load all ASCII characters.
+	for (uSize i = 0; i < manager.lowGlyphDatas.Size(); i += 1)
+		manager.lowGlyphDatas[i] = impl::LoadNewGlyph(manager, (u32)i);
+}
+
 void impl::TextManager::RenderText(
 	TextManager& manager,
 	std::string_view string,
 	Math::Vec4 color,
 	Extent framebufferExtent,
 	Rect widgetRect,
-	DrawInfo const& drawInfo)
+	DrawInfo& drawInfo)
 {
 	Math::Vec2Int penPos = widgetRect.position;
+	penPos.y += manager.lineheight;
+	penPos.y -= manager.lineMinY;
 
-	u32 linespace = manager.face->size->metrics.height / 72;
-
-	penPos.y += linespace;
-
-	for (uSize i = 0; i < string.size(); i++)
+	for (uSize i = 0; i < string.size(); i += 1)
 	{
 		u32 glyphChar = string[i];
-
-		auto glyphDataIt = manager.glyphDatas.find(glyphChar);
-		if (glyphDataIt == manager.glyphDatas.end())
-		{
-			// Load glyph data
-			FT_UInt glyphIndex = FT_Get_Char_Index(manager.face, glyphChar);
-			if (glyphIndex == 0) // 0 is an error index
-				throw std::runtime_error("Unable to load glyph index");
-
-			FT_Error ftError = FT_Load_Glyph(
-				manager.face,
-				glyphIndex,
-				FT_LOAD_DEFAULT);
-
-			if (ftError != FT_Err_Ok)
-				throw std::runtime_error("Unable to load glyph");
-
-			ftError = FT_Render_Glyph(manager.face->glyph, FT_RENDER_MODE_NORMAL);
-			if (ftError != FT_Err_Ok)
-				throw std::runtime_error("Unable to render glyph");
-
-			if (manager.face->glyph->bitmap.buffer != nullptr)
-			{
-				manager.gfxCtx->NewFontTexture(
-					glyphChar,
-					manager.face->glyph->bitmap.width,
-					manager.face->glyph->bitmap.rows,
-					manager.face->glyph->bitmap.pitch,
-					{ (std::byte const*)manager.face->glyph->bitmap.buffer,
-						(uSize)manager.face->glyph->bitmap.pitch * manager.face->glyph->bitmap.rows });
-			}
-
-			GlyphData newData{};
-			newData.hasBitmap = manager.face->glyph->bitmap.buffer != nullptr;
-			newData.bitmapWidth = manager.face->glyph->bitmap.width;
-			newData.bitmapHeight = manager.face->glyph->bitmap.rows;
-			newData.advance = manager.face->glyph->metrics.horiAdvance;
-			newData.horizBearingX = manager.face->glyph->metrics.horiBearingX;
-			newData.horizBearingY = manager.face->glyph->metrics.horiBearingY;
-			glyphDataIt = manager.glyphDatas.insert({ glyphChar, newData }).first;
-		}
-
-		GlyphData const& glyphData = glyphDataIt->second;
-
+		GlyphData const& glyphData = GetGlyphData(manager, glyphChar);
 		if (glyphData.hasBitmap)
 		{
 			// This holds the top-left position of the glyph.
 			Math::Vec2Int glyphPos = penPos;
-			glyphPos.x += glyphData.horizBearingX / 64;
-			glyphPos.y -= glyphData.horizBearingY / 64;
+			glyphPos += glyphData.posOffset;
 
 			Gfx::GuiDrawCmd cmd;
 			cmd.type = Gfx::GuiDrawCmd::Type::TextGlyph;
@@ -492,6 +548,24 @@ void impl::TextManager::RenderText(
 			drawInfo.drawCmds.push_back(cmd);
 		}
 
-		penPos.x += glyphData.advance / 64; // Advance is measured 1/64ths of a pixel.
+		penPos.x += glyphData.advanceX;
 	}
+}
+
+SizeHint impl::TextManager::GetSizeHint(
+	TextManager& manager,
+	std::string_view str)
+{
+	SizeHint returnVar{};
+	returnVar.preferred.height = manager.lineheight;
+	
+	// Iterate over the string, find the bounding box width
+	for (uSize i = 0; i < str.size(); i += 1)
+	{
+		u32 glyphChar = str[i];
+		GlyphData const& glyphData = GetGlyphData(manager, glyphChar);
+		returnVar.preferred.width += glyphData.advanceX;
+	}
+
+	return returnVar;
 }

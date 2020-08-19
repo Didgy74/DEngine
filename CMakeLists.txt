@@ -15,6 +15,9 @@ include(Common.cmake)
 	target_include_directories(dengine PRIVATE ${DENGINE_INCLUDE_DIRS})
 	target_compile_definitions(dengine PRIVATE ${DENGINE_DEFINES})
 	target_link_libraries(dengine PRIVATE ${CMAKE_DL_LIBS})
+	if(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
+		target_compile_options(dengine PRIVATE -Og)
+	endif()
 
 	# Remove data folder from target binary directory
 	add_custom_command(
@@ -47,6 +50,9 @@ include(Common.cmake)
 
 add_subdirectory(external/freetype2 freetype2 EXCLUDE_FROM_ALL)
 target_link_libraries(dengine PRIVATE freetype)
+
+#add_subdirectory(external/harfbuzz harfbuzz EXCLUDE_FROM_ALL)
+#target_link_libraries(dengine PRIVATE harfbuzz)
 
 # -----------------------
 # Link external libraries

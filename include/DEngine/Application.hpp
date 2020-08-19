@@ -2,8 +2,8 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Containers/Array.hpp>
-#include <DEngine/Containers/StaticVector.hpp>
-#include <DEngine/Containers/Optional.hpp>
+#include <DEngine/Containers/StackVec.hpp>
+#include <DEngine/Containers/Opt.hpp>
 
 #include <DEngine/Math/Vector.hpp>
 
@@ -45,7 +45,7 @@ namespace DEngine::Application
 	Math::Vec2Int GetWindowPosition(WindowID);
 	bool GetWindowMinimized(WindowID);
 	WindowEvents GetWindowEvents(WindowID);
-	Std::StaticVector<char const*, 5> RequiredVulkanInstanceExtensions();
+	Std::StackVec<char const*, 5> RequiredVulkanInstanceExtensions();
 	Std::Opt<u64> CreateVkSurface(
 		WindowID window,
 		uSize vkInstance,
@@ -73,14 +73,14 @@ namespace DEngine::Application
 	constexpr uSize maxTouchEventCount = 10;
 	enum class TouchEventType : u8;
 	struct TouchInput;
-	Std::StaticVector<TouchInput, maxTouchEventCount> TouchInputs();
+	Std::StackVec<TouchInput, maxTouchEventCount> TouchInputs();
 
 	struct GamepadState
 	{
 		f32 leftStickX = 0.f;
 		f32 leftStickY = 0.f;
 	};
-	Std::Optional<GamepadState> GetGamepad();
+	Std::Opt<GamepadState> GetGamepad();
 
 	void Log(char const* msg);
 

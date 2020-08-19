@@ -474,19 +474,19 @@ Std::Opt<u64> Application::CreateVkSurface(
 	PFN_vkGetInstanceProcAddr procAddr = nullptr;
 	void* lib = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
 	if (lib == nullptr)
-		return Std::nullOpt;
+		return {};
 	procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(lib, "vkGetInstanceProcAddr"));
 	int closeReturnCode = dlclose(lib);
 	lib = nullptr;
 	if (procAddr == nullptr || closeReturnCode != 0)
-		return Std::nullOpt;
+		return {};
 
 	auto funcPtr = reinterpret_cast<PFN_vkCreateAndroidSurfaceKHR>(
 			procAddr(
 					*reinterpret_cast<VkInstance*>(&vkInstance),
 					"vkCreateAndroidSurfaceKHR"));
 	if (funcPtr == nullptr)
-		return Std::nullOpt;
+		return {};
 
 	VkAndroidSurfaceCreateInfoKHR createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
@@ -503,12 +503,12 @@ Std::Opt<u64> Application::CreateVkSurface(
 
 	u64 temp = *reinterpret_cast<u64*>(&returnVal);
 
-	return { temp };
+	return Std::Opt{ temp };
 }
 
-Std::StaticVector<char const*, 5> Application::RequiredVulkanInstanceExtensions()
+Std::StackVec<char const*, 5> Application::RequiredVulkanInstanceExtensions()
 {
-	Std::StaticVector<char const*, 5> returnVal{};
+	Std::StackVec<char const*, 5> returnVal{};
 	returnVal.PushBack("VK_KHR_surface");
 	returnVal.PushBack("VK_KHR_android_surface");
 	return returnVal;
@@ -634,7 +634,7 @@ namespace DEngine::Application::detail
 	};
 }
 
-DEngine::Application::FileInputStream::FileInputStream()
+Application::FileInputStream::FileInputStream()
 {
 	static_assert(sizeof(detail::Backend_FileInputStreamData) <= sizeof(FileInputStream::m_buffer));
 
@@ -642,7 +642,7 @@ DEngine::Application::FileInputStream::FileInputStream()
 	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
 }
 
-DEngine::Application::FileInputStream::FileInputStream(char const* path)
+Application::FileInputStream::FileInputStream(char const* path)
 {
 	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
@@ -650,19 +650,19 @@ DEngine::Application::FileInputStream::FileInputStream(char const* path)
 	Open(path);
 }
 
-DEngine::Application::FileInputStream::FileInputStream(FileInputStream&& other) noexcept
+Application::FileInputStream::FileInputStream(FileInputStream&& other) noexcept
 {
 	std::memcpy(&m_buffer[0], &other.m_buffer[0], sizeof(detail::Backend_FileInputStreamData));
 	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&other.m_buffer[0], &implData, sizeof(implData));
 }
 
-DEngine::Application::FileInputStream::~FileInputStream()
+Application::FileInputStream::~FileInputStream()
 {
 	Close();
 }
 
-DEngine::Application::FileInputStream& DEngine::Application::FileInputStream::operator=(FileInputStream&& other) noexcept
+Application::FileInputStream& DEngine::Application::FileInputStream::operator=(FileInputStream&& other) noexcept
 {
 	if (this == &other)
 		return *this;
@@ -677,7 +677,7 @@ DEngine::Application::FileInputStream& DEngine::Application::FileInputStream::op
 }
 
 
-bool DEngine::Application::FileInputStream::Seek(i64 offset, SeekOrigin origin)
+bool Application::FileInputStream::Seek(i64 offset, SeekOrigin origin)
 {
 	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
@@ -708,7 +708,7 @@ bool DEngine::Application::FileInputStream::Seek(i64 offset, SeekOrigin origin)
 	return true;
 }
 
-bool DEngine::Application::FileInputStream::Read(char* output, u64 size)
+bool Application::FileInputStream::Read(char* output, u64 size)
 {
 	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
@@ -725,24 +725,24 @@ bool DEngine::Application::FileInputStream::Read(char* output, u64 size)
 	return true;
 }
 
-DEngine::Std::Opt<DEngine::u64> DEngine::Application::FileInputStream::Tell() const
+Std::Opt<u64> Application::FileInputStream::Tell() const
 {
 	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
 	if (implData.file == nullptr)
 		return {};
 
-	return (u64)implData.pos;
+	return Std::Opt{ (u64)implData.pos };
 }
 
-bool DEngine::Application::FileInputStream::IsOpen() const
+bool Application::FileInputStream::IsOpen() const
 {
 	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
 	return implData.file != nullptr;
 }
 
-bool DEngine::Application::FileInputStream::Open(char const* path)
+bool Application::FileInputStream::Open(char const* path)
 {
 	Close();
 
@@ -754,7 +754,7 @@ bool DEngine::Application::FileInputStream::Open(char const* path)
 	return implData.file != nullptr;
 }
 
-void DEngine::Application::FileInputStream::Close()
+void Application::FileInputStream::Close()
 {
 	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));

@@ -2,8 +2,10 @@
 
 #include <DEngine/Gui/Events.hpp>
 #include <DEngine/Gui/Layout.hpp>
+#include <DEngine/Gui/SizeHint.hpp>
 #include <DEngine/Gui/WindowID.hpp>
 
+#include <DEngine/Containers/Array.hpp>
 #include <DEngine/Containers/Box.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
@@ -22,6 +24,8 @@
 #include <unordered_map>
 #include <ft2build.h>
 #include FT_FREETYPE_H
+
+
 
 namespace DEngine::Gui::impl
 {
@@ -88,18 +92,25 @@ namespace DEngine::Gui::impl
 		FT_Library ftLib{};
 		FT_Face face{};
 		std::vector<u8> fontFileData;
-		u32 dpi = 0;
-		u32 lineHeight = 0;
+		u32 lineheight = 0;
+		u32 lineMinY = 0;
 		struct GlyphData
 		{
+			bool hasBitmap{};
 			u32 bitmapWidth{};
 			u32 bitmapHeight{};
-			u32 advance{};
-			i32 horizBearingX{};
-			i32 horizBearingY{};
-			u32 hasBitmap{};
+
+			i32 advanceX{};
+			Math::Vec2Int posOffset{};
 		};
+		// Stores glyph-data that is not in the ascii-table
 		std::unordered_map<u32, GlyphData> glyphDatas;
+		static constexpr uSize lowGlyphTableSize = 256;
+		Std::Array<GlyphData, lowGlyphTableSize> lowGlyphDatas;
+
+		static void Initialize(
+			TextManager& manager,
+			Gfx::Context* gfxCtx);
 
 		static void RenderText(
 			TextManager& manager,
@@ -107,7 +118,11 @@ namespace DEngine::Gui::impl
 			Math::Vec4 color,
 			Gui::Extent framebufferExtent,
 			Gui::Rect widgetRect,
-			DrawInfo const& drawInfo);
+			DrawInfo& drawInfo);
+
+		static SizeHint GetSizeHint(
+			TextManager& manager,
+			std::string_view st);
 	};
 
 	struct WindowData

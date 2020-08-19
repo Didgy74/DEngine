@@ -22,6 +22,7 @@ namespace DEngine::Gui
 		Context& operator=(Context&&) noexcept;
 
 		void ProcessEvents();
+		void Render() const;
 
 		void PushEvent(CharEvent);
 		void PushEvent(CharRemoveEvent);
@@ -36,10 +37,10 @@ namespace DEngine::Gui
 		
 		// TEMPORARY FIELDS
 		StackLayout* outerLayout = nullptr;
-		std::vector<Gfx::GuiVertex> vertices;
-		std::vector<u32> indices;
-		std::vector<Gfx::GuiDrawCmd> drawCmds;
-		std::vector<Gfx::NativeWindowUpdate> windowUpdates;
+		mutable std::vector<Gfx::GuiVertex> vertices;
+		mutable std::vector<u32> indices;
+		mutable std::vector<Gfx::GuiDrawCmd> drawCmds;
+		mutable std::vector<Gfx::NativeWindowUpdate> windowUpdates;
 
 		void* Internal_ImplData() const { return pImplData; }
 

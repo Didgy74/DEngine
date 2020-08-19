@@ -1,11 +1,12 @@
 #include "detail_Application.hpp"
-#include <DEngine/Containers/StaticVector.hpp>
+#include <DEngine/Containers/StackVec.hpp>
 #include "Assert.hpp"
 
 #include <iostream>
 #include <cstring>
 #include <chrono>
 #include <stdexcept>
+#include <algorithm>
 
 namespace DEngine::Application::detail
 {
@@ -165,7 +166,7 @@ namespace DEngine::Application::detail
 	}
 }
 
-Std::StaticVector<Application::TouchInput, 10> Application::TouchInputs()
+Std::StackVec<Application::TouchInput, 10> Application::TouchInputs()
 {
 	return detail::pAppData->touchInputs;
 }
@@ -210,8 +211,8 @@ void Application::detail::ProcessEvents()
 	{
 		if (appData.touchInputs[i].eventType == TouchEventType::Up)
 		{
-			appData.touchInputs.Erase(i);
-			appData.touchInputStartTime.Erase(i);
+			appData.touchInputs.EraseUnsorted(i);
+			appData.touchInputStartTime.EraseUnsorted(i);
 			i -= 1;
 		}
 		else
@@ -423,10 +424,10 @@ void Application::detail::UpdateTouchInput(TouchEventType type, u8 id, f32 x, f3
 		eventCallback->TouchEvent(id, type, { x, y });
 }
 
-Std::Optional<Application::GamepadState> Application::GetGamepad()
+Std::Opt<Application::GamepadState> Application::GetGamepad()
 {
 	if (detail::pAppData->gamepadConnected)
-		return detail::pAppData->gamepadState;
+		return Std::Opt{ detail::pAppData->gamepadState };
 	else
 		return {};
 }

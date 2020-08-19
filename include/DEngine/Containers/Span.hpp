@@ -2,7 +2,8 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Containers/detail/Assert.hpp>
-#include <DEngine/Containers/Optional.hpp>
+#include <DEngine/Containers/Opt.hpp>
+#include <DEngine/Containers/IteratorPair.hpp>
 
 #include <stdexcept>
 
@@ -20,22 +21,19 @@ namespace DEngine::Std
 		[[nodiscard]] constexpr Span<T const> ConstSpan() const noexcept;
 		constexpr operator Span<T const>() const noexcept;
 
+		[[nodiscard]] constexpr Range<T*> AsRange() const noexcept;
+		constexpr operator Range<T*>() const noexcept;
+
 		[[nodiscard]] T* Data() const noexcept;
 
 		[[nodiscard]] uSize Size() const noexcept;
 
-		template<typename Callable>
-		[[nodiscard]] Std::Optional<uSize> FindIf(Callable&& test) const;
-
 		[[nodiscard]] T& At(uSize i) const;
 
-		[[nodiscard]] T& operator[](uSize i);
-		[[nodiscard]] T const& operator[](uSize i) const;
+		[[nodiscard]] T& operator[](uSize i) const;
 
-		[[nodiscard]] T* begin() noexcept;
-		[[nodiscard]] T const* begin() const noexcept;
-		[[nodiscard]] T* end() noexcept;
-		[[nodiscard]] T const* end() const noexcept;
+		[[nodiscard]] T* begin() const noexcept;
+		[[nodiscard]] T* end() const noexcept;
 
 	private:
 		T* data = nullptr;
@@ -52,6 +50,15 @@ namespace DEngine::Std
 	constexpr Span<T const> Span<T>::ConstSpan() const noexcept
 	{
 		return Span<T const>(data, size);
+	}
+
+	template<typename T>
+	constexpr Range<T*> Span<T>::AsRange() const noexcept
+	{
+		Range<T*> returnVal;
+		returnVal.begin = begin();
+		returnVal.end = end();
+		return returnVal;
 	}
 
 	template<typename T>
@@ -73,20 +80,6 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	template<typename Callable>
-	Std::Optional<uSize> Span<T>::FindIf(Callable&& test) const
-	{
-		if (data == nullptr)
-			return {};
-		for (uSize i = 0; i < Size(); i += 1)
-		{
-			if (test(data[i]))
-				return i;
-		}
-		return {};
-	}
-
-	template<typename T>
 	T& Span<T>::At(uSize i) const
 	{
 		if (data == nullptr)
@@ -97,37 +90,19 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	T& Span<T>::operator[](uSize i)
+	T& Span<T>::operator[](uSize i) const
 	{
 		return At(i);
 	}
 
 	template<typename T>
-	T const& Span<T>::operator[](uSize i) const
-	{
-		return At(i);
-	}
-
-	template<typename T>
-	T* Span<T>::begin() noexcept
+	T* Span<T>::begin() const noexcept
 	{
 		return data;
 	}
 
 	template<typename T>
-	T const* Span<T>::begin() const noexcept
-	{
-		return data;
-	}
-
-	template<typename T>
-	T* Span<T>::end() noexcept
-	{
-		return data + size;
-	}
-
-	template<typename T>
-	T const* Span<T>::end() const noexcept
+	T* Span<T>::end() const noexcept
 	{
 		return data + size;
 	}

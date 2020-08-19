@@ -14,37 +14,37 @@ f32 Math::Round(f32 input)
 
 f32 Math::Sqrt(f32 input)
 {
-    return std::sqrtf(input);
+    return sqrtf(input);
 }
 
 f64 Math::Sqrt(f64 input)
 {
-    return std::sqrtl(input);
+    return sqrtl(input);
 }
 
 f32 Math::Pow(f32 coefficient, f32 exponent)
 {
-    return std::powf(coefficient, exponent);
+    return powf(coefficient, exponent);
 }
 
 f64 Math::Pow(f64 coefficient, f64 exponent)
 {
-    return std::powl(coefficient, exponent);
+    return powl(coefficient, exponent);
 }
 
 f32 Math::Sin(f32 radians)
 {
-    return std::sinf(radians);
+    return sinf(radians);
 }
 
 f32 Math::Cos(f32 radians)
 {
-    return std::cosf(radians);
+    return cosf(radians);
 }
 
 f32 Math::Tan(f32 radians)
 {
-    return std::tanf(radians);
+    return tanf(radians);
 }
 
 Math::Matrix<3, 3, f32> Math::LinearTransform3D::Rotate(ElementaryAxis axis, f32 amountRadians)

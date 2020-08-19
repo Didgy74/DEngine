@@ -57,6 +57,7 @@ Vk::DeviceDispatchRaw Vk::DeviceDispatchRaw::Build(
 	returnVal.vkCmdNextSubpass = (PFN_vkCmdNextSubpass)getDeviceProcAddr(device, "vkCmdNextSubpass");
 	returnVal.vkCmdPipelineBarrier = (PFN_vkCmdPipelineBarrier)getDeviceProcAddr(device, "vkCmdPipelineBarrier");
 	returnVal.vkCmdPushConstants = (PFN_vkCmdPushConstants)getDeviceProcAddr(device, "vkCmdPushConstants");
+	returnVal.vkCmdSetScissor = (PFN_vkCmdSetScissor)getDeviceProcAddr(device, "vkCmdSetScissor");
 	returnVal.vkCmdSetViewport = (PFN_vkCmdSetViewport)getDeviceProcAddr(device, "vkCmdSetViewport");
 	returnVal.vkCreateBuffer = (PFN_vkCreateBuffer)getDeviceProcAddr(device, "vkCreateBuffer");
 	returnVal.vkCreateBufferView = (PFN_vkCreateBufferView)getDeviceProcAddr(device, "vkCreateBufferView");
@@ -674,6 +675,18 @@ void Vk::DeviceDispatch::cmdPushConstants(
 		offset,
 		size,
 		pValues);
+}
+
+void Vk::DeviceDispatch::cmdSetScissor(
+	vk::CommandBuffer commandBuffer,
+	std::uint32_t firstScissor,
+	vk::ArrayProxy<vk::Rect2D const> scissors) const
+{
+	raw.vkCmdSetScissor(
+		static_cast<VkCommandBuffer>(commandBuffer),
+		firstScissor,
+		scissors.size(),
+		reinterpret_cast<VkRect2D const*>(scissors.data()));
 }
 
 void Vk::DeviceDispatch::cmdSetViewport(

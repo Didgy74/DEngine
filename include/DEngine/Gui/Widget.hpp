@@ -1,8 +1,9 @@
 #pragma once
 
-#include <DEngine/Gui/Events.hpp>
-#include <DEngine/Gui/Utility.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
+#include <DEngine/Gui/Events.hpp>
+#include <DEngine/Gui/SizeHint.hpp>
+#include <DEngine/Gui/Utility.hpp>
 
 namespace DEngine::Gui
 {
@@ -19,10 +20,17 @@ namespace DEngine::Gui
 		Widget& operator=(Widget const&) = delete;
 		Widget& operator=(Widget&&) = delete;
 
+		[[nodiscard]] virtual Gui::SizeHint SizeHint(
+			Context const& ctx) const = 0;
+
+		[[nodiscard]] virtual Gui::SizeHint SizeHint_Tick(
+			Context const& ctx) = 0;
+
 		virtual void Render(
-			Context& ctx,
+			Context const& ctx,
 			Extent framebufferExtent,
 			Rect widgetRect,
+			Rect visibleRect,
 			DrawInfo& drawInfo) const {}
 
 		virtual void CharEvent(
@@ -33,21 +41,28 @@ namespace DEngine::Gui
 			Context& ctx) {}
 
 		virtual void CursorMove(
+			Context& ctx,
 			Rect widgetRect,
+			Rect visibleRect,
 			CursorMoveEvent event) {}
 
 		virtual void CursorClick(
+			Context& ctx,
 			Rect widgetRect,
+			Rect visibleRect,
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) {}
 
 		virtual void TouchEvent(
+			Context& ctx,
 			Rect widgetRect,
-			TouchEvent touch) {}
+			Rect visibleRect,
+			TouchEvent event) {}
 
 		virtual void Tick(
 			Context& ctx,
-			Rect widgetRect) {}
+			Rect widgetRect,
+			Rect visibleRect) {}
 	};
 
 	inline Widget::~Widget() {}

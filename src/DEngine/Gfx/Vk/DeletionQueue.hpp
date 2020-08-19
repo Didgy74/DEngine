@@ -6,7 +6,7 @@
 
 #include <DEngine/Gfx/detail/Assert.hpp>
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/StaticVector.hpp"
+#include "DEngine/Containers/StackVec.hpp"
 #include "DEngine/Containers/Pair.hpp"
 
 #include "VMAIncluder.hpp"
@@ -102,7 +102,7 @@ namespace DEngine::Gfx::Vk
 			std::vector<Job> jobs;
 			std::vector<u8> customData;
 		};
-		mutable Std::StaticVector<InFlightQueue, Constants::maxInFlightCount> jobQueues{};
+		mutable Std::StackVec<InFlightQueue, Constants::maxInFlightCount> jobQueues{};
 		mutable InFlightQueue tempQueue{};
 
 		struct FencedJob

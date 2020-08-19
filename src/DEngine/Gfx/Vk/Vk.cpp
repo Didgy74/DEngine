@@ -4,7 +4,7 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Containers/Span.hpp>
-#include <DEngine/Containers/StaticVector.hpp>
+#include <DEngine/Containers/StackVec.hpp>
 // For file IO
 #include <DEngine/Application.hpp>
 

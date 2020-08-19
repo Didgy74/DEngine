@@ -5,21 +5,41 @@
 #include <DEngine/Math/Vector.hpp>
 
 #include <string>
+#include <string_view>
 
 namespace DEngine::Gui
 {
 	class Text : public Widget
 	{
 	public:
-		std::string text;
+		using ParentType = Widget;
+
 		Math::Vec4 color = Math::Vec4::One();
 		
 		virtual ~Text() override {}
 
+		void String_Set(char const* string);
+		void String_PushBack(u8 value);
+		void String_PopBack();
+		[[nodiscard]] std::string_view StringView() const;
+
+
+		[[nodiscard]] virtual Gui::SizeHint SizeHint(
+			Context const& ctx) const override;
+
+		[[nodiscard]] virtual Gui::SizeHint SizeHint_Tick(
+			Context const& ctx) override;
+
 		virtual void Render(
-			Context& ctx,
+			Context const& ctx,
 			Extent framebufferExtent,
 			Rect widgetRect,
+			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
+
+	private:
+		mutable bool invalidated = true;
+		mutable Gui::SizeHint cachedSizeHint{};
+		std::string text;
 	};
 }

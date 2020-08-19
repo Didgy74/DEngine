@@ -10,6 +10,8 @@ namespace DEngine::Gui
 	class Button : public Widget
 	{
 	public:
+		using ParentType = Widget;
+
 		Button();
 		virtual ~Button() {}
 
@@ -45,22 +47,35 @@ namespace DEngine::Gui
 		bool GetToggled() const;
 
 		virtual void CursorMove(
+			Context& ctx,
 			Rect widgetRect,
+			Rect visibleRect,
 			CursorMoveEvent event) override;
 
 		virtual void CursorClick(
+			Context& ctx,
 			Rect widgetRect,
+			Rect visibleRect,
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
 		virtual void TouchEvent(
+			Context& ctx,
 			Rect widgetRect,
-			Gui::TouchEvent touch) override;
+			Rect visibleRect,
+			Gui::TouchEvent event) override;
+
+		[[nodiscard]] virtual Gui::SizeHint SizeHint(
+			Context const& ctx) const override;
+
+		[[nodiscard]] virtual Gui::SizeHint SizeHint_Tick(
+			Context const& ctx) override;
 
 		virtual void Render(
-			Context& ctx,
+			Context const& ctx,
 			Extent framebufferExtent,
 			Rect widgetRect,
+			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
 	private:

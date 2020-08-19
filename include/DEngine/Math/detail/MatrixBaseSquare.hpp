@@ -1,10 +1,9 @@
 #pragma once
 
+#include <DEngine/Containers/Opt.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
-
 #include <DEngine/Math/detail/MatrixBase.hpp>
 #include <DEngine/Math/Trait.hpp>
-#include <DEngine/Containers/Optional.hpp>
 
 namespace DEngine::Math
 {
@@ -58,7 +57,7 @@ namespace DEngine::Math
 					return 1;
 			}
 
-			[[nodiscard]] constexpr Std::Optional<Math::Matrix<width, width, T>> GetInverse() const
+			[[nodiscard]] constexpr Std::Opt<Math::Matrix<width, width, T>> GetInverse() const
 			{
 				Math::Matrix<width, width, T> adjugate = GetAdjugate();
 				T determinant = T();
@@ -68,7 +67,7 @@ namespace DEngine::Math
 				{
 					for (size_t i = 0; i < width * width; i += 1)
 						adjugate.data[i] /= determinant;
-					return adjugate;
+					return Std::Opt{ adjugate };
 				}
 				else
 					return {};

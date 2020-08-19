@@ -18,7 +18,7 @@
 #include "DEngine/Gfx/Gfx.hpp"
 
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/StaticVector.hpp"
+#include "DEngine/Containers/StackVec.hpp"
 #include "DEngine/Containers/Array.hpp"
 #include "DEngine/Containers/Pair.hpp"
 
@@ -81,7 +81,7 @@ namespace DEngine::Gfx::Vk
 		// Do not touch this.
 		VMA_MemoryTrackingData vma_trackingData{};
 
-		Std::StaticVector<vk::Fence, Constants::maxInFlightCount> mainFences{};
+		Std::StackVec<vk::Fence, Constants::maxInFlightCount> mainFences{};
 
 		GlobUtils globUtils{};
 

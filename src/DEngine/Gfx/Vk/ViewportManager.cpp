@@ -111,7 +111,7 @@ namespace DEngine::Gfx::Vk
 		vk::DescriptorSetAllocateInfo descrSetAllocInfo{};
 		descrSetAllocInfo.descriptorPool = viewport.cameraDescrPool;
 		descrSetAllocInfo.descriptorSetCount = globUtils.inFlightCount;
-		Std::StaticVector<vk::DescriptorSetLayout, Constants::maxInFlightCount> descrLayouts;
+		Std::StackVec<vk::DescriptorSetLayout, Constants::maxInFlightCount> descrLayouts;
 		descrLayouts.Resize(globUtils.inFlightCount);
 		for (auto& item : descrLayouts)
 			item = cameraDescrLayout;
@@ -175,9 +175,9 @@ namespace DEngine::Gfx::Vk
 		
 
 		// Update descriptor sets
-		Std::StaticVector<vk::WriteDescriptorSet, Constants::maxInFlightCount> writes{};
+		Std::StackVec<vk::WriteDescriptorSet, Constants::maxInFlightCount> writes{};
 		writes.Resize(globUtils.inFlightCount);
-		Std::StaticVector<vk::DescriptorBufferInfo, Constants::maxInFlightCount> bufferInfos{};
+		Std::StackVec<vk::DescriptorBufferInfo, Constants::maxInFlightCount> bufferInfos{};
 		bufferInfos.Resize(globUtils.inFlightCount);
 		for (uSize i = 0; i < globUtils.inFlightCount; i += 1)
 		{

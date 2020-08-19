@@ -6,7 +6,7 @@
 #include "Constants.hpp"
 #include "VMAIncluder.hpp"
 
-#include "DEngine/Containers/StaticVector.hpp"
+#include "DEngine/Containers/StackVec.hpp"
 
 #include <vector>
 #include <mutex>
@@ -26,9 +26,9 @@ namespace DEngine::Gfx::Vk
 		WsiInterface* wsiConnection = nullptr;
 		vk::SurfaceKHR surface{};
 		vk::SwapchainKHR swapchain{};
-		Std::StaticVector<vk::Image, Constants::maxSwapchainLength> swapchainImages{};
+		Std::StackVec<vk::Image, Constants::maxSwapchainLength> swapchainImages{};
 		// Has length of resource sets
-		Std::StaticVector<vk::CommandBuffer, Constants::maxInFlightCount> copyCmdBuffers{};
+		Std::StackVec<vk::CommandBuffer, Constants::maxInFlightCount> copyCmdBuffers{};
 		vk::Semaphore swapchainImageReady{};
 	};
 
@@ -40,10 +40,11 @@ namespace DEngine::Gfx::Vk
 		vk::ImageView imgView{};
 		vk::Framebuffer framebuffer{};
 
+		vk::SurfaceTransformFlagBitsKHR surfaceRotation = vk::SurfaceTransformFlagBitsKHR::eIdentity;
 		Math::Mat2 rotation{};
 
 		vk::CommandPool cmdPool{};
-		Std::StaticVector<vk::CommandBuffer, Constants::maxInFlightCount> cmdBuffers{};
+		Std::StackVec<vk::CommandBuffer, Constants::maxInFlightCount> cmdBuffers{};
 	};
 
 	struct NativeWindowManager

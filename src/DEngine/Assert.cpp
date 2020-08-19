@@ -5,7 +5,11 @@
 
 namespace DEngine::detail
 {
-	[[noreturn]] void Assert(char const* conditionString, const char* file, unsigned long long line, const char* msg)
+	[[noreturn]] void Assert(
+		char const* conditionString,
+		const char* file,
+		unsigned long long line, 
+		const char* msg)
 	{
 		std::cout << std::endl;
 		std::cout << "#################" << std::endl;
