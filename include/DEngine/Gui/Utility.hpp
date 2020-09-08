@@ -34,25 +34,18 @@ namespace DEngine::Gui
 		Math::Vec2Int position{};
 		Extent extent{};
 
-		[[nodiscard]] constexpr bool IsNothing() const noexcept { return extent.width == 0 || extent.height == 0; }
+		[[nodiscard]] constexpr bool IsNothing() const noexcept;
 
 		[[nodiscard]] constexpr bool PointIsInside(Math::Vec2Int point) const noexcept;
 		[[nodiscard]] constexpr bool PointIsInside(Math::Vec2 point) const noexcept;
 
-		[[nodiscard]] constexpr static Rect Intersection(Rect const& a, Rect const& b) noexcept
-		{
-			Rect returnVal{};
-			for (uSize i = 0; i < 2; i += 1)
-			{
-				i32 minPoint = Math::Max(a.position[i], b.position[i]);
-				returnVal.position[i] = minPoint;
-				i32 maxPoint = Math::Min(a.position[i] + (i32)a.extent[i], b.position[i] + (i32)b.extent[i]);
-				returnVal.extent[i] = (u32)Math::Max(0, maxPoint - returnVal.position[i]);
-			}
-			return returnVal;
-		}
+		[[nodiscard]] constexpr static Rect Intersection(Rect const&, Rect const&) noexcept;
+
+		[[nodiscard]] constexpr bool operator==(Rect const&) const noexcept;
 	};
 }
+
+constexpr bool DEngine::Gui::Rect::IsNothing() const noexcept { return extent.width == 0 || extent.height == 0; }
 
 constexpr bool DEngine::Gui::Rect::PointIsInside(Math::Vec2Int point) const noexcept
 {
@@ -64,4 +57,22 @@ constexpr bool DEngine::Gui::Rect::PointIsInside(Math::Vec2 point) const noexcep
 {
 	return point.x >= (f32)position.x && point.x < (f32)position.x + (f32)extent.width &&
 		point.y >= (f32)position.y && point.y < (f32)position.y + (f32)extent.height;
+}
+
+constexpr DEngine::Gui::Rect DEngine::Gui::Rect::Intersection(Rect const& a, Rect const& b) noexcept
+{
+	Rect returnVal{};
+	for (uSize i = 0; i < 2; i += 1)
+	{
+		i32 minPoint = Math::Max(a.position[i], b.position[i]);
+		returnVal.position[i] = minPoint;
+		i32 maxPoint = Math::Min(a.position[i] + (i32)a.extent[i], b.position[i] + (i32)b.extent[i]);
+		returnVal.extent[i] = (u32)Math::Max(0, maxPoint - returnVal.position[i]);
+	}
+	return returnVal;
+}
+
+constexpr bool DEngine::Gui::Rect::operator==(Rect const& other) const noexcept
+{
+	return position == other.position && extent.width == other.extent.width && extent.height == other.extent.height;
 }

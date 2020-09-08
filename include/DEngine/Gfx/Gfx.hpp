@@ -114,18 +114,11 @@ namespace DEngine::Gfx
 		{
 			ViewportID id;
 		};
-		struct Scissor
-		{
-			Math::Vec2Int position;
-			u32 width;
-			u32 height;
-		};
 		union
 		{
 			FilledMesh filledMesh;
 			TextGlyph textGlyph;
 			Viewport viewport;
-			Scissor scissor;
 		};
 		// In the range of 0-1
 		Math::Vec2 rectPosition;

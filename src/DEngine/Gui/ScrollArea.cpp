@@ -68,25 +68,20 @@ void ScrollArea::Render(
   Gui::SizeHint childSizeHint{};
   if (layout)
     childSizeHint = layout->SizeHint(ctx);
-  else if (widget)
+  else
     childSizeHint = widget->SizeHint(ctx);
 
   Rect childRect = widgetRect;
   childRect.position.y -= scrollBarPos;
   childRect.extent = childSizeHint.preferred;
 
+  Rect childVisibleRect = Rect::Intersection(childRect, visibleRect);
+
   bool scissorAdded = false;
-  //if ((layout || widget) && childRect.extent.width > 0 && childRect.extent.height > 0)
-  if (layout || widget)
+  if ((layout || widget) && !childVisibleRect.IsNothing())
   {
-    // Add scissor drawcmd
-    Gfx::GuiDrawCmd cmd{};
-    cmd.type = Gfx::GuiDrawCmd::Type::Scissor;
-    cmd.scissor.position = widgetRect.position;
-    cmd.scissor.width = widgetRect.extent.width;
-    cmd.scissor.height = widgetRect.extent.height;
-    drawInfo.drawCmds.push_back(cmd);
     scissorAdded = true;
+    drawInfo.PushScissor(childVisibleRect);
   }
 
   if (childType == ChildType::Layout)
@@ -95,7 +90,7 @@ void ScrollArea::Render(
       ctx,
       framebufferExtent,
       childRect,
-      Rect::Intersection(childRect, visibleRect),
+      childVisibleRect,
       drawInfo);
   } 
   else if (childType == ChildType::Widget)
@@ -104,20 +99,13 @@ void ScrollArea::Render(
       ctx,
       framebufferExtent,
       childRect,
-      Rect::Intersection(childRect, visibleRect),
+      childVisibleRect,
       drawInfo);
   }
 
   // Add scissor remove drawcmd
   if (scissorAdded)
-  {
-    Gfx::GuiDrawCmd cmd{};
-    cmd.type = Gfx::GuiDrawCmd::Type::Scissor;
-    cmd.scissor.position = {};
-    cmd.scissor.width = framebufferExtent.width;
-    cmd.scissor.height = framebufferExtent.height;
-    drawInfo.drawCmds.push_back(cmd);
-  }
+    drawInfo.PopScissor();
 
   // Draw scrollbar
   {

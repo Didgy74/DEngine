@@ -10,21 +10,25 @@ namespace DEngine::Std
 	public:
 		using ValueType = T;
 
-		Box() noexcept = default;
-		Box(Box<T> const&) = delete;
-		Box(Box<T>&&) noexcept;
-		Box(T* ptr) noexcept;
+		Box() noexcept;
+		Box(Box const&) = delete;
+		Box(Box&&) noexcept;
+		explicit Box(T* ptr) noexcept;
 		~Box();
 
-		Box<T>& operator=(Box<T> const&) = delete;
-		Box<T>& operator=(Box<T>&&) noexcept;
+		Box& operator=(Box const&) = delete;
+		Box& operator=(Box&&) noexcept;
 
-		T* Get() noexcept;
-		T const* Get() const noexcept;
-		T* operator->() noexcept;
-		T const* operator->() const noexcept;
+		[[nodiscard]] T* Get() noexcept;
+		[[nodiscard]] T const* Get() const noexcept;
+		[[nodiscard]] T* operator->() noexcept;
+		[[nodiscard]] T const* operator->() const noexcept;
+		[[nodiscard]] T& operator*() const noexcept;
 
-		operator bool() const noexcept;
+		[[nodiscard]] operator bool() const noexcept;
+
+		[[nodiscard]] bool operator==(Box const&) const noexcept;
+		[[nodiscard]] bool operator==(T const*) const noexcept;
 
 		void Release() noexcept;
 
@@ -33,7 +37,13 @@ namespace DEngine::Std
 	};
 
 	template<typename T>
-	inline Box<T>::Box(Box<T>&& other) noexcept :
+	inline Box<T>::Box() noexcept :
+		data(nullptr)
+	{
+	}
+
+	template<typename T>
+	inline Box<T>::Box(Box&& other) noexcept :
 		data(other.data)
 	{
 		other.data = nullptr;
@@ -52,7 +62,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	inline Box<T>& Box<T>::operator=(Box<T>&& right) noexcept
+	inline Box<T>& Box<T>::operator=(Box&& right) noexcept
 	{
 		if (this == &right)
 			return *this;
@@ -88,9 +98,24 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
+	inline T& Box<T>::operator*() const noexcept
+	{
+		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+			data != nullptr,
+			"Attempted to dereference a Std::Box with a nullptr value.");
+		return *data;
+	}
+
+	template<typename T>
 	inline Box<T>::operator bool() const noexcept
 	{
 		return data != nullptr;
+	}
+
+	template<typename T>
+	inline bool Box<T>::operator==(T const* other) const noexcept
+	{
+		return data == other;
 	}
 
 	template<typename T>

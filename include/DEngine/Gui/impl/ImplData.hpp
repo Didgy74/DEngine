@@ -120,7 +120,7 @@ namespace DEngine::Gui::impl
 			Gui::Rect widgetRect,
 			DrawInfo& drawInfo);
 
-		static SizeHint GetSizeHint(
+		[[nodiscard]] static SizeHint GetSizeHint(
 			TextManager& manager,
 			std::string_view st);
 	};

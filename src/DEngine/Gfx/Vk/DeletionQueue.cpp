@@ -192,6 +192,9 @@ void DeletionQueue::Destroy(
 	Std::Span<vk::CommandBuffer const> cmdBuffers) const
 {
 	DENGINE_DETAIL_GFX_ASSERT(cmdPool != vk::CommandPool());
+	DENGINE_DETAIL_GFX_ASSERT(
+		Std::AllOf(cmdBuffers.AsRange(),
+		[](vk::CommandBuffer cmdBuffer) -> bool { return cmdBuffer != vk::CommandBuffer{}; }));
 
 	std::lock_guard lockGuard{ accessMutex };
 

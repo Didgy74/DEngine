@@ -31,19 +31,16 @@ namespace DEngine::Gfx::Vk
 		void*& apiDataBuffer);
 }
 
-Std::Opt<Gfx::Context> Gfx::Initialize(const InitInfo& initInfo)
+Std::Opt<Gfx::Context> Gfx::Initialize(InitInfo const& initInfo)
 {
 	Gfx::Context returnVal{};
 
 	returnVal.logger = initInfo.optional_logger;
 	returnVal.texAssetInterface = initInfo.texAssetInterface;
 
-	if (initInfo.optional_logger)
-		initInfo.optional_logger->log(LogInterface::Level::Info, "Logger test");
-
 	Vk::InitializeBackend(returnVal, initInfo, returnVal.apiDataBuffer);
 
-	return Std::Opt<Gfx::Context>(Std::Move(returnVal));
+	return Std::Opt<Gfx::Context>{ Std::Move(returnVal) };
 }
 
 void Gfx::Context::Draw(DrawParams const& params)

@@ -12,6 +12,9 @@ namespace DEngine::Gui
 	class Layout
 	{
 	public:
+		Layout() noexcept = default;
+		Layout(Layout const&) = delete;
+		Layout(Layout&&) noexcept = default;
 		inline virtual ~Layout() = 0;
 
 		[[nodiscard]] virtual Gui::SizeHint SizeHint(

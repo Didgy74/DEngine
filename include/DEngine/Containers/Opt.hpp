@@ -1,9 +1,7 @@
 #pragma once
 
-#include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Containers/detail/Assert.hpp>
 
-#include <stdexcept>
 #include <new>
 
 namespace DEngine::Std
@@ -167,16 +165,18 @@ namespace DEngine::Std
 	template<typename T>
 	T const& Opt<T>::Value() const
 	{
-		if (!hasValue)
-			throw std::runtime_error("Tried to deference Opt-variable without Value.");
+		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+			hasValue,
+			"Tried to deference Opt without a value.");
 		return value;
 	}
 
 	template<typename T>
 	T& Opt<T>::Value()
 	{
-		if (!hasValue)
-			throw std::runtime_error("Tried to deference Opt-variable without Value.");
+		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+			hasValue,
+			"Tried to deference Opt without a value.");
 		return value;
 	}
 

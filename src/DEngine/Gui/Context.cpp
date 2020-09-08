@@ -5,6 +5,7 @@
 #include <DEngine/Utility.hpp>
 
 #include <vector>
+#include <string_view>
 #include <algorithm>
 
 using namespace DEngine;
@@ -35,8 +36,8 @@ Context Context::Create(Gfx::Context* gfxCtx)
 		newNode.data.clearColor = { 0.1f, 0.1f, 0.1f, 1.f };
 
 		StackLayout* outmostLayout = new StackLayout(StackLayout::Direction::Vertical);
-		newNode.data.topLayout = outmostLayout;
-		implData.windows.push_back(Std::Move(newNode));
+		newNode.data.topLayout = Std::Box<Layout>{ outmostLayout };
+		implData.windows.emplace_back(Std::Move(newNode));
 
 		newCtx.outerLayout = outmostLayout;
 	}
@@ -371,6 +372,7 @@ void Context::Render() const
 		if (windowNode.data.topLayout)
 		{
 			DrawInfo drawInfo(
+				windowNode.data.rect.extent,
 				vertices,
 				indices,
 				drawCmds);

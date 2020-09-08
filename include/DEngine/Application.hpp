@@ -51,6 +51,9 @@ namespace DEngine::Application
 		uSize vkInstance,
 		void const* vkAllocationCallbacks);
 
+	enum class CursorType : u8;
+	void SetCursor(WindowID window, CursorType cursor);
+
 	enum class Orientation : u8;
 	Orientation GetOrientation();
 	bool GetOrientationEvent();
@@ -97,6 +100,16 @@ namespace DEngine
 {
 	namespace App = Application;
 }
+
+enum class DEngine::Application::CursorType : DEngine::u8
+{
+	Arrow,
+	HorizontalResize,
+	VerticalResize,
+#ifdef DENGINE_APPLICATION_CURSORTYPE_COUNT
+	COUNT,
+#endif
+};
 
 enum class DEngine::Application::Orientation : DEngine::u8
 {

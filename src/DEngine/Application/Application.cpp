@@ -361,7 +361,7 @@ void Application::detail::UpdateCursor(
 
 	CursorData& cursorData = pAppData->cursorOpt.Value();
 	cursorData.position = newPosition;
-	cursorData.positionDelta = delta;
+	cursorData.positionDelta += delta;
 	
 	for (EventInterface* eventCallback : pAppData->eventCallbacks)
 		eventCallback->CursorMove(cursorData.position, cursorData.positionDelta);

@@ -2,6 +2,7 @@
 #include "ContextImpl.hpp"
 
 #include <DEngine/Gui/Button.hpp>
+#include <DEngine/Gui/DockArea.hpp>
 #include <DEngine/Gui/Image.hpp>
 #include <DEngine/Gui/LineEdit.hpp>
 #include <DEngine/Gui/ScrollArea.hpp>
@@ -414,17 +415,17 @@ namespace DEngine::Editor
 
 			// Create the horizontal position stuff layout
 			Gui::StackLayout* positionLayout = new StackLayout(StackLayout::Direction::Horizontal);
-			this->AddLayout2(positionLayout);
+			this->AddLayout2(Std::Box<Layout>{ positionLayout });
 			positionLayout->spacing = 10;
 
 			// Create the Position: text
 			Gui::Text* positionText = new Gui::Text;
-			positionLayout->AddWidget2(positionText);
+			positionLayout->AddWidget2(Std::Box<Gui::Widget>{ positionText });
 			positionText->String_Set("Position: ");
 
 			// Create the Position input field
 			Gui::LineEdit* positionInputX = new Gui::LineEdit;
-			positionLayout->AddWidget2(positionInputX);
+			positionLayout->AddWidget2(Std::Box<Gui::Widget>{ positionInputX });
 			positionInputX->type = Gui::LineEdit::Type::Float;
 			positionInputX->String_Set(std::to_string(transform.position.x).c_str());
 			positionInputX->textChangedPfn = [entityId, scene](Gui::LineEdit& widget)
@@ -447,7 +448,7 @@ namespace DEngine::Editor
 
 			// Create the Position input field
 			Gui::LineEdit* positionInputY = new Gui::LineEdit;
-			positionLayout->AddWidget2(positionInputY);
+			positionLayout->AddWidget2(Std::Box<Gui::Widget>{ positionInputY });
 			positionInputY->String_Set(std::to_string(transform.position.y).c_str());
 			positionInputY->textChangedPfn = [entityId, scene](Gui::LineEdit& widget)
 			{
@@ -468,7 +469,7 @@ namespace DEngine::Editor
 			};
 
 			Gui::LineEdit* positionInputZ = new Gui::LineEdit;
-			positionLayout->AddWidget2(positionInputZ);
+			positionLayout->AddWidget2(Std::Box<Gui::Widget>{ positionInputZ });
 			positionInputZ->String_Set(std::to_string(transform.position.z).data());
 			positionInputZ->textChangedPfn = [entityId, scene](Gui::LineEdit& widget)
 			{
@@ -506,16 +507,16 @@ namespace DEngine::Editor
 
 			// Create the horizontal position stuff layout
 			Gui::StackLayout* positionLayout = new StackLayout(StackLayout::Direction::Horizontal);
-			this->AddLayout2(positionLayout);
+			this->AddLayout2(Std::Box<Gui::Layout>{ positionLayout });
 
 			// Create the Position: text
 			Gui::Text* positionText = new Gui::Text;
-			positionLayout->AddWidget2(positionText);
+			positionLayout->AddWidget2(Std::Box<Gui::Widget>{positionText });
 			positionText->String_Set("Texture: ");
 
 			// Create the Position input field
 			Gui::LineEdit* positionInputX = new Gui::LineEdit;
-			positionLayout->AddWidget2(positionInputX);
+			positionLayout->AddWidget2(Std::Box<Gui::Widget>{ positionInputX });
 			positionInputX->type = Gui::LineEdit::Type::Integer;
 			positionInputX->String_Set(std::to_string((int)textureId).c_str());
 			positionInputX->textChangedPfn = [entityId, scene](Gui::LineEdit& widget)
@@ -545,14 +546,10 @@ namespace DEngine::Editor
 			this->direction = Direction::Vertical;
 
 			Gui::StackLayout* topElementLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-			this->AddLayout2({ topElementLayout });
-
-			Gui::Text* entityIdText = new Gui::Text;
-			topElementLayout->AddWidget2({ entityIdText });
-			entityIdText->String_Set("Entities");
+			this->AddLayout2(Std::Box<Gui::Layout>{ topElementLayout });
 
 			Gui::Button* newEntityButton = new Gui::Button;
-			topElementLayout->AddWidget2({ newEntityButton });
+			topElementLayout->AddWidget2(Std::Box<Gui::Widget>{ newEntityButton });
 			newEntityButton->textWidget.String_Set("New");
 			newEntityButton->activatePfn = [this](Gui::Button& btn)
 			{
@@ -561,7 +558,7 @@ namespace DEngine::Editor
 			};
 
 			Gui::Button* entityDeleteButton = new Gui::Button;
-			topElementLayout->AddWidget2({ entityDeleteButton });
+			topElementLayout->AddWidget2(Std::Box<Gui::Widget>{ entityDeleteButton });
 			entityDeleteButton->textWidget.String_Set("Delete");
 			entityDeleteButton->activatePfn = [this](Gui::Button& btn)
 			{
@@ -578,11 +575,11 @@ namespace DEngine::Editor
 			};
 			
 			Gui::ScrollArea* entityListScrollArea = new Gui::ScrollArea();
-			this->AddLayout2({ entityListScrollArea });
+			this->AddLayout2(Std::Box<Gui::Layout>{ entityListScrollArea });
 
 			entitiesListLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
 			entityListScrollArea->childType = Gui::ScrollArea::ChildType::Layout;
-			entityListScrollArea->layout = entitiesListLayout;
+			entityListScrollArea->layout = Std::Box<Gui::Layout>{ entitiesListLayout };
 
 			for (uSize i = 0; i < ctxImpl->scene->entities.size(); i++)
 			{
@@ -599,15 +596,15 @@ namespace DEngine::Editor
 		void AddEntityToList(Entity id)
 		{
 			Gui::StackLayout* entityListItemLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-			entitiesListLayout->AddLayout2({ entityListItemLayout });
+			entitiesListLayout->AddLayout2(Std::Box<Gui::Layout>{ entityListItemLayout });
 			entityEntries.push_back({ id, entityListItemLayout });
 
 			Gui::Text* textWidget = new Gui::Text;
-			entityListItemLayout->AddWidget2({ textWidget });
+			entityListItemLayout->AddWidget2(Std::Box<Gui::Widget>{ textWidget });
 			textWidget->String_Set(std::to_string((u64)id).c_str());
 
 			Gui::Button* entitySelectButton = new Gui::Button;
-			entityListItemLayout->AddWidget2({ entitySelectButton });
+			entityListItemLayout->AddWidget2(Std::Box<Gui::Widget>{ entitySelectButton });
 			entitySelectButton->textWidget.String_Set("Select");
 			entitySelectButton->activatePfn = [this, id](Gui::Button& btn)
 			{
@@ -679,12 +676,8 @@ namespace DEngine::Editor
 
 			direction = Direction::Vertical;
 
-			Gui::Text* componentsText = new Gui::Text;
-			this->AddWidget2({ componentsText });
-			componentsText->String_Set("Components");
-
 			componentWidgetListLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
-			this->AddLayout2({ componentWidgetListLayout });
+			this->AddLayout2(Std::Box<Gui::Layout>{ componentWidgetListLayout });
 		}
 
 	private:
@@ -693,7 +686,7 @@ namespace DEngine::Editor
 			// Add a Transform toggle button
 			// check if Entity has a Transform component
 			Gui::Button* transformButton = new Gui::Button;
-			componentWidgetListLayout->AddWidget2({ transformButton });
+			componentWidgetListLayout->AddWidget2(Std::Box<Gui::Widget>{ transformButton });
 			transformButton->textWidget.String_Set("Transform");
 			transformButton->type = Gui::Button::Type::Toggle;
 			transformButton->activatePfn = [id, this](Gui::Button& btn)
@@ -704,7 +697,7 @@ namespace DEngine::Editor
 					ctxImpl->scene->transforms.push_back(Std::Pair<Entity, Transform>{ id, Transform() });
 
 					TransformWidget* transformWidget = new TransformWidget(id, ctxImpl->scene);
-					componentWidgetListLayout->InsertLayout(1, transformWidget);
+					componentWidgetListLayout->InsertLayout(1, Std::Box<Gui::Layout>{ transformWidget });
 				}
 				else
 				{
@@ -735,7 +728,7 @@ namespace DEngine::Editor
 				transformButton->SetToggled(true);
 
 				TransformWidget* transformWidget = new TransformWidget(id, ctxImpl->scene);
-				componentWidgetListLayout->AddLayout2(transformWidget);
+				componentWidgetListLayout->AddLayout2(Std::Box<Gui::Layout>{ transformWidget });
 			}
 		}
 
@@ -744,7 +737,7 @@ namespace DEngine::Editor
 			// Add a Transform toggle button,
 			// check if Entity has a Transform component
 			Gui::Button* transformButton = new Gui::Button;
-			componentWidgetListLayout->AddWidget2({ transformButton });
+			componentWidgetListLayout->AddWidget2(Std::Box<Gui::Widget>{ transformButton });
 			transformButton->textWidget.String_Set("SpriteRenderer2D");
 			transformButton->type = Gui::Button::Type::Toggle;
 			Scene* scene = this->ctxImpl->scene;
@@ -757,7 +750,7 @@ namespace DEngine::Editor
 					scene->textureIDs.push_back(Std::Pair<Entity, Gfx::TextureID>{ id, Gfx::TextureID() });
 
 					TextureIdWidget* transformWidget = new TextureIdWidget(id, scene);
-					componentWidgetListLayout->AddLayout2(transformWidget);
+					componentWidgetListLayout->AddLayout2(Std::Box<Gui::Layout>{ transformWidget });
 				}
 				else
 				{
@@ -789,7 +782,7 @@ namespace DEngine::Editor
 				transformButton->SetToggled(true);
 
 				TextureIdWidget* transformWidget = new TextureIdWidget(id, scene);
-				componentWidgetListLayout->AddLayout2(transformWidget);
+				componentWidgetListLayout->AddLayout2(Std::Box<Gui::Layout>{ transformWidget });
 			}
 		}
 	public:
@@ -845,19 +838,21 @@ Editor::Context Editor::Context::Create(
 
 	newCtx.implData = new ContextImpl;
 	ContextImpl& implData = *static_cast<ContextImpl*>(newCtx.implData);
-	implData.guiCtx = new DEngine::Gui::Context(DEngine::Gui::Context::Create(gfxCtx));
+	implData.guiCtx = Std::Box{ new DEngine::Gui::Context(DEngine::Gui::Context::Create(gfxCtx)) };
 	implData.gfxCtx = gfxCtx;
 	implData.scene = scene;
 	App::InsertEventInterface(implData);
 
 	{
 		Gui::StackLayout* outmostLayout = implData.guiCtx->outerLayout;
+
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;
 		implData.test_fpsText = deltaText;
 		deltaText->String_Set("Test text");
-		outmostLayout->AddWidget2(deltaText);
+		outmostLayout->AddWidget2(Std::Box<Gui::Widget>{ deltaText });
 
+		/*
 		Gui::StackLayout* innerHorizLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
 		innerHorizLayout->test_expand = true;
 		outmostLayout->AddLayout2(innerHorizLayout);
@@ -874,6 +869,59 @@ Editor::Context Editor::Context::Create(
 		Gui::Text* logWidget = new Gui::Text;
 		outmostLayout->AddWidget2({ logWidget });
 		logWidget->String_Set("Log widget");
+		*/
+
+		Gui::DockArea* dockArea = new Gui::DockArea;
+		outmostLayout->AddLayout2(Std::Box<Gui::Layout>{ dockArea });
+
+		{
+			Gui::DockArea::TopLevelNode newTop{};
+			newTop.rect = { { 0, 0 }, { 400, 400 } };
+			Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
+			newTop.node = Std::Box{ topNode };
+			topNode->type = Gui::DockArea::Node::Type::Window;
+			topNode->windows.push_back(Gui::DockArea::Window{});
+			auto& newWindow = topNode->windows.back();
+			newWindow.title = "Entities";
+			newWindow.titleBarColor = { 0.5f, 0.5f, 0.f, 1.f };
+			EntityIdList* entityIdList = new EntityIdList(&implData);
+			newWindow.layout = Std::Box<Gui::Layout>{ entityIdList };
+
+			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
+		}
+
+		{
+			Gui::DockArea::TopLevelNode newTop{};
+			newTop.rect = { { 150, 150 }, { 400, 400 } };
+			Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
+			newTop.node = Std::Box{ topNode };
+			topNode->type = Gui::DockArea::Node::Type::Window;
+			topNode->windows.push_back(Gui::DockArea::Window{});
+			auto& newWindow = topNode->windows.back();
+			newWindow.title = "Viewport";
+			newWindow.titleBarColor = { 0.5f, 0.f, 0.5f, 1.f };
+			ViewportWidget* viewport = new ViewportWidget(implData, *implData.gfxCtx);
+			newWindow.widget = Std::Box<Gui::Widget>{ viewport };
+
+			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
+		}
+
+		{
+			Gui::DockArea::TopLevelNode newTop{};
+			newTop.rect = { { 250, 250 }, { 400, 400 } };
+			Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
+			newTop.node = Std::Box{ topNode };
+			topNode->type = Gui::DockArea::Node::Type::Window;
+			topNode->windows.push_back(Gui::DockArea::Window{});
+			auto& newWindow = topNode->windows.back();
+			newWindow.title = "Components";
+			newWindow.titleBarColor = { 0.f, 0.5f, 0.5f, 1.f };
+			ComponentList* componentList = new ComponentList(&implData);
+			newWindow.layout = Std::Box<Gui::Layout>{ componentList };
+
+			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
+		}
+
 	}
 	
 	return newCtx;
@@ -963,10 +1011,12 @@ void Editor::ContextImpl::SelectEntity(Entity id)
 		return;
 
 	// Update the entity list
-	entityIdList->SelectEntity(selectedEntity, id);
+	if (entityIdList)
+		entityIdList->SelectEntity(selectedEntity, id);
 
 	// Update the component list
-	componentList->EntitySelected(id);
+	if (componentList)
+		componentList->EntitySelected(id);
 
 	selectedEntity = id;
 }
@@ -974,11 +1024,12 @@ void Editor::ContextImpl::SelectEntity(Entity id)
 void Editor::ContextImpl::UnselectEntity()
 {
 	// Update the entity list
-	if (selectedEntity.HasValue())
+	if (selectedEntity.HasValue() && entityIdList)
 		entityIdList->UnselectEntity(selectedEntity.Value());
 
 	// Clear the component list
-	componentList->Clear();
+	if (componentList)
+		componentList->Clear();
 
 	selectedEntity = Std::nullOpt;
 }

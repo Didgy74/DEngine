@@ -3,16 +3,17 @@
 #   define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#define DENGINE_APPLICATION_CURSORTYPE_COUNT
 #define DENGINE_APPLICATION_BUTTON_COUNT
 #include "detail_Application.hpp"
-#include "DEngine/Application.hpp"
+
+#include <DEngine/Utility.hpp>
 
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 
 #include <iostream>
 #include <cstdio>
-#include <algorithm>
 #include <cstring>
 
 namespace DEngine::Application::detail
@@ -21,6 +22,8 @@ namespace DEngine::Application::detail
 	{
 		bool cursorLocked = false;
 		Math::Vec2Int virtualCursorPos{};
+
+		GLFWcursor* cursorTypes[(int)CursorType::COUNT] = {};
 	};
 
 	static Backend_Data* pBackendData = nullptr;
@@ -87,7 +90,7 @@ void Application::LockCursor(bool state)
 	auto& appData = *detail::pAppData;
 	auto& backendData = *detail::pBackendData;
 
-	auto const& window = *std::find_if(
+	auto const& window = *Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
 		[](decltype(appData.windows)::value_type const& val) -> bool {
@@ -108,6 +111,20 @@ void Application::OpenSoftInput()
 void Application::detail::Backend_Log(char const* msg)
 {
 	std::cout << msg << std::endl;
+}
+
+void Application::SetCursor(WindowID windowIn, CursorType cursor)
+{
+	auto& appData = *detail::pAppData;
+	auto& backendData = *detail::pBackendData;
+
+	auto const& window = *Std::FindIf(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[windowIn](decltype(appData.windows)::value_type const& val) -> bool {
+			return val.id == windowIn; });
+
+	glfwSetCursor((GLFWwindow*)window.platformHandle, backendData.cursorTypes[(u8)cursor]);
 }
 
 Application::WindowID Application::CreateWindow(
@@ -141,9 +158,6 @@ Application::WindowID Application::CreateWindow(
 	
 	appData.windows.push_back(newNode);
 
-	if (glfwRawMouseMotionSupported())
-		glfwSetInputMode(rawHandle, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-
 	glfwSetWindowPosCallback(rawHandle, detail::Backend_GLFW_WindowPosCallback);
 	glfwSetWindowSizeCallback(rawHandle, detail::Backend_GLFW_WindowSizeCallback);
 	glfwSetWindowFocusCallback(rawHandle, detail::Backend_GLFW_WindowFocusCallback);
@@ -154,8 +168,6 @@ Application::WindowID Application::CreateWindow(
 	glfwSetMouseButtonCallback(rawHandle, detail::Backend_GLFW_MouseButtonCallback);
 	glfwSetCharCallback(rawHandle, detail::Backend_GLFW_CharCallback);
 	glfwSetKeyCallback(rawHandle, detail::Backend_GLFW_KeyboardKeyCallback);
-
-
 
 	return newNode.id;
 }
@@ -174,9 +186,13 @@ bool Application::detail::Backend_Initialize()
 	if (!glfwInit())
 		exit(EXIT_FAILURE);
 
+	pAppData->cursorOpt = CursorData();
+
 	pBackendData = new Backend_Data;
 
-	pAppData->cursorOpt = CursorData();
+	pBackendData->cursorTypes[(u8)CursorType::Arrow] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
+	pBackendData->cursorTypes[(u8)CursorType::VerticalResize] = glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR);
+	pBackendData->cursorTypes[(u8)CursorType::HorizontalResize] = glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR);
 
 	return true;
 }

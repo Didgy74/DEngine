@@ -1,7 +1,9 @@
 #pragma once
-#define DENGINE_APPLICATION_BUTTON_COUNT
 
+#define DENGINE_APPLICATION_CURSORTYPE_COUNT
+#define DENGINE_APPLICATION_BUTTON_COUNT
 #include "DEngine/Application.hpp"
+
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Opt.hpp"
 #include "DEngine/Containers/StackVec.hpp"
@@ -110,4 +112,11 @@ namespace DEngine::Application::detail
 	};
 
 	extern AppData* pAppData;
+
+	[[nodiscard]] constexpr bool IsValid(CursorType);
+}
+
+constexpr bool DEngine::Application::detail::IsValid(CursorType in)
+{
+	return 0 <= (u8)in && (u8)in < (u8)CursorType::COUNT;
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <DEngine/Gui/Utility.hpp>
+
 #include <DEngine/Gfx/Gfx.hpp>
 #include <vector>
 
@@ -10,11 +12,16 @@ namespace DEngine::Gui
 		std::vector<Gfx::GuiVertex>& vertices;
 		std::vector<u32>& indices;
 		std::vector<Gfx::GuiDrawCmd>& drawCmds;
+		Extent framebufferExtent;
+
+		std::vector<Rect> scissors;
 
 		DrawInfo(
+			Extent framebufferExtent,
 			std::vector<Gfx::GuiVertex>& verticesIn,
 			std::vector<u32>& indicesIn,
 			std::vector<Gfx::GuiDrawCmd>& drawCmdsIn) :
+			framebufferExtent(framebufferExtent),
 			vertices(verticesIn),
 			indices(indicesIn),
 			drawCmds(drawCmdsIn)
@@ -66,6 +73,45 @@ namespace DEngine::Gui
 			newMeshSpan.indexOffset = quadIndexOffset;
 			newMeshSpan.indexCount = 6;
 			return newMeshSpan;
+		}
+
+		void PushScissor(Rect rect)
+		{
+			Rect rectToUse{};
+			if (!scissors.empty())
+				rectToUse = Rect::Intersection(rect, scissors.back());
+			else
+				rectToUse = rect;
+			scissors.push_back(rectToUse);
+			Gfx::GuiDrawCmd cmd{};
+			cmd.type = Gfx::GuiDrawCmd::Type::Scissor;
+			cmd.rectPosition.x = (f32)rectToUse.position.x / framebufferExtent.width;
+			cmd.rectPosition.y = (f32)rectToUse.position.y / framebufferExtent.height;
+			cmd.rectExtent.x = (f32)rectToUse.extent.width / framebufferExtent.width;
+			cmd.rectExtent.y = (f32)rectToUse.extent.height / framebufferExtent.height;
+			drawCmds.push_back(cmd);
+		}
+
+		void PopScissor()
+		{
+			DENGINE_IMPL_GUI_ASSERT(!scissors.empty());
+			scissors.pop_back();
+			Gfx::GuiDrawCmd cmd{};
+			cmd.type = Gfx::GuiDrawCmd::Type::Scissor;
+			if (!scissors.empty())
+			{
+				Rect rect = scissors.back();
+				cmd.rectPosition.x = (f32)rect.position.x / framebufferExtent.width;
+				cmd.rectPosition.y = (f32)rect.position.y / framebufferExtent.height;
+				cmd.rectExtent.x = (f32)rect.extent.width / framebufferExtent.width;
+				cmd.rectExtent.y = (f32)rect.extent.height / framebufferExtent.height;
+			}
+			else
+			{
+				cmd.rectPosition = {};
+				cmd.rectExtent = { 1.f, 1.f };
+			}
+			drawCmds.push_back(cmd);
 		}
 	};
 }
