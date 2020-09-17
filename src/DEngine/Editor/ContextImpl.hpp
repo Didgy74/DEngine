@@ -19,10 +19,11 @@ namespace DEngine::Editor
 	class ComponentList;
 	class ViewportWidget;
 
-	struct ContextImpl : public App::EventInterface
+	struct ContextImpl : public App::EventInterface, public Gui::WindowHandler
 	{
 		Std::Box<Gui::Context> guiCtx;
 
+		// Override app-interface methods
 		virtual void WindowResize(
 			App::WindowID window,
 			App::Extent newExtent) override;
@@ -46,6 +47,9 @@ namespace DEngine::Editor
 			App::TouchEventType type,
 			Math::Vec2 position) override;
 
+
+		// Override window-handler methods
+		virtual void SetCursorType(Gui::WindowID, Gui::CursorType) override;
 
 		// App-specific stuff
 		Gfx::Context* gfxCtx = nullptr;

@@ -3,7 +3,7 @@
 #include <DEngine/Gui/Events.hpp>
 #include <DEngine/Gui/Layout.hpp>
 #include <DEngine/Gui/SizeHint.hpp>
-#include <DEngine/Gui/WindowID.hpp>
+#include <DEngine/Gui/WindowHandler.hpp>
 
 #include <DEngine/Containers/Array.hpp>
 #include <DEngine/Containers/Box.hpp>
@@ -116,7 +116,6 @@ namespace DEngine::Gui::impl
 			TextManager& manager,
 			std::string_view string,
 			Math::Vec4 color,
-			Gui::Extent framebufferExtent,
 			Gui::Rect widgetRect,
 			DrawInfo& drawInfo);
 
@@ -143,7 +142,12 @@ namespace DEngine::Gui::impl
 
 	struct ImplData
 	{
+		ImplData() = default;
+		ImplData(ImplData const&) = delete;
+
 		std::vector<Event> eventQueue;
+
+		WindowHandler* windowHandler = nullptr;
 
 		std::vector<WindowNode> windows;
 

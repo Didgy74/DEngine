@@ -177,6 +177,24 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	appInfo.pApplicationName = "DidgyImguiVulkanTest";
 	appInfo.pEngineName = "Nothing special";
 	instanceInfo.pApplicationInfo = &appInfo;
+	instanceInfo.pApplicationInfo = nullptr;
+
+	vk::DebugUtilsMessengerCreateInfoEXT messengerCreateInfo{};
+	if constexpr (Constants::enableDebugUtils)
+	{
+		messengerCreateInfo.messageSeverity =
+			vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
+			vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
+			//vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
+			//vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
+		messengerCreateInfo.messageType =
+			vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+			vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
+			vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
+		messengerCreateInfo.pfnUserCallback = VulkanDebugCallback;
+		messengerCreateInfo.pUserData = static_cast<void*>(logger);
+		instanceInfo.pNext = &messengerCreateInfo;
+	}
 
 	vk::Instance instance = baseDispatch.createInstance(instanceInfo);
 
@@ -188,7 +206,7 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 vk::DebugUtilsMessengerEXT DEngine::Gfx::Vk::Init::CreateLayerMessenger(
 	vk::Instance instanceHandle,
 	DebugUtilsDispatch const* debugUtilsOpt,
-	const void* userData)
+	void* userData)
 {
 	vk::DebugUtilsMessengerCreateInfoEXT debugMessengerInfo{};
 	debugMessengerInfo.messageSeverity =
@@ -201,7 +219,7 @@ vk::DebugUtilsMessengerEXT DEngine::Gfx::Vk::Init::CreateLayerMessenger(
 		vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
 		vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
 	debugMessengerInfo.pfnUserCallback = VulkanDebugCallback;
-	debugMessengerInfo.pUserData = const_cast<void*>(userData);
+	debugMessengerInfo.pUserData = userData;
 
 	return debugUtilsOpt->createDebugUtilsMessengerEXT(instanceHandle, debugMessengerInfo);
 }

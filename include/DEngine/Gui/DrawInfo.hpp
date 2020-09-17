@@ -12,9 +12,11 @@ namespace DEngine::Gui
 		std::vector<Gfx::GuiVertex>& vertices;
 		std::vector<u32>& indices;
 		std::vector<Gfx::GuiDrawCmd>& drawCmds;
+	private:
 		Extent framebufferExtent;
-
 		std::vector<Rect> scissors;
+	public:
+		Extent GetFramebufferExtent() const { return framebufferExtent; }
 
 		DrawInfo(
 			Extent framebufferExtent,
@@ -81,7 +83,7 @@ namespace DEngine::Gui
 			if (!scissors.empty())
 				rectToUse = Rect::Intersection(rect, scissors.back());
 			else
-				rectToUse = rect;
+				rectToUse = Rect::Intersection(rect, Rect{ {}, framebufferExtent });
 			scissors.push_back(rectToUse);
 			Gfx::GuiDrawCmd cmd{};
 			cmd.type = Gfx::GuiDrawCmd::Type::Scissor;
@@ -111,6 +113,19 @@ namespace DEngine::Gui
 				cmd.rectPosition = {};
 				cmd.rectExtent = { 1.f, 1.f };
 			}
+			drawCmds.push_back(cmd);
+		}
+
+		void PushFilledQuad(Rect rect, Math::Vec4 color)
+		{
+			Gfx::GuiDrawCmd cmd{};
+			cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
+			cmd.filledMesh.color = color;
+			cmd.filledMesh.mesh = GetQuadMesh();
+			cmd.rectPosition.x = f32(rect.position.x) / framebufferExtent.width;
+			cmd.rectPosition.y = f32(rect.position.y) / framebufferExtent.height;
+			cmd.rectExtent.x = f32(rect.extent.width) / framebufferExtent.width;
+			cmd.rectExtent.y = f32(rect.extent.height) / framebufferExtent.height;
 			drawCmds.push_back(cmd);
 		}
 	};

@@ -6,6 +6,16 @@
 #include <DEngine/Containers/Box.hpp>
 #include <DEngine/Math/Vector.hpp>
 
+namespace DEngine::Gui::impl
+{
+	template<bool tick, typename T, typename Callable>
+	void StackLayout_IterateOverChildren(
+		Context const& ctx,
+		T& layout,
+		Rect widgetRect,
+		Callable const& callable);
+}
+
 namespace DEngine::Gui
 {
 	class StackLayout : public Layout
@@ -34,7 +44,7 @@ namespace DEngine::Gui
 		bool test_expand = false;
 
 		u32 ChildCount() const;
-		struct Test
+		struct Child
 		{
 			enum class Type
 			{
@@ -45,8 +55,8 @@ namespace DEngine::Gui
 			Widget* widget = nullptr;
 			Layout* layout = nullptr;
 		};
-		Test At(u32 index);
-		struct Test2
+		Child At(u32 index);
+		struct ConstChild
 		{
 			enum class Type
 			{
@@ -57,7 +67,7 @@ namespace DEngine::Gui
 			Widget const* widget = nullptr;
 			Layout const* layout = nullptr;
 		};
-		Test2 At(u32 index) const;
+		ConstChild At(u32 index) const;
 		void AddWidget2(Std::Box<Widget>&& in);
 		void AddLayout2(Std::Box<Layout>&& in);
 		void InsertLayout(u32 index, Std::Box<Layout>&& in);
@@ -85,7 +95,7 @@ namespace DEngine::Gui
 			Context& ctx) override;
 
 		virtual void CursorMove(
-			Context& ctx,
+			Test& test,
 			Rect widgetRect,
 			Rect visibleRect,
 			CursorMoveEvent event) override;
@@ -148,7 +158,7 @@ namespace DEngine::Gui
 		void ResolveWidgetAddRemoves();
 
 		template<bool tick, typename T, typename Callable>
-		friend void IterateOverChildren(
+		friend void impl::StackLayout_IterateOverChildren(
 			Context const& ctx,
 			T& layout,
 			Rect widgetRect,

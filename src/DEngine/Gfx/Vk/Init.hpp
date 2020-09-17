@@ -22,7 +22,7 @@ namespace DEngine::Gfx::Vk::Init
 	[[nodiscard]] vk::DebugUtilsMessengerEXT CreateLayerMessenger(
 		vk::Instance instanceHandle,
 		DebugUtilsDispatch const* debugUtilsOpt,
-		const void* userData);
+		void* userData);
 
 	[[nodiscard]] PhysDeviceInfo LoadPhysDevice(
 		InstanceDispatch const& instance,

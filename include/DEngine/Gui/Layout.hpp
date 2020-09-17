@@ -5,6 +5,8 @@
 #include <DEngine/Gui/Events.hpp>
 #include <DEngine/Gui/Utility.hpp>
 
+#include <DEngine/Gui/Test.hpp>
+
 namespace DEngine::Gui
 {
 	class Context;
@@ -38,7 +40,7 @@ namespace DEngine::Gui
 			Context& ctx) {}
 
 		virtual void CursorMove(
-			Context& ctx,
+			Test& test,
 			Rect widgetRect,
 			Rect visibleRect,
 			CursorMoveEvent event) {}

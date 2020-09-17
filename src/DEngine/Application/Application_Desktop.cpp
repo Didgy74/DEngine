@@ -118,13 +118,18 @@ void Application::SetCursor(WindowID windowIn, CursorType cursor)
 	auto& appData = *detail::pAppData;
 	auto& backendData = *detail::pBackendData;
 
-	auto const& window = *Std::FindIf(
+	auto& window = *Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
-		[windowIn](decltype(appData.windows)::value_type const& val) -> bool {
+		[windowIn](decltype(appData.windows)::value_type& val) -> bool {
 			return val.id == windowIn; });
 
-	glfwSetCursor((GLFWwindow*)window.platformHandle, backendData.cursorTypes[(u8)cursor]);
+	if (window.windowData.currentCursorType != cursor)
+	{
+		glfwSetCursor((GLFWwindow*)window.platformHandle, backendData.cursorTypes[(u8)cursor]);
+		window.windowData.currentCursorType = cursor;
+	}
+		
 }
 
 Application::WindowID Application::CreateWindow(

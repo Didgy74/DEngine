@@ -6,7 +6,7 @@
 #include <android_native_app_glue.h>
 
 #define VK_USE_PLATFORM_ANDROID_KHR
-#include "vulkan/vulkan.h"
+#include <vulkan/vulkan.h>
 
 #include <dlfcn.h>
 
@@ -512,6 +512,11 @@ Std::StackVec<char const*, 5> Application::RequiredVulkanInstanceExtensions()
 	returnVal.PushBack("VK_KHR_surface");
 	returnVal.PushBack("VK_KHR_android_surface");
 	return returnVal;
+}
+
+void Application::SetCursor(WindowID id, CursorType cursorType)
+{
+
 }
 
 void Application::detail::Backend_Log(char const* msg)

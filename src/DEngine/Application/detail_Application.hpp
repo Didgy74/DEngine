@@ -66,6 +66,8 @@ namespace DEngine::Application::detail
 		Math::Vec2Int position;
 		bool isMinimized = false;
 		bool shouldShutdown = false;
+
+		CursorType currentCursorType = CursorType::Arrow;
 	};
 
 	struct AppData

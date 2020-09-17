@@ -170,7 +170,7 @@ vk::Instance Vk::BaseDispatch::createInstance(
 	vk::Instance returnVal;
 	vk::Result vkResult = static_cast<vk::Result>(raw.vkCreateInstance(
 		reinterpret_cast<VkInstanceCreateInfo const*>(&createInfo),
-		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator)),
+		reinterpret_cast<VkAllocationCallbacks const*>(static_cast<vk::AllocationCallbacks const*>(allocator)),
 		reinterpret_cast<VkInstance*>(&returnVal)));
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("DEngine - Vulkan: Unable to create Vulkan instance.");

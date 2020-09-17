@@ -6,7 +6,6 @@
 
 #include <vector>
 #include <string_view>
-#include <algorithm>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
@@ -16,12 +15,18 @@ using namespace DEngine::Gui;
 #include <DEngine/Gui/StackLayout.hpp>
 #include <DEngine/Gui/Text.hpp>
 
-Context Context::Create(Gfx::Context* gfxCtx)
+#include <stdexcept>
+
+Context Context::Create(
+	WindowHandler& windowHandler,
+	Gfx::Context* gfxCtx)
 {
 	Context newCtx;
 	newCtx.pImplData = new impl::ImplData;
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(newCtx.pImplData);
 	
+	implData.windowHandler = &windowHandler;
+
 	impl::TextManager::Initialize(
 		implData.textManager,
 		gfxCtx);
@@ -149,6 +154,29 @@ void Context::PushEvent(WindowResizeEvent event)
 	implData.eventQueue.push_back(newEvent);
 }
 
+Test::Test(
+	Context& ctx,
+	WindowHandler& windowHandler,
+	WindowID windowId,
+	Rect windowRect) noexcept :
+	ctx{ ctx },
+	windowHandler{ windowHandler },
+	windowId{ windowId },
+	windowRect{ windowRect }
+{
+
+}
+
+Context& Gui::Test::GetContext() const
+{
+	return ctx;
+}
+
+void Test::SetCursorType(CursorType cursorType)
+{
+	windowHandler.SetCursorType(windowId, cursorType);
+}
+
 namespace DEngine::Gui::impl
 {
 	static void DispatchEvent(ImplData& implData, WindowCursorEnterEvent resize)
@@ -260,12 +288,14 @@ namespace DEngine::Gui::impl
 		{
 			if (windowNode.data.topLayout)
 			{
+				Test test = Test(ctx, *implData.windowHandler, windowNode.id, windowNode.data.rect);
+
 				CursorMoveEvent modifiedEvent{};
 				modifiedEvent.position = implData.cursorPosition - windowNode.data.rect.position;
 				modifiedEvent.positionDelta = event.positionDelta;
 
 				windowNode.data.topLayout->CursorMove(
-					ctx,
+					test,
 					{ { 0, 0 }, windowNode.data.rect.extent },
 					{ { 0, 0 }, windowNode.data.rect.extent },
 					modifiedEvent);
@@ -408,13 +438,13 @@ namespace DEngine::Gui::impl
 		u32 utfValue)
 	{
 		if (utfValue == 0)
-			return {};
+			return TextManager::GlyphData{};
 
 		// Load glyph data
 		FT_UInt glyphIndex = FT_Get_Char_Index(manager.face, utfValue);
 		if (glyphIndex == 0) // 0 is an error index
 			//throw std::runtime_error("Unable to load glyph index");
-			return {};
+			return TextManager::GlyphData{};
 
 		FT_Error ftError = FT_Load_Glyph(
 			manager.face,
@@ -461,7 +491,7 @@ namespace DEngine::Gui::impl
 			auto glyphDataIt = manager.glyphDatas.find(utfValue);
 			if (glyphDataIt == manager.glyphDatas.end())
 			{
-				glyphDataIt = manager.glyphDatas.insert({ utfValue, LoadNewGlyph(manager, utfValue) }).first;
+				glyphDataIt = manager.glyphDatas.insert(std::pair{ utfValue, LoadNewGlyph(manager, utfValue) }).first;
 			}
 
 			return glyphDataIt->second;
@@ -501,7 +531,7 @@ void impl::TextManager::Initialize(
 	ftError = FT_Set_Char_Size(
 		manager.face,    /* handle to face object           */
 		0,       /* char_width in 1/64th of points  */
-		32 * 64,   /* char_height in 1/64th of points */
+		42 * 64,   /* char_height in 1/64th of points */
 		0,     /* horizontal device resolution    */
 		0);   /* vertical device resolution      */
 	if (ftError != FT_Err_Ok)
@@ -520,7 +550,6 @@ void impl::TextManager::RenderText(
 	TextManager& manager,
 	std::string_view string,
 	Math::Vec4 color,
-	Extent framebufferExtent,
 	Rect widgetRect,
 	DrawInfo& drawInfo)
 {
@@ -542,10 +571,10 @@ void impl::TextManager::RenderText(
 			cmd.type = Gfx::GuiDrawCmd::Type::TextGlyph;
 			cmd.textGlyph.utfValue = glyphChar;
 			cmd.textGlyph.color = color;
-			cmd.rectPosition.x = (f32)glyphPos.x / framebufferExtent.width;
-			cmd.rectPosition.y = (f32)glyphPos.y / framebufferExtent.height;
-			cmd.rectExtent.x = (f32)glyphData.bitmapWidth / framebufferExtent.width;
-			cmd.rectExtent.y = (f32)glyphData.bitmapHeight / framebufferExtent.height;
+			cmd.rectPosition.x = (f32)glyphPos.x / drawInfo.GetFramebufferExtent().width;
+			cmd.rectPosition.y = (f32)glyphPos.y / drawInfo.GetFramebufferExtent().height;
+			cmd.rectExtent.x = (f32)glyphData.bitmapWidth / drawInfo.GetFramebufferExtent().width;
+			cmd.rectExtent.y = (f32)glyphData.bitmapHeight / drawInfo.GetFramebufferExtent().height;
 
 			drawInfo.drawCmds.push_back(cmd);
 		}

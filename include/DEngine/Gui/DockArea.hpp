@@ -13,6 +13,11 @@
 
 namespace DEngine::Gui
 {
+	namespace impl
+	{
+		enum class DockArea_LayoutGizmo { Top, Bottom, Left, Right, Center };
+	}
+
 	class DockArea : public Layout
 	{
 	public:
@@ -52,18 +57,14 @@ namespace DEngine::Gui
 			Std::Box<Node> node{};
 		};
 		std::vector<TopLevelNode> topLevelNodes;
-		Math::Vec2Int windowMovedRelativePos{};
-		Std::Opt<Rect> highlightRect;
-		Node const* holdingTab = nullptr;
+		
 		u32 tabDisconnectRadius = 25;
-		Node const* showLayoutNodePtr = nullptr;
-		u32 gizmoSize = 25;
+		u32 gizmoSize = 50;
 		u32 gizmoPadding = 10;
-		u32 resizeAreaRect = 10;
+		u32 resizeAreaThickness = 30;
+		u32 resizeHandleLength = 50;
+
 		enum class ResizeSide { Top, Bottom, Left, Right, };
-		ResizeSide resizeSide{};
-		bool resizingSplit = false;
-		Node const* resizeSplitNode = nullptr;
 
 		enum class Behavior
 		{
@@ -72,8 +73,44 @@ namespace DEngine::Gui
 			Resizing,
 			HoldingTab,
 		};
-		Behavior currentBehavior = Behavior::Normal;
-
+		Behavior behavior = Behavior::Normal;
+		union BehaviorData
+		{
+			template<Behavior>
+			struct Internal;
+			template<>
+			struct Internal<Behavior::Normal>
+			{
+			};
+			template<>
+			struct Internal<Behavior::Moving>
+			{
+				Math::Vec2Int windowMovedRelativePos;
+				Node const* showLayoutNodePtr;
+				bool useHighlightGizmo;
+				impl::DockArea_LayoutGizmo highlightGizmo;
+			};
+			template<>
+			struct Internal<Behavior::Resizing>
+			{
+				ResizeSide resizeSide;
+				bool resizingSplit;
+				Node const* resizeSplitNode;
+				bool resizingSplitIsFrontNode;
+			};
+			template<>
+			struct Internal<Behavior::HoldingTab>
+			{
+				bool holdingFrontWindow;
+				Node const* holdingTab;
+				Math::Vec2Int cursorPosRelative;
+			};
+			Internal<Behavior::Normal> normal;
+			Internal<Behavior::Moving> moving;
+			Internal<Behavior::Resizing> resizing;
+			Internal<Behavior::HoldingTab> holdingTab;
+		};
+		BehaviorData behaviorData{};
 
 		[[nodiscard]] virtual Gui::SizeHint SizeHint(
 			Context const& ctx) const override;
@@ -94,7 +131,7 @@ namespace DEngine::Gui
 			Rect visibleRect) override;
 
 		virtual void CursorMove(
-			Context& ctx,
+			Test& test,
 			Rect widgetRect,
 			Rect visibleRect,
 			CursorMoveEvent event) override;
@@ -105,5 +142,11 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
+
+		virtual void TouchEvent(
+			Context& ctx,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchEvent event) override;
 	};
 }

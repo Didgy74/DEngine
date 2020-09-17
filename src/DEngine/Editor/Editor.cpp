@@ -10,6 +10,7 @@
 #include <DEngine/Gui/Text.hpp>
 #include <DEngine/Gui/Widget.hpp>
 
+#include <DEngine/Application.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
 #include <DEngine/Time.hpp>
 
@@ -125,7 +126,7 @@ namespace DEngine::Editor
 		}
 
 		virtual void CursorMove(
-			Gui::Context& ctx,
+			Gui::Test& test,
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect,
 			Gui::CursorMoveEvent event) override 
@@ -838,7 +839,7 @@ Editor::Context Editor::Context::Create(
 
 	newCtx.implData = new ContextImpl;
 	ContextImpl& implData = *static_cast<ContextImpl*>(newCtx.implData);
-	implData.guiCtx = Std::Box{ new DEngine::Gui::Context(DEngine::Gui::Context::Create(gfxCtx)) };
+	implData.guiCtx = Std::Box{ new DEngine::Gui::Context(DEngine::Gui::Context::Create(implData, gfxCtx)) };
 	implData.gfxCtx = gfxCtx;
 	implData.scene = scene;
 	App::InsertEventInterface(implData);
@@ -849,7 +850,7 @@ Editor::Context Editor::Context::Create(
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;
 		implData.test_fpsText = deltaText;
-		deltaText->String_Set("Test text");
+		deltaText->String_Set("Child text");
 		outmostLayout->AddWidget2(Std::Box<Gui::Widget>{ deltaText });
 
 		/*
@@ -1119,4 +1120,25 @@ void Editor::ContextImpl::TouchEvent(
 	else if (type == App::TouchEventType::Up)
 		event.type = Gui::TouchEventType::Up;
 	guiCtx->PushEvent(event);
+}
+
+void Editor::ContextImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursorType)
+{
+	App::CursorType appCursorType{};
+	switch (cursorType)
+	{
+	case Gui::CursorType::Arrow:
+		appCursorType = App::CursorType::Arrow;
+		break;
+	case Gui::CursorType::HorizontalResize:
+		appCursorType = App::CursorType::HorizontalResize;
+		break;
+	case Gui::CursorType::VerticalResize:
+		appCursorType = App::CursorType::VerticalResize;
+		break;
+	default:
+		throw std::runtime_error("Error. This Gui::CursorType has not been implemented.");
+		break;
+	}
+	App::SetCursor((App::WindowID)id, appCursorType);
 }

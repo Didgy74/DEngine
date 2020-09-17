@@ -3,10 +3,10 @@
 
 #include <DEngine/Math/Common.hpp>
 
-namespace DEngine::Gui
+namespace DEngine::Gui::impl
 {
 	template<bool tick, typename T, typename Callable>
-	void IterateOverChildren(
+	void StackLayout_IterateOverChildren(
 		Context const& ctx,
 		T& layout,
 		Rect widgetRect,
@@ -131,29 +131,29 @@ u32 StackLayout::ChildCount() const
 	return (u32)count;
 }
 
-StackLayout::Test StackLayout::At(u32 index)
+StackLayout::Child StackLayout::At(u32 index)
 {
 	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
 	auto& child = children[index];
 	
 	DENGINE_IMPL_GUI_ASSERT(child.layout || child.widget);
 
-	Test returnVal{};
+	Child returnVal{};
 	if (child.type == LayoutItem::Type::Layout)
 	{
-		returnVal.type = Test::Type::Layout;
+		returnVal.type = Child::Type::Layout;
 		returnVal.layout = child.layout.Get();
 	}
 	else
 	{
-		returnVal.type = Test::Type::Widget;
+		returnVal.type = Child::Type::Widget;
 		returnVal.widget = child.widget.Get();
 	}
 
 	return returnVal;
 }
 
-StackLayout::Test2 StackLayout::At(u32 index) const
+StackLayout::ConstChild StackLayout::At(u32 index) const
 {
 	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
 
@@ -161,15 +161,15 @@ StackLayout::Test2 StackLayout::At(u32 index) const
 
 	DENGINE_IMPL_GUI_ASSERT(child.layout || child.widget);
 
-	Test2 returnVal{};
+	ConstChild returnVal{};
 	if (child.type == LayoutItem::Type::Layout)
 	{
-		returnVal.type = Test2::Type::Layout;
+		returnVal.type = ConstChild::Type::Layout;
 		returnVal.layout = child.layout.Get();
 	}
 	else
 	{
-		returnVal.type = Test2::Type::Widget;
+		returnVal.type = ConstChild::Type::Widget;
 		returnVal.widget = child.widget.Get();
 	}
 	return returnVal;
@@ -349,7 +349,7 @@ void StackLayout::Render(
 		drawInfo.drawCmds.push_back(cmd);
 	}
 
-	IterateOverChildren<false>(
+	impl::StackLayout_IterateOverChildren<false>(
 		ctx,
 		*this,
 		widgetRect,
@@ -417,34 +417,34 @@ void StackLayout::CharRemoveEvent(Context& ctx)
 }
 
 void StackLayout::CursorMove(
-	Context& ctx,
+	Test& test,
 	Rect widgetRect,
 	Rect visibleRect,
 	CursorMoveEvent event)
 {
 	ParentType::CursorMove(
-		ctx,
+		test,
 		widgetRect,
 		visibleRect,
 		event);
 
 	ResolveWidgetAddRemoves();
 
-	IterateOverChildren<false>(
-		ctx,
+	impl::StackLayout_IterateOverChildren<false>(
+		test.GetContext(),
 		*this,
 		widgetRect,
-		[&ctx, visibleRect, event](LayoutItem& child, Rect childRect)
+		[visibleRect, event, &test](LayoutItem& child, Rect childRect)
 		{
 			if (child.type == LayoutItem::Type::Layout)
 				child.layout->CursorMove(
-					ctx,
+					test,
 					childRect,
 					Rect::Intersection(childRect, visibleRect),
 					event);
 			else
 				child.widget->CursorMove(
-					ctx,
+					test,
 					childRect,
 					Rect::Intersection(childRect, visibleRect),
 					event);
@@ -467,7 +467,7 @@ void StackLayout::CursorClick(
 
 	ResolveWidgetAddRemoves();
 
-	IterateOverChildren<false>(
+	impl::StackLayout_IterateOverChildren<false>(
 		ctx,
 		*this,
 		widgetRect,
@@ -504,7 +504,7 @@ void StackLayout::TouchEvent(
 
 	ResolveWidgetAddRemoves();
 
-	IterateOverChildren<false>(
+	impl::StackLayout_IterateOverChildren<false>(
 		ctx,
 		*this,
 		widgetRect,
@@ -537,7 +537,7 @@ void StackLayout::Tick(
 
 	ResolveWidgetAddRemoves();
 
-	IterateOverChildren<true>(
+	impl::StackLayout_IterateOverChildren<true>(
 		ctx,
 		*this,
 		widgetRect,

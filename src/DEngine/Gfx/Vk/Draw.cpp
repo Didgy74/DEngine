@@ -69,27 +69,33 @@ namespace DEngine::Gfx::Vk
 				case GuiDrawCmd::Type::Scissor:
 				{
 					vk::Rect2D scissor{};
-					scissor.extent.width = u32(drawCmd.rectExtent.x * guiData.extent.width);
-					scissor.extent.height = u32(drawCmd.rectExtent.y * guiData.extent.height);
+					vk::Extent2D rotatedFramebufferExtent = guiData.extent;
+					if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90 ||
+						guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)
+						std::swap(rotatedFramebufferExtent.width, rotatedFramebufferExtent.height);
+					scissor.extent.width = u32(drawCmd.rectExtent.x * rotatedFramebufferExtent.width);
+					scissor.extent.height = u32(drawCmd.rectExtent.y * rotatedFramebufferExtent.height);
+					i32 scissorPosX = i32(drawCmd.rectPosition.x * rotatedFramebufferExtent.width);
+					i32 scissorPosY = i32(drawCmd.rectPosition.y * rotatedFramebufferExtent.height);
 					if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eIdentity)
 					{
-						scissor.offset.x = i32(drawCmd.rectPosition.x * guiData.extent.width);
-						scissor.offset.y = i32(drawCmd.rectPosition.y * guiData.extent.height);
+						scissor.offset.x = scissorPosX;
+						scissor.offset.y = scissorPosY;
 					}
 					else if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90)
 					{
-						scissor.offset.x = guiData.extent.width - scissor.extent.height - i32(drawCmd.rectPosition.y * guiData.extent.height);
-						scissor.offset.y = i32(drawCmd.rectPosition.x * guiData.extent.width);
+						scissor.offset.x = rotatedFramebufferExtent.height - scissor.extent.height - scissorPosY;
+						scissor.offset.y = scissorPosX;
 					}
 					else if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)
 					{
-						scissor.offset.x = i32(drawCmd.rectPosition.y * guiData.extent.height);
-						scissor.offset.y = guiData.extent.height - scissor.extent.width - i32(drawCmd.rectPosition.x * guiData.extent.width);
+						scissor.offset.x = scissorPosY;
+						scissor.offset.y = rotatedFramebufferExtent.width - scissor.extent.width - scissorPosX;
 					}
 					else if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate180)
 					{
-						scissor.offset.x = guiData.extent.width - scissor.extent.width - i32(drawCmd.rectPosition.x * guiData.extent.width);
-						scissor.offset.y = guiData.extent.height - scissor.extent.height - i32(drawCmd.rectPosition.y * guiData.extent.height);
+						scissor.offset.x = rotatedFramebufferExtent.width - scissor.extent.width - scissorPosX;
+						scissor.offset.y = rotatedFramebufferExtent.height - scissor.extent.height - scissorPosY;
 					}
 					if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90 ||
 							guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)

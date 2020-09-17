@@ -64,7 +64,6 @@ void Text::Render(
 		implData.textManager,
 		this->text,
 		this->color,
-		framebufferExtent,
 		widgetRect,
 		drawInfo);
 }

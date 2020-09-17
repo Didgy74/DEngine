@@ -5,8 +5,6 @@
 #include <DEngine/Containers/Opt.hpp>
 #include <DEngine/Containers/Range.hpp>
 
-#include <stdexcept>
-
 namespace DEngine::Std
 {
 	template<typename T>
@@ -36,20 +34,20 @@ namespace DEngine::Std
 		[[nodiscard]] T* end() const noexcept;
 
 	private:
-		T* data = nullptr;
-		uSize size = 0;
+		T* m_data = nullptr;
+		uSize m_size = 0;
 	};
 
 	template<typename T>
 	constexpr Span<T>::Span(T* data, uSize size) noexcept :
-		data(data),
-		size(size)
+		m_data(data),
+		m_size(size)
 	{}
 
 	template<typename T>
 	constexpr Span<T const> Span<T>::ConstSpan() const noexcept
 	{
-		return Span<T const>(data, size);
+		return Span<T const>(m_data, m_size);
 	}
 
 	template<typename T>
@@ -70,23 +68,25 @@ namespace DEngine::Std
 	template<typename T>
 	T* Span<T>::Data() const noexcept
 	{
-		return data;
+		return m_data;
 	}
 
 	template<typename T>
 	uSize Span<T>::Size() const noexcept
 	{
-		return size;
+		return m_size;
 	}
 
 	template<typename T>
 	T& Span<T>::At(uSize i) const
 	{
-		if (data == nullptr)
-			throw std::runtime_error("Tried to .At() a Span with data pointer set to nullptr.");
-		if (i >= size)
-			throw std::out_of_range("Tried to .At() a Span with index out of bounds.");
-		return data[i];
+		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+			m_data != nullptr,
+			"Tried to .At() a Span with data pointer set to nullptr.");
+		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+			i < m_size,
+			"Tried to .At() a Span with index out of bounds.");
+		return m_data[i];
 	}
 
 	template<typename T>
@@ -98,12 +98,12 @@ namespace DEngine::Std
 	template<typename T>
 	T* Span<T>::begin() const noexcept
 	{
-		return data;
+		return m_data;
 	}
 
 	template<typename T>
 	T* Span<T>::end() const noexcept
 	{
-		return data + size;
+		return m_data + m_size;
 	}
 }

@@ -28,6 +28,7 @@ namespace DEngine::Std::Trait::impl
 	struct RemoveRef<T&> { using Type = T; };
 	template<typename T>
 	struct RemoveRef<T&&> { using Type = T; };
+
 }
 
 namespace DEngine::Std::Trait

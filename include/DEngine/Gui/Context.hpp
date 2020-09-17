@@ -1,7 +1,7 @@
 #pragma once
 
 #include <DEngine/Gui/Events.hpp>
-#include <DEngine/Gui/WindowID.hpp>
+#include <DEngine/Gui/WindowHandler.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
 
 // Temporary include.
@@ -14,7 +14,9 @@ namespace DEngine::Gui
 	class Context
 	{
 	public:
-		static Context Create(Gfx::Context* gfxCtx);
+		static Context Create(
+			WindowHandler& windowHandler,
+			Gfx::Context* gfxCtx);
 		Context(Context&&) noexcept;
 		Context(Context const&) = delete;
 

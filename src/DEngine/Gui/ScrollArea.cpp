@@ -177,7 +177,7 @@ void ScrollArea::Tick(
 }
 
 void ScrollArea::CursorMove(
-  Context& ctx, 
+  Test& test, 
   Rect widgetRect,
   Rect visibleRect,
   CursorMoveEvent event)
@@ -186,9 +186,9 @@ void ScrollArea::CursorMove(
   {
     Gui::SizeHint childSizeHint{};
     if (childType == ChildType::Layout)
-      childSizeHint = layout->SizeHint(ctx);
+      childSizeHint = layout->SizeHint(test.GetContext());
     else
-      childSizeHint = widget->SizeHint(ctx);
+      childSizeHint = widget->SizeHint(test.GetContext());
 
 
     // Check if mouse is over
@@ -224,13 +224,13 @@ void ScrollArea::CursorMove(
     childRect.extent = childSizeHint.preferred;
     if (childType == ChildType::Layout)
       layout->CursorMove(
-        ctx,
+        test,
         childRect,
         Rect::Intersection(childRect, visibleRect),
         event);
     else if (childType == ChildType::Widget)
       widget->CursorMove(
-        ctx,
+        test,
         childRect,
         Rect::Intersection(childRect, visibleRect),
         event);

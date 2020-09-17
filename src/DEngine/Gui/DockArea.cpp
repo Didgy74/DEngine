@@ -4,11 +4,8 @@
 #include <DEngine/Gui/impl/ImplData.hpp>
 
 #include <DEngine/Containers/Opt.hpp>
+#include <DEngine/Containers/Span.hpp>
 #include <DEngine/Utility.hpp>
-
-#include <DEngine/Application.hpp>
-
-#include <iostream>
 
 namespace DEngine::Gui::impl
 {
@@ -18,25 +15,21 @@ namespace DEngine::Gui::impl
 		DockArea::Node* parentNode,
 		bool& continueIterating);
 
-	using DockArea_SplitCallablePFN = void(*)(
-		DockArea::Node& node,
-		Rect rect,
-		bool& continueIterating);
+	enum class DockArea_IterateNode_SplitCallableOrder { First, Last };
 
-	template<typename T, typename WindowCallable, typename SplitCallable>
-	void DockArea_IterateThroughNode_Internal(
+	template<typename T, typename Callable>
+	void DockArea_IterateNode_Internal(
 		T& node,
 		Rect rect,
 		T* parentNode,
 		bool& continueIterating,
-		Std::Opt<WindowCallable> windowCallable,
-		Std::Opt<SplitCallable> splitCallable)
+		DockArea_IterateNode_SplitCallableOrder splitCallableOrder,
+		Callable const& callable)
 	{
 		if (node.type == DockArea::Node::Type::Window)
 		{
 			DENGINE_IMPL_GUI_ASSERT(!node.windows.empty());
-			if (windowCallable.HasValue())
-				windowCallable.Value()(
+				callable(
 					node,
 					rect,
 					parentNode,
@@ -45,66 +38,160 @@ namespace DEngine::Gui::impl
 		}
 
 		DENGINE_IMPL_GUI_ASSERT(node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit);
-		if (splitCallable.HasValue())
-			splitCallable.Value()(
-				node,
-				rect,
-				continueIterating);
-		if (!continueIterating)
-			return;
 
-		Rect childRect = rect;
-		if (node.type == DockArea::Node::Type::HoriSplit)
-			childRect.extent.width = u32(rect.extent.width * node.split.split);
-		else
-			childRect.extent.height = u32(rect.extent.height * node.split.split);
-
-		DockArea_IterateThroughNode_Internal(
-			*node.split.a,
-			childRect,
-			&node,
-			continueIterating,
-			windowCallable,
-			splitCallable);
-		if (!continueIterating)
-			return;
-
-		if (node.type == DockArea::Node::Type::HoriSplit)
+		if (node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit)
 		{
-			childRect.position.x += childRect.extent.width;
-			childRect.extent.width = rect.extent.width - childRect.extent.width;
-		}
-		else
-		{
-			childRect.position.y += childRect.extent.height;
-			childRect.extent.height = rect.extent.height - childRect.extent.height;
-		}
+			if (splitCallableOrder == DockArea_IterateNode_SplitCallableOrder::First)
+			{
+				callable(
+					node,
+					rect,
+					parentNode,
+					continueIterating);
+				if (!continueIterating)
+					return;
+			}
 
-		DockArea_IterateThroughNode_Internal(
-			*node.split.b,
-			childRect,
-			&node,
-			continueIterating,
-			windowCallable,
-			splitCallable);
+			Rect childRect = rect;
+			if (node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit)
+			{
+				if (node.type == DockArea::Node::Type::HoriSplit)
+					childRect.extent.width = u32(rect.extent.width * node.split.split);
+				else
+					childRect.extent.height = u32(rect.extent.height * node.split.split);
+				DockArea_IterateNode_Internal(
+					*node.split.a,
+					childRect,
+					&node,
+					continueIterating,
+					splitCallableOrder,
+					callable);
+				if (!continueIterating)
+					return;
+			}
+
+			if (node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit)
+			{
+				if (node.type == DockArea::Node::Type::HoriSplit)
+				{
+					childRect.position.x += childRect.extent.width;
+					childRect.extent.width = rect.extent.width - childRect.extent.width;
+				}
+				else
+				{
+					childRect.position.y += childRect.extent.height;
+					childRect.extent.height = rect.extent.height - childRect.extent.height;
+				}
+
+				DockArea_IterateNode_Internal(
+					*node.split.b,
+					childRect,
+					&node,
+					continueIterating,
+					splitCallableOrder,
+					callable);
+				if (!continueIterating)
+					return;
+			}
+
+			if (node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit)
+			{
+				if (splitCallableOrder == DockArea_IterateNode_SplitCallableOrder::Last)
+				{
+					callable(
+						node,
+						rect,
+						parentNode,
+						continueIterating);
+					if (!continueIterating)
+						return;
+				}
+			}
+		}
 	}
 
-	template<typename T, typename WindowCallable, typename SplitCallable>
-	void DockArea_IterateThroughNode(
+	template<typename T, typename Callable>
+	void DockArea_IterateNode(
 		T& node,
 		Rect rect,
 		bool& continueIterating,
-		Std::Opt<WindowCallable> windowCallable,
-		Std::Opt<SplitCallable> splitCallable)
+		DockArea_IterateNode_SplitCallableOrder splitCallableOrder,
+		Callable callable)
 	{
 		DENGINE_IMPL_GUI_ASSERT(continueIterating);
-		DockArea_IterateThroughNode_Internal(
+		DockArea_IterateNode_Internal(
 			node,
 			rect,
 			(T*)nullptr,
 			continueIterating,
-			windowCallable,
-			splitCallable);
+			splitCallableOrder,
+			callable);
+	}
+
+	enum class DockArea_IterateTopLevelNodeMode
+	{
+		FrontToBack,
+		BackToFront,
+	};
+
+	using DockArea_IterateTopLevelNodeCallbackPFN = void(*)(
+		DockArea::TopLevelNode& topLevelNode,
+		Rect topLevelRect,
+		uSize topLevelIndex,
+		bool& continueIterating);
+
+	template<typename T, typename Callable>
+	void DockArea_IterateTopLevelNodes(
+		DockArea_IterateTopLevelNodeMode iterateMode,
+		Std::Span<T> topLevelNodes,
+		Rect widgetRect,
+		bool& continueIterating,
+		Callable callable)
+	{
+		uSize n = 0;
+		if (iterateMode == DockArea_IterateTopLevelNodeMode::BackToFront)
+			n = topLevelNodes.Size();
+		while (true)
+		{
+			uSize i = 0;
+			bool shouldContinue = false;
+			if (iterateMode == DockArea_IterateTopLevelNodeMode::FrontToBack)
+			{
+				if (n < topLevelNodes.Size())
+					shouldContinue = true;
+				i = n;
+			}
+			else if (iterateMode == DockArea_IterateTopLevelNodeMode::BackToFront)
+			{
+				if (n > 0)
+					shouldContinue = true;
+				i = n - 1;
+			}
+			if (!shouldContinue)
+				break;
+
+			auto& topLevelNode = topLevelNodes[i];
+			Rect topLevelRect = topLevelNode.rect;
+			topLevelRect.position += widgetRect.position;
+			if (i == topLevelNodes.Size() - 1)
+				topLevelRect = widgetRect;
+			callable(
+				topLevelNode, 
+				topLevelRect, 
+				i, 
+				continueIterating);
+			if (!continueIterating)
+				return;
+
+			if (iterateMode == DockArea_IterateTopLevelNodeMode::FrontToBack)
+			{
+				n += 1;
+			}
+			else if (iterateMode == DockArea_IterateTopLevelNodeMode::BackToFront)
+			{
+				n -= 1;
+			}
+		}
 	}
 
 	enum class DockArea_ResizeRect { Top, Bottom, Left, Right };
@@ -112,7 +199,7 @@ namespace DEngine::Gui::impl
 		DockArea_ResizeRect side,
 		Rect rect);
 	template<typename Callable>
-	void DockArea_IterateThroughResizeRects(
+	void DockArea_IterateResizeRects(
 		Rect rect,
 		u32 resizeAreaWidth,
 		Callable callable)
@@ -135,12 +222,11 @@ namespace DEngine::Gui::impl
 		callable(DockArea_ResizeRect::Right, rightRect);
 	}
 
-	enum class DockArea_LayoutGizmo { Top, Bottom, Left, Right, Center };
-	using DockArea_IterateLayoutGizmoCallbackPFN = void(*)(
+	using DockArea_IterateLayoutGizmosCallbackPFN = void(*)(
 		DockArea_LayoutGizmo gizmo,
 		Rect rect);
 	template<typename Callable>
-	void DockArea_IterateThroughLayoutGizmos(
+	void DockArea_IterateLayoutGizmos(
 		Rect rect,
 		u32 gizmoSize,
 		u32 gizmoPadding,
@@ -168,13 +254,54 @@ namespace DEngine::Gui::impl
 		callable(DockArea_LayoutGizmo::Bottom, gizmoRect);
 	}
 
+	static Rect DockArea_GetSplitResizeHandle(
+		DockArea::Node::Type nodeType,
+		Rect nodeRect,
+		f32 split,
+		u32 thickness,
+		u32 handleLength)
+	{
+		DENGINE_IMPL_GUI_ASSERT(nodeType == DockArea::Node::Type::HoriSplit || nodeType == DockArea::Node::Type::VertSplit);
+		// calc the rect
+		Rect middleRect = nodeRect;
+		// Check if we are hovering the resize line. Then switch to resize mode if we are.
+		if (nodeType == DockArea::Node::Type::HoriSplit)
+		{
+			middleRect.extent.width = thickness;
+			middleRect.extent.height = handleLength;
+			middleRect.position.x += u32(nodeRect.extent.width * split) - middleRect.extent.width / 2;
+			middleRect.position.y += u32(nodeRect.extent.height / 2) - middleRect.extent.height / 2;
+		}
+		else
+		{
+			middleRect.extent.width = handleLength;
+			middleRect.extent.height = thickness;
+			middleRect.position.x += u32(nodeRect.extent.width / 2) - middleRect.extent.width / 2;
+			middleRect.position.y += u32(nodeRect.extent.height * split) - middleRect.extent.height / 2;
+		}
+		return middleRect;
+	}
+
+	static void DockArea_PushTopLevelToFront(
+		std::vector<DockArea::TopLevelNode>& topLevelNodes,
+		uSize index)
+	{
+		DENGINE_IMPL_GUI_ASSERT(index < topLevelNodes.size());
+		if (index > 0)
+		{
+			DockArea::TopLevelNode tempTopLevelNode = Std::Move(topLevelNodes[index]);
+			topLevelNodes.erase(topLevelNodes.begin() + index);
+			topLevelNodes.insert(topLevelNodes.begin(), Std::Move(tempTopLevelNode));
+		}
+	}
 }
 
 using namespace DEngine;
 using namespace DEngine::Gui;
 
-DockArea::DockArea()
+DockArea::DockArea() : behaviorData{BehaviorData()}
 {
+	
 }
 
 SizeHint DockArea::SizeHint(
@@ -197,113 +324,220 @@ SizeHint DockArea::SizeHint_Tick(
 
 namespace DEngine::Gui::impl
 {
-	static auto DockArea_GetRenderLambda(
+	static void DockArea_RenderWindows(
 		Context const& ctx,
+		DockArea const& dockArea,
 		ImplData& implData,
-		DrawInfo& drawInfo,
-		Extent framebufferExtent)
+		Std::Span<DockArea::TopLevelNode const> topLevelNodes,
+		Rect widgetRect,
+		Extent framebufferExtent,
+		DrawInfo& drawInfo)
 	{
-		return [&ctx, &implData, &drawInfo, framebufferExtent](
-			DockArea::Node const& node,
-			Rect rect,
-			DockArea::Node const* parentNode,
-			bool& continueIterating)
+		bool continueIterating = true;
+		impl::DockArea_IterateTopLevelNodes(
+			DockArea_IterateTopLevelNodeMode::BackToFront,
+			topLevelNodes,
+			widgetRect,
+			continueIterating,
+			[&ctx, &dockArea, &implData, &drawInfo](
+				DockArea::TopLevelNode const& topLevelNode,
+				Rect topLevelRect,
+				uSize topLevelIndex,
+				bool& continueIterating)
+			{
+				impl::DockArea_IterateNode(
+					*topLevelNode.node,
+					topLevelRect,
+					continueIterating,
+					impl::DockArea_IterateNode_SplitCallableOrder::Last,
+					[&ctx, &dockArea, &implData, &drawInfo](
+						DockArea::Node const& node,
+						Rect rect,
+						DockArea::Node const* parentNode,
+						bool& continueIterating)
+					{
+						if (node.type == DockArea::Node::Type::Window)
+						{
+							// First draw titlebar and main window background
+							auto& window = node.windows[node.selectedWindow];
+
+							Rect titleBarRect{};
+							titleBarRect.position = rect.position;
+							titleBarRect.extent.width = rect.extent.width;
+							titleBarRect.extent.height = implData.textManager.lineheight;
+							drawInfo.PushFilledQuad(titleBarRect, window.titleBarColor);
+
+							Rect contentRect{};
+							contentRect.position.x = titleBarRect.position.x;
+							contentRect.position.y = titleBarRect.position.y + titleBarRect.extent.height;
+							contentRect.extent.width = titleBarRect.extent.width;
+							contentRect.extent.height = rect.extent.height - titleBarRect.extent.height;
+
+							// Draw the main window
+							Math::Vec4 contentColor = window.titleBarColor * 0.5f;
+							contentColor.w = 0.975f;
+							drawInfo.PushFilledQuad(contentRect, contentColor);
+
+							// Draw all the tabs
+							u32 tabHoriOffset = 0;
+							for (uSize i = 0; i < node.windows.size(); i += 1)
+							{
+								auto& window = node.windows[i];
+								Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
+									implData.textManager,
+									window.title);
+								Rect tabRect{};
+								tabRect.position = rect.position;
+								tabRect.position.x += tabHoriOffset;
+								tabRect.extent = titleBarSizeHint.preferred;
+								// Draw tab highlight
+								if (i == node.selectedWindow)
+									drawInfo.PushFilledQuad(tabRect, window.titleBarColor + Math::Vec4{ 0.25f, 0.25f, 0.25f, 1.f });
+
+								impl::TextManager::RenderText(
+									implData.textManager,
+									window.title,
+									{ 1.f, 1.f, 1.f, 1.f },
+									tabRect,
+									drawInfo);
+
+								tabHoriOffset += tabRect.extent.width;
+							}
+
+							// Draw the window content
+							if (window.widget || window.layout)
+							{
+								drawInfo.PushScissor(contentRect);
+								if (window.widget)
+								{
+									window.widget->Render(
+										ctx,
+										drawInfo.GetFramebufferExtent(),
+										contentRect,
+										contentRect,
+										drawInfo);
+								}
+								else
+								{
+									window.layout->Render(
+										ctx,
+										drawInfo.GetFramebufferExtent(),
+										contentRect,
+										contentRect,
+										drawInfo);
+								}
+								drawInfo.PopScissor();
+							}
+						}
+						else if (node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit)
+						{
+							Rect resizeHandleRect = impl::DockArea_GetSplitResizeHandle(
+								node.type,
+								rect,
+								node.split.split,
+								dockArea.resizeAreaThickness,
+								dockArea.resizeHandleLength);
+							drawInfo.PushFilledQuad(resizeHandleRect, { 0.75f, 0.75f, 0.75f, 1.f });
+						}
+					});
+
+				impl::DockArea_IterateResizeRects(
+					topLevelRect,
+					dockArea.resizeAreaThickness,
+					[&dockArea, &drawInfo, topLevelIndex](
+						DockArea_ResizeRect side,
+						Rect rect)
+					{
+						if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
+							drawInfo.PushFilledQuad(rect, { 1.f, 1.f, 1.f, 0.75f });
+					});
+			});
+	}
+
+	static void DockArea_RenderLayoutGizmos(
+		DockArea const& dockArea,
+		ImplData const& implData,
+		Rect widgetRect,
+		Extent framebufferExtent,
+		DrawInfo& drawInfo)
+	{
+		DENGINE_IMPL_GUI_ASSERT(dockArea.behaviorData.moving.showLayoutNodePtr);
+		DENGINE_IMPL_GUI_ASSERT(dockArea.behavior == DockArea::Behavior::Moving);
+
+		Rect windowRect{};
+		// First find the node
+		bool nodeFound = false;
+		bool continueIterating = true;
+		impl::DockArea_IterateTopLevelNodes(
+			DockArea_IterateTopLevelNodeMode::FrontToBack,
+			Std::Span{ dockArea.topLevelNodes.data(), dockArea.topLevelNodes.size() },
+			widgetRect,
+			continueIterating,
+			[&dockArea, &windowRect, &nodeFound](
+				DockArea::TopLevelNode const& topLevelNode,
+				Rect topLevelRect,
+				uSize topLevelIndex,
+				bool& continueIterating)
+			{
+				impl::DockArea_IterateNode(
+					*topLevelNode.node,
+					topLevelRect,
+					continueIterating,
+					impl::DockArea_IterateNode_SplitCallableOrder::First,
+					[&dockArea, &windowRect, &nodeFound](
+						DockArea::Node const& node,
+						Rect rect,
+						DockArea::Node const* parentNode,
+						bool& continueIterating)
+					{
+						if (&node != dockArea.behaviorData.moving.showLayoutNodePtr)
+							return;
+						continueIterating = false;
+						nodeFound = true;
+						windowRect = rect;
+					});
+			});
+
+		// Then draw the gizmos.
+		DENGINE_IMPL_GUI_ASSERT(nodeFound);
+		windowRect.position.y += implData.textManager.lineheight;
+		windowRect.extent.height -= implData.textManager.lineheight;
+		DockArea_IterateLayoutGizmos(
+			windowRect,
+			dockArea.gizmoSize,
+			dockArea.gizmoPadding,
+			[&drawInfo](
+				impl::DockArea_LayoutGizmo gizmo,
+				Rect rect)
+			{
+				drawInfo.PushFilledQuad(rect, { 1.f, 1.f, 1.f, 0.9f });
+			});
+
+		// Draw the highlight rect on top
+		if (dockArea.behaviorData.moving.useHighlightGizmo)
 		{
-			// First draw titlebar and main window background
-			auto& window = node.windows[node.selectedWindow];
-			Rect titleBarRect{};
-			titleBarRect.position = rect.position;
-			titleBarRect.extent.width = rect.extent.width;
-			titleBarRect.extent.height = implData.textManager.lineheight;
-			Gfx::GuiDrawCmd cmd{};
-			cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-			cmd.filledMesh.color = window.titleBarColor;
-			cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
-			cmd.rectPosition.x = f32(titleBarRect.position.x) / framebufferExtent.width;
-			cmd.rectPosition.y = f32(titleBarRect.position.y) / framebufferExtent.height;
-			cmd.rectExtent.x = f32(titleBarRect.extent.width) / framebufferExtent.width;
-			cmd.rectExtent.y = f32(titleBarRect.extent.height) / framebufferExtent.height;
-			drawInfo.drawCmds.push_back(cmd);
-
-			Rect contentRect{};
-			contentRect.position.x = titleBarRect.position.x;
-			contentRect.position.y = titleBarRect.position.y + titleBarRect.extent.height;
-			contentRect.extent.width = titleBarRect.extent.width;
-			contentRect.extent.height = rect.extent.height - titleBarRect.extent.height;
-
-			// Draw the main window
-			//Gfx::GuiDrawCmd cmd{};
-			cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-			cmd.filledMesh.color = window.titleBarColor * 0.5f;
-			cmd.filledMesh.color.w = 0.95f;
-			cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
-			cmd.rectPosition.x = f32(contentRect.position.x) / framebufferExtent.width;
-			cmd.rectPosition.y = f32(contentRect.position.y) / framebufferExtent.height;
-			cmd.rectExtent.x = f32(contentRect.extent.width) / framebufferExtent.width;
-			cmd.rectExtent.y = f32(contentRect.extent.height) / framebufferExtent.height;
-			drawInfo.drawCmds.push_back(cmd);
-
-			if (window.widget || window.layout)
+			Rect highlightRect = windowRect;
+			switch (dockArea.behaviorData.moving.highlightGizmo)
 			{
-				drawInfo.PushScissor(contentRect);
-				if (window.widget)
-				{
-					window.widget->Render(
-						ctx,
-						framebufferExtent,
-						contentRect,
-						contentRect,
-						drawInfo);
-				}
-				else
-				{
-					window.layout->Render(
-						ctx,
-						framebufferExtent,
-						contentRect,
-						contentRect,
-						drawInfo);
-				}
-				drawInfo.PopScissor();
+			case impl::DockArea_LayoutGizmo::Top:
+				highlightRect.extent.height = highlightRect.extent.height / 2;
+				break;
+			case impl::DockArea_LayoutGizmo::Bottom:
+				highlightRect.extent.height = highlightRect.extent.height / 2;
+				highlightRect.position.y += highlightRect.extent.height;
+				break;
+			case impl::DockArea_LayoutGizmo::Left:
+				highlightRect.extent.width = highlightRect.extent.width / 2;
+				break;
+			case impl::DockArea_LayoutGizmo::Right:
+				highlightRect.extent.width = highlightRect.extent.width / 2;
+				highlightRect.position.x += highlightRect.extent.width;
+				break;
+			default:
+				break;
 			}
-
-			// Draw all the tabs
-			u32 tabHoriOffset = 0;
-			for (uSize i = 0; i < node.windows.size(); i += 1)
-			{
-				auto& window = node.windows[i];
-				Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
-					implData.textManager,
-					window.title);
-				Rect tabRect{};
-				tabRect.position = rect.position;
-				tabRect.position.x += tabHoriOffset;
-				tabRect.extent = titleBarSizeHint.preferred;
-				// Draw tab highlight
-				if (i == node.selectedWindow)
-				{
-					Gfx::GuiDrawCmd cmd{};
-					cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-					cmd.filledMesh.color = window.titleBarColor + Math::Vec4{ 0.25f, 0.25f, 0.25f, 1.f };
-					cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
-					cmd.rectPosition.x = f32(tabRect.position.x) / framebufferExtent.width;
-					cmd.rectPosition.y = f32(tabRect.position.y) / framebufferExtent.height;
-					cmd.rectExtent.x = f32(tabRect.extent.width) / framebufferExtent.width;
-					cmd.rectExtent.y = f32(tabRect.extent.height) / framebufferExtent.height;
-					drawInfo.drawCmds.push_back(cmd);
-				}
-
-				impl::TextManager::RenderText(
-					implData.textManager,
-					window.title,
-					{ 1.f, 1.f, 1.f, 1.f },
-					framebufferExtent,
-					tabRect,
-					drawInfo);
-
-				tabHoriOffset += tabRect.extent.width;
-			}
-		};
+			drawInfo.PushFilledQuad(highlightRect, { 0.f, 0.5f, 1.f, 0.25f });
+		}
 	}
 }
 
@@ -321,95 +555,24 @@ void DockArea::Render(
 
 	drawInfo.PushScissor(visibleRect);
 
-	for (uSize n = topLevelNodes.size(); n > 0; n -= 1)
-	{
-		uSize i = n - 1;
-		auto& topLevelNode = topLevelNodes[i];
-		Rect rectToUse = topLevelNode.rect;
-		rectToUse.position += widgetRect.position;
-		bool continueIterating = true;
-		impl::DockArea_IterateThroughNode(
-			*topLevelNode.node,
-			rectToUse,
-			continueIterating,
-			Std::Opt{ impl::DockArea_GetRenderLambda(
-				ctx, 
-				implData, 
-				drawInfo, 
-				framebufferExtent) },
-			Std::Opt<impl::DockArea_SplitCallablePFN>{});
-	}
+	impl::DockArea_RenderWindows(
+		ctx,
+		*this,
+		implData,
+		Std::Span{ this->topLevelNodes.data(), this->topLevelNodes.size() },
+		widgetRect,
+		framebufferExtent,
+		drawInfo);
 
 	// We need to draw the layout gizmo stuff
-	if (showLayoutNodePtr)
+	if (this->behavior == DockArea::Behavior::Moving && this->behaviorData.moving.showLayoutNodePtr)
 	{
-		for (uSize i = 0; i < topLevelNodes.size(); i += 1)
-		{
-			auto lambda = [this, &implData, &drawInfo, framebufferExtent](
-				Node const& node,
-				Rect rect,
-				Node const* parentNode,
-				bool& continueIterating)
-			{
-				if (&node != showLayoutNodePtr)
-					return;
-				continueIterating = false;
-				
-				auto& window = node.windows[node.selectedWindow];
-
-				Rect contentRect = rect;
-				contentRect.position.y += implData.textManager.lineheight;
-				contentRect.extent.height -= implData.textManager.lineheight;
-
-				impl::DockArea_IterateThroughLayoutGizmos(
-					contentRect,
-					this->gizmoSize,
-					this->gizmoPadding,
-					[&drawInfo, framebufferExtent](
-						impl::DockArea_LayoutGizmo gizmo,
-						Rect rect)
-					{
-						Gfx::GuiDrawCmd cmd{};
-						cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-						cmd.filledMesh.color = { 1.f, 1.f, 1.f, 1.f };
-						cmd.filledMesh.color.w = 0.9f;
-						cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
-						cmd.rectPosition.x = (f32)rect.position.x / framebufferExtent.width;
-						cmd.rectPosition.y = (f32)rect.position.y / framebufferExtent.height;
-						cmd.rectExtent.x = (f32)rect.extent.width / framebufferExtent.width;
-						cmd.rectExtent.y = (f32)rect.extent.height / framebufferExtent.height;
-						drawInfo.drawCmds.push_back(cmd);
-					});
-			};
-
-			auto& topLevelNode = topLevelNodes[i];
-			Rect rectToUse = topLevelNode.rect;
-			rectToUse.position += widgetRect.position;
-			bool continueIterating = true;
-			impl::DockArea_IterateThroughNode(
-				*topLevelNode.node,
-				rectToUse,
-				continueIterating,
-				Std::Opt{ lambda },
-				Std::Opt<impl::DockArea_SplitCallablePFN>());
-			if (!continueIterating)
-				break;
-		}
-	}
-
-	if (highlightRect.HasValue())
-	{
-		// Add the layout-thing highlight
-		Gfx::GuiDrawCmd cmd{};
-		cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-		cmd.filledMesh.color = { 0.f, 0.5f, 1.f, 0.25f };
-		cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
-		cmd.rectPosition.x = f32(highlightRect.Value().position.x) / framebufferExtent.width;
-		cmd.rectPosition.y = f32(highlightRect.Value().position.y) / framebufferExtent.height;
-		cmd.rectExtent.x = (f32)highlightRect.Value().extent.width / framebufferExtent.width;
-		cmd.rectExtent.y = (f32)highlightRect.Value().extent.height / framebufferExtent.height;
-
-		drawInfo.drawCmds.push_back(cmd);
+		impl::DockArea_RenderLayoutGizmos(
+			*this,
+			implData,
+			widgetRect,
+			framebufferExtent,
+			drawInfo);
 	}
 
 	drawInfo.PopScissor();
@@ -420,184 +583,185 @@ void DockArea::Tick(
 	Rect widgetRect, 
 	Rect visibleRect)
 {
-	for (uSize topLevelIndex = 0; topLevelIndex < topLevelNodes.size(); topLevelIndex += 1)
-	{
-		auto lambda = [&ctx](
-			Node& node,
-			Rect rect,
-			Node* parentNode,
+	bool continueIterating = true;
+	impl::DockArea_IterateTopLevelNodes(
+		impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+		Std::Span{ this->topLevelNodes.data(), this->topLevelNodes.size() },
+		widgetRect,
+		continueIterating,
+		[&ctx](
+			DockArea::TopLevelNode const& topLevelNode,
+			Rect topLevelRect,
+			uSize topLevelIndex,
 			bool& continueIterating)
 		{
-			// Iterate over each window in a node
-			for (uSize windowIndex = 0; windowIndex < node.windows.size(); windowIndex += 1)
-			{
-				auto& window = node.windows[windowIndex];
-				Rect childVisibleRect = windowIndex == node.selectedWindow ? rect : Rect{};
-				if (window.widget)
+			impl::DockArea_IterateNode(
+				*topLevelNode.node,
+				topLevelRect,
+				continueIterating,
+				impl::DockArea_IterateNode_SplitCallableOrder::First,
+				[&ctx](
+					Node& node,
+					Rect rect,
+					Node* parentNode,
+					bool& continueIterating)
 				{
-					window.widget->Tick(
-						ctx,
-						rect,
-						childVisibleRect);
-				}
-				else if (window.layout)
-				{
-					window.layout->Tick(
-						ctx,
-						rect,
-						childVisibleRect);
-				}
-			}
-		};
-
-		auto& topLevelNode = topLevelNodes[topLevelIndex];
-		Rect rectToUse = topLevelNode.rect;
-		rectToUse.position += widgetRect.position;
-		bool continueIterating = true;
-		impl::DockArea_IterateThroughNode(
-			*topLevelNode.node,
-			rectToUse,
-			continueIterating,
-			Std::Opt{ lambda },
-			Std::Opt<impl::DockArea_SplitCallablePFN>());
-	}
+					if (node.type != DockArea::Node::Type::Window)
+						return;
+					// Iterate over each window in a node
+					for (uSize windowIndex = 0; windowIndex < node.windows.size(); windowIndex += 1)
+					{
+						auto& window = node.windows[windowIndex];
+						Rect childVisibleRect = windowIndex == node.selectedWindow ? rect : Rect{};
+						if (window.widget)
+						{
+							window.widget->Tick(
+								ctx,
+								rect,
+								childVisibleRect);
+						}
+						else if (window.layout)
+						{
+							window.layout->Tick(
+								ctx,
+								rect,
+								childVisibleRect);
+						}
+					}
+				});
+		});
 }
 
 namespace DEngine::Gui::impl
 {
 	static void DockArea_CursorMove_Behavior_Normal(
-		Context& ctx,
+		Test& test,
 		DockArea& dockArea,
 		ImplData& implData,
 		Rect widgetRect,
 		Rect visibleRect,
 		Gui::CursorMoveEvent event)
 	{
+		//bool cursorInsideWidget = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
+		//if (!cursorInsideWidget)
+			//return;
+
 		// Check if we are hovering a resize rect.
 		bool rectWasHit = false;
 		// Iterate over every window.
-		for (uSize topLevelIndex = 0; topLevelIndex < dockArea.topLevelNodes.size(); topLevelIndex += 1)
-		{
-			auto& topLevelNode = dockArea.topLevelNodes[topLevelIndex];
-			Rect rect = topLevelNode.rect;
-			rect.position += widgetRect.position;
-			bool continueIterating = true;
-
-			Std::Opt<DockArea_ResizeRect> resizeRectHit;
-			DockArea_IterateThroughResizeRects(
-				rect,
-				dockArea.resizeAreaRect,
-				[&resizeRectHit, event](DockArea_ResizeRect side, Rect rect)
-				{
-					if (!resizeRectHit.HasValue() && rect.PointIsInside(event.position))
-						resizeRectHit = Std::Opt{ side };
-				});
-			if (resizeRectHit.HasValue())
+		bool continueIterating = true;
+		impl::DockArea_IterateTopLevelNodes(
+			impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+			Std::Span{ dockArea.topLevelNodes.data(), dockArea.topLevelNodes.size() },
+			widgetRect,
+			continueIterating,
+			[&test, &dockArea, &implData, event, &rectWasHit](
+				DockArea::TopLevelNode const& topLevelNode,
+				Rect topLevelRect,
+				uSize topLevelIndex,
+				bool& continueIterating)
 			{
-				continueIterating = false;
-				rectWasHit = true;
-				switch (resizeRectHit.Value())
+				// First we check if we hit a resize rect. We do not check this for the rear-most one
+				// Because it is always full-size.
+				if (rectWasHit)
+					return;
+				Std::Opt<DockArea_ResizeRect> resizeRectHit;
+				if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
 				{
-				case DockArea_ResizeRect::Top:
-				case DockArea_ResizeRect::Bottom:
-					App::SetCursor(App::WindowID(0), App::CursorType::VerticalResize);
-					break;
-				case DockArea_ResizeRect::Left:
-				case DockArea_ResizeRect::Right:
-					App::SetCursor(App::WindowID(0), App::CursorType::HorizontalResize);
-					break;
+					DockArea_IterateResizeRects(
+						topLevelRect,
+						dockArea.resizeAreaThickness,
+						[topLevelRect, event, &resizeRectHit](DockArea_ResizeRect side, Rect rect)
+					{
+						if (!resizeRectHit.HasValue() && rect.PointIsInside(event.position))
+							resizeRectHit = Std::Opt{ side };
+					});
 				}
-			}
 
-			if (continueIterating && !rectWasHit && rect.PointIsInside(event.position))
-			{
-				// Send the move event to the widget
-				auto lambda = [&ctx, &implData, event](
-					DockArea::Node& node,
-					Rect rect,
-					DockArea::Node* parentNode,
-					bool& continueIterating)
+				if (continueIterating && resizeRectHit.HasValue())
 				{
-					if (rect.PointIsInside(event.position))
-						continueIterating = false;
-					auto& window = node.windows[node.selectedWindow];
-					Rect contentRect = rect;
-					contentRect.position.y += implData.textManager.lineheight;
-					contentRect.extent.height -= implData.textManager.lineheight;
-					if (contentRect.PointIsInside(event.position))
+					continueIterating = false;
+					rectWasHit = true;
+					switch (resizeRectHit.Value())
 					{
-						if (window.widget)
-						{
-							window.widget->CursorMove(
-								ctx,
-								contentRect,
-								contentRect,
-								event);
-						}
-						else if (window.layout)
-						{
-							window.layout->CursorMove(
-								ctx,
-								contentRect,
-								contentRect,
-								event);
-						}
+					case DockArea_ResizeRect::Top:
+					case DockArea_ResizeRect::Bottom:
+						test.SetCursorType(CursorType::VerticalResize);
+						break;
+					case DockArea_ResizeRect::Left:
+					case DockArea_ResizeRect::Right:
+						test.SetCursorType(CursorType::HorizontalResize);
+						break;
 					}
-				};
-
-				auto lambda2 = [event, &dockArea, &rectWasHit](
-					DockArea::Node& node,
-					Rect rect,
-					bool& continueIterating)
+					return;
+				}
+				if (continueIterating && topLevelRect.PointIsInside(event.position))
 				{
-					DENGINE_IMPL_GUI_ASSERT(node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit);
-
-					if (node.type == DockArea::Node::Type::HoriSplit)
-					{
-						// calc the rect
-						Rect middleRect = rect;
-						middleRect.extent.width = dockArea.resizeAreaRect;
-						middleRect.position.x += u32(rect.extent.width * node.split.split) - middleRect.extent.width / 2;
-						if (middleRect.PointIsInside(event.position))
+					continueIterating = false;
+					bool continueIterating2 = true;
+					impl::DockArea_IterateNode(
+						*topLevelNode.node,
+						topLevelRect,
+						continueIterating2,
+						impl::DockArea_IterateNode_SplitCallableOrder::First,
+						[&dockArea, &implData, &test, event, &rectWasHit](
+							DockArea::Node& node,
+							Rect rect,
+							DockArea::Node* parentNode,
+							bool& continueIterating)
 						{
-							continueIterating = false;
-							rectWasHit = true;
-							App::SetCursor(App::WindowID(0), App::CursorType::HorizontalResize);
-							return;
-						}
-					}
-					else if (node.type == DockArea::Node::Type::VertSplit)
-					{
-						// calc the rect
-						Rect middleRect = rect;
-						middleRect.extent.height = dockArea.resizeAreaRect;
-						middleRect.position.y += u32(rect.extent.height * node.split.split) - middleRect.extent.height / 2;
-						if (middleRect.PointIsInside(event.position))
-						{
-							continueIterating = false;
-							rectWasHit = true;
-							App::SetCursor(App::WindowID(0), App::CursorType::VerticalResize);
-							return;
-						}
-					}
-				};
-				DockArea_IterateThroughNode(
-					*topLevelNode.node,
-					rect,
-					continueIterating,
-					Std::Opt{ lambda },
-					Std::Opt{ lambda2 });
-
-				continueIterating = false;
-			}
-
-			if (!continueIterating)
-				break;
-		}
-		if (!rectWasHit)
-		{
-			App::SetCursor(App::WindowID(0), App::CursorType::Arrow);
-		}
+							if (node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit)
+							{
+								Rect resizeHandleRect = impl::DockArea_GetSplitResizeHandle(
+									node.type,
+									rect,
+									node.split.split,
+									dockArea.resizeAreaThickness,
+									dockArea.resizeHandleLength);
+								if (resizeHandleRect.PointIsInside(event.position))
+								{
+									continueIterating = false;
+									rectWasHit = true;
+									if (node.type == DockArea::Node::Type::HoriSplit)
+										test.SetCursorType(CursorType::HorizontalResize);
+									else if (node.type == DockArea::Node::Type::VertSplit)
+										test.SetCursorType(CursorType::VerticalResize);
+									return;
+								}
+							}
+							else if (node.type == DockArea::Node::Type::Window)
+							{
+								Rect contentRect = rect;
+								contentRect.position.y += implData.textManager.lineheight;
+								contentRect.extent.height -= implData.textManager.lineheight;
+								if (contentRect.PointIsInside(event.position))
+								{
+									auto& window = node.windows[node.selectedWindow];
+									if (window.widget)
+									{
+										window.widget->CursorMove(
+											test,
+											contentRect,
+											contentRect,
+											event);
+									}
+									else if (window.layout)
+									{
+										window.layout->CursorMove(
+											test,
+											contentRect,
+											contentRect,
+											event);
+									}
+								}
+							}
+						});
+				}
+			});
+		if (rectWasHit)
+			return;
+		else
+			test.SetCursorType(CursorType::Arrow);
 	}
 
 	static void DockArea_CursorMove_Behavior_Moving(
@@ -607,102 +771,78 @@ namespace DEngine::Gui::impl
 		Rect visibleRect,
 		Math::Vec2Int cursorPos)
 	{
-		// Check if we should display layout gizmos and highlight rect.
-
 		bool cursorInsideWidget = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
 		if (cursorInsideWidget)
 		{
-			auto& topLevelNode = dockArea.topLevelNodes[0];
-			topLevelNode.rect.position = cursorPos - widgetRect.position - dockArea.windowMovedRelativePos;
+			// First move the window.
+			auto& topLevelNode = dockArea.topLevelNodes.front();
+			topLevelNode.rect.position = cursorPos - widgetRect.position - dockArea.behaviorData.moving.windowMovedRelativePos;
 
-			bool windowWasHit = false;
-
-			// Iterate over other windows, see if we are hovering layout gizmos in them first
-			for (uSize i = 1; i < dockArea.topLevelNodes.size(); i += 1)
-			{
-				auto const& otherNode = dockArea.topLevelNodes[i];
-				auto lambda = [&implData, cursorPos, &dockArea, &windowWasHit](
-					DockArea::Node const& node,
-					Rect rect,
-					DockArea::Node const* parentNode,
+			bool continueIterating = true;
+			bool windowContentWasHit = false;
+			impl::DockArea_IterateTopLevelNodes(
+				impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+				Std::Span{ dockArea.topLevelNodes.data(), dockArea.topLevelNodes.size() },
+				widgetRect,
+				continueIterating,
+				[&dockArea, &implData, cursorPos, &windowContentWasHit](
+					DockArea::TopLevelNode const& topLevelNode,
+					Rect topLevelRect,
+					uSize topLevelIndex,
 					bool& continueIterating)
 				{
-					auto& window = node.windows[node.selectedWindow];
-					// If we are inside the titlebar-area, stop then stop iterating.
-					Rect titleBarRect{};
-					titleBarRect.position = rect.position;
-					titleBarRect.extent.width = rect.extent.width;
-					titleBarRect.extent.height = implData.textManager.lineheight;
-					if (titleBarRect.PointIsInside(cursorPos))
-					{
-						continueIterating = false;
-						windowWasHit = true;
+					// Jump over the first top-level node. It's the one we're moving.
+					if (topLevelIndex == 0)
 						return;
-					}
-
-					// Check if we are within the window's main area, and if so, display the layout gizmo stuff
-					Rect contentRect = rect;
-					contentRect.position.y += titleBarRect.extent.height;
-					contentRect.extent.height -= titleBarRect.extent.height;
-					if (contentRect.PointIsInside(cursorPos))
-					{
-						continueIterating = false;
-						dockArea.showLayoutNodePtr = &node;
-						windowWasHit = true;
-
-						dockArea.highlightRect = Std::nullOpt;
-						DockArea_IterateThroughLayoutGizmos(
-							contentRect,
-							dockArea.gizmoSize,
-							dockArea.gizmoPadding,
-							[&dockArea, contentRect, cursorPos](
-								DockArea_LayoutGizmo gizmo,
-								Rect rect)
+					impl::DockArea_IterateNode(
+						*topLevelNode.node,
+						topLevelRect,
+						continueIterating,
+						impl::DockArea_IterateNode_SplitCallableOrder::First,
+						[&dockArea, &implData, cursorPos, &windowContentWasHit](
+							DockArea::Node const& node,
+							Rect rect,
+							DockArea::Node const* parentNode,
+							bool& continueIterating)
+						{
+							if (node.type != DockArea::Node::Type::Window)
+								return;
+							// If we hit the titlebar, we stop iterating.
+							Rect titlebarRect = rect;
+							titlebarRect.extent.height = implData.textManager.lineheight;
+							if (titlebarRect.PointIsInside(cursorPos))
+								continueIterating = false;
+							// Check if the cursor is inside the contentRect.
+							Rect contentRect = rect;
+							contentRect.extent.height -= titlebarRect.extent.height;
+							contentRect.position.y += titlebarRect.extent.height;
+							if (contentRect.PointIsInside(cursorPos))
 							{
-								if (!dockArea.highlightRect.HasValue() && rect.PointIsInside(cursorPos))
-								{
-									Rect highlightRectToUse = contentRect;
-									switch (gizmo)
+								dockArea.behaviorData.moving.showLayoutNodePtr = &node;
+								continueIterating = false;
+								windowContentWasHit = true;
+
+								// Check if we are hovering any of the layout gizmos, and apply the highlight rect if we are.
+								dockArea.behaviorData.moving.useHighlightGizmo = false;
+								impl::DockArea_IterateLayoutGizmos(
+									contentRect,
+									dockArea.gizmoSize,
+									dockArea.gizmoPadding,
+									[&dockArea, cursorPos](
+										impl::DockArea_LayoutGizmo gizmo,
+										Rect rect)
 									{
-									case DockArea_LayoutGizmo::Left:
-										highlightRectToUse.extent.width = highlightRectToUse.extent.width * 0.5f;
-										break;
-									case DockArea_LayoutGizmo::Right:
-										highlightRectToUse.extent.width = highlightRectToUse.extent.width * 0.5f;
-										highlightRectToUse.position.x += highlightRectToUse.extent.width;
-										break;
-									case DockArea_LayoutGizmo::Top:
-										highlightRectToUse.extent.height = highlightRectToUse.extent.height * 0.5f;
-										break;
-									case DockArea_LayoutGizmo::Bottom:
-										highlightRectToUse.extent.height = highlightRectToUse.extent.height * 0.5f;
-										highlightRectToUse.position.y += highlightRectToUse.extent.height;
-										break;
-									default:
-										break;
-									}
-									dockArea.highlightRect = highlightRectToUse;
-								}
-							});
-					}
-				};
-				Rect rect = otherNode.rect;
-				rect.position += widgetRect.position;
-				bool continueIterating = true;
-				DockArea_IterateThroughNode(
-					*otherNode.node,
-					rect,
-					continueIterating,
-					Std::Opt{ lambda },
-					Std::Opt<DockArea_SplitCallablePFN>());
-				if (!continueIterating)
-					break;
-			}
-			if (!windowWasHit)
-			{
-				dockArea.showLayoutNodePtr = nullptr;
-				dockArea.highlightRect = Std::nullOpt;
-			}
+										if (!dockArea.behaviorData.moving.useHighlightGizmo && rect.PointIsInside(cursorPos))
+										{
+											dockArea.behaviorData.moving.useHighlightGizmo = true;
+											dockArea.behaviorData.moving.highlightGizmo = gizmo;
+										}
+									});
+							}
+						});
+				});
+			if (!windowContentWasHit)
+				dockArea.behaviorData.moving.showLayoutNodePtr = nullptr;
 		}
 	}
 
@@ -714,22 +854,34 @@ namespace DEngine::Gui::impl
 		Math::Vec2Int cursorPos)
 	{
 		bool cursorInsideWidget = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
-
-		if (cursorInsideWidget)
+		if (!cursorInsideWidget)
+			return;
+		DENGINE_IMPL_GUI_ASSERT(!dockArea.topLevelNodes.empty());
+		
+		if (dockArea.behaviorData.resizing.resizingSplit)
 		{
-			DENGINE_IMPL_GUI_ASSERT(!dockArea.topLevelNodes.empty());
-			auto& topLevelNode = dockArea.topLevelNodes[0];
-
-			if (dockArea.resizingSplit)
+			auto& topLevelNode = dockArea.behaviorData.resizing.resizingSplitIsFrontNode ? dockArea.topLevelNodes.front() : dockArea.topLevelNodes.back();
+			Rect windowRect = topLevelNode.rect;
+			if (!dockArea.behaviorData.resizing.resizingSplitIsFrontNode)
 			{
-				// Find the node we are resizing
-				auto lambda = [&dockArea, widgetRect, cursorPos](
+				windowRect.position = {};
+				windowRect.extent = widgetRect.extent;
+			}
+				
+			bool continueIterating = true;
+			impl::DockArea_IterateNode(
+				*topLevelNode.node,
+				windowRect,
+				continueIterating,
+				impl::DockArea_IterateNode_SplitCallableOrder::First,
+				[&dockArea, cursorPos, widgetRect](
 					DockArea::Node& node,
 					Rect rect,
+					DockArea::Node const* parentNode,
 					bool& continueIterating)
 				{
 					if ((node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit) &&
-						&node == dockArea.resizeSplitNode)
+							 &node == dockArea.behaviorData.resizing.resizeSplitNode)
 					{
 						continueIterating = false;
 
@@ -737,59 +889,46 @@ namespace DEngine::Gui::impl
 						{
 							// Find out the position of the cursor in range 0-1 of the node.
 							f32 test = f32(cursorPos.x - widgetRect.position.x - rect.position.x) / rect.extent.width;
-							test = Math::Clamp(test, 0.1f, 0.9f);
-							node.split.split = test;
-							return;
+							node.split.split = Math::Clamp(test, 0.1f, 0.9f);
 						}
 						else if (node.type == DockArea::Node::Type::VertSplit)
 						{
 							// Find out the position of the cursor in range 0-1 of the node.
 							f32 test = f32(cursorPos.y - widgetRect.position.y - rect.position.y) / rect.extent.height;
-							test = Math::Clamp(test, 0.1f, 0.9f);
-							node.split.split = test;
-							return;
+							node.split.split = Math::Clamp(test, 0.1f, 0.9f);
 						}
-
 					}
-				};
-				bool continueIterating = true;
-				DockArea_IterateThroughNode(
-					*topLevelNode.node,
-					topLevelNode.rect,
-					continueIterating,
-					Std::Opt<DockArea_WindowCallablePFN>{},
-					Std::Opt{ lambda });
-			}
-			else
+				});
+		}
+		else
+		{
+			auto& topLevelNode = dockArea.topLevelNodes.front();
+			if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Top)
 			{
-				if (dockArea.resizeSide == DockArea::ResizeSide::Top)
-				{
-					i32 prevY = topLevelNode.rect.position.y;
-					i32 a = cursorPos.y - widgetRect.position.y;
-					i32 b = topLevelNode.rect.position.y + (i32)topLevelNode.rect.extent.height - 100;
-					topLevelNode.rect.position.y = Math::Min(a, b);
-					topLevelNode.rect.extent.height += prevY - topLevelNode.rect.position.y;
-				}
-				else if (dockArea.resizeSide == DockArea::ResizeSide::Bottom)
-				{
-					topLevelNode.rect.extent.height = cursorPos.y - widgetRect.position.y - topLevelNode.rect.position.y;
-				}
-				else if (dockArea.resizeSide == DockArea::ResizeSide::Left)
-				{
-					i32 prevX = topLevelNode.rect.position.x;
-					i32 a = cursorPos.x - widgetRect.position.x;
-					i32 b = topLevelNode.rect.position.x + (i32)topLevelNode.rect.extent.width - 100;
-					topLevelNode.rect.position.x = Math::Min(a, b);
-					topLevelNode.rect.extent.width += prevX - topLevelNode.rect.position.x;
-				}
-				else if (dockArea.resizeSide == DockArea::ResizeSide::Right)
-				{
-					topLevelNode.rect.extent.width = cursorPos.x - widgetRect.position.x - topLevelNode.rect.position.x;
-				}
-
-				topLevelNode.rect.extent.height = Math::Max(topLevelNode.rect.extent.height, 100U);
-				topLevelNode.rect.extent.width = Math::Max(topLevelNode.rect.extent.width, 100U);
+				i32 prevY = topLevelNode.rect.position.y;
+				i32 a = cursorPos.y - widgetRect.position.y;
+				i32 b = topLevelNode.rect.position.y + (i32)topLevelNode.rect.extent.height - 100;
+				topLevelNode.rect.position.y = Math::Min(a, b);
+				topLevelNode.rect.extent.height += prevY - topLevelNode.rect.position.y;
 			}
+			else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Bottom)
+			{
+				topLevelNode.rect.extent.height = Math::Max(0, cursorPos.y - widgetRect.position.y - topLevelNode.rect.position.y);
+			}
+			else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Left)
+			{
+				i32 prevX = topLevelNode.rect.position.x;
+				i32 a = cursorPos.x - widgetRect.position.x;
+				i32 b = topLevelNode.rect.position.x + (i32)topLevelNode.rect.extent.width - 100;
+				topLevelNode.rect.position.x = Math::Min(a, b);
+				topLevelNode.rect.extent.width += prevX - topLevelNode.rect.position.x;
+			}
+			else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Right)
+			{
+				topLevelNode.rect.extent.width = Math::Max(0, cursorPos.x - widgetRect.position.x - topLevelNode.rect.position.x);
+			}
+			topLevelNode.rect.extent.height = Math::Max(topLevelNode.rect.extent.height, 100U);
+			topLevelNode.rect.extent.width = Math::Max(topLevelNode.rect.extent.width, 100U);
 		}
 	}
 
@@ -803,25 +942,36 @@ namespace DEngine::Gui::impl
 		bool cursorInsideWidget = widgetRect.PointIsInside(cursorPos);
 
 		// First we check if we need to disconnect any tabs
-		if (cursorInsideWidget && dockArea.holdingTab)
+		if (cursorInsideWidget)
 		{
-			for (uSize topLevelNodeIndex = 0; topLevelNodeIndex < dockArea.topLevelNodes.size(); topLevelNodeIndex += 1)
+			auto& topLevelNode = dockArea.behaviorData.holdingTab.holdingFrontWindow ? dockArea.topLevelNodes.front() : dockArea.topLevelNodes.back();
+			Rect topLevelRect = topLevelNode.rect;
+			topLevelRect.position += widgetRect.position;
+			if (!dockArea.behaviorData.holdingTab.holdingFrontWindow)
 			{
-				auto lambda = [&implData, cursorPos, &dockArea](
+				topLevelRect = widgetRect;
+			}
+			bool continueIterating = true;
+			impl::DockArea_IterateNode(
+				*topLevelNode.node,
+				topLevelRect,
+				continueIterating,
+				impl::DockArea_IterateNode_SplitCallableOrder::First,
+				[&dockArea, &implData, widgetRect, cursorPos](
 					DockArea::Node& node,
 					Rect rect,
-					DockArea::Node const* parentNode,
+					DockArea::Node* parentNode,
 					bool& continueIterating)
 				{
-					if (&node != dockArea.holdingTab)
+					if (node.type != DockArea::Node::Type::Window)
 						return;
-					continueIterating = false;
-
-					// We shouldn't be in the moving-tab-state if the node holds only one tab.
-					DENGINE_IMPL_GUI_ASSERT(node.windows.size() > 1);
+					if (&node != dockArea.behaviorData.holdingTab.holdingTab)
+						return;
 
 					// First find out the rect of the tab we are holding
-					Rect tabRect = rect;
+					Rect tabRect{};
+					tabRect.position = rect.position;
+					tabRect.extent.height = implData.textManager.lineheight;
 					for (uSize nodeWindowIndex = 0; nodeWindowIndex < node.windows.size(); nodeWindowIndex += 1)
 					{
 						auto& window = node.windows[nodeWindowIndex];
@@ -831,7 +981,7 @@ namespace DEngine::Gui::impl
 						tabRect.position.x += titleBarSizeHint.preferred.width;
 						if (nodeWindowIndex == node.selectedWindow)
 						{
-							tabRect.extent = titleBarSizeHint.preferred;
+							tabRect.extent.width = titleBarSizeHint.preferred.width;
 							break;
 						}
 					}
@@ -842,6 +992,7 @@ namespace DEngine::Gui::impl
 						// We want to disconnect this tab into a new top-level node.
 						DockArea::TopLevelNode newTopLevelNode{};
 						newTopLevelNode.rect = rect;
+						newTopLevelNode.rect.position = cursorPos - widgetRect.position - dockArea.behaviorData.holdingTab.cursorPosRelative;
 						DockArea::Node* newNode = new DockArea::Node;
 						newTopLevelNode.node = Std::Box{ newNode };
 						newNode->type = DockArea::Node::Type::Window;
@@ -854,50 +1005,54 @@ namespace DEngine::Gui::impl
 							node.selectedWindow -= 1;
 
 						// We are now moving this tab.
-						dockArea.holdingTab = nullptr;
-						dockArea.currentBehavior = DockArea::Behavior::Moving;
+						Math::Vec2Int cursorRelativePos = dockArea.behaviorData.holdingTab.cursorPosRelative;
+						dockArea.behavior = DockArea::Behavior::Moving;
+						dockArea.behaviorData.moving = {};
+						dockArea.behaviorData.moving.windowMovedRelativePos = cursorRelativePos;
+
+						if (node.windows.empty())
+						{
+							// We want to turn the parent-node from a split into a window-node.
+							DENGINE_IMPL_GUI_ASSERT(parentNode);
+							DENGINE_IMPL_GUI_ASSERT(parentNode->split.a == &node || parentNode->split.b == &node);
+							if (parentNode->split.a == &node)
+							{
+								DockArea::Node temp = Std::Move(*parentNode);
+								*parentNode = Std::Move(*temp.split.b);
+							}
+							else
+							{
+								DockArea::Node temp = Std::Move(*parentNode);
+								*parentNode = Std::Move(*temp.split.a);
+							}
+						}
 					}
-
-				};
-
-				auto& topLevelNode = dockArea.topLevelNodes[topLevelNodeIndex];
-				Rect yo = topLevelNode.rect;
-				yo.position += widgetRect.position;
-				bool continueIterating = true;
-				DockArea_IterateThroughNode(
-					*topLevelNode.node,
-					yo,
-					continueIterating,
-					Std::Opt{ lambda },
-					Std::Opt<DockArea_SplitCallablePFN>());
-				if (!continueIterating)
-					break;
-			}
+				});
 		}
 	}
 }
 
 void DockArea::CursorMove(
-	Context& ctx, 
+	Test& test,
 	Rect widgetRect, 
 	Rect visibleRect, 
 	CursorMoveEvent event)
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(test.GetContext().Internal_ImplData());
 
 	bool cursorInsideWidget = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
 
-	if (this->currentBehavior == Behavior::Normal)
+	if (this->behavior == Behavior::Normal)
 	{
 		impl::DockArea_CursorMove_Behavior_Normal(
-			ctx,
+			test,
 			*this,
 			implData,
 			widgetRect,
 			visibleRect,
 			event);
 	}
-	else if (this->currentBehavior == Behavior::Moving)
+	else if (this->behavior == Behavior::Moving)
 	{
 		impl::DockArea_CursorMove_Behavior_Moving(
 			*this,
@@ -906,7 +1061,7 @@ void DockArea::CursorMove(
 			visibleRect,
 			event.position);
 	}
-	else if (this->currentBehavior == Behavior::Resizing)
+	else if (this->behavior == Behavior::Resizing)
 	{
 		impl::DockArea_CursorMove_Behavior_Resizing(
 			*this,
@@ -915,7 +1070,7 @@ void DockArea::CursorMove(
 			visibleRect,
 			event.position);
 	}
-	else if (this->currentBehavior == Behavior::HoldingTab)
+	else if (this->behavior == Behavior::HoldingTab)
 	{
 		impl::DockArea_CursorMove_Behavior_HoldingTab(
 			*this,
@@ -940,236 +1095,163 @@ namespace DEngine::Gui::impl
 		bool cursorInsideWidget = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
 		if (!cursorInsideWidget)
 			return;
-
-		Std::Opt<uSize> topLevelNodeToPushToFront;
-		for (uSize topLevelIndex = 0; topLevelIndex < dockArea.topLevelNodes.size(); topLevelIndex += 1)
-		{
-			auto& topLevelNode = dockArea.topLevelNodes[topLevelIndex];
-			Rect topLevelRect = topLevelNode.rect;
-			topLevelRect.position += widgetRect.position;
-			bool continueIterating = true;
-
-			auto lambda = [&ctx, &dockArea, &implData, event, cursorPos, widgetRect, &topLevelNodeToPushToFront, topLevelIndex, topLevelRect](
-				DockArea::Node& node,
-				Rect rect,
-				DockArea::Node* parentNode,
+		// First check if we hit the resize rects
+		bool continueIterating = true;
+		impl::DockArea_IterateTopLevelNodes(
+			impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+			Std::Span{ dockArea.topLevelNodes.data(), dockArea.topLevelNodes.size() },
+			widgetRect,
+			continueIterating,
+			[&ctx, &dockArea, &implData, event, cursorPos](
+				DockArea::TopLevelNode& topLevelNode,
+				Rect topLevelRect,
+				uSize topLevelIndex,
 				bool& continueIterating)
 			{
-				if (rect.PointIsInside(cursorPos))
-					continueIterating = false;
-
-				// After we check if should hold a tab, or move the window
-				// Check if we are inside title bar first
-				Rect titleBarRect{};
-				auto& window = node.windows[node.selectedWindow];
-				titleBarRect.position = rect.position;
-				titleBarRect.extent = { rect.extent.width, implData.textManager.lineheight };
-				if (titleBarRect.PointIsInside(cursorPos))
+				Std::Opt<impl::DockArea_ResizeRect> resizeRectHit;
+				if (event.clicked && continueIterating && topLevelIndex != dockArea.topLevelNodes.size() - 1)
 				{
-					continueIterating = false;
-
-					// Check if we hit one of the tabs, if so, select it
-					bool tabWasHit = false;
-					if (node.windows.size() > 1)
-					{
-						// We have multiple tabs, dragging out a tab means removing it from the list of tabs
-						u32 tabHoriOffset = 0;
-						for (uSize windowIndex = 0; windowIndex < node.windows.size(); windowIndex += 1)
+					impl::DockArea_IterateResizeRects(
+						topLevelRect,
+						dockArea.resizeAreaThickness,
+						[topLevelRect, &resizeRectHit, cursorPos](impl::DockArea_ResizeRect side, Rect rect)
 						{
-							auto& window = node.windows[windowIndex];
-							Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
-								implData.textManager,
-								window.title);
-							Rect tabRect{};
-							tabRect.position = rect.position;
-							tabRect.position.x += tabHoriOffset;
-							tabRect.extent = titleBarSizeHint.preferred;
-							tabHoriOffset += tabRect.extent.width;
-							if (tabRect.PointIsInside(cursorPos))
-							{
-								tabWasHit = true;
-								// Select this window to display, and bring it the top-level-node to front.
-								node.selectedWindow = windowIndex;
-								topLevelNodeToPushToFront = Std::Opt{ topLevelIndex };
-								dockArea.currentBehavior = DockArea::Behavior::HoldingTab;
-								dockArea.holdingTab = &node;
-								dockArea.windowMovedRelativePos = cursorPos - tabRect.position;
-								break;
-							}
-						}
-					}
-					else
-					{
-						// We only have one tab.
-						auto& window = node.windows[node.selectedWindow];
-						Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
-							implData.textManager,
-							window.title);
-						Rect tabRect{};
-						tabRect.position = rect.position;
-						tabRect.extent = titleBarSizeHint.preferred;
-						if (parentNode && tabRect.PointIsInside(cursorPos))
-						{
-							// We only have one tab. Dragging it out means splitting the Hori/Vert split if we have a parent.
-							DockArea::TopLevelNode topLevelNode{};
-							topLevelNode.rect = rect;
-							topLevelNode.rect.position -= widgetRect.position;
-							parentNode->type = DockArea::Node::Type::Window;
-							if (parentNode->split.a == &node)
-							{
-								topLevelNode.node = Std::Move(parentNode->split.a);
-								parentNode->windows = Std::Move(parentNode->split.b->windows);
-								parentNode->split.b = {};
-							}
-							else
-							{
-								topLevelNode.node = Std::Move(parentNode->split.b);
-								parentNode->windows = Std::Move(parentNode->split.a->windows);
-								parentNode->split.a = {};
-							}
-							dockArea.topLevelNodes.emplace(dockArea.topLevelNodes.begin(), Std::Move(topLevelNode));
-							dockArea.currentBehavior = DockArea::Behavior::Moving;
-							dockArea.windowMovedRelativePos = cursorPos - rect.position;
-							tabWasHit = true;
-							return;
-						}
-					}
-					if (!tabWasHit)
-					{
-						// We hit the title bar but not any tabs, start moving it and bring it to front
-						dockArea.currentBehavior = DockArea::Behavior::Moving;
-						dockArea.windowMovedRelativePos = cursorPos - topLevelRect.position;
-						topLevelNodeToPushToFront = Std::Opt{ topLevelIndex };
-					}
-					return;
-				}
-
-				// We did not hit the titlebar, check if we hit the window content
-				Rect contentRect{};
-				contentRect.position.x = titleBarRect.position.x;
-				contentRect.position.y = titleBarRect.position.y + titleBarRect.extent.height;
-				contentRect.extent.width = titleBarRect.extent.width;
-				contentRect.extent.height = rect.extent.height - titleBarRect.extent.height;
-				if (contentRect.PointIsInside(cursorPos))
-				{
-					continueIterating = false;
-					// Bring to front
-					// Send event to inner widget/layout
-					// Then don't pass the event to windows further back.
-					topLevelNodeToPushToFront = Std::Opt{ topLevelIndex };
-
-					auto& window = node.windows[node.selectedWindow];
-					if (window.widget)
-					{
-						window.widget->CursorClick(
-							ctx,
-							contentRect,
-							contentRect,
-							cursorPos,
-							event);
-					}
-					else if (window.layout)
-					{
-						window.layout->CursorClick(
-							ctx,
-							contentRect,
-							contentRect,
-							cursorPos,
-							event);
-					}
-
-					return;
-				}
-			};
-
-			auto lambda2 = [event, &dockArea, cursorPos, &topLevelNodeToPushToFront, topLevelIndex](
-				DockArea::Node const& node,
-				Rect rect,
-				bool& continueIterating)
-			{
-				DENGINE_IMPL_GUI_ASSERT(node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit);
-
-				if (node.type == DockArea::Node::Type::HoriSplit)
-				{
-					// calc the rect
-					Rect middleRect = rect;
-					middleRect.extent.width = dockArea.resizeAreaRect;
-					middleRect.position.x += u32(rect.extent.width * node.split.split) - middleRect.extent.width / 2;
-					if (middleRect.PointIsInside(cursorPos))
+							if (!resizeRectHit.HasValue() && rect.PointIsInside(cursorPos))
+								resizeRectHit = Std::Opt{ side };
+						});
+					if (resizeRectHit.HasValue())
 					{
 						continueIterating = false;
-						dockArea.currentBehavior = DockArea::Behavior::Resizing;
-						dockArea.resizingSplit = true;
-						dockArea.resizeSplitNode = &node;
-						topLevelNodeToPushToFront = { topLevelIndex };
-						return;
-					}
-				}
-				else if (node.type == DockArea::Node::Type::VertSplit)
-				{
-					// calc the rect
-					Rect middleRect = rect;
-					middleRect.extent.height = dockArea.resizeAreaRect;
-					middleRect.position.y += u32(rect.extent.height * node.split.split) - middleRect.extent.height / 2;
-					if (middleRect.PointIsInside(cursorPos))
-					{
-						continueIterating = false;
-						dockArea.currentBehavior = DockArea::Behavior::Resizing;
-						dockArea.resizingSplit = true;
-						dockArea.resizeSplitNode = &node;
-						topLevelNodeToPushToFront = { topLevelIndex };
-						return;
-					}
-				}
-			};
-
-			if (event.clicked)
-			{
-				Std::Opt<DockArea_ResizeRect> resizeRectHit;
-				DockArea_IterateThroughResizeRects(
-					topLevelRect,
-					dockArea.resizeAreaRect,
-					[&resizeRectHit, cursorPos](DockArea_ResizeRect side, Rect rect)
-				{
-					if (!resizeRectHit.HasValue() && rect.PointIsInside(cursorPos))
-						resizeRectHit = Std::Opt{ side };
-				});
-				if (resizeRectHit.HasValue())
-				{
-					continueIterating = false;
-					topLevelNodeToPushToFront = { topLevelIndex };
-					dockArea.currentBehavior = DockArea::Behavior::Resizing;
-					dockArea.resizingSplit = false;
-					dockArea.resizeSplitNode = nullptr;
-					switch (resizeRectHit.Value())
-					{
-					case DockArea_ResizeRect::Top: dockArea.resizeSide = DockArea::ResizeSide::Top; break;
-					case DockArea_ResizeRect::Bottom: dockArea.resizeSide = DockArea::ResizeSide::Bottom; break;
-					case DockArea_ResizeRect::Left: dockArea.resizeSide = DockArea::ResizeSide::Left; break;
-					case DockArea_ResizeRect::Right: dockArea.resizeSide = DockArea::ResizeSide::Right; break;
+						impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+						dockArea.behavior = DockArea::Behavior::Resizing;
+						dockArea.behaviorData.resizing = {};
+						switch (resizeRectHit.Value())
+						{
+						case DockArea_ResizeRect::Top: dockArea.behaviorData.resizing.resizeSide = DockArea::ResizeSide::Top; break;
+						case DockArea_ResizeRect::Bottom: dockArea.behaviorData.resizing.resizeSide = DockArea::ResizeSide::Bottom; break;
+						case DockArea_ResizeRect::Left: dockArea.behaviorData.resizing.resizeSide = DockArea::ResizeSide::Left; break;
+						case DockArea_ResizeRect::Right: dockArea.behaviorData.resizing.resizeSide = DockArea::ResizeSide::Right; break;
+						}
 					}
 				}
 
-				if (!continueIterating)
-					break;
-			}
+				if (!resizeRectHit.HasValue() && topLevelRect.PointIsInside(cursorPos))
+				{
+					// Iterate through nodes, check if we hit a tab or the titlebar.
+					impl::DockArea_IterateNode(
+						*topLevelNode.node,
+						topLevelRect,
+						continueIterating,
+						impl::DockArea_IterateNode_SplitCallableOrder::First,
+						[&ctx, &dockArea, &implData, cursorPos, event, topLevelRect, topLevelIndex](
+							DockArea::Node& node,
+							Rect rect,
+							DockArea::Node* parentNode,
+							bool& continueIterating)
+						{
+							if (event.clicked && (node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit))
+							{
+								Rect resizeHandleRect = impl::DockArea_GetSplitResizeHandle(
+									node.type,
+									rect,
+									node.split.split,
+									dockArea.resizeAreaThickness,
+									dockArea.resizeHandleLength);
+								if (resizeHandleRect.PointIsInside(cursorPos))
+								{
+									continueIterating = false;
+									if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
+										impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+									dockArea.behavior = DockArea::Behavior::Resizing;
+									dockArea.behaviorData.resizing = {};
+									dockArea.behaviorData.resizing.resizingSplit = true;
+									dockArea.behaviorData.resizing.resizeSplitNode = &node;
+									dockArea.behaviorData.resizing.resizingSplitIsFrontNode = topLevelIndex != dockArea.topLevelNodes.size() - 1;
+									return;
+								}
+							}
+							else if (node.type == DockArea::Node::Type::Window)
+							{
+								DENGINE_IMPL_GUI_ASSERT(!node.windows.empty());
+								if (rect.PointIsInside(cursorPos))
+								{
+									continueIterating = false;
 
-			DockArea_IterateThroughNode(
-				*topLevelNode.node,
-				topLevelRect,
-				continueIterating,
-				Std::Opt{ lambda },
-				Std::Opt{ lambda2 });
-			if (!continueIterating)
-				break;
-		}
-		if (topLevelNodeToPushToFront.HasValue())
-		{
-			uSize i = topLevelNodeToPushToFront.Value();
-			DockArea::TopLevelNode tempTopLevelNode = Std::Move(dockArea.topLevelNodes[i]);
-			dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin() + i);
-			dockArea.topLevelNodes.insert(dockArea.topLevelNodes.begin(), Std::Move(tempTopLevelNode));
-		}
+									Rect titlebarRect = rect;
+									titlebarRect.extent.height = implData.textManager.lineheight;
+									if (event.clicked && titlebarRect.PointIsInside(cursorPos))
+									{
+										// Check if we hit one of the tabs, if so, select it
+										bool tabWasHit = false;
+										if (parentNode || node.windows.size() > 1)
+										{
+											u32 tabHoriOffset = 0;
+											for (uSize windowIndex = 0; !tabWasHit && windowIndex < node.windows.size(); windowIndex += 1)
+											{
+												auto& window = node.windows[windowIndex];
+												Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
+													implData.textManager,
+													window.title);
+												Rect tabRect{};
+												tabRect.position = rect.position;
+												tabRect.position.x += tabHoriOffset;
+												tabRect.extent = titleBarSizeHint.preferred;
+												tabHoriOffset += tabRect.extent.width;
+												if (tabRect.PointIsInside(cursorPos))
+												{
+													tabWasHit = true;
+													// Select this window to display, and bring it the top-level-node to front.
+													node.selectedWindow = windowIndex;
+													if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
+														impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+													dockArea.behavior = DockArea::Behavior::HoldingTab;
+													dockArea.behaviorData.holdingTab = {};
+													dockArea.behaviorData.holdingTab.holdingTab = &node;
+													dockArea.behaviorData.holdingTab.holdingFrontWindow = topLevelIndex != dockArea.topLevelNodes.size() - 1;
+													dockArea.behaviorData.holdingTab.cursorPosRelative = cursorPos - tabRect.position;
+													break;
+												}
+											}
+										}
+										if (!tabWasHit && topLevelIndex != dockArea.topLevelNodes.size() - 1)
+										{
+											// We hit the title bar but not any tabs, start moving it and bring it to front
+											dockArea.behavior = DockArea::Behavior::Moving;
+											dockArea.behaviorData.moving = {};
+											dockArea.behaviorData.moving.windowMovedRelativePos = cursorPos - topLevelRect.position;
+											impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+										}
+									}
+									Rect contentRect = rect;
+									contentRect.position.y += titlebarRect.extent.height;
+									contentRect.extent.height -= titlebarRect.extent.height;
+									if (contentRect.PointIsInside(cursorPos))
+									{
+										auto& window = node.windows[node.selectedWindow];
+										if (window.widget)
+										{
+											window.widget->CursorClick(
+												ctx,
+												contentRect,
+												contentRect,
+												cursorPos,
+												event);
+										}
+										else if (window.layout)
+										{
+											window.layout->CursorClick(
+												ctx,
+												contentRect,
+												contentRect,
+												cursorPos,
+												event);
+										}
+									}
+								}
+							}
+						});
+				}
+		});
 	}
 
 	static void DockArea_CursorClick_Behavior_Moving(
@@ -1186,7 +1268,7 @@ namespace DEngine::Gui::impl
 		if (isInsideWidget && !event.clicked)
 		{
 			// We don't need to test the front-most node, since that's the one being moved.
-			for (uSize i = 1; i < dockArea.topLevelNodes.size(); i++)
+			for (uSize topLevelIndex = 1; topLevelIndex < dockArea.topLevelNodes.size(); topLevelIndex++)
 			{
 				auto lambda = [&dockArea, &implData, cursorPos](
 					DockArea::Node& node,
@@ -1194,30 +1276,28 @@ namespace DEngine::Gui::impl
 					DockArea::Node* parentNode,
 					bool& continueIterating)
 				{
-					if (&node != dockArea.showLayoutNodePtr)
+					if (&node != dockArea.behaviorData.moving.showLayoutNodePtr)
 						return;
 					continueIterating = false;
-
 					auto& window = node.windows[node.selectedWindow];
-
 					// Check if we are within the window's main area first
 					Rect contentRect = rect;
 					contentRect.position.y += implData.textManager.lineheight;
 					contentRect.extent.height -= implData.textManager.lineheight;
 					if (contentRect.PointIsInside(cursorPos))
 					{
-						bool test = false;
-						DockArea_IterateThroughLayoutGizmos(
+						bool gizmoWasHit = false;
+						DockArea_IterateLayoutGizmos(
 							contentRect,
 							dockArea.gizmoSize,
 							dockArea.gizmoPadding,
-							[&dockArea, &node, cursorPos, &test](
+							[&dockArea, &node, cursorPos, &gizmoWasHit](
 								DockArea_LayoutGizmo gizmo,
 								Rect rect)
 							{
-								if (!test && rect.PointIsInside(cursorPos))
+								if (!gizmoWasHit && rect.PointIsInside(cursorPos))
 								{
-									test = true;
+									gizmoWasHit = true;
 									if (gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Right)
 										node.type = DockArea::Node::Type::HoriSplit;
 									else if (gizmo == DockArea_LayoutGizmo::Top || gizmo == DockArea_LayoutGizmo::Bottom)
@@ -1225,22 +1305,23 @@ namespace DEngine::Gui::impl
 									if (gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Right ||
 											gizmo == DockArea_LayoutGizmo::Top || gizmo == DockArea_LayoutGizmo::Bottom)
 									{
-										// Turn this node into a horisplit-node
 										DockArea::Node* newNode = new DockArea::Node;
 										auto& nodeA = gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Top ? node.split.a : node.split.b;
 										auto& nodeB = gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Top ? node.split.b : node.split.a;
 										nodeB = Std::Box{ newNode };
 										newNode->type = DockArea::Node::Type::Window;
 										newNode->windows = Std::Move(node.windows);
-										nodeA = Std::Move(dockArea.topLevelNodes[0].node);
+										newNode->selectedWindow = node.selectedWindow;
+										node.selectedWindow = 0;
+										nodeA = Std::Move(dockArea.topLevelNodes.front().node);
 										dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
 									}
 
-									if (gizmo == DockArea_LayoutGizmo::Center && dockArea.topLevelNodes[0].node->type == DockArea::Node::Type::Window)
+									if (gizmo == DockArea_LayoutGizmo::Center && dockArea.topLevelNodes.front().node->type == DockArea::Node::Type::Window)
 									{
-										for (auto& window : dockArea.topLevelNodes[0].node->windows)
+										node.selectedWindow = node.windows.size() + dockArea.topLevelNodes.front().node->selectedWindow;
+										for (auto& window : dockArea.topLevelNodes.front().node->windows)
 											node.windows.emplace_back(Std::Move(window));
-										node.selectedWindow = node.windows.size() - 1;
 										dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
 									}
 								}
@@ -1248,16 +1329,18 @@ namespace DEngine::Gui::impl
 					}
 				};
 
-				auto& topLevelNode = dockArea.topLevelNodes[i];
+				auto& topLevelNode = dockArea.topLevelNodes[topLevelIndex];
 				Rect topLevelNodeRect = topLevelNode.rect;
 				topLevelNodeRect.position += widgetRect.position;
+				if (topLevelIndex == dockArea.topLevelNodes.size() - 1)
+					topLevelNodeRect = widgetRect;
 				bool continueIterating = true;
-				DockArea_IterateThroughNode(
+				DockArea_IterateNode(
 					*topLevelNode.node,
 					topLevelNodeRect,
 					continueIterating,
-					Std::Opt{ lambda },
-					Std::Opt<DockArea_SplitCallablePFN>());
+					impl::DockArea_IterateNode_SplitCallableOrder::First,
+					lambda);
 				if (!continueIterating)
 					break;
 			}
@@ -1265,9 +1348,8 @@ namespace DEngine::Gui::impl
 
 		if (!event.clicked)
 		{
-			dockArea.currentBehavior = DockArea::Behavior::Normal;
-			dockArea.showLayoutNodePtr = nullptr;
-			dockArea.highlightRect = Std::nullOpt;
+			dockArea.behavior = DockArea::Behavior::Normal;
+			dockArea.behaviorData.normal = {};
 		}
 	}
 
@@ -1279,7 +1361,8 @@ namespace DEngine::Gui::impl
 	{
 		if (!event.clicked)
 		{
-			dockArea.currentBehavior = DockArea::Behavior::Normal;
+			dockArea.behavior = DockArea::Behavior::Normal;
+			dockArea.behaviorData.normal = {};
 		}
 	}
 
@@ -1290,11 +1373,10 @@ namespace DEngine::Gui::impl
 		Math::Vec2Int cursorPos,
 		CursorClickEvent event)
 	{
-		bool cursorInsideWidget = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
 		if (!event.clicked)
 		{
-			dockArea.currentBehavior = DockArea::Behavior::Normal;
-			dockArea.holdingTab = nullptr;
+			dockArea.behavior = DockArea::Behavior::Normal;
+			dockArea.behaviorData.normal = {};
 		}
 	}
 }
@@ -1310,7 +1392,7 @@ void DockArea::CursorClick(
 
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 
-	if (this->currentBehavior == Behavior::Normal)
+	if (this->behavior == Behavior::Normal)
 	{
 		impl::DockArea_CursorClick_Behavior_Normal(
 			ctx,
@@ -1321,7 +1403,7 @@ void DockArea::CursorClick(
 			event,
 			implData);
 	}
-	else if (this->currentBehavior == Behavior::Moving)
+	else if (this->behavior == Behavior::Moving)
 	{
 		impl::DockArea_CursorClick_Behavior_Moving(
 			*this,
@@ -1331,7 +1413,7 @@ void DockArea::CursorClick(
 			event,
 			implData);
 	}
-	else if (this->currentBehavior == Behavior::Resizing)
+	else if (this->behavior == Behavior::Resizing)
 	{
 		impl::DockArea_CursorClick_Behavior_Resizing(
 			*this,
@@ -1339,13 +1421,651 @@ void DockArea::CursorClick(
 			visibleRect,
 			event);
 	}
-	else if (this->currentBehavior == Behavior::HoldingTab)
+	else if (this->behavior == Behavior::HoldingTab)
 	{
 		impl::DockArea_CursorClick_Behavior_HoldingTab(
 			*this,
 			widgetRect,
 			visibleRect,
 			cursorPos,
+			event);
+	}
+}
+
+namespace DEngine::Gui::impl
+{
+	static void DockArea_TouchEvent_Behavior_Normal(
+		Context& ctx,
+		ImplData& implData,
+		DockArea& dockArea,
+		Rect widgetRect,
+		Rect visibleRect,
+		Gui::TouchEvent event)
+	{
+		Math::Vec2Int cursorPos = { (i32)event.position.x, (i32)event.position.y };
+		bool isInsideWidget = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
+		if (isInsideWidget)
+		{
+			bool continueIterating = true;
+			impl::DockArea_IterateTopLevelNodes(
+				impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+				Std::Span{dockArea.topLevelNodes.data(), dockArea.topLevelNodes.size()},
+				widgetRect,
+				continueIterating,
+				[&ctx, &dockArea, &implData, event](
+					DockArea::TopLevelNode &topLevelNode,
+					Rect topLevelRect,
+					uSize topLevelIndex,
+					bool &continueIterating)
+				{
+					Std::Opt<impl::DockArea_ResizeRect> resizeRectHit;
+					if (event.type == TouchEventType::Down && continueIterating &&
+							topLevelIndex != dockArea.topLevelNodes.size() - 1)
+					{
+						impl::DockArea_IterateResizeRects(
+							topLevelRect,
+							dockArea.resizeAreaThickness,
+							[topLevelRect, &resizeRectHit, event](impl::DockArea_ResizeRect side, Rect rect)
+							{
+								if (!resizeRectHit.HasValue() && rect.PointIsInside(event.position))
+									resizeRectHit = Std::Opt{side};
+							});
+						if (resizeRectHit.HasValue())
+						{
+							continueIterating = false;
+							impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+							dockArea.behavior = DockArea::Behavior::Resizing;
+							dockArea.behaviorData.resizing = {};
+							switch (resizeRectHit.Value())
+							{
+								case impl::DockArea_ResizeRect::Top:
+									dockArea.behaviorData.resizing.resizeSide = DockArea::ResizeSide::Top;
+									break;
+								case impl::DockArea_ResizeRect::Bottom:
+									dockArea.behaviorData.resizing.resizeSide = DockArea::ResizeSide::Bottom;
+									break;
+								case impl::DockArea_ResizeRect::Left:
+									dockArea.behaviorData.resizing.resizeSide = DockArea::ResizeSide::Left;
+									break;
+								case impl::DockArea_ResizeRect::Right:
+									dockArea.behaviorData.resizing.resizeSide = DockArea::ResizeSide::Right;
+									break;
+							}
+						}
+					}
+					if (!resizeRectHit.HasValue() && topLevelRect.PointIsInside(event.position))
+					{
+						// Iterate through nodes, check if we hit a tab or the titlebar.
+						impl::DockArea_IterateNode(
+							*topLevelNode.node,
+							topLevelRect,
+							continueIterating,
+							impl::DockArea_IterateNode_SplitCallableOrder::First,
+							[&ctx, &dockArea, &implData, event, topLevelRect, topLevelIndex](
+								DockArea::Node &node,
+								Rect rect,
+								DockArea::Node *parentNode,
+								bool &continueIterating)
+							{
+								if ((node.type == DockArea::Node::Type::HoriSplit ||
+										 node.type == DockArea::Node::Type::VertSplit))
+								{
+									if (event.type == TouchEventType::Down)
+									{
+										Rect resizeHandleRect = impl::DockArea_GetSplitResizeHandle(
+											node.type,
+											rect,
+											node.split.split,
+											dockArea.resizeAreaThickness,
+											dockArea.resizeHandleLength);
+										if (resizeHandleRect.PointIsInside(event.position))
+										{
+											continueIterating = false;
+											if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
+												impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+											dockArea.behavior = DockArea::Behavior::Resizing;
+											dockArea.behaviorData.resizing = {};
+											dockArea.behaviorData.resizing.resizingSplit = true;
+											dockArea.behaviorData.resizing.resizeSplitNode = &node;
+											dockArea.behaviorData.resizing.resizingSplitIsFrontNode =
+												topLevelIndex != dockArea.topLevelNodes.size() - 1;
+											return;
+										}
+									}
+								}
+								else if (node.type == DockArea::Node::Type::Window)
+								{
+									DENGINE_IMPL_GUI_ASSERT(!node.windows.empty());
+									if (rect.PointIsInside(event.position))
+									{
+										continueIterating = false;
+
+										Rect titlebarRect = rect;
+										titlebarRect.extent.height = implData.textManager.lineheight;
+										bool titleBarWasHit = false;
+										if (event.type == TouchEventType::Down &&
+												titlebarRect.PointIsInside(event.position))
+										{
+											titleBarWasHit = true;
+											// Check if we hit one of the tabs, if so, select it
+											bool tabWasHit = false;
+											if (parentNode || node.windows.size() > 1)
+											{
+												u32 tabHoriOffset = 0;
+												for (uSize windowIndex = 0;
+														 !tabWasHit && windowIndex < node.windows.size(); windowIndex += 1)
+												{
+													auto &window = node.windows[windowIndex];
+													Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
+														implData.textManager,
+														window.title);
+													Rect tabRect{};
+													tabRect.position = rect.position;
+													tabRect.position.x += tabHoriOffset;
+													tabRect.extent = titleBarSizeHint.preferred;
+													tabHoriOffset += tabRect.extent.width;
+													if (tabRect.PointIsInside(event.position))
+													{
+														tabWasHit = true;
+														// Select this window to display, and bring it the top-level-node to front.
+														node.selectedWindow = windowIndex;
+														if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
+															impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes,
+																																 topLevelIndex);
+														dockArea.behavior = DockArea::Behavior::HoldingTab;
+														dockArea.behaviorData.holdingTab = {};
+														dockArea.behaviorData.holdingTab.holdingTab = &node;
+														dockArea.behaviorData.holdingTab.holdingFrontWindow =
+															topLevelIndex != dockArea.topLevelNodes.size() - 1;
+														dockArea.behaviorData.holdingTab.cursorPosRelative =
+															Math::Vec2Int{(i32) event.position.x, (i32) event.position.y} -
+															tabRect.position;
+														break;
+													}
+												}
+											}
+											if (!tabWasHit && topLevelIndex != dockArea.topLevelNodes.size() - 1)
+											{
+												// We hit the title bar but not any tabs, start moving it and bring it to front
+												dockArea.behavior = DockArea::Behavior::Moving;
+												dockArea.behaviorData.moving = {};
+												dockArea.behaviorData.moving.windowMovedRelativePos =
+													Math::Vec2Int{(i32) event.position.x, (i32) event.position.y} -
+													topLevelRect.position;
+												impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+											}
+										}
+										if (!titleBarWasHit)
+										{
+											Rect contentRect = rect;
+											contentRect.position.y += titlebarRect.extent.height;
+											contentRect.extent.height -= titlebarRect.extent.height;
+											if (contentRect.PointIsInside(
+												Math::Vec2Int{(i32) event.position.x, (i32) event.position.y}))
+											{
+												auto &window = node.windows[node.selectedWindow];
+												if (window.widget)
+												{
+													window.widget->TouchEvent(
+														ctx,
+														contentRect,
+														contentRect,
+														event);
+												}
+												else if (window.layout)
+												{
+													window.layout->TouchEvent(
+														ctx,
+														contentRect,
+														contentRect,
+														event);
+												}
+											}
+										}
+									}
+								}
+							});
+					}
+				});
+		}
+	}
+
+	static void DockArea_TouchEvent_Behavior_Moving(
+		Context& ctx,
+		ImplData& implData,
+		DockArea& dockArea,
+		Rect widgetRect,
+		Rect visibleRect,
+		Gui::TouchEvent event)
+	{
+		if (event.id == 0 && event.type == TouchEventType::Moved)
+		{
+			Math::Vec2Int cursorPos = Math::Vec2Int{ (i32)event.position.x, (i32)event.position.y };
+			bool cursorInsideWidget = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
+			if (cursorInsideWidget)
+			{
+				// First move the window.
+				auto& topLevelNode = dockArea.topLevelNodes.front();
+				topLevelNode.rect.position = cursorPos - widgetRect.position - dockArea.behaviorData.moving.windowMovedRelativePos;
+
+				bool continueIterating = true;
+				bool windowContentWasHit = false;
+				impl::DockArea_IterateTopLevelNodes(
+					impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+					Std::Span{ dockArea.topLevelNodes.data(), dockArea.topLevelNodes.size() },
+					widgetRect,
+					continueIterating,
+					[&dockArea, &implData, cursorPos, &windowContentWasHit](
+						DockArea::TopLevelNode const& topLevelNode,
+						Rect topLevelRect,
+						uSize topLevelIndex,
+						bool& continueIterating)
+					{
+						// Jump over the first top-level node. It's the one we're moving.
+						if (topLevelIndex == 0)
+							return;
+						impl::DockArea_IterateNode(
+							*topLevelNode.node,
+							topLevelRect,
+							continueIterating,
+							impl::DockArea_IterateNode_SplitCallableOrder::First,
+							[&dockArea, &implData, cursorPos, &windowContentWasHit](
+								DockArea::Node const& node,
+								Rect rect,
+								DockArea::Node const* parentNode,
+								bool& continueIterating)
+							{
+								if (node.type != DockArea::Node::Type::Window)
+									return;
+								// If we hit the titlebar, we stop iterating.
+								Rect titlebarRect = rect;
+								titlebarRect.extent.height = implData.textManager.lineheight;
+								if (titlebarRect.PointIsInside(cursorPos))
+									continueIterating = false;
+								// Check if the cursor is inside the contentRect.
+								Rect contentRect = rect;
+								contentRect.extent.height -= titlebarRect.extent.height;
+								contentRect.position.y += titlebarRect.extent.height;
+								if (contentRect.PointIsInside(cursorPos))
+								{
+									dockArea.behaviorData.moving.showLayoutNodePtr = &node;
+									continueIterating = false;
+									windowContentWasHit = true;
+
+									// Check if we are hovering any of the layout gizmos, and apply the highlight rect if we are.
+									dockArea.behaviorData.moving.useHighlightGizmo = false;
+									impl::DockArea_IterateLayoutGizmos(
+										contentRect,
+										dockArea.gizmoSize,
+										dockArea.gizmoPadding,
+										[&dockArea, cursorPos](
+											impl::DockArea_LayoutGizmo gizmo,
+											Rect rect)
+										{
+											if (!dockArea.behaviorData.moving.useHighlightGizmo && rect.PointIsInside(cursorPos))
+											{
+												dockArea.behaviorData.moving.useHighlightGizmo = true;
+												dockArea.behaviorData.moving.highlightGizmo = gizmo;
+											}
+										});
+								}
+							});
+					});
+				if (!windowContentWasHit)
+					dockArea.behaviorData.moving.showLayoutNodePtr = nullptr;
+			}
+		}
+		else if (event.id == 0 && event.type == TouchEventType::Up)
+		{
+			// We don't need to test the front-most node, since that's the one being moved.
+			bool windowContentWasHit = false;
+			bool continueIterating = true;
+			impl::DockArea_IterateTopLevelNodes(
+				impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+				Std::Span{ dockArea.topLevelNodes.data(), dockArea.topLevelNodes.size() },
+				widgetRect,
+				continueIterating,
+				[&dockArea, &implData, event, &windowContentWasHit](
+					DockArea::TopLevelNode const& topLevelNode,
+					Rect topLevelRect,
+					uSize topLevelIndex,
+					bool& continueIterating)
+			{
+				if (topLevelIndex == 0)
+					return;
+
+				DockArea_IterateNode(
+					*topLevelNode.node,
+					topLevelRect,
+					continueIterating,
+					impl::DockArea_IterateNode_SplitCallableOrder::First,
+					[&dockArea, &implData, event](
+						DockArea::Node& node,
+						Rect rect,
+						DockArea::Node* parentNode,
+						bool& continueIterating)
+				{
+					if (&node != dockArea.behaviorData.moving.showLayoutNodePtr)
+						return;
+					auto cursorPos = Math::Vec2Int{ (i32)event.position.x, (i32)event.position.y };
+					continueIterating = false;
+					auto& window = node.windows[node.selectedWindow];
+					// Check if we are within the window's main area first
+					Rect contentRect = rect;
+					contentRect.position.y += implData.textManager.lineheight;
+					contentRect.extent.height -= implData.textManager.lineheight;
+					if (contentRect.PointIsInside(cursorPos))
+					{
+						bool gizmoWasHit = false;
+						DockArea_IterateLayoutGizmos(
+							contentRect,
+							dockArea.gizmoSize,
+							dockArea.gizmoPadding,
+							[&dockArea, &node, cursorPos, &gizmoWasHit](
+								DockArea_LayoutGizmo gizmo,
+								Rect rect)
+							{
+								if (!gizmoWasHit && rect.PointIsInside(cursorPos))
+								{
+									gizmoWasHit = true;
+									if (gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Right)
+										node.type = DockArea::Node::Type::HoriSplit;
+									else if (gizmo == DockArea_LayoutGizmo::Top || gizmo == DockArea_LayoutGizmo::Bottom)
+										node.type = DockArea::Node::Type::VertSplit;
+									if (gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Right ||
+										gizmo == DockArea_LayoutGizmo::Top || gizmo == DockArea_LayoutGizmo::Bottom)
+									{
+										DockArea::Node* newNode = new DockArea::Node;
+										auto& nodeA = gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Top ? node.split.a : node.split.b;
+										auto& nodeB = gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Top ? node.split.b : node.split.a;
+										nodeB = Std::Box{ newNode };
+										newNode->type = DockArea::Node::Type::Window;
+										newNode->windows = Std::Move(node.windows);
+										newNode->selectedWindow = node.selectedWindow;
+										node.selectedWindow = 0;
+										nodeA = Std::Move(dockArea.topLevelNodes.front().node);
+										dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
+										dockArea.behavior = DockArea::Behavior::Normal;
+										dockArea.behaviorData.normal = {};
+									}
+									else if (gizmo == DockArea_LayoutGizmo::Center && dockArea.topLevelNodes.front().node->type == DockArea::Node::Type::Window)
+									{
+										node.selectedWindow = node.windows.size() + dockArea.topLevelNodes.front().node->selectedWindow;
+										for (auto& window : dockArea.topLevelNodes.front().node->windows)
+											node.windows.emplace_back(Std::Move(window));
+										dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
+										dockArea.behavior = DockArea::Behavior::Normal;
+										dockArea.behaviorData.normal = {};
+									}
+								}
+							});
+					}
+				});
+				if (!continueIterating)
+					return;
+			});
+
+			dockArea.behavior = DockArea::Behavior::Normal;
+			dockArea.behaviorData.normal = {};
+		}
+	}
+
+	static void DockArea_TouchEvent_Behavior_Resizing(
+		Context& ctx,
+		ImplData& implData,
+		DockArea& dockArea,
+		Rect widgetRect,
+		Rect visibleRect,
+		Gui::TouchEvent event)
+	{
+		if (event.id == 0 && event.type == TouchEventType::Up)
+		{
+			dockArea.behavior = DockArea::Behavior::Normal;
+			dockArea.behaviorData.normal = {};
+		}
+		else if (event.id == 0 && event.type == TouchEventType::Moved)
+		{
+			bool cursorInsideWidget = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
+			if (!cursorInsideWidget)
+				return;
+			DENGINE_IMPL_GUI_ASSERT(!dockArea.topLevelNodes.empty());
+
+			if (dockArea.behaviorData.resizing.resizingSplit)
+			{
+				auto& topLevelNode = dockArea.behaviorData.resizing.resizingSplitIsFrontNode ? dockArea.topLevelNodes.front() : dockArea.topLevelNodes.back();
+				Rect windowRect = topLevelNode.rect;
+				if (!dockArea.behaviorData.resizing.resizingSplitIsFrontNode)
+				{
+					windowRect.position = {};
+					windowRect.extent = widgetRect.extent;
+				}
+
+				bool continueIterating = true;
+				impl::DockArea_IterateNode(
+					*topLevelNode.node,
+					windowRect,
+					continueIterating,
+					impl::DockArea_IterateNode_SplitCallableOrder::First,
+					[&dockArea, event, widgetRect](
+						DockArea::Node& node,
+						Rect rect,
+						DockArea::Node const* parentNode,
+						bool& continueIterating)
+					{
+						if ((node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit) &&
+								&node == dockArea.behaviorData.resizing.resizeSplitNode)
+						{
+							continueIterating = false;
+
+							if (node.type == DockArea::Node::Type::HoriSplit)
+							{
+								// Find out the position of the cursor in range 0-1 of the node.
+								f32 test = f32(event.position.x - widgetRect.position.x - rect.position.x) / rect.extent.width;
+								node.split.split = Math::Clamp(test, 0.1f, 0.9f);
+							}
+							else if (node.type == DockArea::Node::Type::VertSplit)
+							{
+								// Find out the position of the cursor in range 0-1 of the node.
+								f32 test = f32(event.position.y - widgetRect.position.y - rect.position.y) / rect.extent.height;
+								node.split.split = Math::Clamp(test, 0.1f, 0.9f);
+							}
+						}
+					});
+			}
+			else
+			{
+				auto& topLevelNode = dockArea.topLevelNodes.front();
+				if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Top)
+				{
+					i32 prevY = topLevelNode.rect.position.y;
+					i32 a = event.position.y - widgetRect.position.y;
+					i32 b = topLevelNode.rect.position.y + (i32)topLevelNode.rect.extent.height - 100;
+					topLevelNode.rect.position.y = Math::Min(a, b);
+					topLevelNode.rect.extent.height += prevY - topLevelNode.rect.position.y;
+				}
+				else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Bottom)
+				{
+					topLevelNode.rect.extent.height = Math::Max(0, (i32)event.position.y - widgetRect.position.y - topLevelNode.rect.position.y);
+				}
+				else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Left)
+				{
+					i32 prevX = topLevelNode.rect.position.x;
+					i32 a = event.position.x - widgetRect.position.x;
+					i32 b = topLevelNode.rect.position.x + (i32)topLevelNode.rect.extent.width - 100;
+					topLevelNode.rect.position.x = Math::Min(a, b);
+					topLevelNode.rect.extent.width += prevX - topLevelNode.rect.position.x;
+				}
+				else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Right)
+				{
+					topLevelNode.rect.extent.width = Math::Max(0, (i32)event.position.x - widgetRect.position.x - topLevelNode.rect.position.x);
+				}
+				topLevelNode.rect.extent.height = Math::Max(topLevelNode.rect.extent.height, 100U);
+				topLevelNode.rect.extent.width = Math::Max(topLevelNode.rect.extent.width, 100U);
+			}
+		}
+	}
+
+	static void DockArea_TouchEvent_Behavior_HoldingTab(
+		Context& ctx,
+		ImplData& implData,
+		DockArea& dockArea,
+		Rect widgetRect,
+		Rect visibleRect,
+		Gui::TouchEvent event)
+	{
+		if (event.id == 0 && event.type == TouchEventType::Up)
+		{
+			dockArea.behavior = DockArea::Behavior::Normal;
+			dockArea.behaviorData.normal = {};
+		}
+		else if (event.id == 0 && event.type == TouchEventType::Moved)
+		{
+			auto cursorPos = Math::Vec2Int{ (i32)event.position.x, (i32)event.position.y };
+			bool cursorInsideWidget = widgetRect.PointIsInside(cursorPos);
+
+			// First we check if we need to disconnect any tabs
+			if (cursorInsideWidget)
+			{
+				auto &topLevelNode = dockArea.behaviorData.holdingTab.holdingFrontWindow ? dockArea.topLevelNodes.front() : dockArea.topLevelNodes.back();
+				Rect topLevelRect = topLevelNode.rect;
+				topLevelRect.position += widgetRect.position;
+				if (!dockArea.behaviorData.holdingTab.holdingFrontWindow)
+				{
+					topLevelRect = widgetRect;
+				}
+				bool continueIterating = true;
+				impl::DockArea_IterateNode(
+					*topLevelNode.node,
+					topLevelRect,
+					continueIterating,
+					impl::DockArea_IterateNode_SplitCallableOrder::First,
+					[&dockArea, &implData, widgetRect, cursorPos](
+						DockArea::Node &node,
+						Rect rect,
+						DockArea::Node *parentNode,
+						bool &continueIterating)
+					{
+						if (node.type != DockArea::Node::Type::Window)
+							return;
+						if (&node != dockArea.behaviorData.holdingTab.holdingTab)
+							return;
+
+						// First find out the rect of the tab we are holding
+						Rect tabRect{};
+						tabRect.position = rect.position;
+						tabRect.extent.height = implData.textManager.lineheight;
+						for (uSize nodeWindowIndex = 0;
+								 nodeWindowIndex < node.windows.size(); nodeWindowIndex += 1)
+						{
+							auto &window = node.windows[nodeWindowIndex];
+							Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
+								implData.textManager,
+								window.title);
+							tabRect.position.x += titleBarSizeHint.preferred.width;
+							if (nodeWindowIndex == node.selectedWindow)
+							{
+								tabRect.extent.width = titleBarSizeHint.preferred.width;
+								break;
+							}
+						}
+
+						if ((cursorPos.y <= tabRect.position.y - dockArea.tabDisconnectRadius) ||
+								(cursorPos.y >=
+								 tabRect.position.y + tabRect.extent.height + dockArea.tabDisconnectRadius))
+						{
+							// We want to disconnect this tab into a new top-level node.
+							DockArea::TopLevelNode newTopLevelNode{};
+							newTopLevelNode.rect = rect;
+							newTopLevelNode.rect.position = cursorPos - widgetRect.position -
+																							dockArea.behaviorData.holdingTab.cursorPosRelative;
+							DockArea::Node *newNode = new DockArea::Node;
+							newTopLevelNode.node = Std::Box{newNode};
+							newNode->type = DockArea::Node::Type::Window;
+							newNode->windows.push_back(Std::Move(node.windows[node.selectedWindow]));
+							dockArea.topLevelNodes.emplace(dockArea.topLevelNodes.begin(), Std::Move(newTopLevelNode));
+
+							// Remove the window from the node
+							node.windows.erase(node.windows.begin() + node.selectedWindow);
+							if (node.selectedWindow > 0)
+								node.selectedWindow -= 1;
+
+							// We are now moving this tab.
+							Math::Vec2Int cursorRelativePos = dockArea.behaviorData.holdingTab.cursorPosRelative;
+							dockArea.behavior = DockArea::Behavior::Moving;
+							dockArea.behaviorData.moving = {};
+							dockArea.behaviorData.moving.windowMovedRelativePos = cursorRelativePos;
+
+							if (node.windows.empty())
+							{
+								// We want to turn the parent-node from a split into a window-node.
+								DENGINE_IMPL_GUI_ASSERT(parentNode);
+								DENGINE_IMPL_GUI_ASSERT(
+									parentNode->split.a == &node || parentNode->split.b == &node);
+								if (parentNode->split.a == &node)
+								{
+									DockArea::Node temp = Std::Move(*parentNode);
+									*parentNode = Std::Move(*temp.split.b);
+								}
+								else
+								{
+									DockArea::Node temp = Std::Move(*parentNode);
+									*parentNode = Std::Move(*temp.split.a);
+								}
+							}
+						}
+					});
+			}
+		}
+	}
+}
+
+void DockArea::TouchEvent(
+	Context& ctx, 
+	Rect widgetRect, 
+	Rect visibleRect,
+	Gui::TouchEvent event)
+{
+	auto& dockArea = *this;
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+
+	if (this->behavior == DockArea::Behavior::Normal)
+	{
+		impl::DockArea_TouchEvent_Behavior_Normal(
+			ctx,
+			implData,
+			dockArea,
+			widgetRect,
+			visibleRect,
+			event);
+	}
+	else if (this->behavior == DockArea::Behavior::Moving)
+	{
+		impl::DockArea_TouchEvent_Behavior_Moving(
+			ctx,
+			implData,
+			dockArea,
+			widgetRect,
+			visibleRect,
+			event);
+	}
+	else if (this->behavior == DockArea::Behavior::Resizing)
+	{
+		impl::DockArea_TouchEvent_Behavior_Resizing(
+			ctx,
+			implData,
+			dockArea,
+			widgetRect,
+			visibleRect,
+			event);
+	}
+	else if (this->behavior == DockArea::Behavior::HoldingTab)
+	{
+		impl::DockArea_TouchEvent_Behavior_HoldingTab(
+			ctx,
+			implData,
+			dockArea,
+			widgetRect,
+			visibleRect,
 			event);
 	}
 }

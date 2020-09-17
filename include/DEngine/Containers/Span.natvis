@@ -2,12 +2,12 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
   <Type Name="DEngine::Std::Span&lt;*&gt;">
-    <DisplayString>{{ Size={size} }}</DisplayString>
+    <DisplayString>{{ Size={m_size} }}</DisplayString>
     <Expand>
-      <Item Name="Size" ExcludeView="simple">size</Item>
+      <Item Name="Size" ExcludeView="simple">m_size</Item>
       <ArrayItems>
-        <Size>size</Size>
-        <ValuePointer>data</ValuePointer>
+        <Size>m_size</Size>
+        <ValuePointer>m_data</ValuePointer>
       </ArrayItems>
     </Expand>
   </Type>

@@ -4,5 +4,5 @@
 
 namespace DEngine::Gui
 {
-	enum class WindowID : u64;
+	enum class WindowID : u64 {};
 }

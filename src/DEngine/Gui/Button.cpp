@@ -58,7 +58,6 @@ void Button::Render(
 		implData.textManager,
 		textWidget.StringView(),
 		currentTextColor,
-		framebufferExtent,
 		widgetRect,
 		drawInfo);
 }
@@ -118,7 +117,7 @@ bool Button::GetToggled() const
 }
 
 void Button::CursorMove(
-	Context& ctx,
+	Test& test,
 	Rect widgetRect,
 	Rect visibleRect,
 	CursorMoveEvent event)
