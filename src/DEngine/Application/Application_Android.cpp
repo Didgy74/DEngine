@@ -1,9 +1,9 @@
 #include "detail_Application.hpp"
 
-#include <android/window.h>
+#include <android/configuration.h>
 #include <android/log.h>
+#include <android/native_activity.h>
 #include <jni.h>
-#include <android_native_app_glue.h>
 
 #define VK_USE_PLATFORM_ANDROID_KHR
 #include <vulkan/vulkan.h>
@@ -11,6 +11,7 @@
 #include <dlfcn.h>
 
 #include <string>
+#include <thread>
 #include <vector>
 #include <mutex>
 
@@ -18,12 +19,26 @@ extern int dengine_app_detail_main(int argc, char** argv);
 
 namespace DEngine::Application::detail
 {
+	struct BackendData;
+
+	enum class LooperID
+	{
+		Input = 1
+	};
+
+	struct AndroidPollSource {
+		LooperID looperId = LooperID::Input;
+
+		BackendData* backendData = nullptr;
+	};
+
 	struct CustomEvent
 	{
 		enum class Type
 		{
 			CharInput,
 			CharRemove,
+			CharEnter,
 		};
 		Type type;
 		union
@@ -34,18 +49,26 @@ namespace DEngine::Application::detail
 
 	struct BackendData
 	{
-		android_app* app = nullptr;
-		bool androidAppReady = false;
-		bool androidWindowReady = false;
-		bool configChangedThisTick = false;
+		ANativeActivity* activity = nullptr;
 
+		AndroidPollSource inputPollSource{};
+
+		std::thread gameThread;
+		std::mutex lock;
+		ANativeWindow* nativeWindow = nullptr;
+		u32 nativeWindowVisibleOffsetX = 0;
+		u32 nativeWindowVisibleOffsetY = 0;
+		Extent nativeWindowVisibleExtent{};
+		bool windowVisibleRectInitialized = false;
+		AInputQueue* inputQueue = nullptr;
+
+		jobject mainActivity = nullptr;
+		// JNI Envs are per-thread. This is for the game thread, it is created when attaching
+		// the thread to the JavaVM.
+		JNIEnv* gameThreadJniEnv = nullptr;
+		jmethodID jniOpenSoftInput = nullptr;
+		jmethodID jniHideSoftInput = nullptr;
 		std::vector<CustomEvent> customEventQueue;
-		std::mutex customEventQueueLock;
-
-		JNIEnv* jniEnv = nullptr;
-		jclass jniActivity = nullptr;
-		jmethodID jniGetCurrentOrientation{};
-		jmethodID jniOpenSoftInput{};
 	};
 
 	BackendData* pBackendData = nullptr;
@@ -58,13 +81,6 @@ namespace DEngine::Application::detail
 	static Button Backend_AndroidKeyCodeToButton(int32_t in);
 
 	static void Backend_HandleConfigChanged_Deferred();
-
-	static void HandleCmd(android_app* app, int32_t cmd);
-	// Return 1 if you have handled the event, 0 for any default
-	// dispatching.
-	static int32_t HandleInput(
-			android_app* app,
-			AInputEvent* event);
 
 	static bool HandleInputEvents_Motion(
 			AInputEvent* event,
@@ -79,24 +95,152 @@ namespace DEngine::Application::detail
 
 using namespace DEngine;
 
-static void Application::detail::Backend_HandleWindowInitializeEvent()
+namespace DEngine::Application::detail
 {
-	auto& backendData = *detail::pBackendData;
-	backendData.androidWindowReady = true;
-
-	if (!detail::pAppData->windows.empty())
+	static void onStart(ANativeActivity* activity)
 	{
-		Log("ANDROID TESTING!!! Window restore event");
-		detail::pAppData->windows.front().platformHandle = backendData.app->window;
-		detail::UpdateWindowMinimized(backendData.app->window, false);
+
+	}
+
+	static void onNativeWindowCreated(ANativeActivity* activity, ANativeWindow* window)
+	{
+		auto& backendData = *detail::pBackendData;
+		std::lock_guard _{ backendData.lock };
+
+		backendData.nativeWindow = window;
+	}
+
+	static void onInputQueueCreated(ANativeActivity* activity, AInputQueue* queue)
+	{
+		auto& backendData = *detail::pBackendData;
+		std::lock_guard _{ backendData.lock };
+
+		backendData.inputQueue = queue;
 	}
 }
 
-static void Application::detail::Backend_HandleWindowTerminateEvent()
+extern "C"
+JNIEXPORT void JNICALL ANativeActivity_onCreate(
+	ANativeActivity* activity,
+	void* savedState,
+	size_t savedStateSize)
 {
-	auto& backendData = *detail::pBackendData;
+	using namespace DEngine;
+	using namespace DEngine::Application;
+	using namespace DEngine::Application::detail;
 
-	detail::UpdateWindowMinimized(backendData.app->window, true);
+	Application::detail::pBackendData = new Application::detail::BackendData();
+	auto& backendData = *Application::detail::pBackendData;
+
+	backendData.activity = activity;
+
+	activity->callbacks->onStart = &Application::detail::onStart;
+	activity->callbacks->onNativeWindowCreated = &Application::detail::onNativeWindowCreated;
+	activity->callbacks->onInputQueueCreated = &Application::detail::onInputQueueCreated;
+}
+
+extern "C"
+JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeInit(
+	JNIEnv* env,
+	jobject dengineActivity)
+{
+	using namespace DEngine;
+	using namespace DEngine::Application;
+	using namespace DEngine::Application::detail;
+
+	auto& backendData = *Application::detail::pBackendData;
+
+	backendData.mainActivity = dengineActivity;
+
+	backendData.inputPollSource.backendData = &backendData;
+
+	backendData.customEventQueue.reserve(25);
+
+	auto lambda = []()
+	{
+		DENGINE_APP_MAIN_ENTRYPOINT(0, nullptr);
+	};
+
+	backendData.gameThread = std::thread(lambda);
+	auto threadName = "MainGameThread";
+	pthread_setname_np(backendData.gameThread.native_handle(), threadName);
+}
+
+extern "C"
+JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharInput(
+	JNIEnv* env,
+	jobject dengineActivity,
+	jint utfValue)
+{
+	using namespace DEngine;
+	using namespace DEngine::Application;
+	using namespace DEngine::Application::detail;
+
+	auto& backendData = *Application::detail::pBackendData;
+	std::lock_guard _{ backendData.lock };
+
+	CustomEvent newEvent{};
+	newEvent.type = CustomEvent::Type::CharInput;
+	newEvent.charInput = utfValue;
+	backendData.customEventQueue.push_back(newEvent);
+}
+
+extern "C"
+JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharEnter(
+	JNIEnv* env,
+	jobject dengineActivity)
+{
+	using namespace DEngine;
+	using namespace DEngine::Application;
+	using namespace DEngine::Application::detail;
+
+	auto& backendData = *Application::detail::pBackendData;
+	std::lock_guard _{ backendData.lock };
+
+	CustomEvent newEvent{};
+	newEvent.type = CustomEvent::Type::CharEnter;
+	backendData.customEventQueue.push_back(newEvent);
+}
+
+extern "C"
+JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharRemove(
+	JNIEnv* env,
+	jobject dengineActivity)
+{
+	using namespace DEngine;
+	using namespace DEngine::Application;
+	using namespace DEngine::Application::detail;
+
+	auto& backendData = *Application::detail::pBackendData;
+	std::lock_guard _{ backendData.lock };
+
+	CustomEvent newEvent{};
+	newEvent.type = CustomEvent::Type::CharRemove;
+	backendData.customEventQueue.push_back(newEvent);
+}
+
+extern "C"
+JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeUpdateWindowContentRect(
+	JNIEnv* env,
+	jobject dengineActivity,
+	jint top,
+	jint bottom,
+	jint left,
+	jint right)
+{
+	using namespace DEngine;
+	using namespace DEngine::Application;
+	using namespace DEngine::Application::detail;
+
+	auto& backendData = *Application::detail::pBackendData;
+	std::lock_guard _{ backendData.lock };
+	backendData.nativeWindowVisibleOffsetY = (u32)top;
+	backendData.nativeWindowVisibleOffsetX = (u32)left;
+	//std::swap(backendData.nativeWindowVisibleOffsetX, backendData.nativeWindowVisibleOffsetY);
+	backendData.nativeWindowVisibleExtent.width = right - left;
+	backendData.nativeWindowVisibleExtent.height = bottom - top;
+	//std::swap(backendData.nativeWindowVisibleExtent.width, backendData.nativeWindowVisibleExtent.height);
+	backendData.windowVisibleRectInitialized = true;
 }
 
 static Application::Orientation Application::detail::Backend_ToOrientation(int aconfiguration_orientation)
@@ -120,64 +264,7 @@ static bool Application::detail::Backend_initJNI()
 static Application::Orientation Application::detail::Backend_GetUpdatedOrientation()
 {
 	auto const& backendData = *detail::pBackendData;
-	int a = backendData.jniEnv->CallIntMethod(
-			backendData.app->activity->clazz,
-			backendData.jniGetCurrentOrientation);
-	Orientation b = Backend_ToOrientation(a);
-	if (b == Orientation::Invalid)
-		throw std::runtime_error("DEngine - Application: Tried to get new updated device orientation, but it failed.");
-	return b;
-}
-
-static void Application::detail::HandleCmd(android_app* app, int32_t cmd)
-{
-	auto& backendData = *detail::pBackendData;
-	switch (cmd)
-	{
-	case APP_CMD_INIT_WINDOW:
-		Log("ANDROID TESTING!!!! Init window event");
-		Backend_HandleWindowInitializeEvent();
-		break;
-	case APP_CMD_TERM_WINDOW:
-		Log("ANDROID TESTING!!!! Terminate window event");
-		Backend_HandleWindowTerminateEvent();
-		break;
-	case APP_CMD_LOST_FOCUS:
-		break;
-	case APP_CMD_GAINED_FOCUS:
-		break;
-	case APP_CMD_CONFIG_CHANGED:
-		backendData.configChangedThisTick = true;
-		break;
-	case APP_CMD_CONTENT_RECT_CHANGED:
-		Log("ANDROID TESTING!!!! Content rect changed");
-		break;
-	case APP_CMD_WINDOW_RESIZED:
-		break;
-	case APP_CMD_START:
-		backendData.androidAppReady = true;
-		Log("ANDROID TESTING!!!! App start event");
-		break;
-	case APP_CMD_STOP:
-		Log("ANDROID TESTING!!!! App stop event");
-		break;
-	case APP_CMD_PAUSE:
-		Log("ANDROID TESTING!!!! App pause event");
-		break;
-	case APP_CMD_RESUME:
-		Log("ANDROID TESTING!!!! App resume event");
-		break;
-	case APP_CMD_WINDOW_REDRAW_NEEDED:
-		break;
-	case APP_CMD_INPUT_CHANGED:
-		break;
-	case APP_CMD_DESTROY:
-		Log("ANDROID TESTING!!!! App destroy event");
-		std::exit(0);
-		break;
-	case APP_CMD_SAVE_STATE:
-		break;
-	}
+	return {};
 }
 
 static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, int32_t source)
@@ -261,32 +348,6 @@ static bool Application::detail::HandleInputKeyEvents_Key(
 	return handled;
 }
 
-// Return 1 if you have handled the event, 0 for any default
-// dispatching.
-static int32_t Application::detail::HandleInput(
-		android_app* app,
-		AInputEvent* event)
-{
-	bool handled = false;
-
-	int32_t inputType = AInputEvent_getType(event);
-	int32_t source = AInputEvent_getSource(event);
-
-	switch (inputType)
-	{
-	case AINPUT_EVENT_TYPE_KEY:
-		handled = detail::HandleInputKeyEvents_Key(event, source);
-		break;
-	case AINPUT_EVENT_TYPE_MOTION:
-		handled = detail::HandleInputEvents_Motion(event, source);
-		break;
-	default:
-		throw std::runtime_error("Error. Unexpected Android input event.");
-	}
-
-	return handled ? 1 : 0;
-}
-
 static void Application::detail::Backend_HandleConfigChanged_Deferred()
 {
 	auto& appData = *detail::pAppData;
@@ -304,18 +365,43 @@ static void Application::detail::Backend_HandleConfigChanged_Deferred()
 	if (appData.orientationEvent && !appData.windows.empty())
 	{
 		Extent windowExtent = appData.windows.front().windowData.size;
-		detail::UpdateWindowSize(backendData.app->window, { windowExtent.height, windowExtent.width });
 	}
 }
 
-// Main entry point for our program.
-// This gets ran by the new thread that our Android app starts.
-void android_main(android_app* app)
+namespace DEngine::Application::detail
 {
-	Application::detail::pBackendData = new Application::detail::BackendData;
-	auto& backendData = *Application::detail::pBackendData;
-	backendData.app = app;
-	dengine_app_detail_main(0, nullptr);
+	int testCallback(int fd, int events, void *data)
+	{
+		AndroidPollSource& androidPollSource = *(AndroidPollSource*)data;
+		auto& backendData = *androidPollSource.backendData;
+		if ((unsigned int)events & ALOOPER_EVENT_INPUT)
+		{
+			while (true)
+			{
+				AInputEvent* event = nullptr;
+				int32_t eventIndex = AInputQueue_getEvent(backendData.inputQueue, &event);
+				if (eventIndex < 0)
+					break;
+
+				if (AInputQueue_preDispatchEvent(backendData.inputQueue, event) != 0) {
+					continue;
+				}
+				int handled = 0;
+
+				int32_t eventType = AInputEvent_getType(event);
+				int32_t eventSource = AInputEvent_getSource(event);
+
+				if (eventType == AINPUT_EVENT_TYPE_MOTION)
+				{
+					handled = HandleInputEvents_Motion(event, eventSource);
+				}
+
+				AInputQueue_finishEvent(backendData.inputQueue, event, handled);
+			}
+		}
+
+		return 1;
+	}
 }
 
 bool Application::detail::Backend_Initialize()
@@ -324,8 +410,14 @@ bool Application::detail::Backend_Initialize()
 	auto& backendData = *detail::pBackendData;
 
 	// First we attach this thread to the JVM
-	backendData.app->activity->vm->AttachCurrentThread(&backendData.jniEnv, nullptr);
-
+	jint attachThreadResult = backendData.activity->vm->AttachCurrentThread(
+		&backendData.gameThreadJniEnv,
+		nullptr);
+	if (attachThreadResult != JNI_OK)
+	{
+		// Attaching failed. Crash the program.
+		std::abort();
+	}
 	// I have no idea how this code works.
 	// It does some crazy JNI bullshit to get some handles,
 	// which in turn we need to grab Java function-pointer/handles
@@ -333,68 +425,65 @@ bool Application::detail::Backend_Initialize()
 	//
 	// I think this code can be shortened by reusing some values
 	// inside the android_app struct. I don't actually know.
-	jclass clazz = backendData.jniEnv->GetObjectClass(backendData.app->activity->clazz);
-	jmethodID getApplication = backendData.jniEnv->GetMethodID(clazz,
-			"getApplication",
-			"()Landroid/app/Application;");
-	jobject application = backendData.jniEnv->CallObjectMethod(backendData.app->activity->clazz, getApplication);
-	jclass applicationClass = backendData.jniEnv->GetObjectClass(application);
-	jmethodID getApplicationContext = backendData.jniEnv->GetMethodID(
-			applicationClass,
-			"getApplicationContext",
-			"()Landroid/content/Context;");
-	jobject context = backendData.jniEnv->CallObjectMethod(application, getApplicationContext);
-	jclass contextClass = backendData.jniEnv->GetObjectClass(context);
-	jmethodID getClassLoader = backendData.jniEnv->GetMethodID(
-			contextClass,
-			"getClassLoader",
-			"()Ljava/lang/ClassLoader;");
-	jobject classLoader = backendData.jniEnv->CallObjectMethod(context, getClassLoader);
-	jclass classLoaderClass = backendData.jniEnv->GetObjectClass(classLoader);
-	jmethodID loadClass = backendData.jniEnv->GetMethodID(
+
+	jclass clazz = backendData.gameThreadJniEnv->GetObjectClass(backendData.activity->clazz);
+	jmethodID getApplication = backendData.gameThreadJniEnv->GetMethodID(
+		clazz,
+		"getApplication",
+		"()Landroid/app/Application;");
+	jobject application = backendData.gameThreadJniEnv->CallObjectMethod(backendData.activity->clazz, getApplication);
+	jclass applicationClass = backendData.gameThreadJniEnv->GetObjectClass(application);
+	jmethodID getApplicationContext = backendData.gameThreadJniEnv->GetMethodID(
+		applicationClass,
+		"getApplicationContext",
+		"()Landroid/content/Context;");
+	jobject context = backendData.gameThreadJniEnv->CallObjectMethod(application, getApplicationContext);
+	jclass contextClass = backendData.gameThreadJniEnv->GetObjectClass(context);
+	jmethodID getClassLoader = backendData.gameThreadJniEnv->GetMethodID(
+		contextClass,
+		"getClassLoader",
+		"()Ljava/lang/ClassLoader;");
+	jobject classLoader = backendData.gameThreadJniEnv->CallObjectMethod(context, getClassLoader);
+	jclass classLoaderClass = backendData.gameThreadJniEnv->GetObjectClass(classLoader);
+	jmethodID loadClass = backendData.gameThreadJniEnv->GetMethodID(
 			classLoaderClass,
 			"loadClass",
 			"(Ljava/lang/String;)Ljava/lang/Class;");
-	jstring activityName = backendData.jniEnv->NewStringUTF("didgy.dengine.editor.DEngineActivity");
-	backendData.jniActivity = static_cast<jclass>(backendData.jniEnv->CallObjectMethod(
+
+
+	jstring activityName = backendData.gameThreadJniEnv->NewStringUTF("didgy.dengine.editor.DEngineActivity");
+	jclass activity = static_cast<jclass>(backendData.gameThreadJniEnv->CallObjectMethod(
 			classLoader,
 			loadClass,
 			activityName));
-	backendData.jniGetCurrentOrientation = backendData.jniEnv->GetMethodID(
-			backendData.jniActivity,
-			"getCurrentOrientation",
-			"()I");
-	backendData.jniOpenSoftInput = backendData.jniEnv->GetMethodID(
-			backendData.jniActivity,
+
+	backendData.jniOpenSoftInput = backendData.gameThreadJniEnv->GetMethodID(
+		activity,
 			"openSoftInput",
-			"()V");
+			"(Ljava/lang/String;)V");
+	backendData.jniHideSoftInput = backendData.gameThreadJniEnv->GetMethodID(
+		activity,
+		"hideSoftInput",
+		"()V");
 
 	// Figure out current orientation
-	appData.currentOrientation = Backend_GetUpdatedOrientation();
+	//appData.currentOrientation = Backend_GetUpdatedOrientation();
 
-	// Set the callback to process system events
-	backendData.app->onAppCmd = HandleCmd;
-	while (!backendData.androidWindowReady)
+
+	while (true)
 	{
-		// Keep polling events until the window is ready
-		int fileDescriptors = 0; // What even is this?
-		android_poll_source* source = nullptr;
-		int pollResult = ALooper_pollAll(
-				0,
-				nullptr,
-				&fileDescriptors,
-				(void**)&source);
-		if (pollResult >= 0)
-		{
-			if (source != nullptr)
-			{
-				source->process(backendData.app, source);
-			}
-		}
+		std::lock_guard _{ backendData.lock };
+		if (backendData.nativeWindow && backendData.windowVisibleRectInitialized && backendData.inputQueue)
+			break;
 	}
 
-	backendData.app->onInputEvent = HandleInput;
-
+	ALooper* looper = ALooper_prepare(0); // ALOOPER_PREPARE_ALLOW_NON_CALLBACKS ?
+	AInputQueue_attachLooper(
+		backendData.inputQueue,
+		looper,
+		(int)LooperID::Input,
+		&testCallback,
+		&backendData.inputPollSource);
 	return true;
 }
 
@@ -402,44 +491,41 @@ void Application::detail::Backend_ProcessEvents()
 {
 	auto& backendData = *detail::pBackendData;
 
-
-	int fileDescriptors = 0; // What even is this?
-	android_poll_source* source = nullptr;
+	int eventCount = 0; // What even is this?
+	int fileDescriptor = 0;
+	AndroidPollSource* source = nullptr;
 	int pollResult = ALooper_pollAll(
-			0,
-			nullptr,
-			&fileDescriptors,
-			(void**)&source);
+		0,
+		&fileDescriptor,
+		&eventCount,
+		(void**)&source);
 	if (pollResult >= 0)
 	{
+		auto looperId = (LooperID)fileDescriptor; // This is wrong.
 		if (source != nullptr)
 		{
-			source->process(backendData.app, source);
+
 		}
 	}
 
-	if (backendData.configChangedThisTick)
-		Backend_HandleConfigChanged_Deferred();
-	backendData.configChangedThisTick = false;
-
+	// Process our custom events
 	{
-		// Process our custom events
-		std::lock_guard _{ backendData.customEventQueueLock};
-		for (auto const& event : backendData.customEventQueue)
+		std::lock_guard _{ backendData.lock };
+		for (auto const event : backendData.customEventQueue)
 		{
 			switch (event.type)
 			{
-			case CustomEvent::Type::CharInput:
-				detail::PushCharInput(event.charInput);
-				break;
-			case CustomEvent::Type::CharRemove:
-				detail::PushCharRemoveEvent();
-				break;
-			default:
-				break;
+				case CustomEvent::Type::CharInput:
+					detail::PushCharInput(event.charInput);
+					break;
+				case CustomEvent::Type::CharRemove:
+					detail::PushCharRemoveEvent();
+					break;
+				case CustomEvent::Type::CharEnter:
+					detail::PushCharEnterEvent();
+					break;
 			}
 		}
-
 		backendData.customEventQueue.clear();
 	}
 }
@@ -452,18 +538,20 @@ Application::WindowID Application::CreateWindow(
 	auto& backendData = *detail::pBackendData;
 
 	detail::AppData::WindowNode newNode{};
+
 	newNode.id = (App::WindowID)appData.windowIdTracker;
 	appData.windowIdTracker++;
-	newNode.platformHandle = backendData.app->window;
 
-	int width = ANativeWindow_getWidth(backendData.app->window);
-	int height = ANativeWindow_getHeight(backendData.app->window);
+	int width = ANativeWindow_getWidth(backendData.nativeWindow);
+	int height = ANativeWindow_getHeight(backendData.nativeWindow);
 	newNode.windowData.size.width = (u32)width;
 	newNode.windowData.size.height = (u32)height;
+	newNode.windowData.visiblePosition = { (i32)backendData.nativeWindowVisibleOffsetX, (i32)backendData.nativeWindowVisibleOffsetY };
+	newNode.windowData.visibleSize = backendData.nativeWindowVisibleExtent;
 
 	appData.windows.push_back(newNode);
 
-	return newNode.id;
+	return WindowID(0);
 }
 
 Std::Opt<u64> Application::CreateVkSurface(
@@ -488,9 +576,10 @@ Std::Opt<u64> Application::CreateVkSurface(
 	if (funcPtr == nullptr)
 		return {};
 
+
 	VkAndroidSurfaceCreateInfoKHR createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
-	createInfo.window = detail::pBackendData->app->window;
+	createInfo.window = detail::pBackendData->nativeWindow;
 
 	VkSurfaceKHR returnVal{};
 	VkResult result = funcPtr(
@@ -524,99 +613,30 @@ void Application::detail::Backend_Log(char const* msg)
 	__android_log_print(ANDROID_LOG_ERROR, "DEngine: ", "%s", msg);
 }
 
-static Application::Button Application::detail::Backend_AndroidKeyCodeToButton(int32_t in)
+
+
+void Application::OpenSoftInput(std::string_view text)
 {
-	switch (in)
+	auto const& backendData = *detail::pBackendData;
+	std::basic_string<jchar> tempString;
+	tempString.reserve(text.size());
+	for (auto item : text)
 	{
-	case AKEYCODE_0:
-		return Button::Zero;
-	case AKEYCODE_1:
-		return Button::One;
-	case AKEYCODE_2:
-		return Button::Two;
-	case AKEYCODE_3:
-		return Button::Three;
-	case AKEYCODE_4:
-		return Button::Four;
-	case AKEYCODE_5:
-		return Button::Five;
-	case AKEYCODE_6:
-		return Button::Six;
-	case AKEYCODE_7:
-		return Button::Seven;
-	case AKEYCODE_8:
-		return Button::Eight;
-	case AKEYCODE_9:
-		return Button::Nine;
-
-	case AKEYCODE_DEL:
-		return Button::Delete;
-	case AKEYCODE_BACK:
-		return Button::Back;
-	default:
-		return Button::Undefined;
+		tempString.push_back(item);
 	}
+
+	jstring javaString = backendData.gameThreadJniEnv->NewString(tempString.data(), tempString.length());
+
+	backendData.gameThreadJniEnv->CallVoidMethod(backendData.activity->clazz, backendData.jniOpenSoftInput, javaString);
+
+	//backendData.gameThreadJniEnv->ReleaseStringChars(javaString, tempString.data());
 }
 
-void Application::OpenSoftInput()
+void Application::HideSoftInput()
 {
-	const auto& backendData = *detail::pBackendData;
-	backendData.jniEnv->CallVoidMethod(backendData.app->activity->clazz, backendData.jniOpenSoftInput);
-}
+	auto const& backendData = *detail::pBackendData;
 
-
-extern "C"
-JNIEXPORT void JNICALL
-Java_didgy_dengine_editor_DEngineActivity_nativeTestFunc(
-	JNIEnv *env,
-	jobject thiz,
-	int utfValue)
-{
-		using namespace DEngine::Application;
-		using namespace DEngine::Application::detail;
-		auto& backendData = *Application::detail::pBackendData;
-
-		std::lock_guard _(backendData.customEventQueueLock );
-
-		CustomEvent event{};
-		event.type = CustomEvent::Type::CharInput;
-		event.charInput = utfValue;
-
-		backendData.customEventQueue.push_back(event);
-}
-
-extern "C"
-JNIEXPORT void JNICALL
-Java_didgy_dengine_editor_DEngineActivity_charRemoveEventNative(
-		JNIEnv *env,
-		jobject thiz)
-{
-	// TODO: implement charRemoveEventNative()
-	using namespace DEngine::Application;
-	using namespace DEngine::Application::detail;
-	auto& backendData = *Application::detail::pBackendData;
-
-	std::lock_guard _(backendData.customEventQueueLock );
-
-	CustomEvent event{};
-	event.type = CustomEvent::Type::CharRemove;
-
-	backendData.customEventQueue.push_back(event);
-}
-
-extern "C"
-JNIEXPORT void JNICALL
-Java_didgy_dengine_MainActivity_nativeTestFunc(
-		JNIEnv *env,
-		jobject thiz)
-{
-	// TODO: implement nativeTestFunc()
-
-	int x = 0;
-	if (x > 2)
-	{
-
-	}
+	backendData.gameThreadJniEnv->CallVoidMethod(backendData.activity->clazz, backendData.jniHideSoftInput);
 }
 
 void Application::LockCursor(bool state)
@@ -624,6 +644,39 @@ void Application::LockCursor(bool state)
 
 }
 
+static Application::Button Application::detail::Backend_AndroidKeyCodeToButton(int32_t in)
+{
+	switch (in)
+	{
+		case AKEYCODE_0:
+			return Button::Zero;
+		case AKEYCODE_1:
+			return Button::One;
+		case AKEYCODE_2:
+			return Button::Two;
+		case AKEYCODE_3:
+			return Button::Three;
+		case AKEYCODE_4:
+			return Button::Four;
+		case AKEYCODE_5:
+			return Button::Five;
+		case AKEYCODE_6:
+			return Button::Six;
+		case AKEYCODE_7:
+			return Button::Seven;
+		case AKEYCODE_8:
+			return Button::Eight;
+		case AKEYCODE_9:
+			return Button::Nine;
+
+		case AKEYCODE_DEL:
+			return Button::Delete;
+		case AKEYCODE_BACK:
+			return Button::Back;
+		default:
+			return Button::Undefined;
+	}
+}
 
 //
 // File IO
@@ -754,7 +807,7 @@ bool Application::FileInputStream::Open(char const* path)
 	detail::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
 	auto const& backendData = *detail::pBackendData;
-	implData.file = AAssetManager_open(backendData.app->activity->assetManager, path, AASSET_MODE_RANDOM);
+	implData.file = AAssetManager_open(backendData.activity->assetManager, path, AASSET_MODE_RANDOM);
 	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
 	return implData.file != nullptr;
 }

@@ -376,7 +376,27 @@ void StackLayout::Render(
 		});
 }
 
-void StackLayout::CharEvent(Context& ctx, u32 utfValue)
+void StackLayout::CharEnterEvent(Context& ctx)
+{
+	ParentType::CharEnterEvent(ctx);
+	ResolveWidgetAddRemoves();
+
+	for (auto& child : children)
+	{
+		if (child.type == LayoutItem::Type::Layout)
+		{
+			child.layout->CharEnterEvent(ctx);
+		}
+		else
+		{
+			child.widget->CharEnterEvent(ctx);
+		}
+	}
+}
+
+void StackLayout::CharEvent(
+	Context& ctx, 
+	u32 utfValue)
 {
 	ParentType::CharEvent(
 		ctx,

@@ -26,7 +26,9 @@ namespace DEngine::Editor
 		// Override app-interface methods
 		virtual void WindowResize(
 			App::WindowID window,
-			App::Extent newExtent) override;
+			App::Extent newExtent,
+			Math::Vec2Int visiblePos,
+			App::Extent visibleExtent) override;
 		virtual void WindowMove(
 			App::WindowID window,
 			Math::Vec2Int position) override;
@@ -39,8 +41,8 @@ namespace DEngine::Editor
 		virtual void ButtonEvent(
 			App::Button button,
 			bool state) override;
-		virtual void CharEvent(
-			u32 value) override;
+		virtual void CharEvent(u32 value) override;
+		virtual void CharEnterEvent() override;
 		virtual void CharRemoveEvent() override;
 		virtual void TouchEvent(
 			u8 id,

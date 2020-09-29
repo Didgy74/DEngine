@@ -87,6 +87,9 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
+		virtual void CharEnterEvent(
+			Context& ctx) override;
+
 		virtual void CharEvent(
 			Context& ctx,
 			u32 utfValue) override;

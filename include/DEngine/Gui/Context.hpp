@@ -26,6 +26,7 @@ namespace DEngine::Gui
 		void ProcessEvents();
 		void Render() const;
 
+		void PushEvent(CharEnterEvent);
 		void PushEvent(CharEvent);
 		void PushEvent(CharRemoveEvent);
 		void PushEvent(CursorClickEvent);

@@ -362,3 +362,27 @@ void ScrollArea::TouchEvent(
         event);
   }
 }
+
+void ScrollArea::CharEnterEvent(Context& ctx)
+{
+  if (childType == ChildType::Layout)
+    layout->CharEnterEvent(ctx);
+  else if (childType == ChildType::Widget)
+    widget->CharEnterEvent(ctx);
+}
+
+void ScrollArea::CharEvent(Context& ctx, u32 utfValue)
+{
+  if (childType == ChildType::Layout)
+    layout->CharEvent(ctx, utfValue);
+  else if (childType == ChildType::Widget)
+    widget->CharEvent(ctx, utfValue);
+}
+
+void ScrollArea::CharRemoveEvent(Context& ctx)
+{
+  if (childType == ChildType::Layout)
+    layout->CharRemoveEvent(ctx);
+  else if (childType == ChildType::Widget)
+    widget->CharRemoveEvent(ctx);
+}

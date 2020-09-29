@@ -38,6 +38,9 @@ Context Context::Create(
 		App::Extent appWindowExtent = App::GetWindowSize(App::WindowID(0));
 		newNode.data.rect.extent = { appWindowExtent.width, appWindowExtent.height };
 		newNode.data.rect.position = App::GetWindowPosition(App::WindowID(0));
+		App::Extent appWindowVisibleExtent = App::GetWindowVisibleSize(App::WindowID(0));
+		newNode.data.visibleRect.extent = { appWindowVisibleExtent.width, appWindowVisibleExtent.height };
+		newNode.data.visibleRect.position = App::GetWindowVisiblePosition(App::WindowID(0));
 		newNode.data.clearColor = { 0.1f, 0.1f, 0.1f, 1.f };
 
 		StackLayout* outmostLayout = new StackLayout(StackLayout::Direction::Vertical);
@@ -62,6 +65,15 @@ Context::Context(Context&& other) noexcept :
 {
 	other.pImplData = nullptr;
 	other.outerLayout = nullptr;
+}
+
+void Context::PushEvent(CharEnterEvent)
+{
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	impl::Event newEvent{};
+	newEvent.type = impl::Event::Type::Input;
+	newEvent.input.type = impl::Event::Input::Type::CharEnter;
+	implData.eventQueue.push_back(newEvent);
 }
 
 void Context::PushEvent(CharEvent event)
@@ -220,6 +232,7 @@ namespace DEngine::Gui::impl
 
 		auto& windowData = windowIt->data;
 		windowData.rect.extent = resize.extent;
+		windowData.visibleRect = resize.visibleRect;
 	}
 
 	static void DispatchWindowEvents(ImplData& implData, Event::Window windowEvent)
@@ -238,6 +251,17 @@ namespace DEngine::Gui::impl
 		case Event::Window::Type::Resize:
 			DispatchEvent(implData, windowEvent.resize);
 			break;
+		}
+	}
+
+	static void DispatchEvent(Context& ctx, ImplData& implData, CharEnterEvent event)
+	{
+		for (auto& windowNode : implData.windows)
+		{
+			if (windowNode.data.topLayout)
+			{
+				windowNode.data.topLayout->CharEnterEvent(ctx);
+			}
 		}
 	}
 
@@ -273,8 +297,8 @@ namespace DEngine::Gui::impl
 			{
 				windowNode.data.topLayout->CursorClick(
 					ctx,
-					{ { 0, 0 }, windowNode.data.rect.extent },
-					{ { 0, 0 }, windowNode.data.rect.extent },
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 					implData.cursorPosition - windowNode.data.rect.position,
 					event);
 			}
@@ -296,8 +320,8 @@ namespace DEngine::Gui::impl
 
 				windowNode.data.topLayout->CursorMove(
 					test,
-					{ { 0, 0 }, windowNode.data.rect.extent },
-					{ { 0, 0 }, windowNode.data.rect.extent },
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 					modifiedEvent);
 			}
 		}
@@ -311,8 +335,8 @@ namespace DEngine::Gui::impl
 			{
 				windowNode.data.topLayout->TouchEvent(
 					ctx,
-					{ { 0, 0 }, windowNode.data.rect.extent },
-					{ { 0, 0 }, windowNode.data.rect.extent },
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 					event);
 			}
 		}
@@ -324,6 +348,9 @@ namespace DEngine::Gui::impl
 		{
 		case Event::Input::Type::Char:
 			DispatchEvent(ctx, implData, inputEvent.charEvent);
+			break;
+		case Event::Input::Type::CharEnter:
+			DispatchEvent(ctx, implData, inputEvent.charEnter);
 			break;
 		case Event::Input::Type::CharRemove:
 			DispatchEvent(ctx, implData, inputEvent.charRemove);
@@ -365,8 +392,8 @@ namespace DEngine::Gui::impl
 			{
 				windowNode.data.topLayout->Tick(
 					ctx,
-					{ {}, windowNode.data.rect.extent },
-					{ {}, windowNode.data.rect.extent });
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent });
 			}
 		}
 	}
@@ -409,8 +436,8 @@ void Context::Render() const
 			windowNode.data.topLayout->Render(
 				*this,
 				windowNode.data.rect.extent,
-				Gui::Rect{ { 0, 0 }, windowNode.data.rect.extent },
-				Gui::Rect{ { 0, 0 }, windowNode.data.rect.extent },
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 				drawInfo);
 		}
 
@@ -499,7 +526,6 @@ namespace DEngine::Gui::impl
 	}
 }
 
-
 void impl::TextManager::Initialize(
 	TextManager& manager,
 	Gfx::Context* gfxCtx)
@@ -531,7 +557,7 @@ void impl::TextManager::Initialize(
 	ftError = FT_Set_Char_Size(
 		manager.face,    /* handle to face object           */
 		0,       /* char_width in 1/64th of points  */
-		42 * 64,   /* char_height in 1/64th of points */
+		46 * 64,   /* char_height in 1/64th of points */
 		0,     /* horizontal device resolution    */
 		0);   /* vertical device resolution      */
 	if (ftError != FT_Err_Ok)

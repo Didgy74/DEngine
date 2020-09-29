@@ -70,5 +70,15 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchEvent event) override;
+
+		virtual void CharEnterEvent(
+			Context& ctx) override;
+
+		virtual void CharEvent(
+			Context& ctx,
+			u32 utfValue) override;
+
+		virtual void CharRemoveEvent(
+			Context& ctx) override;
 	};
 }

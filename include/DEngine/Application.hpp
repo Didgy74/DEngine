@@ -7,6 +7,8 @@
 
 #include <DEngine/Math/Vector.hpp>
 
+#include <string_view>
+
 #if defined(_WIN32) || defined(_WIN64)
 #	define DENGINE_OS_WINDOWS
 #elif defined(__ANDROID__)
@@ -42,7 +44,9 @@ namespace DEngine::Application
 		Extent extents);
 	void DestroyWindow(WindowID);
 	Extent GetWindowSize(WindowID);
+	Extent GetWindowVisibleSize(WindowID);
 	Math::Vec2Int GetWindowPosition(WindowID);
+	Math::Vec2Int GetWindowVisiblePosition(WindowID);
 	bool GetWindowMinimized(WindowID);
 	WindowEvents GetWindowEvents(WindowID);
 	Std::StackVec<char const*, 5> RequiredVulkanInstanceExtensions();
@@ -91,7 +95,8 @@ namespace DEngine::Application
 	void InsertEventInterface(EventInterface&);
 	void RemoveEventInterface(EventInterface&);
 
-	void OpenSoftInput();
+	void OpenSoftInput(std::string_view text);
+	void HideSoftInput();
 
 	class FileInputStream;
 }
@@ -247,7 +252,9 @@ public:
 
 	virtual void WindowResize(
 		WindowID window, 
-		Extent extent) {}
+		Extent extent,
+		Math::Vec2Int visiblePos,
+		Extent visibleExtent) {}
 	virtual void WindowMove(
 		WindowID window, 
 		Math::Vec2Int position) {}
@@ -273,16 +280,14 @@ public:
 
 	virtual void ButtonEvent(
 		Button button,
-		bool state) {};
-	virtual void CharEvent(
-		u32 utfValue) {};
+		bool state) {}
+
+	virtual void CharEvent(u32 utfValue) {}
+	virtual void CharEnterEvent() {}
 	virtual void CharRemoveEvent() {}
 
 	
 	virtual void Log(char const* msg) {};
 };
 
-inline DEngine::Application::EventInterface::~EventInterface()
-{
-
-}
+inline DEngine::Application::EventInterface::~EventInterface() {}

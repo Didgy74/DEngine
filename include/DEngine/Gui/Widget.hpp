@@ -35,6 +35,9 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const {}
 
+		virtual void CharEnterEvent(
+			Context& ctx) {}
+
 		virtual void CharEvent(
 			Context& ctx,
 			u32 utfValue) {}

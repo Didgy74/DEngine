@@ -29,6 +29,19 @@ Application::Extent Application::GetWindowSize(WindowID window)
 	return windowNode.windowData.size;
 }
 
+Application::Extent Application::GetWindowVisibleSize(WindowID window)
+{
+	auto const& appData = *detail::pAppData;
+	auto windowNodeIt = std::find_if(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[window](detail::AppData::WindowNode const& val) -> bool {
+			return window == val.id; });
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	auto const& windowNode = *windowNodeIt;
+	return windowNode.windowData.visibleSize;
+}
+
 Math::Vec2Int Application::GetWindowPosition(WindowID window)
 {
 	auto const& appData = *detail::pAppData;
@@ -40,6 +53,19 @@ Math::Vec2Int Application::GetWindowPosition(WindowID window)
 	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	auto const& windowNode = *windowNodeIt;
 	return windowNode.windowData.position;
+}
+
+Math::Vec2Int Application::GetWindowVisiblePosition(WindowID window)
+{
+	auto const& appData = *detail::pAppData;
+	auto windowNodeIt = std::find_if(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[window](detail::AppData::WindowNode const& val) -> bool {
+			return window == val.id; });
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	auto const& windowNode = *windowNodeIt;
+	return windowNode.windowData.visiblePosition;
 }
 
 bool Application::GetWindowMinimized(WindowID window)
@@ -126,12 +152,18 @@ void Application::detail::PushCharInput(u32 charValue)
 		eventCallback->CharEvent(charValue);
 }
 
+void DEngine::Application::detail::PushCharEnterEvent()
+{
+	auto& appData = *detail::pAppData;
+	for (EventInterface* eventCallback : appData.eventCallbacks)
+		eventCallback->CharEnterEvent();
+}
+
 void Application::detail::PushCharRemoveEvent()
 {
 	auto& appData = *detail::pAppData;
 	for (EventInterface* eventCallback : appData.eventCallbacks)
 		eventCallback->CharRemoveEvent();
-
 }
 
 Application::KeyEventType Application::ButtonEvent(Button input)
@@ -246,7 +278,9 @@ void Application::detail::SetLogCallback(LogCallback callback)
 
 void Application::detail::UpdateWindowSize(
 	void* platformHandle,
-	Extent newSize)
+	Extent newSize,
+	Math::Vec2Int visiblePos,
+	Extent visibleSize)
 {
 	auto& windowNode = *std::find_if(
 		pAppData->windows.begin(),
@@ -255,9 +289,11 @@ void Application::detail::UpdateWindowSize(
 			return val.platformHandle == platformHandle; });
 
 	windowNode.windowData.size = newSize;
+	windowNode.windowData.visiblePosition = visiblePos;
+	windowNode.windowData.visibleSize = visibleSize;
 	windowNode.events.resize = true;
 	for (EventInterface* eventCallback : pAppData->eventCallbacks)
-		eventCallback->WindowResize(windowNode.id, newSize);
+		eventCallback->WindowResize(windowNode.id, newSize, visiblePos, visibleSize);
 }
 
 void Application::detail::UpdateWindowPosition(

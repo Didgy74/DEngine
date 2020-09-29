@@ -34,7 +34,13 @@ namespace DEngine::Editor
 		Gfx::Context* gfxCtx = nullptr;
 		ContextImpl* implData = nullptr;
 
+		mutable bool isVisible = false;
+
 		Gui::Extent currentExtent{};
+		Gui::Extent newExtent{};
+		bool currentlyResizing = false;
+		u32 extentCorrectTickCounter = 0;
+		bool extentsAreInitialized = false;
 
 		bool isCurrentlyClicked = false;
 
@@ -248,7 +254,34 @@ namespace DEngine::Editor
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect) override
 		{
-			currentExtent = widgetRect.extent;
+			this->isVisible = false;
+			if (!extentsAreInitialized)
+			{
+				currentExtent = widgetRect.extent;
+				newExtent = widgetRect.extent;
+				extentsAreInitialized = true;
+			}
+			else
+			{
+				if (newExtent != widgetRect.extent)
+				{
+					currentlyResizing = true;
+					newExtent = widgetRect.extent;
+				}
+				else
+				{
+					if (currentlyResizing)
+					{
+						currentlyResizing = false;
+						extentCorrectTickCounter = 0;
+					}
+					newExtent = widgetRect.extent;
+					extentCorrectTickCounter += 1;
+					if (extentCorrectTickCounter >= 15)
+						currentExtent = newExtent;
+				}
+			}
+			
 			UpdateCircleStartPosition(widgetRect);
 
 			// Handle camera movement
@@ -323,6 +356,8 @@ namespace DEngine::Editor
 			Gui::Rect visibleRect,
 			Gui::DrawInfo& drawInfo) const override
 		{
+			this->isVisible = true;
+
 			// First draw the viewport.
 			Gfx::GuiDrawCmd drawCmd{};
 			drawCmd.type = Gfx::GuiDrawCmd::Type::Viewport;
@@ -441,6 +476,8 @@ namespace DEngine::Editor
 				{
 					if (widget.StringView().size() == 1 && widget.StringView().front() == '-')
 						return;
+					if (widget.StringView().size() == 1 && widget.StringView().front() == '.')
+						return;
 					transform.position.x = std::stof(widget.StringView().data());
 				}
 				else
@@ -463,6 +500,8 @@ namespace DEngine::Editor
 				{
 					if (widget.StringView().size() == 1 && widget.StringView().front() == '-')
 						return;
+					if (widget.StringView().size() == 1 && widget.StringView().front() == '.')
+						return;
 					transform.position.y = std::stof(widget.StringView().data());
 				}
 				else
@@ -483,6 +522,8 @@ namespace DEngine::Editor
 				if (!widget.StringView().empty())
 				{
 					if (widget.StringView().size() == 1 && widget.StringView().front() == '-')
+						return;
+					if (widget.StringView().size() == 1 && widget.StringView().front() == '.')
 						return;
 					transform.position.z = std::stof(widget.StringView().data());
 				}
@@ -966,9 +1007,10 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 
 	returnVal.windowUpdates = implData.guiCtx->windowUpdates;
 
-	if (implData.viewportWidget)
+	if (implData.viewportWidget && implData.viewportWidget->isVisible)
 	{
 		DENGINE_DETAIL_ASSERT(implData.viewportWidget->currentExtent.width > 0 && implData.viewportWidget->currentExtent.height > 0);
+		DENGINE_DETAIL_ASSERT(implData.viewportWidget->newExtent.width > 0 && implData.viewportWidget->newExtent.height > 0);
 
 		Gfx::ViewportUpdate update{};
 		update.id = implData.viewportWidget->viewportId;
@@ -991,7 +1033,7 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 
 
 		camMat = camMat.GetInverse().Value();
-		f32 aspectRatio = (f32)update.width / update.height;
+		f32 aspectRatio = (f32)implData.viewportWidget->newExtent.width / implData.viewportWidget->newExtent.height;
 
 		camMat = Math::LinTran3D::Perspective_RH_ZO(implData.viewportWidget->cam.verticalFov * Math::degToRad, aspectRatio, 0.1f, 100.f) * camMat;
 
@@ -1037,11 +1079,14 @@ void Editor::ContextImpl::UnselectEntity()
 
 void Editor::ContextImpl::WindowResize(
 	App::WindowID window,
-	App::Extent newExtent)
+	App::Extent newExtent,
+	Math::Vec2Int visiblePos,
+	App::Extent visibleSize)
 {
 	Gui::WindowResizeEvent event{};
 	event.windowId = (Gui::WindowID)window;
 	event.extent = { newExtent.width, newExtent.height };
+	event.visibleRect = { visiblePos, { newExtent.width, newExtent.height } };
 	guiCtx->PushEvent(event);
 }
 
@@ -1096,6 +1141,12 @@ void Editor::ContextImpl::CharEvent(
 {
 	Gui::CharEvent event{};
 	event.utfValue = value;
+	guiCtx->PushEvent(event);
+}
+
+void DEngine::Editor::ContextImpl::CharEnterEvent()
+{
+	Gui::CharEnterEvent event{};
 	guiCtx->PushEvent(event);
 }
 

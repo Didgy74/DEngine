@@ -9,6 +9,7 @@ namespace DEngine::Gui
 	{
 		WindowID windowId;
 		Extent extent;
+		Rect visibleRect;
 	};
 
 	struct WindowMoveEvent
@@ -60,6 +61,8 @@ namespace DEngine::Gui
 		TouchEventType type;
 		Math::Vec2 position;
 	};
+
+	struct CharEnterEvent {};
 
 	struct CharEvent
 	{

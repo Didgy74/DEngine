@@ -65,6 +65,7 @@ namespace DEngine::Gui::impl
 				CursorClick,
 				Touch,
 				Char,
+				CharEnter,
 				CharRemove,
 			};
 			Type type;
@@ -73,6 +74,7 @@ namespace DEngine::Gui::impl
 				CursorMoveEvent cursorMove;
 				CursorClickEvent cursorClick;
 				TouchEvent touch;
+				CharEnterEvent charEnter;
 				CharEvent charEvent;
 				CharRemoveEvent charRemove;
 			};
@@ -116,7 +118,7 @@ namespace DEngine::Gui::impl
 			TextManager& manager,
 			std::string_view string,
 			Math::Vec4 color,
-			Gui::Rect widgetRect,
+			Rect widgetRect,
 			DrawInfo& drawInfo);
 
 		[[nodiscard]] static SizeHint GetSizeHint(
@@ -126,7 +128,8 @@ namespace DEngine::Gui::impl
 
 	struct WindowData
 	{
-		Gui::Rect rect{};
+		Rect rect{};
+		Rect visibleRect{};
 		bool isMinimized{};
 		Math::Vec4 clearColor{ 0, 0, 0, 1 };
 		u32 drawCmdOffset{};

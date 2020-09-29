@@ -30,39 +30,83 @@ namespace DEngine::Gui
 			Extent framebufferExtent,
 			Rect widgetRect,
 			Rect visibleRect,
-			DrawInfo& drawInfo) const {}
+			DrawInfo& drawInfo) const = 0;
+
+		virtual void CharEnterEvent(
+			Context& ctx) = 0;
 
 		virtual void CharEvent(
 			Context& ctx,
-			u32 utfValue) {}
+			u32 utfValue) = 0;
 
 		virtual void CharRemoveEvent(
-			Context& ctx) {}
+			Context& ctx) = 0;
 
 		virtual void CursorMove(
 			Test& test,
 			Rect widgetRect,
 			Rect visibleRect,
-			CursorMoveEvent event) {}
+			CursorMoveEvent event) = 0;
 
 		virtual void CursorClick(
 			Context& ctx,
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
-			CursorClickEvent event) {}
+			CursorClickEvent event) = 0;
 
 		virtual void TouchEvent(
 			Context& ctx,
 			Rect widgetRect,
 			Rect visibleRect,
-			TouchEvent event) {}
+			Gui::TouchEvent event) = 0;
 
 		virtual void Tick(
 			Context& ctx,
 			Rect widgetRect,
-			Rect visibleRect) {}
+			Rect visibleRect) = 0;
 	};
-
-	inline Layout::~Layout() {}
 }
+
+inline DEngine::Gui::Layout::~Layout() {}
+
+inline void DEngine::Gui::Layout::Render(
+	Context const& ctx,
+	Extent framebufferExtent,
+	Rect widgetRect,
+	Rect visibleRect,
+	DrawInfo& drawInfo) const {}
+
+inline void DEngine::Gui::Layout::CharEnterEvent(
+	Context& ctx) {}
+
+inline void DEngine::Gui::Layout::CharEvent(
+	Context& ctx,
+	u32 utfValue) {}
+
+inline void DEngine::Gui::Layout::CharRemoveEvent(
+	Context& ctx) {}
+
+inline void DEngine::Gui::Layout::CursorMove(
+	Test& test,
+	Rect widgetRect,
+	Rect visibleRect,
+	CursorMoveEvent event) {}
+
+inline void DEngine::Gui::Layout::CursorClick(
+	Context& ctx,
+	Rect widgetRect,
+	Rect visibleRect,
+	Math::Vec2Int cursorPos,
+	CursorClickEvent event) {}
+
+inline void DEngine::Gui::Layout::TouchEvent(
+	Context& ctx,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchEvent event) {}
+
+inline void DEngine::Gui::Layout::Tick(
+	Context& ctx,
+	Rect widgetRect,
+	Rect visibleRect) {}

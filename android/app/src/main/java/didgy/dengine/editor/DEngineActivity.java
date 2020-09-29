@@ -1,257 +1,377 @@
+// TODO: Implement filtering, like only enable . - 1-9 for example. DONE.
+// TODO: Implement filtering for -, it should only be possible to be entered if it's the first character in the string. DONE.
+// TODO: Detect when keyboard appears/disappears, possibly through onGlobalLayoutChange. CANCELLED.
+// TODO: Implement the "Submit" button functionality stuff. DONE.
+// TODO: Fix being only able to open keyboard once then never again. DONE.
+// TODO: Add support for integer type input, needs differing text filters.
+// TODO: Fix issue where switching between input fields can cause keyboard to close depending on execution order in code.
+
 package didgy.dengine.editor;
 
 import android.app.NativeActivity;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.util.Log;
 import android.view.KeyEvent;
+import android.view.SurfaceHolder;
 import android.view.View;
+import android.view.WindowInsets;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 
-public class DEngineActivity extends NativeActivity {
+
+public class DEngineActivity extends NativeActivity  {
 
     static {
         System.loadLibrary("dengine");
     }
 
-    public native void nativeTestFunc(int utfValue);
-    public native void charRemoveEventNative();
+    public native void nativeInit();
 
-    static class NativeEditable implements Editable {
-        public NativeEditable(DEngineActivity activity)
-        {
-            this.activity = activity;
-        }
-        DEngineActivity activity;
+    public native void nativeOnCharInput(int utfValue);
+    public native void nativeOnCharEnter();
+    public native void nativeOnCharRemove();
 
-        @Override
-        public Editable replace(int st, int en, CharSequence source, int start, int end) {
+    public native void nativeUpdateWindowContentRect(int top, int bottom, int left, int right);
 
-            if (source.length() > 0)
-            {
-                activity.nativeTestFunc(source.charAt(end - 1));
+    static boolean contains(CharSequence seq, char character) {
+        int length = seq.length();
+        for (int i = 0; i < length; i++) {
+            if (seq.charAt(i) == character) {
+                return true;
             }
-
-            return this;
         }
-
-        @Override
-        public Editable replace(int st, int en, CharSequence text) {
-            return replace(st, en, text, 0, text.length());
-        }
-
-        @Override
-        public Editable insert(int where, CharSequence text, int start, int end) {
-            return null;
-        }
-
-        @Override
-        public Editable insert(int where, CharSequence text) {
-            return null;
-        }
-
-        @Override
-        public Editable delete(int st, int en) {
-            return null;
-        }
-
-        @Override
-        public Editable append(CharSequence text) {
-
-            return null;
-        }
-
-        @Override
-        public Editable append(CharSequence text, int start, int end) {
-            return null;
-        }
-
-        @Override
-        public Editable append(char text) {
-            return null;
-        }
-
-        @Override
-        public void clear() {
-
-        }
-
-        @Override
-        public void clearSpans() {
-
-        }
-
-        @Override
-        public void setFilters(InputFilter[] filters) {
-
-        }
-
-        @Override
-        public InputFilter[] getFilters() {
-            return new InputFilter[0];
-        }
-
-        @Override
-        public void getChars(int start, int end, char[] dest, int destoff) {
-
-        }
-
-        @Override
-        public void setSpan(Object what, int start, int end, int flags) {
-
-        }
-
-        @Override
-        public void removeSpan(Object what) {
-
-        }
-
-        @Override
-        public <T> T[] getSpans(int start, int end, Class<T> type) {
-            return null;
-        }
-
-        @Override
-        public int getSpanStart(Object tag) {
-            return -1;
-        }
-
-        @Override
-        public int getSpanEnd(Object tag) {
-            return -1;
-        }
-
-        @Override
-        public int getSpanFlags(Object tag) {
-            return 0;
-        }
-
-        @Override
-        public int nextSpanTransition(int start, int limit, Class type) {
-            return 0;
-        }
-
-        @Override
-        public int length() {
-            return 0;
-        }
-
-        @Override
-        public char charAt(int index) {
-            return 0;
-        }
-
-        @Override
-        public CharSequence subSequence(int start, int end) {
-            return null;
-        }
-
-        @Override
-        public String toString() {
-            return null;
-        }
-
-
+        return false;
     }
 
-    public NativeEditable myEditable = null;
+    static class InputEditable extends SpannableStringBuilder  {
 
-    static class NativeInputConnection extends BaseInputConnection {
+        public DEngineActivity mActivity;
 
-        public NativeInputConnection(
-                View targetView,
-                DEngineActivity activity) {
-            super(targetView, true);
+        public InputEditable(DEngineActivity activity, String string) {
+            super(string);
+            this.mActivity = activity;
 
-            this.activity = activity;
+            InputFilter textFilter = new InputFilter() {
+                @Override
+                public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                    boolean sourceHasInvalidChar = false;
+                    int sourceLength = end - start;
+                    for (int i = start; i < end; i++) {
+                        char c = source.charAt(i);
+                        if (!(48 <= c && c <= 57) &&
+                            c != '.' &&
+                            c != '-') {
+                            sourceHasInvalidChar = true;
+                            break;
+                        }
+                    }
+                    if (sourceHasInvalidChar) {
+                        StringBuilder returnVal = new StringBuilder(sourceLength);
+                        for (int i = start; i < end; i++) {
+                            char c = source.charAt(i);
+                            if ((48 <= c && c <= 57) ||
+                                c == '.' ||
+                                c == '-')
+                                returnVal.append(c);
+                        }
+                        return returnVal;
+                    }
+                    else
+                        return null;
+                }
+            };
+
+            InputFilter dotFilter = new InputFilter() {
+                @Override
+                public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                    if (source == null || source == "") {
+                        return null;
+                    }
+                    else if (end - start > 0) {
+                        boolean srcHasDot = contains(source, '.');
+                        boolean dstHasDot = contains(dest, '.');
+                        if (dstHasDot && srcHasDot) { // If we already have a dot, we can't submit this dot.
+                            StringBuilder returnString = new StringBuilder(source.length());
+                            int sourceLength = source.length();
+                            for (int i = 0; i < sourceLength; i++)
+                            {
+                                char origChar = source.charAt(i);
+                                if (origChar != '.')
+                                    returnString.append(origChar);
+                            }
+                            return returnString.toString();
+                        }
+                    }
+                    return null;
+                }
+            };
+
+            InputFilter minusFilter = new InputFilter() {
+                @Override
+                public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                    if (source == null || source.equals("")) {
+                        return null;
+                    }
+                    else if (end - start > 0) {
+                        boolean srcHasMinus = contains(source, '-');
+                        if (srcHasMinus && dest.length() > 0) { // We can only submit the - if it's the first part of the string.
+                            return "";
+                        }
+                    }
+                    return null;
+                }
+            };
+
+            this.setFilters(new InputFilter[]{ textFilter, dotFilter, minusFilter } );
         }
 
-        public DEngineActivity activity;
-
         @Override
-        public Editable getEditable() {
-            return activity.myEditable;
-        }
+        public SpannableStringBuilder replace(int st, int en, CharSequence source, int start, int end) {
 
+            int prevLength = length();
 
+            SpannableStringBuilder returnVal = super.replace(st, en, source, start, end);
 
-        @Override
-        public boolean sendKeyEvent(KeyEvent event) {
-            int keyAction = event.getAction();
-            if (keyAction == KeyEvent.ACTION_UP)
+            Log.e("DEngineActivity", this.toString());
+
+            int newLength = length();
+
+            if (st < prevLength) {
+                if (source == null || source == "") {
+                    for (int i = st; i < prevLength; i++) {
+                        mActivity.nativeOnCharRemove();
+                    }
+                }
+            }
+            else
             {
-                int test = event.getUnicodeChar();
-                if (48 <= test && test <= 57)
-                    activity.nativeTestFunc(test);
-
-                int yo = event.getKeyCode();
-                if (yo == KeyEvent.KEYCODE_DEL)
-                {
-                    activity.charRemoveEventNative();
+                if (prevLength != newLength) {
+                    if (source != null && source != "") {
+                        int j = start;
+                        while (j < end) {
+                            mActivity.nativeOnCharInput(source.charAt(j));
+                            j++;
+                        }
+                    }
                 }
             }
 
-            return super.sendKeyEvent(event);
+            return returnVal;
         }
     }
 
     static class NativeContentView extends View {
+        static class NativeInputConnection extends BaseInputConnection {
+
+            public DEngineActivity mActivity;
+            public int mInputConnectionID;
+
+            public NativeInputConnection(NativeContentView targetView, DEngineActivity activity) {
+                super(targetView, true);
+
+                this.mActivity = activity;
+
+                mInputConnectionID = mActivity.mInputConnectionCounter;
+                mActivity.mInputConnectionCounter++;
+            }
+
+            @Override
+            public Editable getEditable() {
+                return mActivity.mEditable;
+            }
+
+            @Override
+            public boolean sendKeyEvent(KeyEvent event) {
+                int keyAction = event.getAction();
+                if (keyAction == KeyEvent.ACTION_UP)
+                {
+                    // The dot and minus sign is handled by the commit-text event
+                    // So we use a filter for that.
+
+                    int test = event.getUnicodeChar();
+                    if (48 <= test && test <= 57) {
+                        mActivity.mEditable.append((char)test);
+                        this.setSelection(mActivity.mEditable.length(), mActivity.mEditable.length());
+                    }
+
+                    int keyCode = event.getKeyCode();
+                    if (keyCode == KeyEvent.KEYCODE_DEL) {
+                        if (mActivity.mEditable.length() > 0) {
+                            mActivity.mEditable.delete(mActivity.mEditable.length() - 1, mActivity.mEditable.length());
+                            this.setSelection(mActivity.mEditable.length(), mActivity.mEditable.length());
+                        }
+                    }
+                    else if (keyCode == KeyEvent.KEYCODE_ENTER) {
+                        mActivity.nativeOnCharEnter();
+                    }
+                }
+
+                return super.sendKeyEvent(event);
+            }
+        }
+
+        public DEngineActivity mActivity;
+
         public NativeContentView(DEngineActivity activity) {
             super(activity);
 
-            this.activity = activity;
+            this.mActivity = activity;
         }
 
-        public DEngineActivity activity;
+        public NativeContentView(Context activity) {
+            super(activity);
+
+            this.mActivity = null;
+        }
+
+        @Override
+        public WindowInsets onApplyWindowInsets(WindowInsets insets) {
+            return super.onApplyWindowInsets(insets);
+        }
 
         @Override
         public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+
+            outAttrs.initialSelStart = mActivity.mEditable.length();
+            outAttrs.initialSelEnd = mActivity.mEditable.length();
+
             outAttrs.inputType = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED;
             //outAttrs.inputType = InputType.TYPE_CLASS_TEXT;
-            return new NativeInputConnection(this, activity);
+            return new NativeInputConnection(this, mActivity);
+        }
+
+        @Override
+        public boolean onCheckIsTextEditor() {
+            // This means we don't want the IME to automatically pop up
+            // when opening this View.
+            return false;
+        }
+
+        @Override
+        protected void finalize() throws Throwable {
+
+            super.finalize();
         }
     }
 
+    public int mInputConnectionCounter = 0;
     public NativeContentView mNativeContentView = null;
+    public InputEditable mEditable = null;
+    public InputMethodManager mIMM = null;
 
     @Override
     protected void onCreate(Bundle savedState) {
         super.onCreate(savedState);
 
+        mIMM = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+        assert mIMM != null;
+
+        mEditable = new InputEditable(this, "");
         mNativeContentView = new NativeContentView(this);
-        mNativeContentView.setFocusableInTouchMode(true);
+
         setContentView(mNativeContentView);
-        mNativeContentView.requestFocus();
+        //mNativeContentView.setFocusableInTouchMode(true);
+        //mNativeContentView.requestFocus();
         mNativeContentView.getViewTreeObserver().addOnGlobalLayoutListener(this);
 
+        nativeInit();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        /*
+        android.graphics.Rect test = new android.graphics.Rect();
+        mNativeContentView.getWindowVisibleDisplayFrame(test);
+
+        android.graphics.Rect x = new android.graphics.Rect();
+        mNativeContentView.getDrawingRect(x);
+
+        android.graphics.Point pointTest = new android.graphics.Point();
+        mNativeContentView.getDisplay().getSize(pointTest);
 
 
-        myEditable = new NativeEditable(this);
+        WindowInsets yo = mNativeContentView.getRootWindowInsets();
+     */
+    }
 
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
     }
 
     @Override
     public void onGlobalLayout() {
         super.onGlobalLayout();
+
+        // TODO: The on-screen display is changed in this event.
     }
 
-    public void openSoftInput()
-    {
-        Runnable test = new Runnable() {
-            public void run() {
+    @Override
+    public void onContentChanged() {
+        super.onContentChanged();
+    }
 
-                InputMethodManager imm = (InputMethodManager)
-                        getSystemService(Context.INPUT_METHOD_SERVICE);
-                assert imm != null;
-                imm.showSoftInput(mNativeContentView, InputMethodManager.SHOW_IMPLICIT);
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        super.surfaceCreated(holder);
 
+        android.graphics.Rect test = new android.graphics.Rect();
+        mNativeContentView.getWindowVisibleDisplayFrame(test);
+
+        nativeUpdateWindowContentRect(test.top, test.bottom, test.left, test.right);
+
+        android.graphics.Rect x = new android.graphics.Rect();
+        mNativeContentView.getDrawingRect(x);
+
+        android.graphics.Point pointTest = new android.graphics.Point();
+        mNativeContentView.getDisplay().getSize(pointTest);
+
+        WindowInsets yo = mNativeContentView.getRootWindowInsets();
+    }
+
+    public void openSoftInput(String text) {
+        class OpenSoftInputRunnable implements Runnable {
+            DEngineActivity activity;
+            String innerText;
+            OpenSoftInputRunnable(DEngineActivity inActivity, String text) {
+                activity = inActivity;
+                innerText = text;
             }
-        };
+            public void run() {
+                mEditable = new InputEditable(activity, innerText);
+
+                mNativeContentView.setFocusableInTouchMode(true);
+                mNativeContentView.requestFocus();
+                mIMM.showSoftInput(mNativeContentView, 0);
+            }
+        }
+        OpenSoftInputRunnable test = new OpenSoftInputRunnable(this, text);
+        runOnUiThread(test);
+    }
+
+    public void hideSoftInput()
+    {
+        class HideSoftInputRunnable implements Runnable {
+            DEngineActivity activity;
+            HideSoftInputRunnable() {
+            }
+            public void run() {
+                mEditable = null;
+                mIMM.hideSoftInputFromWindow(mNativeContentView.getWindowToken(), 0);
+            }
+        }
+        HideSoftInputRunnable test = new HideSoftInputRunnable();
         runOnUiThread(test);
     }
 

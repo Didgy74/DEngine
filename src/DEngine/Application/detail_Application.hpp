@@ -31,7 +31,9 @@ namespace DEngine::Application::detail
 
 	void UpdateWindowSize(
 		void* platformHandle,
-		Extent newSize);
+		Extent newSize,
+		Math::Vec2Int visiblePos,
+		Extent visibleSize);
 	void UpdateWindowPosition(
 		void* platformHandle,
 		Math::Vec2Int newPosition);
@@ -58,12 +60,16 @@ namespace DEngine::Application::detail
 
 	void UpdateButton(Button button, bool pressed);
 	void PushCharInput(u32 charValue);
+	void PushCharEnterEvent();
 	void PushCharRemoveEvent();
 
 	struct WindowData
 	{
-		Extent size;
-		Math::Vec2Int position;
+		Math::Vec2Int position{};
+		Extent size{};
+		Math::Vec2Int visiblePosition{};
+		Extent visibleSize{};
+
 		bool isMinimized = false;
 		bool shouldShutdown = false;
 

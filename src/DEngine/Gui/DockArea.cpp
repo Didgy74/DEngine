@@ -201,25 +201,42 @@ namespace DEngine::Gui::impl
 	template<typename Callable>
 	void DockArea_IterateResizeRects(
 		Rect rect,
-		u32 resizeAreaWidth,
+		u32 resizeAreaThickness,
+		u32 resizeHandleLength,
 		Callable callable)
 	{
-		Rect topRect = rect;
-		topRect.extent.height = resizeAreaWidth;
-		topRect.position.y -= topRect.extent.height / 2;
-		callable(DockArea_ResizeRect::Top, topRect);
-		Rect bottomRect = rect;
-		bottomRect.extent.height = resizeAreaWidth;
-		bottomRect.position.y += rect.extent.height - (bottomRect.extent.height / 2);
-		callable(DockArea_ResizeRect::Bottom, bottomRect);
-		Rect leftRect = rect;
-		leftRect.extent.width = resizeAreaWidth;
-		leftRect.position.x -= leftRect.extent.width / 2;
-		callable(DockArea_ResizeRect::Left, leftRect);
-		Rect rightRect = rect;
-		rightRect.extent.width = resizeAreaWidth;
-		rightRect.position.x += rect.extent.width - rightRect.extent.width / 2;
-		callable(DockArea_ResizeRect::Right, rightRect);
+		{
+			Rect topRect = rect;
+			topRect.extent.width = resizeHandleLength;
+			topRect.extent.height = resizeAreaThickness;
+			topRect.position.x += rect.extent.width / 2 - topRect.extent.width;
+			topRect.position.y -= topRect.extent.height / 2;
+			callable(DockArea_ResizeRect::Top, topRect);
+		}
+		{
+			Rect bottomRect = rect;
+			bottomRect.extent.width = resizeHandleLength;
+			bottomRect.extent.height = resizeAreaThickness;
+			bottomRect.position.x += rect.extent.width / 2 - bottomRect.extent.width;
+			bottomRect.position.y += rect.extent.height - (bottomRect.extent.height / 2);
+			callable(DockArea_ResizeRect::Bottom, bottomRect);
+		}
+		{
+			Rect leftRect = rect;
+			leftRect.extent.width = resizeAreaThickness;
+			leftRect.extent.height = resizeHandleLength;
+			leftRect.position.x -= leftRect.extent.width / 2;
+			leftRect.position.y += rect.extent.height / 2 - (leftRect.extent.height / 2);
+			callable(DockArea_ResizeRect::Left, leftRect);
+		}
+		{
+			Rect rightRect = rect;
+			rightRect.extent.width = resizeAreaThickness;
+			rightRect.extent.height = resizeHandleLength;
+			rightRect.position.x += rect.extent.width - rightRect.extent.width / 2;
+			rightRect.position.y += rect.extent.height / 2 - (rightRect.extent.height / 2);
+			callable(DockArea_ResizeRect::Right, rightRect);
+		}
 	}
 
 	using DockArea_IterateLayoutGizmosCallbackPFN = void(*)(
@@ -444,6 +461,7 @@ namespace DEngine::Gui::impl
 				impl::DockArea_IterateResizeRects(
 					topLevelRect,
 					dockArea.resizeAreaThickness,
+					dockArea.resizeHandleLength,
 					[&dockArea, &drawInfo, topLevelIndex](
 						DockArea_ResizeRect side,
 						Rect rect)
@@ -671,6 +689,7 @@ namespace DEngine::Gui::impl
 					DockArea_IterateResizeRects(
 						topLevelRect,
 						dockArea.resizeAreaThickness,
+						dockArea.resizeHandleLength,
 						[topLevelRect, event, &resizeRectHit](DockArea_ResizeRect side, Rect rect)
 					{
 						if (!resizeRectHit.HasValue() && rect.PointIsInside(event.position))
@@ -1114,6 +1133,7 @@ namespace DEngine::Gui::impl
 					impl::DockArea_IterateResizeRects(
 						topLevelRect,
 						dockArea.resizeAreaThickness,
+						dockArea.resizeHandleLength,
 						[topLevelRect, &resizeRectHit, cursorPos](impl::DockArea_ResizeRect side, Rect rect)
 						{
 							if (!resizeRectHit.HasValue() && rect.PointIsInside(cursorPos))
@@ -1465,6 +1485,7 @@ namespace DEngine::Gui::impl
 						impl::DockArea_IterateResizeRects(
 							topLevelRect,
 							dockArea.resizeAreaThickness,
+							dockArea.resizeHandleLength,
 							[topLevelRect, &resizeRectHit, event](impl::DockArea_ResizeRect side, Rect rect)
 							{
 								if (!resizeRectHit.HasValue() && rect.PointIsInside(event.position))
@@ -2068,4 +2089,128 @@ void DockArea::TouchEvent(
 			visibleRect,
 			event);
 	}
+}
+
+void DEngine::Gui::DockArea::CharEnterEvent(Context& ctx)
+{
+	// Only send events to the window in focus?
+
+	bool continueIterating = true;
+	impl::DockArea_IterateTopLevelNodes(
+		impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+		Std::Span{ topLevelNodes.data(), topLevelNodes.size() },
+		Rect{},
+		continueIterating,
+		[&ctx](
+			DockArea::TopLevelNode const& topLevelNode,
+			Rect topLevelRect,
+			uSize topLevelIndex,
+			bool& continueIterating)
+		{
+			impl::DockArea_IterateNode(
+				*topLevelNode.node,
+				topLevelRect,
+				continueIterating,
+				impl::DockArea_IterateNode_SplitCallableOrder::First,
+				[&ctx](
+					DockArea::Node& node,
+					Rect rect,
+					DockArea::Node* parentNode,
+					bool& continueIterating)
+				{
+					if (node.type == Node::Type::Window)
+					{
+						auto& window = node.windows[node.selectedWindow];
+						if (window.widget)
+							window.widget->CharEnterEvent(ctx);
+						else if (window.layout)
+							window.layout->CharEnterEvent(ctx);
+					}
+				});
+		});
+}
+
+void DockArea::CharEvent(
+	Context& ctx,
+	u32 utfValue)
+{
+	// Only send events to the window in focus?
+
+	bool continueIterating = true;
+	impl::DockArea_IterateTopLevelNodes(
+		impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+		Std::Span{ topLevelNodes.data(), topLevelNodes.size() },
+		Rect{},
+		continueIterating,
+		[&ctx, utfValue](
+			DockArea::TopLevelNode const& topLevelNode,
+			Rect topLevelRect,
+			uSize topLevelIndex,
+			bool& continueIterating)
+		{
+			impl::DockArea_IterateNode(
+				*topLevelNode.node,
+				topLevelRect,
+				continueIterating,
+				impl::DockArea_IterateNode_SplitCallableOrder::First,
+				[&ctx, utfValue](
+					DockArea::Node& node,
+					Rect rect,
+					DockArea::Node* parentNode,
+					bool& continueIterating)
+				{
+					if (node.type == Node::Type::Window)
+					{
+						auto& window = node.windows[node.selectedWindow];
+						if (window.widget)
+							window.widget->CharEvent(
+								ctx,
+								utfValue);
+						else if (window.layout)
+							window.layout->CharEvent(
+								ctx,
+								utfValue);
+					}
+				});
+		});
+}
+
+void DockArea::CharRemoveEvent(
+	Context& ctx)
+{
+	bool continueIterating = true;
+	impl::DockArea_IterateTopLevelNodes(
+		impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+		Std::Span{ topLevelNodes.data(), topLevelNodes.size() },
+		Rect{},
+		continueIterating,
+		[&ctx](
+			DockArea::TopLevelNode const& topLevelNode,
+			Rect topLevelRect,
+			uSize topLevelIndex,
+			bool& continueIterating)
+		{
+			impl::DockArea_IterateNode(
+				*topLevelNode.node,
+				{},
+				continueIterating,
+				impl::DockArea_IterateNode_SplitCallableOrder::First,
+				[&ctx](
+					DockArea::Node& node,
+					Rect rect,
+					DockArea::Node* parentNode,
+					bool& continueIterating)
+				{
+					if (node.type == Node::Type::Window)
+					{
+						auto& window = node.windows[node.selectedWindow];
+						if (window.widget)
+							window.widget->CharRemoveEvent(
+								ctx);
+						else if (window.layout)
+							window.layout->CharRemoveEvent(
+								ctx);
+					}
+				});
+		});
 }

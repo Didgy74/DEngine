@@ -27,6 +27,9 @@ namespace DEngine::Gui
 				"Attempted to index into an Extent with an index out of bounds.");
 			return (&width)[index];
 		}
+
+		[[nodiscard]] constexpr bool operator==(Extent const&) const noexcept;
+		[[nodiscard]] constexpr bool operator!=(Extent const&) const noexcept;
 	};
 
 	struct Rect
@@ -42,7 +45,18 @@ namespace DEngine::Gui
 		[[nodiscard]] constexpr static Rect Intersection(Rect const&, Rect const&) noexcept;
 
 		[[nodiscard]] constexpr bool operator==(Rect const&) const noexcept;
+		[[nodiscard]] constexpr bool operator!=(Rect const&) const noexcept;
 	};
+}
+
+constexpr bool DEngine::Gui::Extent::operator==(Extent const& other) const noexcept
+{
+	return width == other.width && height == other.height;
+}
+
+constexpr bool DEngine::Gui::Extent::operator!=(Extent const& other) const noexcept
+{
+	return !(*this == other);
 }
 
 constexpr bool DEngine::Gui::Rect::IsNothing() const noexcept { return extent.width == 0 || extent.height == 0; }
@@ -74,5 +88,10 @@ constexpr DEngine::Gui::Rect DEngine::Gui::Rect::Intersection(Rect const& a, Rec
 
 constexpr bool DEngine::Gui::Rect::operator==(Rect const& other) const noexcept
 {
-	return position == other.position && extent.width == other.extent.width && extent.height == other.extent.height;
+	return position == other.position && extent == other.extent;
+}
+
+constexpr bool DEngine::Gui::Rect::operator!=(Rect const& other) const noexcept
+{
+	return !(*this == other);
 }

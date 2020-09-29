@@ -103,9 +103,13 @@ void Application::LockCursor(bool state)
 	backendData.cursorLocked = state;
 }
 
-void Application::OpenSoftInput()
+void Application::OpenSoftInput(std::string_view)
 {
 	
+}
+
+void Application::HideSoftInput()
+{
 }
 
 void Application::detail::Backend_Log(char const* msg)
@@ -153,8 +157,9 @@ Application::WindowID Application::CreateWindow(
 	int widthX;
 	int heightY;
 	glfwGetWindowSize(rawHandle, &widthX, &heightY);
-	newNode.windowData.size.width = (u32)widthX;
-	newNode.windowData.size.height = (u32)heightY;
+	newNode.windowData.size = { (u32)widthX, (u32)heightY };
+	newNode.windowData.visiblePosition = {};
+	newNode.windowData.visibleSize = { (u32)widthX, (u32)heightY };
 	
 	int windowPosX = 0;
 	int windowPosY = 0;
@@ -300,7 +305,6 @@ void Application::detail::Backend_GLFW_JoystickConnectedCallback(int jid, int ev
 		// This can happen in future releases.
 
 	}
-
 }
 
 static void Application::detail::Backend_GLFW_WindowPosCallback(
@@ -318,7 +322,11 @@ static void Application::detail::Backend_GLFW_WindowSizeCallback(
 	int height)
 {
 	if (width != 0 && height != 0)
-		detail::UpdateWindowSize(window, { (u32)width, (u32)height });
+		detail::UpdateWindowSize(
+			window, 
+			{ (u32)width, (u32)height },
+			{},
+			{ (u32)width, (u32)height });
 }
 
 void Application::detail::Backend_GLFW_WindowCursorEnterCallback(

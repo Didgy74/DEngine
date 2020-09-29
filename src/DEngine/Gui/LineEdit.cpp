@@ -1,7 +1,16 @@
 #include <DEngine/Gui/LineEdit.hpp>
+#include <DEngine/Application.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
+
+Gui::LineEdit::~LineEdit()
+{
+	if (selected)
+	{
+		App::HideSoftInput();
+	}
+}
 
 void LineEdit::Render(
 	Context const& ctx,
@@ -29,50 +38,28 @@ void LineEdit::Render(
 		drawInfo);
 }
 
+void LineEdit::CharEnterEvent(Context& ctx)
+{
+	if (selected)
+	{
+		selected = false;
+		App::HideSoftInput();
+		if (StringView().empty())
+		{
+			String_Set("0");
+			if (textChangedPfn)
+				textChangedPfn(*this);
+		}
+	}
+}
+
 void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 {
 	if (selected)
 	{
-		if (type == Type::Float)
-		{
-			bool hasPeriod = false;
-			for (u32 item : StringView())
-			{
-				if (item == '.')
-				{
-					hasPeriod = true;
-					break;
-				}
-			}
-			if ((48 <= charEvent && charEvent <= 58) || (!hasPeriod && charEvent == '.'))
-			{
-				String_PushBack((u8)charEvent);
-				if (textChangedPfn)
-					textChangedPfn(*this);
-			}
-			else if (charEvent == '-' && StringView().empty())
-			{
-				String_PushBack((u8)charEvent);
-				if (textChangedPfn)
-					textChangedPfn(*this);
-			}
-
-		}
-		else if (type == Type::Integer)
-		{
-			if (48 <= charEvent && charEvent <= 58)
-			{
-				String_PushBack((u8)charEvent);
-				if (textChangedPfn)
-					textChangedPfn(*this);
-			}
-			else if (charEvent == '-' && StringView().empty())
-			{
-				String_PushBack((u8)charEvent);
-				if (textChangedPfn)
-					textChangedPfn(*this);
-			}
-		}
+		String_PushBack((u8)charEvent);
+		if (textChangedPfn)
+			textChangedPfn(*this);
 	}
 }
 
@@ -114,8 +101,6 @@ void LineEdit::CursorClick(
 	}
 }
 
-#include <DEngine/Application.hpp>
-
 void LineEdit::TouchEvent(
 	Context& ctx,
 	Rect widgetRect,
@@ -127,7 +112,18 @@ void LineEdit::TouchEvent(
 	if (event.id == 0 && event.type == TouchEventType::Down && cursorIsInside && !selected)
 	{
 		selected = true;
-		//text.clear();
-		App::OpenSoftInput();
+		App::OpenSoftInput(this->StringView());
+	}
+
+	if (event.id == 0 && event.type == TouchEventType::Down && !cursorIsInside && selected)
+	{
+		App::HideSoftInput();
+		if (StringView().empty())
+		{
+			String_Set("0");
+			if (textChangedPfn)
+				textChangedPfn(*this);
+		}
+		selected = false;
 	}
 }

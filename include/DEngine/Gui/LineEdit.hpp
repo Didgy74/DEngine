@@ -24,12 +24,17 @@ namespace DEngine::Gui
 		void* pUserData = nullptr;
 		std::function<void(LineEdit& widget)> textChangedPfn = nullptr;
 
+		virtual ~LineEdit();
+
 		virtual void Render(
 			Context const& ctx,
 			Extent framebufferExtent,
 			Rect widgetRect,
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
+
+		virtual void CharEnterEvent(
+			Context& ctx) override;
 
 		virtual void CharEvent(
 			Context& ctx,

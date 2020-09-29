@@ -31,17 +31,15 @@ target_link_libraries(dengine PRIVATE freetype)
 
 # Application backend library
 	add_library(dengine_application STATIC "${DENGINE_ROOT_DIR}/src/DEngine/Application/Application_Android.cpp")
+	#add_library(dengine_application STATIC "${DENGINE_ROOT_DIR}/src/DEngine/Application/Application_Android2.cpp")
 	target_include_directories(dengine_application PRIVATE ${DENGINE_INCLUDE_DIRS})
 	target_compile_definitions(dengine_application PRIVATE ${DENGINE_DEFINES})
 	target_include_directories(dengine_application PRIVATE ${VULKAN_INCLUDE_DIRS})
 	target_link_libraries(dengine PRIVATE dengine_application)
 # Add the Android-centric stuff
-	add_library(
-		app-glue
-		STATIC
-		${DENGINE_ROOT_DIR}/external/android_native_app_glue/android_native_app_glue.c)
-	target_link_libraries(dengine_application PRIVATE app-glue)
-	target_include_directories(dengine_application PRIVATE ${DENGINE_ROOT_DIR}/external/android_native_app_glue/)
+	#add_library(app-glue STATIC ${DENGINE_ROOT_DIR}/external/android_native_app_glue/android_native_app_glue.c)
+	#target_link_libraries(dengine_application PRIVATE app-glue)
+	#target_include_directories(dengine_application PRIVATE ${DENGINE_ROOT_DIR}/external/android_native_app_glue/)
 
 	# Adding this flag is really important, do not remove it.
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")

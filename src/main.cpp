@@ -34,7 +34,7 @@ class GfxTexAssetInterfacer : public DEngine::Gfx::TextureAssetInterface
 	virtual char const* get(DEngine::Gfx::TextureID id) const override
 	{
 		if ((DEngine::u64)id == 0)
-			return "data/05.ktx";
+			return "data/01.ktx";
 		else
 			return "data/2.png";
 	}
