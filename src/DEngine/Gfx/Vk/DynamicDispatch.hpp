@@ -4,385 +4,308 @@
 
 namespace DEngine::Gfx::Vk
 {
+	PFN_vkGetInstanceProcAddr loadInstanceProcAddressPFN();
+
 	struct BaseDispatchRaw
 	{
-		static BaseDispatchRaw Build(PFN_vkGetInstanceProcAddr getInstanceProcAddr);
+		[[nodiscard]] static BaseDispatchRaw Build(PFN_vkGetInstanceProcAddr getInstanceProcAddr);
 
-		PFN_vkCreateInstance vkCreateInstance = nullptr;
-		PFN_vkEnumerateInstanceExtensionProperties vkEnumerateInstanceExtensionProperties = nullptr;
-		PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties = nullptr;
-		PFN_vkEnumerateInstanceVersion vkEnumerateInstanceVersion = nullptr;
+		PFN_vkCreateInstance vkCreateInstance;
+		PFN_vkEnumerateInstanceExtensionProperties vkEnumerateInstanceExtensionProperties;
+		PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties;
+		PFN_vkEnumerateInstanceVersion vkEnumerateInstanceVersion;
 	};
 
 	struct InstanceDispatchRaw
 	{
-		static InstanceDispatchRaw Build(vk::Instance instance, PFN_vkGetInstanceProcAddr getInstanceProcAddr);
+		[[nodiscard]] static InstanceDispatchRaw Build(
+			vk::Instance instance, 
+			PFN_vkGetInstanceProcAddr getInstanceProcAddr);
 
-		PFN_vkDestroyInstance vkDestroyInstance = nullptr;
-		PFN_vkEnumeratePhysicalDevices vkEnumeratePhysicalDevices = nullptr;
-		PFN_vkEnumerateDeviceExtensionProperties vkEnumerateDeviceExtensionProperties = nullptr;
-		PFN_vkEnumerateDeviceLayerProperties vkEnumerateDeviceLayerProperties = nullptr;
-		PFN_vkGetPhysicalDeviceFeatures vkGetPhysicalDeviceFeatures = nullptr;
-		PFN_vkGetPhysicalDeviceFeatures2 vkGetPhysicalDeviceFeatures2 = nullptr;
-		PFN_vkGetPhysicalDeviceMemoryProperties vkGetPhysicalDeviceMemoryProperties = nullptr;
-		PFN_vkGetPhysicalDeviceMemoryProperties2 vkGetPhysicalDeviceMemoryProperties2 = nullptr;
-		PFN_vkGetPhysicalDeviceProperties vkGetPhysicalDeviceProperties = nullptr;
-		PFN_vkGetPhysicalDeviceProperties2 vkGetPhysicalDeviceProperties2 = nullptr;
-
-		PFN_vkGetPhysicalDeviceQueueFamilyProperties vkGetPhysicalDeviceQueueFamilyProperties = nullptr;
-		PFN_vkGetPhysicalDeviceQueueFamilyProperties2 vkGetPhysicalDeviceQueueFamilyProperties2 = nullptr;
-
-		PFN_vkCreateDevice vkCreateDevice = nullptr;
+		PFN_vkCreateDevice vkCreateDevice;
+		PFN_vkDestroyInstance vkDestroyInstance;
+		PFN_vkEnumerateDeviceExtensionProperties vkEnumerateDeviceExtensionProperties;
+		PFN_vkEnumeratePhysicalDevices vkEnumeratePhysicalDevices;
+		PFN_vkGetPhysicalDeviceFeatures vkGetPhysicalDeviceFeatures;
+		PFN_vkGetPhysicalDeviceMemoryProperties vkGetPhysicalDeviceMemoryProperties;
+		PFN_vkGetPhysicalDeviceProperties vkGetPhysicalDeviceProperties;
+		PFN_vkGetPhysicalDeviceQueueFamilyProperties vkGetPhysicalDeviceQueueFamilyProperties;		
 	};
 
 	struct DeviceDispatchRaw
 	{
-		static DeviceDispatchRaw Build(vk::Device vkDevice, PFN_vkGetDeviceProcAddr getProcAddr);
+		[[nodiscard]] static DeviceDispatchRaw Build(
+			vk::Device vkDevice, 
+			PFN_vkGetDeviceProcAddr getProcAddr);
 
-		PFN_vkBeginCommandBuffer vkBeginCommandBuffer = nullptr;
-		PFN_vkCmdBeginQuery vkCmdBeginQuery = nullptr;
-		PFN_vkCmdBeginRenderPass vkCmdBeginRenderPass = nullptr;
-		PFN_vkCmdBindDescriptorSets vkCmdBindDescriptorSets = nullptr;
-		PFN_vkCmdBindIndexBuffer vkCmdBindIndexBuffer = nullptr;
-		PFN_vkCmdBindPipeline vkCmdBindPipeline = nullptr;
-		PFN_vkCmdBindVertexBuffers vkCmdBindVertexBuffers = nullptr;
-		PFN_vkCmdBlitImage vkCmdBlitImage = nullptr;
-		PFN_vkCmdClearAttachments vkCmdClearAttachments = nullptr;
-		PFN_vkCmdClearColorImage vkCmdClearColorImage = nullptr;
-		PFN_vkCmdClearDepthStencilImage vkCmdClearDepthStencilImage = nullptr;
-		PFN_vkCmdCopyBuffer vkCmdCopyBuffer = nullptr;
-		PFN_vkCmdCopyBufferToImage vkCmdCopyBufferToImage = nullptr;
-		PFN_vkCmdCopyImage vkCmdCopyImage = nullptr;
-		PFN_vkCmdCopyImageToBuffer vkCmdCopyImageToBuffer = nullptr;
-		PFN_vkCmdCopyQueryPoolResults vkCmdCopyQueryPoolResults = nullptr;
-		PFN_vkCmdDispatch vkCmdDispatch = nullptr;
-		PFN_vkCmdDispatchBase vkCmdDispatchBase = nullptr;
-		PFN_vkCmdDispatchIndirect vkCmdDispatchIndirect = nullptr;
-		PFN_vkCmdDraw vkCmdDraw = nullptr;
-		PFN_vkCmdDrawIndexed vkCmdDrawIndexed = nullptr;
-		PFN_vkCmdDrawIndexedIndirect vkCmdDrawIndexedIndirect = nullptr;
-		PFN_vkCmdDrawIndirect vkCmdDrawIndirect = nullptr;
-		PFN_vkCmdEndQuery vkCmdEndQuery = nullptr;
-		PFN_vkCmdEndRenderPass vkCmdEndRenderPass = nullptr;
-		PFN_vkCmdExecuteCommands vkCmdExecuteCommands = nullptr;
-		PFN_vkCmdFillBuffer vkCmdFillBuffer = nullptr;
-		PFN_vkCmdNextSubpass vkCmdNextSubpass = nullptr;
-		PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier = nullptr;
-		PFN_vkCmdPushConstants vkCmdPushConstants = nullptr;
-		PFN_vkCmdResetEvent vkCmdResetEvent = nullptr;
-		PFN_vkCmdResetQueryPool vkCmdResetQueryPool = nullptr;
-		PFN_vkCmdResolveImage vkCmdResolveImage = nullptr;
-		PFN_vkCmdSetBlendConstants vkCmdSetBlendConstants = nullptr;
-		PFN_vkCmdSetDepthBias vkCmdSetDepthBias = nullptr;
-		PFN_vkCmdSetDepthBounds vkCmdSetDepthBounds = nullptr;
-		PFN_vkCmdSetDeviceMask vkCmdSetDeviceMask = nullptr;
-		PFN_vkCmdSetEvent vkCmdSetEvent = nullptr;
-		PFN_vkCmdSetLineWidth vkCmdSetLineWidth = nullptr;
-		PFN_vkCmdSetScissor vkCmdSetScissor = nullptr;
-		PFN_vkCmdSetStencilCompareMask vkCmdSetStencilCompareMask = nullptr;
-		PFN_vkCmdSetStencilReference vkCmdSetStencilReference = nullptr;
-		PFN_vkCmdSetStencilWriteMask vkCmdSetStencilWriteMask = nullptr;
-		PFN_vkCmdSetViewport vkCmdSetViewport = nullptr;
-		PFN_vkCmdUpdateBuffer vkCmdUpdateBuffer = nullptr;
-		PFN_vkCmdWaitEvents vkCmdWaitEvents = nullptr;
-		PFN_vkCmdWriteTimestamp vkCmdWriteTimestamp = nullptr;
-		PFN_vkEndCommandBuffer vkEndCommandBuffer = nullptr;
-		PFN_vkAllocateCommandBuffers vkAllocateCommandBuffers = nullptr;
-		PFN_vkAllocateDescriptorSets vkAllocateDescriptorSets = nullptr;
-		PFN_vkAllocateMemory vkAllocateMemory = nullptr;
-		PFN_vkBindBufferMemory vkBindBufferMemory = nullptr;
-		PFN_vkBindBufferMemory2 vkBindBufferMemory2 = nullptr;
-		PFN_vkBindImageMemory vkBindImageMemory = nullptr;
-		PFN_vkBindImageMemory2 vkBindImageMemory2 = nullptr;
-		PFN_vkCreateBuffer vkCreateBuffer = nullptr;
-		PFN_vkCreateBufferView vkCreateBufferView = nullptr;
-		PFN_vkCreateCommandPool vkCreateCommandPool = nullptr;
-		PFN_vkCreateComputePipelines vkCreateComputePipelines = nullptr;
-		PFN_vkCreateDescriptorPool vkCreateDescriptorPool = nullptr;
-		PFN_vkCreateDescriptorSetLayout vkCreateDescriptorSetLayout = nullptr;
-		PFN_vkCreateDescriptorUpdateTemplate vkCreateDescriptorUpdateTemplate = nullptr;
-		PFN_vkCreateEvent vkCreateEvent = nullptr;
-		PFN_vkCreateFence vkCreateFence = nullptr;
-		PFN_vkCreateFramebuffer vkCreateFramebuffer = nullptr;
-		PFN_vkCreateGraphicsPipelines vkCreateGraphicsPipelines = nullptr;
-		PFN_vkCreateImage vkCreateImage = nullptr;
-		PFN_vkCreateImageView vkCreateImageView = nullptr;
-		PFN_vkCreatePipelineCache vkCreatePipelineCache = nullptr;
-		PFN_vkCreatePipelineLayout vkCreatePipelineLayout = nullptr;
-		PFN_vkCreateQueryPool vkCreateQueryPool = nullptr;
-		PFN_vkCreateRenderPass vkCreateRenderPass = nullptr;
-		PFN_vkCreateSampler vkCreateSampler = nullptr;
-		PFN_vkCreateSamplerYcbcrConversion vkCreateSamplerYcbcrConversion = nullptr;
-		PFN_vkCreateSemaphore vkCreateSemaphore = nullptr;
-		PFN_vkCreateShaderModule vkCreateShaderModule = nullptr;
-		PFN_vkDestroyBuffer vkDestroyBuffer = nullptr;
-		PFN_vkDestroyBufferView vkDestroyBufferView = nullptr;
-		PFN_vkDestroyCommandPool vkDestroyCommandPool = nullptr;
-		PFN_vkDestroyDescriptorPool vkDestroyDescriptorPool = nullptr;
-		PFN_vkDestroyDescriptorSetLayout vkDestroyDescriptorSetLayout = nullptr;
-		PFN_vkDestroyDescriptorUpdateTemplate vkDestroyDescriptorUpdateTemplate = nullptr;
-		PFN_vkDestroyDevice vkDestroyDevice = nullptr;
-		PFN_vkDestroyEvent vkDestroyEvent = nullptr;
-		PFN_vkDestroyFence vkDestroyFence = nullptr;
-		PFN_vkDestroyFramebuffer vkDestroyFramebuffer = nullptr;
-		PFN_vkDestroyImage vkDestroyImage = nullptr;
-		PFN_vkDestroyImageView vkDestroyImageView = nullptr;
-		PFN_vkDestroyPipeline vkDestroyPipeline = nullptr;
-		PFN_vkDestroyPipelineCache vkDestroyPipelineCache = nullptr;
-		PFN_vkDestroyPipelineLayout vkDestroyPipelineLayout = nullptr;
-		PFN_vkDestroyQueryPool vkDestroyQueryPool = nullptr;
-		PFN_vkDestroyRenderPass vkDestroyRenderPass = nullptr;
-		PFN_vkDestroySampler vkDestroySampler = nullptr;
-		PFN_vkDestroySamplerYcbcrConversion vkDestroySamplerYcbcrConversion = nullptr;
-		PFN_vkDestroySemaphore vkDestroySemaphore = nullptr;
-		PFN_vkDestroyShaderModule vkDestroyShaderModule = nullptr;
-		PFN_vkDeviceWaitIdle vkDeviceWaitIdle = nullptr;
-		PFN_vkFlushMappedMemoryRanges vkFlushMappedMemoryRanges = nullptr;
-		PFN_vkFreeCommandBuffers vkFreeCommandBuffers = nullptr;
-		PFN_vkFreeDescriptorSets vkFreeDescriptorSets = nullptr;
-		PFN_vkFreeMemory vkFreeMemory = nullptr;
-		PFN_vkGetBufferMemoryRequirements vkGetBufferMemoryRequirements = nullptr;
-		PFN_vkGetBufferMemoryRequirements2 vkGetBufferMemoryRequirements2 = nullptr;
-		PFN_vkGetDescriptorSetLayoutSupport vkGetDescriptorSetLayoutSupport = nullptr;
-		PFN_vkGetDeviceGroupPeerMemoryFeatures vkGetDeviceGroupPeerMemoryFeatures = nullptr;
-		PFN_vkGetDeviceMemoryCommitment vkGetDeviceMemoryCommitment = nullptr;
-		PFN_vkGetDeviceProcAddr vkGetDeviceProcAddr = nullptr;
-		PFN_vkGetDeviceQueue vkGetDeviceQueue = nullptr;
-		PFN_vkGetDeviceQueue2 vkGetDeviceQueue2 = nullptr;
-		PFN_vkGetEventStatus vkGetEventStatus = nullptr;
-		PFN_vkGetFenceStatus vkGetFenceStatus = nullptr;
-		PFN_vkGetImageMemoryRequirements vkGetImageMemoryRequirements = nullptr;
-		PFN_vkGetImageMemoryRequirements2 vkGetImageMemoryRequirements2 = nullptr;
-		PFN_vkGetImageSparseMemoryRequirements vkGetImageSparseMemoryRequirements = nullptr;
-		PFN_vkGetImageSparseMemoryRequirements2 vkGetImageSparseMemoryRequirements2 = nullptr;
-		PFN_vkGetImageSubresourceLayout vkGetImageSubresourceLayout = nullptr;
-		PFN_vkGetPipelineCacheData vkGetPipelineCacheData = nullptr;
-		PFN_vkGetQueryPoolResults vkGetQueryPoolResults = nullptr;
-		PFN_vkGetRenderAreaGranularity vkGetRenderAreaGranularity = nullptr;
-		PFN_vkGetSwapchainImagesKHR vkGetSwapchainImagesKHR = nullptr;
-		PFN_vkGetSwapchainStatusKHR vkGetSwapchainStatusKHR = nullptr;
-		PFN_vkInvalidateMappedMemoryRanges vkInvalidateMappedMemoryRanges = nullptr;
-		PFN_vkMapMemory vkMapMemory = nullptr;
-		PFN_vkMergePipelineCaches vkMergePipelineCaches = nullptr;
-		PFN_vkResetCommandBuffer vkResetCommandBuffer = nullptr;
-		PFN_vkResetCommandPool vkResetCommandPool = nullptr;
-		PFN_vkResetDescriptorPool vkResetDescriptorPool = nullptr;
-		PFN_vkResetEvent vkResetEvent = nullptr;
-		PFN_vkResetFences vkResetFences = nullptr;
-		PFN_vkSetEvent vkSetEvent = nullptr;
-		PFN_vkTrimCommandPool vkTrimCommandPool = nullptr;
-		PFN_vkUnmapMemory vkUnmapMemory = nullptr;
-		PFN_vkUpdateDescriptorSetWithTemplate vkUpdateDescriptorSetWithTemplate = nullptr;
-		PFN_vkUpdateDescriptorSets vkUpdateDescriptorSets = nullptr;
-		PFN_vkWaitForFences vkWaitForFences = nullptr;
-		PFN_vkQueueBindSparse vkQueueBindSparse = nullptr;
-		PFN_vkQueuePresentKHR vkQueuePresentKHR = nullptr;
-		PFN_vkQueueSubmit vkQueueSubmit = nullptr;
-		PFN_vkQueueWaitIdle vkQueueWaitIdle = nullptr;
+		PFN_vkAllocateCommandBuffers vkAllocateCommandBuffers;
+		PFN_vkAllocateDescriptorSets vkAllocateDescriptorSets;
+		PFN_vkAllocateMemory vkAllocateMemory;
+		PFN_vkBeginCommandBuffer vkBeginCommandBuffer;
+		PFN_vkBindBufferMemory vkBindBufferMemory;
+		PFN_vkBindImageMemory vkBindImageMemory;
+		PFN_vkCmdBeginRenderPass vkCmdBeginRenderPass;
+		PFN_vkCmdBindDescriptorSets vkCmdBindDescriptorSets;
+		PFN_vkCmdBindIndexBuffer vkCmdBindIndexBuffer;
+		PFN_vkCmdBindPipeline vkCmdBindPipeline;
+		PFN_vkCmdBindVertexBuffers vkCmdBindVertexBuffers;
+		PFN_vkCmdCopyBuffer vkCmdCopyBuffer;
+		PFN_vkCmdCopyBufferToImage vkCmdCopyBufferToImage;
+		PFN_vkCmdCopyImage vkCmdCopyImage;
+		PFN_vkCmdCopyImageToBuffer vkCmdCopyImageToBuffer;
+		PFN_vkCmdDraw vkCmdDraw;
+		PFN_vkCmdDrawIndexed vkCmdDrawIndexed;
+		PFN_vkCmdEndRenderPass vkCmdEndRenderPass;
+		PFN_vkCmdNextSubpass vkCmdNextSubpass;
+		PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
+		PFN_vkCmdPushConstants vkCmdPushConstants;
+		PFN_vkCmdSetScissor vkCmdSetScissor;
+		PFN_vkCmdSetViewport vkCmdSetViewport;
+		PFN_vkCreateBuffer vkCreateBuffer;
+		PFN_vkCreateBufferView vkCreateBufferView;
+		PFN_vkCreateCommandPool vkCreateCommandPool;
+		PFN_vkCreateDescriptorPool vkCreateDescriptorPool;
+		PFN_vkCreateDescriptorSetLayout vkCreateDescriptorSetLayout;
+		PFN_vkCreateFence vkCreateFence;
+		PFN_vkCreateFramebuffer vkCreateFramebuffer;
+		PFN_vkCreateGraphicsPipelines vkCreateGraphicsPipelines;
+		PFN_vkCreateImage vkCreateImage;
+		PFN_vkCreateImageView vkCreateImageView;
+		PFN_vkCreatePipelineCache vkCreatePipelineCache;
+		PFN_vkCreatePipelineLayout vkCreatePipelineLayout;
+		PFN_vkCreateRenderPass vkCreateRenderPass;
+		PFN_vkCreateSampler vkCreateSampler;
+		PFN_vkCreateSemaphore vkCreateSemaphore;
+		PFN_vkCreateShaderModule vkCreateShaderModule;
+		PFN_vkDestroyBuffer vkDestroyBuffer;
+		PFN_vkDestroyBufferView vkDestroyBufferView;
+		PFN_vkDestroyCommandPool vkDestroyCommandPool;
+		PFN_vkDestroyDescriptorPool vkDestroyDescriptorPool;
+		PFN_vkDestroyDescriptorSetLayout vkDestroyDescriptorSetLayout;
+		PFN_vkDestroyDevice vkDestroyDevice;
+		PFN_vkDestroyFence vkDestroyFence;
+		PFN_vkDestroyFramebuffer vkDestroyFramebuffer;
+		PFN_vkDestroyImage vkDestroyImage;
+		PFN_vkDestroyImageView vkDestroyImageView;
+		PFN_vkDestroyPipeline vkDestroyPipeline;
+		PFN_vkDestroyPipelineCache vkDestroyPipelineCache;
+		PFN_vkDestroyPipelineLayout vkDestroyPipelineLayout;
+		PFN_vkDestroyRenderPass vkDestroyRenderPass;
+		PFN_vkDestroySampler vkDestroySampler;
+		PFN_vkDestroySemaphore vkDestroySemaphore;
+		PFN_vkDestroyShaderModule vkDestroyShaderModule;
+		PFN_vkDeviceWaitIdle vkDeviceWaitIdle;
+		PFN_vkEndCommandBuffer vkEndCommandBuffer;
+		PFN_vkFlushMappedMemoryRanges vkFlushMappedMemoryRanges;
+		PFN_vkFreeCommandBuffers vkFreeCommandBuffers;
+		PFN_vkFreeDescriptorSets vkFreeDescriptorSets;
+		PFN_vkFreeMemory vkFreeMemory;
+		PFN_vkGetBufferMemoryRequirements vkGetBufferMemoryRequirements;
+		PFN_vkGetDeviceProcAddr vkGetDeviceProcAddr;
+		PFN_vkGetDeviceQueue vkGetDeviceQueue;
+		PFN_vkGetFenceStatus vkGetFenceStatus;
+		PFN_vkGetImageMemoryRequirements vkGetImageMemoryRequirements;
+		PFN_vkInvalidateMappedMemoryRanges vkInvalidateMappedMemoryRanges;
+		PFN_vkMapMemory vkMapMemory;
+		PFN_vkResetCommandBuffer vkResetCommandBuffer;
+		PFN_vkResetCommandPool vkResetCommandPool;
+		PFN_vkResetDescriptorPool vkResetDescriptorPool;
+		PFN_vkResetFences vkResetFences;
+		PFN_vkTrimCommandPool vkTrimCommandPool;
+		PFN_vkUnmapMemory vkUnmapMemory;
+		PFN_vkUpdateDescriptorSets vkUpdateDescriptorSets;
+		PFN_vkWaitForFences vkWaitForFences;
+		PFN_vkQueueSubmit vkQueueSubmit;
+		PFN_vkQueueWaitIdle vkQueueWaitIdle;
 	};
 
 	struct EXT_DebugUtilsDispatchRaw
 	{
-		static EXT_DebugUtilsDispatchRaw Build(vk::Instance instance, PFN_vkGetInstanceProcAddr instanceProcAddr);
+		[[nodiscard]] static EXT_DebugUtilsDispatchRaw Build(
+			vk::Instance instance, 
+			PFN_vkGetInstanceProcAddr instanceProcAddr);
 
-		PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT = nullptr;
-		PFN_vkSetDebugUtilsObjectTagEXT vkSetDebugUtilsObjectTagEXT = nullptr;
-		PFN_vkQueueBeginDebugUtilsLabelEXT vkQueueBeginDebugUtilsLabelEXT = nullptr;
-		PFN_vkQueueEndDebugUtilsLabelEXT vkQueueEndDebugUtilsLabelEXT = nullptr;
-		PFN_vkQueueInsertDebugUtilsLabelEXT vkQueueInsertDebugUtilsLabelEXT = nullptr;
-		PFN_vkCmdBeginDebugUtilsLabelEXT vkCmdBeginDebugUtilsLabelEXT = nullptr;
-		PFN_vkCmdEndDebugUtilsLabelEXT vkCmdEndDebugUtilsLabelEXT = nullptr;
-		PFN_vkCmdInsertDebugUtilsLabelEXT vkCmdInsertDebugUtilsLabelEXT = nullptr;
-		PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT = nullptr;
-		PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT = nullptr;
-		PFN_vkSubmitDebugUtilsMessageEXT vkSubmitDebugUtilsMessageEXT = nullptr;
+		PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT;
+		PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT;
+		PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT;
 	};
 
 	struct KHR_SurfaceDispatchRaw
 	{
-		static KHR_SurfaceDispatchRaw Build(vk::Instance instance, PFN_vkGetInstanceProcAddr instanceProcAddr);
+		[[nodiscard]] static KHR_SurfaceDispatchRaw Build(
+			vk::Instance instance, 
+			PFN_vkGetInstanceProcAddr instanceProcAddr);
 
-		PFN_vkDestroySurfaceKHR vkDestroySurfaceKHR = nullptr;
-		PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR = nullptr;
-		PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR vkGetPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
-		PFN_vkGetPhysicalDeviceSurfaceFormatsKHR vkGetPhysicalDeviceSurfaceFormatsKHR = nullptr;
-		PFN_vkGetPhysicalDeviceSurfacePresentModesKHR vkGetPhysicalDeviceSurfacePresentModesKHR = nullptr;
+		PFN_vkDestroySurfaceKHR vkDestroySurfaceKHR;
+		PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
+		PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR vkGetPhysicalDeviceSurfaceCapabilitiesKHR;
+		PFN_vkGetPhysicalDeviceSurfaceFormatsKHR vkGetPhysicalDeviceSurfaceFormatsKHR;
+		PFN_vkGetPhysicalDeviceSurfacePresentModesKHR vkGetPhysicalDeviceSurfacePresentModesKHR;
 	};
 
 	struct KHR_SwapchainDispatchRaw
 	{
-		static KHR_SwapchainDispatchRaw Build(vk::Device vkDevice, PFN_vkGetDeviceProcAddr getProcAddr);
+		[[nodiscard]] static KHR_SwapchainDispatchRaw Build(
+			vk::Device vkDevice, 
+			PFN_vkGetDeviceProcAddr getProcAddr);
 
-		PFN_vkCreateSwapchainKHR vkCreateSwapchainKHR = nullptr;
-		PFN_vkDestroySwapchainKHR vkDestroySwapchainKHR = nullptr;
-		PFN_vkGetSwapchainImagesKHR vkGetSwapchainImagesKHR = nullptr;
-		PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR = nullptr;
-		PFN_vkQueuePresentKHR vkQueuePresentKHR = nullptr;
-		PFN_vkGetDeviceGroupPresentCapabilitiesKHR vkGetDeviceGroupPresentCapabilitiesKHR = nullptr;
-		PFN_vkGetDeviceGroupSurfacePresentModesKHR vkGetDeviceGroupSurfacePresentModesKHR = nullptr;
-		PFN_vkGetPhysicalDevicePresentRectanglesKHR vkGetPhysicalDevicePresentRectanglesKHR = nullptr;
-		PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR = nullptr;
+		PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR;
+		PFN_vkCreateSwapchainKHR vkCreateSwapchainKHR;
+		PFN_vkDestroySwapchainKHR vkDestroySwapchainKHR;
+		PFN_vkGetSwapchainImagesKHR vkGetSwapchainImagesKHR;
+		PFN_vkQueuePresentKHR vkQueuePresentKHR;
 	};
 
 	class BaseDispatch
 	{
 	public:
+		BaseDispatch() noexcept = default;
+		BaseDispatch(BaseDispatch const&) noexcept = delete;
+		BaseDispatch(BaseDispatch&&) noexcept = delete;
 
-		static BaseDispatch Build(PFN_vkGetInstanceProcAddr procAddr);
+		BaseDispatch& operator=(BaseDispatch const&) noexcept = delete;
+		BaseDispatch& operator=(BaseDispatch&&) noexcept = delete;
 
-		BaseDispatchRaw raw{};
-		std::uint32_t enumerateInstanceVersion() const
-		{
-			if (raw.vkEnumerateInstanceVersion == nullptr)
-				return VK_MAKE_VERSION(1, 0, 0);
-			else
-				return vk::enumerateInstanceVersion(raw);
-		}
-		vk::Result enumerateInstanceExtensionProperties(
-			const char* pLayerName,
+		static void BuildInPlace(
+			BaseDispatch& dispatcher,
+			PFN_vkGetInstanceProcAddr procAddr);
+
+		BaseDispatchRaw raw;
+		[[nodiscard]] vk::Instance createInstance(
+			vk::InstanceCreateInfo const& createInfo,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+
+		[[nodiscard]] vk::Result enumerateInstanceExtensionProperties(
+			char const* pLayerName,
 			std::uint32_t* pPropertyCount,
-			vk::ExtensionProperties* pProperties) const
-		{
-			return vk::enumerateInstanceExtensionProperties(pLayerName, pPropertyCount, pProperties, raw);
-		}
-		vk::Result enumerateInstanceLayerProperties(std::uint32_t* pPropertyCount, vk::LayerProperties* pProperties) const
-		{
-			return vk::enumerateInstanceLayerProperties(pPropertyCount, pProperties, raw);
-		}
-		vk::Instance createInstance(vk::InstanceCreateInfo const& createInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return vk::createInstance(createInfo, allocator, raw);
-		}
+			vk::ExtensionProperties* pProperties) const;
+
+		[[nodiscard]] vk::Result enumerateInstanceLayerProperties(
+			std::uint32_t* pPropertyCount,
+			vk::LayerProperties* pProperties) const;
+
+		[[nodiscard]] std::uint32_t enumerateInstanceVersion() const;
 	};
 
 	class DebugUtilsDispatch
 	{
 	public:
+		EXT_DebugUtilsDispatchRaw raw;
 
-		EXT_DebugUtilsDispatchRaw raw{};
+		DebugUtilsDispatch() noexcept = default;
+		DebugUtilsDispatch(DebugUtilsDispatch const&) noexcept = delete;
+		DebugUtilsDispatch(DebugUtilsDispatch&&) noexcept = delete;
 
-		[[nodiscard]] static DebugUtilsDispatch Build(vk::Instance instance, PFN_vkGetInstanceProcAddr instanceProcAddr);
+		DebugUtilsDispatch& operator=(DebugUtilsDispatch const&) noexcept = delete;
+		DebugUtilsDispatch& operator=(DebugUtilsDispatch&&) noexcept = delete;
+
+		static void BuildInPlace(
+			DebugUtilsDispatch& dispatcher,
+			vk::Instance instance, 
+			PFN_vkGetInstanceProcAddr instanceProcAddr);
 
 		[[nodiscard]] vk::DebugUtilsMessengerEXT createDebugUtilsMessengerEXT(
 			vk::Instance instance,
 			vk::DebugUtilsMessengerCreateInfoEXT const& createInfo,
-			vk::Optional<const vk::AllocationCallbacks> allocator = nullptr) const
-		{
-			return instance.createDebugUtilsMessengerEXT(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		void destroyDebugUtilsMessengerEXT(
 			vk::Instance instance,
 			vk::DebugUtilsMessengerEXT messenger,
-			vk::Optional<const vk::AllocationCallbacks> allocator = nullptr) const
-		{
-			return instance.destroyDebugUtilsMessengerEXT(messenger, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		void setDebugUtilsObjectNameEXT(
 			vk::Device device,
-			vk::DebugUtilsObjectNameInfoEXT const& nameInfo) const
-		{
-			return device.setDebugUtilsObjectNameEXT(nameInfo, raw);
-		}
+			vk::DebugUtilsObjectNameInfoEXT const& nameInfo) const;
 	};
 
 	class InstanceDispatch
 	{
 	public:
+		InstanceDispatch() noexcept = default;
+		InstanceDispatch(InstanceDispatch const&) noexcept = delete;
+		InstanceDispatch(InstanceDispatch&&) noexcept = delete;
+		InstanceDispatch& operator=(InstanceDispatch const&) noexcept = delete;
+		InstanceDispatch& operator=(InstanceDispatch&&) noexcept = delete;
 
-		static InstanceDispatch Build(vk::Instance instance, PFN_vkGetInstanceProcAddr getInstanceProcAddr);
+		static void BuildInPlace(
+			InstanceDispatch& dispatcher,
+			vk::Instance instance, 
+			PFN_vkGetInstanceProcAddr getInstanceProcAddr);
 
-		vk::Instance handle{};
-		InstanceDispatchRaw raw{};
+		vk::Instance handle;
+		InstanceDispatchRaw raw;
 
-		vk::Device createDevice(
+		[[nodiscard]] vk::Device createDevice(
 			vk::PhysicalDevice physDevice,
 			vk::DeviceCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return physDevice.createDevice(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		void destroy(vk::Optional<vk::AllocationCallbacks const> allocator = nullptr)
-		{
-			return handle.destroy(allocator, raw);
-		}
+		void destroy(vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		vk::Result enumeratePhysicalDevices(std::uint32_t* pPhysicalDeviceCount, vk::PhysicalDevice* pPhysicalDevices) const
-		{
-			return handle.enumeratePhysicalDevices(pPhysicalDeviceCount, pPhysicalDevices, raw);
-		}
-		vk::Result enumeratePhysicalDeviceExtensionProperties(
+		[[nodiscard]] vk::Result enumeratePhysicalDeviceExtensionProperties(
 			vk::PhysicalDevice physDevice,
 			std::uint32_t* pPropertyCount,
-			vk::ExtensionProperties* pProperties) const
-		{
-			return physDevice.enumerateDeviceExtensionProperties(nullptr, pPropertyCount, pProperties, raw);
-		}
+			vk::ExtensionProperties* pProperties) const;
 
-		vk::PhysicalDeviceFeatures getPhysicalDeviceFeatures(vk::PhysicalDevice physDevice) const
-		{
-			return physDevice.getFeatures(raw);
-		}
-		vk::PhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties(vk::PhysicalDevice physDevice) const
-		{
-			return physDevice.getMemoryProperties(raw);
-		}
-		vk::PhysicalDeviceProperties getPhysicalDeviceProperties(vk::PhysicalDevice physDevice) const
-		{
-			return physDevice.getProperties(raw);
-		}
+		[[nodiscard]] vk::Result enumeratePhysicalDevices(
+			std::uint32_t* pPhysicalDeviceCount, 
+			vk::PhysicalDevice* pPhysicalDevices) const;
+
+		[[nodiscard]] vk::PhysicalDeviceFeatures getPhysicalDeviceFeatures(vk::PhysicalDevice physDevice) const;
+
+		[[nodiscard]] vk::PhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties(vk::PhysicalDevice physDevice) const;
+
+		[[nodiscard]] vk::PhysicalDeviceProperties getPhysicalDeviceProperties(vk::PhysicalDevice physDevice) const;
+
 		void getPhysicalDeviceQueueFamilyProperties(
 			vk::PhysicalDevice physDevice,
 			std::uint32_t* pQueueFamilyPropertyCount,
-			vk::QueueFamilyProperties* pQueueFamilyProperties) const
-		{
-			return physDevice.getQueueFamilyProperties(pQueueFamilyPropertyCount, pQueueFamilyProperties, raw);
-		}
+			vk::QueueFamilyProperties* pQueueFamilyProperties) const;
 
-		KHR_SurfaceDispatchRaw surface_raw{};
-		void Destroy(
+
+		KHR_SurfaceDispatchRaw surfaceRaw{};
+		void destroy(
 			vk::SurfaceKHR in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		vk::SurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilitiesKHR(vk::PhysicalDevice physDevice, vk::SurfaceKHR surface) const
-		{
-			return physDevice.getSurfaceCapabilitiesKHR(surface, surface_raw);
-		}
-		vk::Result getPhysicalDeviceSurfaceFormatsKHR(
+
+		[[nodiscard]] vk::SurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilitiesKHR(
+			vk::PhysicalDevice physDevice, 
+			vk::SurfaceKHR surface) const;
+
+		[[nodiscard]] vk::Result getPhysicalDeviceSurfaceFormatsKHR(
 			vk::PhysicalDevice physDevice,
 			vk::SurfaceKHR surface,
 			std::uint32_t* pSurfaceFormatCount,
-			vk::SurfaceFormatKHR* pSurfaceFormats) const
-		{
-			return physDevice.getSurfaceFormatsKHR(surface, pSurfaceFormatCount, pSurfaceFormats, surface_raw);
-		}
-		bool getPhysicalDeviceSurfaceSupportKHR(vk::PhysicalDevice physDevice, std::uint32_t queueFamilyIndex, vk::SurfaceKHR surface) const
-		{
-			return static_cast<bool>(physDevice.getSurfaceSupportKHR(queueFamilyIndex, surface, surface_raw));
-		}
-		vk::Result getPhysicalDeviceSurfacePresentModesKHR(
+			vk::SurfaceFormatKHR* pSurfaceFormats) const;
+
+		[[nodiscard]] vk::Result getPhysicalDeviceSurfacePresentModesKHR(
 			vk::PhysicalDevice physDevice,
 			vk::SurfaceKHR surface,
 			std::uint32_t* pPresentModeCount,
-			vk::PresentModeKHR* pPresentModes) const
-		{
-			return physDevice.getSurfacePresentModesKHR(surface, pPresentModeCount, pPresentModes, surface_raw);
-		}
+			vk::PresentModeKHR* pPresentModes) const;
+
+		[[nodiscard]] bool getPhysicalDeviceSurfaceSupportKHR(
+			vk::PhysicalDevice physDevice,
+			std::uint32_t queueFamilyIndex,
+			vk::SurfaceKHR surface) const;
 	};
 
 	class QueueData;
 	class DeviceDispatch
 	{
-	private:
-		DeviceDispatch(const DeviceDispatch&) = default;
-		DeviceDispatch& operator=(const DeviceDispatch&) = default;
-
 	public:
-		DeviceDispatch() = default;
+		DeviceDispatch() noexcept = default;
+		DeviceDispatch(DeviceDispatch const&) noexcept = delete;
+		DeviceDispatch(DeviceDispatch&&) noexcept = delete;
 
-		void copy(const DeviceDispatch& in);
-		static DeviceDispatch Build(vk::Device vkDevice, PFN_vkGetDeviceProcAddr getProcAddr);
+		DeviceDispatch& operator=(DeviceDispatch const&) noexcept = delete;
+		DeviceDispatch& operator=(DeviceDispatch&&) noexcept = delete;
+
+		static void BuildInPlace(
+			DeviceDispatch& dispatcher,
+			vk::Device vkDevice, 
+			PFN_vkGetDeviceProcAddr getProcAddr);
 
 		vk::Device handle{};
 		DeviceDispatchRaw raw{};
@@ -397,7 +320,7 @@ namespace DEngine::Gfx::Vk
 
 		[[nodiscard]] vk::DeviceMemory allocateMemory(
 			vk::MemoryAllocateInfo const& allocInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		void beginCommandBuffer(
 			vk::CommandBuffer cmdBuffer, 
@@ -406,26 +329,17 @@ namespace DEngine::Gfx::Vk
 		void bindBufferMemory(
 			vk::Buffer buffer,
 			vk::DeviceMemory memory,
-			vk::DeviceSize memoryOffset) const
-		{
-			return handle.bindBufferMemory(buffer, memory, memoryOffset, raw);
-		}
+			vk::DeviceSize memoryOffset) const;
 
 		void bindImageMemory(
 			vk::Image image,
 			vk::DeviceMemory memory,
-			vk::DeviceSize memoryOffset) const
-		{
-			return handle.bindImageMemory(image, memory, memoryOffset, raw);
-		}
+			vk::DeviceSize memoryOffset) const;
 
 		void cmdBeginRenderPass(
 			vk::CommandBuffer commandBuffer,
 			vk::RenderPassBeginInfo const& renderPassBegin,
-			vk::SubpassContents contents) const
-		{
-			return commandBuffer.beginRenderPass(renderPassBegin, contents, raw);
-		}
+			vk::SubpassContents contents) const;
 
 		void cmdBindDescriptorSets(
 			vk::CommandBuffer commandBuffer,
@@ -433,24 +347,24 @@ namespace DEngine::Gfx::Vk
 			vk::PipelineLayout layout,
 			std::uint32_t firstSet,
 			vk::ArrayProxy<vk::DescriptorSet const> descriptorSets,
-			vk::ArrayProxy<uint32_t const> dynamicOffsets) const
-		{
-			return commandBuffer.bindDescriptorSets(
-				pipelineBindPoint,
-				layout,
-				firstSet,
-				descriptorSets,
-				dynamicOffsets,
-				raw);
-		}
+			vk::ArrayProxy<uint32_t const> dynamicOffsets) const;
+
+		void cmdBindIndexBuffer(
+			vk::CommandBuffer commandBuffer,
+			vk::Buffer buffer, 
+			vk::DeviceSize offset, 
+			vk::IndexType indexType) const;
 
 		void cmdBindPipeline(
-			vk::CommandBuffer commandBuffer, 
+			vk::CommandBuffer commandBuffer,
 			vk::PipelineBindPoint pipelineBindPoint,
-			vk::Pipeline pipeline) const
-		{
-			return commandBuffer.bindPipeline(pipelineBindPoint, pipeline, raw);
-		}
+			vk::Pipeline pipeline) const;
+
+		void cmdBindVertexBuffers(
+			vk::CommandBuffer commandBuffer,
+			uint32_t firstBinding,
+			vk::ArrayProxy<vk::Buffer const> buffers,
+			vk::ArrayProxy<vk::DeviceSize const> offsets) const;
 
 		void cmdCopyBufferToImage(
 			vk::CommandBuffer commandBuffer,
@@ -465,26 +379,14 @@ namespace DEngine::Gfx::Vk
 			vk::ImageLayout srcImageLayout,
 			vk::Image dstImage,
 			vk::ImageLayout dstImageLayout,
-			vk::ArrayProxy<vk::ImageCopy const> regions) const
-		{
-			return commandBuffer.copyImage(
-				srcImage,
-				srcImageLayout,
-				dstImage,
-				dstImageLayout,
-				regions,
-				raw);
-		}
+			vk::ArrayProxy<vk::ImageCopy const> regions) const;
 
 		void cmdDraw(
 			vk::CommandBuffer commandBuffer,
 			std::uint32_t vertexCount,
 			std::uint32_t instanceCount,
 			std::uint32_t firstVertex,
-			std::uint32_t firstInstance) const
-		{
-			return commandBuffer.draw(vertexCount, instanceCount, firstVertex, firstInstance, raw);
-		}
+			std::uint32_t firstInstance) const;
 
 		void cmdDrawIndexed(
 			vk::CommandBuffer commandBuffer,
@@ -492,40 +394,9 @@ namespace DEngine::Gfx::Vk
 			std::uint32_t instanceCount,
 			std::uint32_t firstIndex,
 			std::int32_t vertexOffset,
-			std::uint32_t firstInstance) const
-		{
-			return commandBuffer.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, raw);
-		}
+			std::uint32_t firstInstance) const;
 
-		void cmdEndRenderPass(vk::CommandBuffer commandBuffer) const
-		{
-			return commandBuffer.endRenderPass(raw);
-		}
-
-		void cmdPipelineBarrier(
-			vk::CommandBuffer commandBuffer,
-			vk::PipelineStageFlags srcStageMask,
-			vk::PipelineStageFlags dstStageMask,
-			vk::DependencyFlags dependencyFlags,
-			std::uint32_t memoryBarrierCount,
-			vk::MemoryBarrier const* pMemoryBarriers,
-			std::uint32_t bufferMemoryBarrierCount,
-			vk::BufferMemoryBarrier const* pBufferMemoryBarriers,
-			std::uint32_t imageMemoryBarrierCount,
-			vk::ImageMemoryBarrier const* pImageMemoryBarriers) const
-		{
-			return commandBuffer.pipelineBarrier(
-				srcStageMask,
-				dstStageMask,
-				dependencyFlags,
-				memoryBarrierCount,
-				pMemoryBarriers,
-				bufferMemoryBarrierCount,
-				pBufferMemoryBarriers,
-				imageMemoryBarrierCount,
-				pImageMemoryBarriers,
-				raw);
-		}
+		void cmdEndRenderPass(vk::CommandBuffer commandBuffer) const;
 
 		void cmdPipelineBarrier(
 			vk::CommandBuffer commandBuffer,
@@ -534,240 +405,176 @@ namespace DEngine::Gfx::Vk
 			vk::DependencyFlags dependencyFlags,
 			vk::ArrayProxy<vk::MemoryBarrier const> memoryBarriers,
 			vk::ArrayProxy<vk::BufferMemoryBarrier const> bufferMemoryBarriers,
-			vk::ArrayProxy<vk::ImageMemoryBarrier const> imageMemoryBarriers) const
-		{
-			return commandBuffer.pipelineBarrier(
-				srcStageMask,
-				dstStageMask,
-				dependencyFlags,
-				memoryBarriers,
-				bufferMemoryBarriers,
-				imageMemoryBarriers,
-				raw);
-		}
+			vk::ArrayProxy<vk::ImageMemoryBarrier const> imageMemoryBarriers) const;
+
+		void cmdPushConstants(
+			vk::CommandBuffer commandBuffer,
+			vk::PipelineLayout layout,
+			vk::ShaderStageFlags stageFlags,
+			std::uint32_t offset,
+			std::uint32_t size,
+			void const* pValues) const;
+
+		void cmdSetScissor(
+			vk::CommandBuffer commandBuffer,
+			std::uint32_t firstScissor,
+			vk::ArrayProxy<vk::Rect2D const> scissors) const;
 
 		void cmdSetViewport(
 			vk::CommandBuffer commandBuffer,
 			std::uint32_t firstViewport,
-			vk::ArrayProxy<vk::Viewport const> viewports) const
-		{
-			return commandBuffer.setViewport(firstViewport, viewports, raw);
-		}
+			vk::ArrayProxy<vk::Viewport const> viewports) const;
 
 		[[nodiscard]] vk::Buffer createBuffer(
 			vk::BufferCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createBuffer(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::CommandPool createCommandPool(
 			vk::CommandPoolCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::DescriptorPool createDescriptorPool(
 			vk::DescriptorPoolCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::DescriptorSetLayout createDescriptorSetLayout(
 			vk::DescriptorSetLayoutCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::Fence createFence(
 			vk::FenceCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createFence(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::Framebuffer createFramebuffer(
 			vk::FramebufferCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createFramebuffer(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::Result createGraphicsPipelines(
 			vk::PipelineCache pipelineCache,
 			vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> createInfos,
-			vk::Optional<vk::AllocationCallbacks const> allocator,
+			vk::Optional<vk::AllocationCallbacks> allocator,
 			vk::Pipeline* pPipelines) const;
 
 		[[nodiscard]] vk::Image createImage(
 			vk::ImageCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::ImageView createImageView(
 			vk::ImageViewCreateInfo const& createInfo, 
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::PipelineLayout createPipelineLayout(
 			vk::PipelineLayoutCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createPipelineLayout(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+
+		[[nodiscard]] vk::RenderPass createRenderPass(
+			vk::RenderPassCreateInfo const& createInfo,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::Sampler createSampler(
 			vk::SamplerCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::ResultValue<vk::Semaphore> createSemaphore(
 			vk::SemaphoreCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::ShaderModule createShaderModule(
 			vk::ShaderModuleCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createShaderModule(createInfo, allocator, raw);
-		}
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		void Destroy(
+		void destroy(
 			vk::CommandPool in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void Destroy(
+		void destroy(
 			vk::DescriptorPool in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void Destroy(
+		void destroy(
 			vk::Framebuffer in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void Destroy(
+		void destroy(
 			vk::Fence in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void Destroy(
+		void destroy(
 			vk::Image in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void Destroy(
+		void destroy(
 			vk::ImageView in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void Destroy(
+		void destroy(
 			vk::RenderPass in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void Destroy(
+		void destroy(
+			vk::Semaphore semaphore,
+			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+		void destroy(
 			vk::ShaderModule in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void Destroy(
-			vk::SwapchainKHR in,
-			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		void endCommandBuffer(vk::CommandBuffer cmdBuffer) const
-		{
-			return cmdBuffer.end(raw);
-		}
+		void endCommandBuffer(vk::CommandBuffer cmdBuffer) const;
 
-		void FreeCommandBuffers(
+		void freeCommandBuffers(
 			vk::CommandPool commandPool,
 			vk::ArrayProxy<vk::CommandBuffer const> commandBuffers) const;
 
-		void FreeMemory(
+		void freeMemory(
 			vk::DeviceMemory memory,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		[[nodiscard]] vk::Result GetFenceStatus(vk::Fence fence) const;
+		[[nodiscard]] vk::Result getFenceStatus(vk::Fence fence) const;
 
-		[[nodiscard]] vk::Queue getQueue(std::uint32_t familyIndex, std::uint32_t queueIndex) const
-		{
-			return handle.getQueue(familyIndex, queueIndex, raw);
-		}
+		[[nodiscard]] vk::Queue getQueue(
+			std::uint32_t familyIndex, 
+			std::uint32_t queueIndex) const;
 
 		[[nodiscard]] void* mapMemory(
 			vk::DeviceMemory memory,
-			vk::DeviceSize offset, 
+			vk::DeviceSize offset,
 			vk::DeviceSize size,
-			vk::MemoryMapFlags flags) const
-		{
-			return handle.mapMemory(memory, offset, size, flags, raw);
-		}
+			vk::MemoryMapFlags flags) const;
+
+		void resetFences(vk::ArrayProxy<vk::Fence const> fences) const;
 
 		void updateDescriptorSets(
 			vk::ArrayProxy<vk::WriteDescriptorSet const> descriptorWrites,
 			vk::ArrayProxy<vk::CopyDescriptorSet const> descriptorCopies) const;
 
 		[[nodiscard]] vk::Result waitForFences(
-			vk::ArrayProxy<vk::Fence const> fences, 
-			bool waitAll, 
-			std::uint64_t timeout) const
-		{
-			return handle.waitForFences(fences, static_cast<VkBool32>(waitAll), timeout, raw);
-		}
+			vk::ArrayProxy<vk::Fence const> fences,
+			bool waitAll,
+			std::uint64_t timeout = std::numeric_limits<std::uint64_t>::max()) const;
 
 		QueueData const* m_queueDataPtr = nullptr;
-		void WaitIdle() const;
-
-		// Memory requirements
-		[[nodiscard]] vk::MemoryRequirements getBufferMemoryRequirements(vk::Buffer buffer) const
-		{
-			return handle.getBufferMemoryRequirements(buffer, raw);
-		}
-		[[nodiscard]] vk::MemoryRequirements getImageMemoryRequirements(vk::Image image) const
-		{
-			return handle.getImageMemoryRequirements(image, raw);
-		}
-
-
-		// Fences
-		void resetFences(vk::ArrayProxy<vk::Fence const> fences) const
-		{
-			return handle.resetFences(fences, raw);
-		}
+		void waitIdle() const;
 
 
 
-		// Images
+		KHR_SwapchainDispatchRaw swapchainRaw{};
+		[[nodiscard]] vk::ResultValue<std::uint32_t> acquireNextImageKHR(
+			vk::SwapchainKHR swapchain,
+			std::uint64_t timeout,
+			vk::Semaphore semaphore,
+			vk::Fence fence) const;
 
+		[[nodiscard]] vk::SwapchainKHR createSwapchainKHR(
+			vk::SwapchainCreateInfoKHR const& createInfo,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
+		void destroy(
+			vk::SwapchainKHR in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
+		[[nodiscard]] vk::Result getSwapchainImagesKHR(
+			vk::SwapchainKHR swapchain, 
+			std::uint32_t* pSwapchainImageCount,
+			vk::Image* pSwapchainImages) const;
 
-
-
-		// Renderpass
-		[[nodiscard]] vk::RenderPass createRenderPass(vk::RenderPassCreateInfo const& createInfo, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createRenderPass(createInfo, allocator, raw);
-		}
-
-
-
-
-		// Semaphore
-
-		void destroySemaphore(vk::Semaphore semaphore, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroySemaphore(semaphore, allocator, raw);
-		}
-
-
-
-		KHR_SwapchainDispatchRaw swapchain_raw{};
-		vk::SwapchainKHR createSwapchainKHR(vk::SwapchainCreateInfoKHR const& info, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.createSwapchainKHR(info, allocator, swapchain_raw);
-		}
-		void destroySwapchainKHR(vk::SwapchainKHR swapchain, vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const
-		{
-			return handle.destroySwapchainKHR(swapchain, allocator, swapchain_raw);
-		}
-		vk::Result getSwapchainImagesKHR(vk::SwapchainKHR swapchain, std::uint32_t* pSwapchainImageCount, vk::Image* pSwapchainImages) const
-		{
-			return handle.getSwapchainImagesKHR(swapchain, pSwapchainImageCount, pSwapchainImages, swapchain_raw);
-		}
-		vk::ResultValue<std::uint32_t> acquireNextImageKHR(vk::SwapchainKHR swapchain, std::uint64_t timeout, vk::Semaphore semaphore, vk::Fence fence) const
-		{
-			return handle.acquireNextImageKHR(swapchain, timeout, semaphore, fence, swapchain_raw);
-		}
-		vk::ResultValue<std::uint32_t> acquireNextImage2KHR(vk::AcquireNextImageInfoKHR const& acquireInfo) const
-		{
-			return handle.acquireNextImage2KHR(acquireInfo, swapchain_raw);
-		}
-		vk::Result queuePresentKHR(vk::Queue queue, vk::PresentInfoKHR const& presentInfo) const
-		{
-			return queue.presentKHR(&presentInfo, swapchain_raw);
-		}
-
+		[[nodiscard]] vk::Result queuePresentKHR(
+			vk::Queue queue,
+			vk::PresentInfoKHR const& presentInfo) const;
 	};
 
 	using DevDispatch = DeviceDispatch;
 
-	PFN_vkGetInstanceProcAddr loadInstanceProcAddressPFN();
+	
 }

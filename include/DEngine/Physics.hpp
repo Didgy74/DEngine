@@ -1,7 +1,7 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Math/Vector.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Math/Vector.hpp>
 
 namespace DEngine
 {

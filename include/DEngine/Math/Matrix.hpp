@@ -20,7 +20,7 @@ namespace DEngine::Math
 	using Mat4Int = Matrix<4, 4, i32>;
 
 	template<uSize width, uSize height, typename T = f32>
-	struct Matrix : public Std::Conditional<width == height, detail::MatrixBaseSquare<width, T>, detail::MatrixBase<width, height, T>>
+	struct Matrix : public Std::Trait::Cond<width == height, detail::MatrixBaseSquare<width, T>, detail::MatrixBase<width, height, T>>
 	{
 	public:
 		[[nodiscard]] constexpr T& At(uSize x, uSize y);

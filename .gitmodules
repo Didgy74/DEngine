@@ -1,5 +1,5 @@
 
 [submodule "external/Texas"]
 	path = external/Texas
-	url = git@github.com:Didgy74/Texas.git
+	url = https://github.com/Didgy74/Texas.git
 	branch = development

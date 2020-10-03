@@ -1,15 +1,16 @@
-#include "DEngine/Gfx/Gfx.hpp"
+#include <DEngine/Gfx/Gfx.hpp>
 #include "APIDataBase.hpp"
 
-#include "DEngine/Utility.hpp"
-#include "Assert.hpp"
+#include <DEngine/Utility.hpp>
+#include <DEngine/Gfx/detail/Assert.hpp>
 
-DEngine::Gfx::Data::Data(Data&& other) noexcept
+using namespace DEngine;
+
+Gfx::Context::Context(Context&& other) noexcept
 {
-	iLog = other.iLog;
-	other.iLog = nullptr;
-	iWsi = other.iWsi;
-	other.iWsi = nullptr;
+	logger = other.logger;
+	other.logger = nullptr;
+
 	texAssetInterface = other.texAssetInterface;
 	other.texAssetInterface = nullptr;
 
@@ -17,53 +18,66 @@ DEngine::Gfx::Data::Data(Data&& other) noexcept
 	other.apiDataBuffer = nullptr;
 }
 
-DEngine::Gfx::Data::~Data()
+Gfx::Context::~Context()
 {
-	if (apiDataBuffer != nullptr)
-		delete static_cast<APIDataBase*>(apiDataBuffer);
-}
-
-DEngine::Gfx::APIDataBase::~APIDataBase()
-{
-
+	delete static_cast<APIDataBase*>(apiDataBuffer);
 }
 
 namespace DEngine::Gfx::Vk
 {
-	bool InitializeBackend(Data& gfxData, InitInfo const& initInfo, void*& apiDataBuffer);
+	bool InitializeBackend(
+		Context& gfxData, 
+		InitInfo const& initInfo, 
+		void*& apiDataBuffer);
 }
 
-DEngine::Std::Opt<DEngine::Gfx::Data> DEngine::Gfx::Initialize(const InitInfo& initInfo)
+Std::Opt<Gfx::Context> Gfx::Initialize(InitInfo const& initInfo)
 {
-	Gfx::Data returnVal{};
+	Gfx::Context returnVal{};
 
-	returnVal.iLog = initInfo.optional_iLog;
-	returnVal.iWsi = initInfo.iWsi;
+	returnVal.logger = initInfo.optional_logger;
 	returnVal.texAssetInterface = initInfo.texAssetInterface;
-
-	if (initInfo.optional_iLog)
-		initInfo.optional_iLog->log("Logger test");
 
 	Vk::InitializeBackend(returnVal, initInfo, returnVal.apiDataBuffer);
 
-	return Std::Opt<Gfx::Data>(Std::Move(returnVal));
+	return Std::Opt<Gfx::Context>{ Std::Move(returnVal) };
 }
 
-void DEngine::Gfx::Data::Draw(DrawParams const& params)
+void Gfx::Context::Draw(DrawParams const& params)
 {
 	static_cast<APIDataBase*>(this->apiDataBuffer)->Draw(*this, params);
 }
 
-DEngine::Gfx::ViewportRef DEngine::Gfx::Data::NewViewport()
+Gfx::NativeWindowID Gfx::Context::NewNativeWindow(WsiInterface& wsiConnection)
+{
+	return static_cast<APIDataBase*>(this->apiDataBuffer)->NewNativeWindow(wsiConnection);
+}
+
+Gfx::ViewportRef Gfx::Context::NewViewport()
 {
 	ViewportRef returnVal{};
 	
-	static_cast<APIDataBase*>(this->apiDataBuffer)->NewViewport(returnVal.viewportID, returnVal.imguiTexID);
+	static_cast<APIDataBase*>(this->apiDataBuffer)->NewViewport(returnVal.viewportID);
 
 	return returnVal;
 }
 
-void DEngine::Gfx::Data::DeleteViewport(uSize viewportID)
+void Gfx::Context::DeleteViewport(ViewportID viewportID)
 {
 	static_cast<APIDataBase*>(this->apiDataBuffer)->DeleteViewport(viewportID);
+}
+
+void Gfx::Context::NewFontTexture(
+	u32 id,
+	u32 width,
+	u32 height,
+	u32 pitch,
+	Std::Span<std::byte const> data)
+{
+	return static_cast<APIDataBase*>(this->apiDataBuffer)->NewFontTexture(
+		id,
+		width,
+		height,
+		pitch,
+		data);
 }

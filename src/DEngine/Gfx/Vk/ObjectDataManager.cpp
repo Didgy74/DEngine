@@ -1,9 +1,9 @@
 #include "ObjectDataManager.hpp"
 #include "GlobUtils.hpp"
 
-#include "DEngine/Math/Common.hpp"
+#include <DEngine/Math/Common.hpp>
 
-#include "../Assert.hpp"
+#include <DEngine/Gfx/detail/Assert.hpp>
 
 #include <string>
 
@@ -26,7 +26,7 @@ void DEngine::Gfx::Vk::ObjectDataManager::HandleResizeEvent(
 	// Allocate the buffer
 	vk::BufferCreateInfo buffInfo{};
 	buffInfo.sharingMode = vk::SharingMode::eExclusive;
-	buffInfo.size = manager.elementSize * manager.capacity * globUtils.resourceSetCount;
+	buffInfo.size = manager.elementSize * manager.capacity * globUtils.inFlightCount;
 	buffInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
 	VmaAllocationCreateInfo vmaAllocInfo{};
 	vmaAllocInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_MAPPED_BIT;

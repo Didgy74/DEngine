@@ -1,6 +1,8 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
+#include <DEngine/Containers/Range.hpp>
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Trait.hpp>
 
 namespace DEngine::Std
 {
@@ -18,19 +20,117 @@ namespace DEngine::Std
 	f32 RandRange<f32>(f32 a, f32 b);
 
 	template<typename T>
-	T&& Move(T&& in) noexcept;
+	[[nodiscard]] constexpr Trait::RemoveRef<T>&& Move(T&& in) noexcept;
+
 	template<typename T>
-	T&& Move(T& in) noexcept;
+	constexpr void Swap(T& a, T& b) noexcept;
+
+	template<typename Iterator, typename BoolCallable>
+	bool AllOf(
+		Iterator begin,
+		Iterator end,
+		BoolCallable callable);
+	template<typename Iterator, typename BoolCallable>
+	bool AllOf(
+		Range<Iterator> range,
+		BoolCallable callable);
+	template<typename Iterator, typename BoolCallable>
+	bool AnyOf(
+		Iterator begin,
+		Iterator end,
+		BoolCallable callable);
+	template<typename Iterator, typename BoolCallable>
+	bool AnyOf(
+		Range<Iterator> range,
+		BoolCallable callable);
+
+	template<typename Iterator, typename BoolCallable>
+	constexpr Iterator FindIf(
+		Iterator begin,
+		Iterator end,
+		BoolCallable callable);
+	template<typename Iterator, typename BoolCallable>
+	constexpr Iterator FindIf(
+		Range<Iterator> range,
+		BoolCallable callable);
 }
 
 template<typename T>
-T&& DEngine::Std::Move(T&& in) noexcept
+constexpr DEngine::Std::Trait::RemoveRef<T>&& DEngine::Std::Move(T&& in) noexcept
 {
-	return static_cast<T&&>(in);
+	return static_cast<Trait::RemoveRef<T>&&>(in);
 }
 
 template<typename T>
-T&& DEngine::Std::Move(T& in) noexcept
+constexpr void DEngine::Std::Swap(T& a, T& b) noexcept
 {
-	return static_cast<T&&>(in);
+	T temp = Move(a);
+	a = Move(b);
+	b = Move(temp);
+}
+
+template<typename Iterator, typename BoolCallable>
+bool DEngine::Std::AllOf(
+	Iterator begin,
+	Iterator end,
+	BoolCallable callable)
+{
+	for (;begin != end; begin++)
+	{
+		if (!callable(*begin))
+			return false;
+	}
+	return true;
+}
+
+template<typename Iterator, typename BoolCallable>
+bool DEngine::Std::AllOf(
+	Range<Iterator> range,
+	BoolCallable callable)
+{
+	return AllOf(range.begin, range.end, callable);
+}
+
+template<typename Iterator, typename BoolCallable>
+bool DEngine::Std::AnyOf(
+	Iterator begin,
+	Iterator end,
+	BoolCallable callable)
+{
+	for (; begin != end; begin++)
+	{
+		if (callable(*begin))
+			return true;
+	}
+	return false;
+}
+
+template<typename Iterator, typename BoolCallable>
+bool DEngine::Std::AnyOf(
+	Range<Iterator> range,
+	BoolCallable callable)
+{
+	return AnyOf(range.begin, range.end, callable);
+}
+
+template<typename Iterator, typename BoolFunc>
+constexpr Iterator DEngine::Std::FindIf(
+	Iterator begin,
+	Iterator end,
+	BoolFunc callable)
+{
+	for (; begin != end; begin++)
+	{
+		if (callable(*begin))
+			return begin;
+	}
+	return end;
+}
+
+template<typename Iterator, typename BoolCallable>
+constexpr Iterator DEngine::Std::FindIf(
+	Range<Iterator> range,
+	BoolCallable callable)
+{
+	return FindIf(range.begin, range.end, callable);
 }

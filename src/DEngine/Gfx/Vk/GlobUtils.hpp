@@ -2,38 +2,35 @@
 
 #include "DEngine/Gfx/Gfx.hpp"
 
-#include "DEngine/FixedWidthTypes.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
 
-#include "VulkanIncluder.hpp"
-#include "PhysDeviceInfo.hpp"
-#include "DynamicDispatch.hpp"
-#include "QueueData.hpp"
-#include "VMAIncluder.hpp"
 #include "DeletionQueue.hpp"
+#include "DynamicDispatch.hpp"
+#include "PhysDeviceInfo.hpp"
+#include "QueueData.hpp"
+#include "SurfaceInfo.hpp"
+#include "VMAIncluder.hpp"
+#include "VulkanIncluder.hpp"
 
 #include <mutex>
 
 namespace DEngine::Gfx::Vk
 {
 	// Everything here is thread-safe to use and access!!
-	struct GlobUtils
+	class GlobUtils
 	{
-		GlobUtils();
+	public:
 		GlobUtils(GlobUtils const&) = delete;
 		GlobUtils(GlobUtils&&) = delete;
 
-		Gfx::ILog* logger = nullptr;
+		Gfx::LogInterface* logger = nullptr;
 
 		InstanceDispatch instance{};
 
 		DebugUtilsDispatch debugUtils{};
 		vk::DebugUtilsMessengerEXT debugMessenger{};
-		bool UsingDebugUtils() const {
-			return debugUtils.raw.vkCmdBeginDebugUtilsLabelEXT != nullptr;
-		}
-		DebugUtilsDispatch const* DebugUtilsPtr() const {
-			return debugUtils.raw.vkCmdBeginDebugUtilsLabelEXT != nullptr ? &debugUtils : nullptr;
-		}
+		bool UsingDebugUtils() const { return debugUtils.raw.vkCreateDebugUtilsMessengerEXT != nullptr; }
+		DebugUtilsDispatch const* DebugUtilsPtr() const { return UsingDebugUtils() ? &debugUtils : nullptr; }
 
 		PhysDeviceInfo physDevice{};
 		DeviceDispatch device{};
@@ -44,19 +41,16 @@ namespace DEngine::Gfx::Vk
 
 		DeletionQueue deletionQueue;
 
-		u8 resourceSetCount = 0;
-		u8 CurrentResourceSetIndex_Async();
+		u8 inFlightCount = 0;
 
-		bool useEditorPipeline = false;
+		SurfaceInfo surfaceInfo{};
+
+		bool editorMode = false;
 		vk::RenderPass guiRenderPass{};
-
 		vk::RenderPass gfxRenderPass{};
 
 	private:
-		void SetCurrentResourceSetIndex(u8 index);
-		std::mutex currentResourceSetIndex_Lock{};
-		u8 currentResourceSetIndex_Var{};
-
+		GlobUtils();
 		friend struct APIData;
 	};
 }

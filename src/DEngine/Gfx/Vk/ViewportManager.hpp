@@ -2,7 +2,7 @@
 
 #include "DEngine/FixedWidthTypes.hpp"
 #include "DEngine/Containers/Pair.hpp"
-#include "DEngine/Containers/StaticVector.hpp"
+#include "DEngine/Containers/StackVec.hpp"
 #include "DEngine/Containers/Span.hpp"
 #include "DEngine/Gfx/Gfx.hpp"
 
@@ -16,13 +16,13 @@
 
 namespace DEngine::Gfx::Vk
 {
-	struct GlobUtils;
+	class GlobUtils;
+	class GuiResourceManager;
 
 	struct GfxRenderTarget
 	{
-		VmaAllocation vmaAllocation{};
-
 		vk::Extent2D extent{};
+		VmaAllocation vmaAllocation{};
 		vk::Image img{};
 		vk::ImageView imgView{};
 		vk::Framebuffer framebuffer{};
@@ -30,39 +30,44 @@ namespace DEngine::Gfx::Vk
 
 	struct ViewportData
 	{
-		uSize id = static_cast<uSize>(-1);
-
 		GfxRenderTarget renderTarget{};
 		vk::CommandPool cmdPool{};
-		Std::StaticVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
-		void* imguiTextureID = nullptr;
+		Std::StackVec<vk::CommandBuffer, Constants::maxInFlightCount> cmdBuffers{};
 
 		vk::DescriptorPool cameraDescrPool{};
-		Std::StaticVector<vk::DescriptorSet, Constants::maxResourceSets> camDataDescrSets{};
+		Std::StackVec<vk::DescriptorSet, Constants::maxInFlightCount> camDataDescrSets{};
 		VmaAllocation camVmaAllocation{};
 		vk::Buffer camDataBuffer{};
-		void* mappedMem = nullptr;
+		void* camDataMappedMem = nullptr;
 		uSize camElementSize = 0;
+
+		// This is temporary and shit
+		// But it works. This is controlled by the GuiResourceManager
+		vk::DescriptorSet descrSet{};
 	};
 
 	// This variable should basically not be accessed anywhere except from APIData.
 	struct ViewportManager
 	{
+		// Controls the entire structure.
+		std::mutex mutexLock{};
+
 		struct CreateJob
 		{
-			uSize id = static_cast<uSize>(-1);
-			void* imguiTexID = nullptr;
+			ViewportID id = ViewportID::Invalid;
 		};
 		uSize viewportIDTracker = 0;
 		std::vector<CreateJob> createQueue{};
 
-		std::vector<uSize> deleteQueue{};
-
-		// Controls the entire structure.
-		std::mutex mutexLock{};
+		std::vector<ViewportID> deleteQueue{};
 
 		// Unsorted vector holding viewport-data and their ID.
-		std::vector<Std::Pair<uSize, ViewportData>> viewportData{};
+		struct Node
+		{
+			ViewportID id;
+			ViewportData viewport;
+		};
+		std::vector<Node> viewportData{};
 
 		static constexpr uSize minimumCamDataCapacity = 8;
 		// Thread safe to access
@@ -76,14 +81,15 @@ namespace DEngine::Gfx::Vk
 			uSize minUniformBufferOffsetAlignment,
 			DebugUtilsDispatch const* debugUtils);
 
-		void NewViewport(uSize& viewportID, void*& imguiTexID);
-		void DeleteViewport(uSize id);
+		void NewViewport(ViewportID& viewportID);
+		void DeleteViewport(ViewportID id);
 
 		// Making it static made it more explicit.
 		// Easier to identify in the main loop
 		static void HandleEvents(
-			ViewportManager& vpManager,
+			ViewportManager& viewportManager,
 			GlobUtils const& globUtils,
-			Std::Span<ViewportUpdateData const> viewportUpdates);
+			Std::Span<ViewportUpdate const> viewportUpdates,
+			GuiResourceManager const& guiResourceManager);
 	};
 }

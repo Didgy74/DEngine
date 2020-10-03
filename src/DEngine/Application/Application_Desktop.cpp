@@ -1,29 +1,34 @@
-#define DENGINE_APPLICATION_BUTTON_COUNT
-
 // Stops the warnings made by MSVC when using "unsafe" CRT fopen functions.
 #ifdef _MSC_VER
 #   define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#include "DEngine/Application.hpp"
+#define DENGINE_APPLICATION_CURSORTYPE_COUNT
+#define DENGINE_APPLICATION_BUTTON_COUNT
 #include "detail_Application.hpp"
+
+#include <DEngine/Utility.hpp>
 
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
-#ifdef _WIN32
-#undef APIENTRY
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>   // for glfwGetWin32Window
-#endif
 
 #include <iostream>
-#include <cmath>
-#include <cstring>
 #include <cstdio>
+#include <cstring>
 
 namespace DEngine::Application::detail
 {
-	static GLFWwindow* mainWindow = nullptr;
+	struct Backend_Data
+	{
+		bool cursorLocked = false;
+		Math::Vec2Int virtualCursorPos{};
+
+		Std::Opt<SoftInputFilter> charInputFilter;
+
+		GLFWcursor* cursorTypes[(int)CursorType::COUNT] = {};
+	};
+
+	static Backend_Data* pBackendData = nullptr;
 
 	static void Backend_GLFW_ErrorCallback(
 		int error, 
@@ -36,7 +41,9 @@ namespace DEngine::Application::detail
 		int scancode, 
 		int action, 
 		int mods);
-	static void Backend_GLFW_CharCallback(GLFWwindow* window, unsigned int codepoint);
+	static void Backend_GLFW_CharCallback(
+		GLFWwindow* window, 
+		unsigned int codepoint);
 	static void Backend_GLFW_MouseButtonCallback(
 		GLFWwindow* window,
 		int button,
@@ -61,6 +68,9 @@ namespace DEngine::Application::detail
 		GLFWwindow* window,
 		int width,
 		int height);
+	static void Backend_GLFW_WindowCursorEnterCallback(
+		GLFWwindow* window,
+		int entered);
 	static void Backend_GLFW_WindowFramebufferSizeCallback(
 		GLFWwindow* window, 
 		int width, 
@@ -73,112 +83,150 @@ namespace DEngine::Application::detail
 	static void Backend_GLFW_WindowMinimizeCallback(
 		GLFWwindow* window, 
 		int iconified);
-
-
 }
 
-void DEngine::Application::OpenSoftInput()
+using namespace DEngine;
+
+void Application::LockCursor(bool state)
 {
-	
+	auto& appData = *detail::pAppData;
+	auto& backendData = *detail::pBackendData;
+
+	auto const& window = *Std::FindIf(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[](decltype(appData.windows)::value_type const& val) -> bool {
+			return val.id == (WindowID)0; });
+	if (state)
+		glfwSetInputMode((GLFWwindow*)window.platformHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	else
+		glfwSetInputMode((GLFWwindow*)window.platformHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+	backendData.cursorLocked = state;
 }
 
-void DEngine::Application::Log(char const* msg)
+void Application::OpenSoftInput(std::string_view currentText, SoftInputFilter filter)
+{
+	auto& backendData = *detail::pBackendData;
+	backendData.charInputFilter = Std::Opt{ filter };
+}
+
+void Application::HideSoftInput()
+{
+	auto& backendData = *detail::pBackendData;
+	backendData.charInputFilter = Std::nullOpt;
+}
+
+void Application::detail::Backend_Log(char const* msg)
 {
 	std::cout << msg << std::endl;
 }
 
-static void DEngine::Application::detail::Backend_GLFW_ErrorCallback(
+void Application::SetCursor(WindowID windowIn, CursorType cursor)
+{
+	auto& appData = *detail::pAppData;
+	auto& backendData = *detail::pBackendData;
+
+	auto& window = *Std::FindIf(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[windowIn](decltype(appData.windows)::value_type& val) -> bool {
+			return val.id == windowIn; });
+
+	if (window.windowData.currentCursorType != cursor)
+	{
+		glfwSetCursor((GLFWwindow*)window.platformHandle, backendData.cursorTypes[(u8)cursor]);
+		window.windowData.currentCursorType = cursor;
+	}
+		
+}
+
+Application::WindowID Application::CreateWindow(
+	char const* title,
+	Extent extents)
+{
+	auto& appData = *detail::pAppData;
+
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	GLFWwindow* rawHandle = glfwCreateWindow((int)extents.width, (int)extents.height, title, nullptr, nullptr);
+	if (!rawHandle)
+		throw std::runtime_error("DEngine - Application: Could not make a new window.");
+
+	detail::AppData::WindowNode newNode{};
+	newNode.id = (WindowID)appData.windowIdTracker;
+	appData.windowIdTracker++;
+	newNode.platformHandle = rawHandle;
+	newNode.events = {};
+	
+	// Get window size
+	int widthX;
+	int heightY;
+	glfwGetWindowSize(rawHandle, &widthX, &heightY);
+	newNode.windowData.size = { (u32)widthX, (u32)heightY };
+	newNode.windowData.visiblePosition = {};
+	newNode.windowData.visibleSize = { (u32)widthX, (u32)heightY };
+	
+	int windowPosX = 0;
+	int windowPosY = 0;
+	glfwGetWindowPos(rawHandle, &windowPosX, &windowPosY);
+	newNode.windowData.position = { (i32)windowPosX,(i32)windowPosY };
+	
+	appData.windows.push_back(newNode);
+
+	glfwSetWindowPosCallback(rawHandle, detail::Backend_GLFW_WindowPosCallback);
+	glfwSetWindowSizeCallback(rawHandle, detail::Backend_GLFW_WindowSizeCallback);
+	glfwSetWindowFocusCallback(rawHandle, detail::Backend_GLFW_WindowFocusCallback);
+	glfwSetWindowIconifyCallback(rawHandle, detail::Backend_GLFW_WindowMinimizeCallback);
+	glfwSetCursorEnterCallback(rawHandle, detail::Backend_GLFW_WindowCursorEnterCallback);
+
+	glfwSetCursorPosCallback(rawHandle, detail::Backend_GLFW_CursorPosCallback);
+	glfwSetMouseButtonCallback(rawHandle, detail::Backend_GLFW_MouseButtonCallback);
+	glfwSetCharCallback(rawHandle, detail::Backend_GLFW_CharCallback);
+	glfwSetKeyCallback(rawHandle, detail::Backend_GLFW_KeyboardKeyCallback);
+
+	return newNode.id;
+}
+
+static void Application::detail::Backend_GLFW_ErrorCallback(
 	int error, 
 	const char* description)
 {
 	fputs(description, stderr);
 }
 
-bool DEngine::Application::detail::Backend_Initialize()
+bool Application::detail::Backend_Initialize()
 {
 	glfwSetErrorCallback(Backend_GLFW_ErrorCallback);
 
 	if (!glfwInit())
 		exit(EXIT_FAILURE);
 
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	detail::mainWindow = glfwCreateWindow(1700, 900, "Simple example", NULL, NULL);
-	if (!detail::mainWindow)
-	{
-		glfwTerminate();
-		exit(EXIT_FAILURE);
-	}
-	int windowPosX = 0;
-	int windowPosY = 0;
-	glfwGetWindowPos(detail::mainWindow, &windowPosX, &windowPosY);
-	detail::mainWindowPos[0] = (i32)windowPosX;
-	detail::mainWindowPos[1] = (i32)windowPosY;
-	int windowSizeX = 0;
-	int windowSizeY = 0;
-	glfwGetWindowSize(detail::mainWindow, &windowSizeX, &windowSizeY);
-	detail::mainWindowSize[0] = (u32)windowSizeX;
-	detail::mainWindowSize[1] = (u32)windowSizeY;
-	int windowFramebufferSizeX = 0;
-	int windowFramebufferSizeY = 0;
-	glfwGetFramebufferSize(detail::mainWindow, &windowFramebufferSizeX, &windowFramebufferSizeY);
-	detail::mainWindowFramebufferSize[0] = (u32)windowFramebufferSizeX;
-	detail::mainWindowFramebufferSize[1] = (u32)windowFramebufferSizeY;
+	pAppData->cursorOpt = CursorData();
 
-	detail::mainWindowIsInFocus = glfwGetWindowAttrib(detail::mainWindow, GLFW_FOCUSED);
+	pBackendData = new Backend_Data;
 
-	detail::cursorOpt = CursorData();
-	CursorData& cursor = detail::cursorOpt.Value();
-	double mouseXPos = 0;
-	double mouseYPos = 0;
-	glfwGetCursorPos(detail::mainWindow, &mouseXPos, &mouseYPos);
-	cursor.posX = (u32)std::floor(mouseXPos);
-	cursor.posY = (u32)std::floor(mouseYPos);
-
-	for (uSize i = 0; i < 8; i += 1)
-	{
-		int result = glfwJoystickPresent((int)i);
-		if (result == GLFW_TRUE)
-		{
-			detail::gamepadConnected = true;
-			break;
-		}
-	}
-	
-	glfwSetKeyCallback(detail::mainWindow, Backend_GLFW_KeyboardKeyCallback);
-	glfwSetCharCallback(detail::mainWindow, Backend_GLFW_CharCallback);
-	glfwSetMouseButtonCallback(detail::mainWindow, Backend_GLFW_MouseButtonCallback);
-	glfwSetCursorPosCallback(detail::mainWindow, Backend_GLFW_CursorPosCallback);
-	glfwSetScrollCallback(detail::mainWindow, Backend_GLFW_ScrollCallback);
-	
-	glfwSetJoystickCallback(Backend_GLFW_JoystickConnectedCallback);
-
-	glfwSetWindowPosCallback(detail::mainWindow, Backend_GLFW_WindowPosCallback);
-	glfwSetWindowSizeCallback(detail::mainWindow, Backend_GLFW_WindowSizeCallback);
-	glfwSetFramebufferSizeCallback(detail::mainWindow, Backend_GLFW_WindowFramebufferSizeCallback);
-	glfwSetWindowCloseCallback(detail::mainWindow, Backend_GLFW_WindowCloseCallback);
-	glfwSetWindowFocusCallback(detail::mainWindow, Backend_GLFW_WindowFocusCallback);
-	glfwSetWindowIconifyCallback(detail::mainWindow, Backend_GLFW_WindowMinimizeCallback);
-	
+	pBackendData->cursorTypes[(u8)CursorType::Arrow] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
+	pBackendData->cursorTypes[(u8)CursorType::VerticalResize] = glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR);
+	pBackendData->cursorTypes[(u8)CursorType::HorizontalResize] = glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR);
 
 	return true;
 }
 
-void DEngine::Application::detail::Backend_ProcessEvents()
+void Application::detail::Backend_ProcessEvents()
 {
 	glfwPollEvents();
 
-	if (detail::gamepadConnected)
+	if (detail::pAppData->gamepadConnected)
 	{
 		int gamepadCount = 0;
-		float const* axes = glfwGetJoystickAxes(detail::gamepadID, &gamepadCount);
+		float const* axes = glfwGetJoystickAxes(detail::pAppData->gamepadID, &gamepadCount);
 
-		detail::gamepadState.leftStickX = axes[GLFW_GAMEPAD_AXIS_LEFT_X];
-		detail::gamepadState.leftStickY = axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
+		detail::pAppData->gamepadState.leftStickX = axes[GLFW_GAMEPAD_AXIS_LEFT_X];
+		detail::pAppData->gamepadState.leftStickY = axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
 	}
-	
 }
 
-static void DEngine::Application::detail::Backend_GLFW_KeyboardKeyCallback(
+static void Application::detail::Backend_GLFW_KeyboardKeyCallback(
 	GLFWwindow* window,
 	int key, 
 	int scancode, 
@@ -191,21 +239,47 @@ static void DEngine::Application::detail::Backend_GLFW_KeyboardKeyCallback(
 		detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), false);
 }
 
-static void DEngine::Application::detail::Backend_GLFW_CharCallback(
+static void Application::detail::Backend_GLFW_CharCallback(
 	GLFWwindow* window, 
 	unsigned int codepoint)
 {
-	detail::charInputs.PushBack((char)codepoint);
+	auto& backendData = *detail::pBackendData;
+	if (backendData.charInputFilter.HasValue())
+	{
+		SoftInputFilter filter = backendData.charInputFilter.Value();
+		switch (filter)
+		{
+			case SoftInputFilter::Integer:
+			{
+				if ('0' <= codepoint && codepoint <= '9')
+					detail::PushCharInput(codepoint);
+			}
+				break;
+			case SoftInputFilter::UnsignedInteger:
+				if (('0' <= codepoint && codepoint <= '9') ||
+						codepoint == '-')
+					detail::PushCharInput(codepoint);
+				break;
+			case SoftInputFilter::Float:
+				if (('0' <= codepoint && codepoint <= '9') ||
+					codepoint == '-' ||
+					codepoint == '.')
+					detail::PushCharInput(codepoint);
+				break;
+			}
+	}
+	else
+		detail::PushCharInput(codepoint);
 }
 
-static void DEngine::Application::detail::Backend_GLFW_MouseButtonCallback(
+static void Application::detail::Backend_GLFW_MouseButtonCallback(
 	GLFWwindow* window, 
 	int button, 
 	int action, 
 	int mods)
 {
 	if (action != GLFW_PRESS && action != GLFW_RELEASE)
-		return;
+		throw std::runtime_error("DEngine - Application: Encountered unexpected action value in GLFW mouse button press callback.");
 
 	bool wasPressed = false;
 	if (action == GLFW_PRESS)
@@ -216,129 +290,158 @@ static void DEngine::Application::detail::Backend_GLFW_MouseButtonCallback(
 	detail::UpdateButton(Backend_GLFW_MouseButtonToRawButton(button), wasPressed);
 }
 
-static void DEngine::Application::detail::Backend_GLFW_CursorPosCallback(
+static void Application::detail::Backend_GLFW_CursorPosCallback(
 	GLFWwindow* window, 
 	double xpos, 
 	double ypos)
 {
-	detail::UpdateCursor((u32)std::floor(xpos), (u32)std::floor(ypos));
+	auto& appData = *detail::pAppData;
+	auto& backendData = *detail::pBackendData;
+	if (backendData.cursorLocked)
+	{
+		auto const& windowNode = appData.windows.front();
+		Math::Vec2Int newVirtualCursorPos = { (i32)xpos, (i32)ypos };
+		Math::Vec2Int cursorDelta = newVirtualCursorPos - backendData.virtualCursorPos;
+		backendData.virtualCursorPos = newVirtualCursorPos;
+		CursorData cursorData = Cursor().Value();
+		detail::UpdateCursor(window, cursorData.position - windowNode.windowData.position, cursorDelta);
+	}
+	else
+	{
+		backendData.virtualCursorPos = { (i32)xpos, (i32)ypos };
+		detail::UpdateCursor(window, { (i32)xpos, (i32)ypos });
+	}
+	
 }
 
-static void DEngine::Application::detail::Backend_GLFW_ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+static void Application::detail::Backend_GLFW_ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
-	CursorData& cursor = detail::cursorOpt.Value();
+	CursorData& cursor = detail::pAppData->cursorOpt.Value();
 	cursor.scrollDeltaY = (f32)yoffset;
 }
 
-void DEngine::Application::detail::Backend_GLFW_JoystickConnectedCallback(int jid, int event)
+void Application::detail::Backend_GLFW_JoystickConnectedCallback(int jid, int event)
 {
 	if (event == GLFW_CONNECTED)
 	{
-		detail::gamepadConnected = true;
-		detail::gamepadID = jid;
+		detail::pAppData->gamepadConnected = true;
+		detail::pAppData->gamepadID = jid;
 	}
 	else if (event == GLFW_DISCONNECTED)
 	{
-		detail::gamepadConnected = false;
+		detail::pAppData->gamepadConnected = false;
 	}
 	else
 	{
 		// This can happen in future releases.
 
 	}
-
 }
 
-static void DEngine::Application::detail::Backend_GLFW_WindowPosCallback(
+static void Application::detail::Backend_GLFW_WindowPosCallback(
 	GLFWwindow* window,
 	int xpos,
 	int ypos)
 {
-	detail::mainWindowPos[0] = (i32)xpos;
-	detail::mainWindowPos[1] = (i32)ypos;
+	if (xpos != -32000 && ypos != -32000)
+		detail::UpdateWindowPosition(window, { (i32)xpos, (i32)ypos });
 }
 
-static void DEngine::Application::detail::Backend_GLFW_WindowSizeCallback(
+static void Application::detail::Backend_GLFW_WindowSizeCallback(
 	GLFWwindow* window, 
 	int width, 
 	int height)
 {
-	detail::mainWindowResizeEvent = true;
-	detail::mainWindowSize[0] = (u32)width;
-	detail::mainWindowSize[1] = (u32)height;
+	if (width != 0 && height != 0)
+		detail::UpdateWindowSize(
+			window, 
+			{ (u32)width, (u32)height },
+			{},
+			{ (u32)width, (u32)height });
 }
 
-static void DEngine::Application::detail::Backend_GLFW_WindowFramebufferSizeCallback(
+void Application::detail::Backend_GLFW_WindowCursorEnterCallback(
+	GLFWwindow* window,
+	int entered)
+{
+	if (entered == GLFW_TRUE)
+		detail::UpdateWindowCursorEnter(window, true);
+	else if (entered == GLFW_FALSE)
+		detail::UpdateWindowCursorEnter(window, false);
+	else
+		throw std::runtime_error("DEngine - App: GLFW window cursor enter event called with unexpected enter argument.");
+}
+
+static void Application::detail::Backend_GLFW_WindowFramebufferSizeCallback(
 	GLFWwindow* window, 
 	int width, 
 	int height)
 {
-	detail::mainWindowResizeEvent = true;
-	detail::mainWindowFramebufferSize[0] = (u32)width;
-	detail::mainWindowFramebufferSize[1] = (u32)height;
 }
 
-static void DEngine::Application::detail::Backend_GLFW_WindowCloseCallback(
+static void Application::detail::Backend_GLFW_WindowCloseCallback(
 	GLFWwindow* window)
 {
-	detail::shouldShutdown = true;
 }
 
-static void DEngine::Application::detail::Backend_GLFW_WindowFocusCallback(GLFWwindow* window, int focused)
+static void Application::detail::Backend_GLFW_WindowFocusCallback(GLFWwindow* window, int focused)
 {
 	if (focused == GLFW_TRUE)
-		detail::mainWindowIsInFocus = true;
+		detail::UpdateWindowFocus(window, true);
 	else if (focused == GLFW_FALSE)
-		detail::mainWindowIsInFocus = false;
+		detail::UpdateWindowFocus(window, false);
+	else
+		throw std::runtime_error("DEngine - App: GLFW window focus callback called with unexpected focus argument.");
 }
 
-static void DEngine::Application::detail::Backend_GLFW_WindowMinimizeCallback(
+static void Application::detail::Backend_GLFW_WindowMinimizeCallback(
 	GLFWwindow* window, 
 	int iconified)
 {
-	if (iconified == GLFW_TRUE)
-	{
-		detail::mainWindowIsMinimized = true;
-	}
-	else if (iconified == GLFW_FALSE)
-	{
-		detail::mainWindowIsMinimized = false;
-		detail::mainWindowRestoreEvent = true;
-	}
+	detail::UpdateWindowMinimized(window, iconified);
 }
 
-bool DEngine::Application::detail::CreateVkSurface(
-	uSize vkInstance, 
-	void const* vkAllocationCallbacks, 
-	void* userData, 
-	u64& vkSurface)
+Std::Opt<u64> Application::CreateVkSurface(
+	WindowID window,
+	uSize vkInstance,
+	void const* vkAllocationCallbacks)
 {
-#pragma warning( suppress : 26812)
-	VkResult err = glfwCreateWindowSurface(
-	reinterpret_cast<VkInstance>(vkInstance), 
-		detail::mainWindow, 
-		reinterpret_cast<VkAllocationCallbacks const*>(vkAllocationCallbacks), 
-		reinterpret_cast<VkSurfaceKHR*>(&vkSurface));
-	if (err != 0)
-		return false;
+	auto const& windowContainer = detail::pAppData->windows;
+	auto windowIt = std::find_if(
+		windowContainer.begin(),
+		windowContainer.end(),
+		[window](detail::AppData::WindowNode const& val) -> bool {
+			return val.id == window; });
+	if (windowIt == windowContainer.end())
+		throw std::runtime_error("Could not find window.");
 
-	return true;
+
+	VkSurfaceKHR newSurface;
+	int err = glfwCreateWindowSurface(
+	reinterpret_cast<VkInstance>(vkInstance), 
+		(GLFWwindow*)windowIt->platformHandle,
+		reinterpret_cast<VkAllocationCallbacks const*>(vkAllocationCallbacks), 
+		&newSurface);
+	if (err != 0)
+		return {};
+	else
+		return Std::Opt{ (u64)newSurface };
 }
 
-DEngine::Std::StaticVector<char const*, 5> DEngine::Application::detail::GetRequiredVulkanInstanceExtensions()
+Std::StackVec<char const*, 5> Application::RequiredVulkanInstanceExtensions()
 {
 	uint32_t count = 0;
 
 	char const** exts = glfwGetRequiredInstanceExtensions(&count);
 
-	Std::StaticVector<char const*, 5> returnVal{};
+	Std::StackVec<char const*, 5> returnVal{};
 	returnVal.Resize(count);
 	std::memcpy(returnVal.Data(), exts, count * sizeof(char const*));
 
 	return returnVal;
 }
 
-DEngine::Application::Button DEngine::Application::detail::Backend_GLFW_MouseButtonToRawButton(i32 input)
+Application::Button Application::detail::Backend_GLFW_MouseButtonToRawButton(i32 input)
 {
 	switch (input)
 	{
@@ -346,12 +449,17 @@ DEngine::Application::Button DEngine::Application::detail::Backend_GLFW_MouseBut
 		return Button::LeftMouse;
 	case GLFW_MOUSE_BUTTON_RIGHT:
 		return Button::RightMouse;
+
+	case GLFW_KEY_BACKSPACE:
+		return Button::Backspace;
+	case GLFW_KEY_DELETE:
+		return Button::Delete;
 	}
 
 	return Button::Undefined;
 }
 
-DEngine::Application::Button DEngine::Application::detail::Backend_GLFW_KeyboardKeyToRawButton(i32 input)
+Application::Button Application::detail::Backend_GLFW_KeyboardKeyToRawButton(i32 input)
 {
 	switch (input)
 	{
@@ -386,32 +494,31 @@ DEngine::Application::Button DEngine::Application::detail::Backend_GLFW_Keyboard
 
 	}
 
-
 	return Button::Undefined;
 }
 
-DEngine::Application::FileInputStream::FileInputStream()
+Application::FileInputStream::FileInputStream()
 {
 	static_assert(sizeof(std::FILE*) <= sizeof(FileInputStream::m_buffer));
 }
 
-DEngine::Application::FileInputStream::FileInputStream(char const* path)
+Application::FileInputStream::FileInputStream(char const* path)
 {
 	Open(path);
 }
 
-DEngine::Application::FileInputStream::FileInputStream(FileInputStream&& other) noexcept
+Application::FileInputStream::FileInputStream(FileInputStream&& other) noexcept
 {
 	std::memcpy(&m_buffer[0], &other.m_buffer[0], sizeof(std::FILE*));
 	std::memset(&other.m_buffer[0], 0, sizeof(std::FILE*));
 }
 
-DEngine::Application::FileInputStream::~FileInputStream()
+Application::FileInputStream::~FileInputStream()
 {
 	Close();
 }
 
-DEngine::Application::FileInputStream& DEngine::Application::FileInputStream::operator=(FileInputStream&& other) noexcept
+Application::FileInputStream& Application::FileInputStream::operator=(FileInputStream&& other) noexcept
 {
 	if (this == &other)
 		return *this;
@@ -424,7 +531,7 @@ DEngine::Application::FileInputStream& DEngine::Application::FileInputStream::op
 	return *this;
 }
 
-bool DEngine::Application::FileInputStream::Seek(i64 offset, SeekOrigin origin)
+bool Application::FileInputStream::Seek(i64 offset, SeekOrigin origin)
 {
 	std::FILE* file = nullptr;
 	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
@@ -445,14 +552,10 @@ bool DEngine::Application::FileInputStream::Seek(i64 offset, SeekOrigin origin)
 		break;
 	}
 	int result = fseek(file, (long)offset, posixOrigin);
-	if (result == 0)
-		return true;
-	else
-		return false;
-
+	return result == 0;
 }
 
-bool DEngine::Application::FileInputStream::Read(char* output, u64 size)
+bool Application::FileInputStream::Read(char* output, u64 size)
 {
 	std::FILE* file = nullptr;
 	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
@@ -463,7 +566,7 @@ bool DEngine::Application::FileInputStream::Read(char* output, u64 size)
 	return result == (size_t)size;
 }
 
-DEngine::Std::Opt<DEngine::u64> DEngine::Application::FileInputStream::Tell() const
+Std::Opt<u64> Application::FileInputStream::Tell() const
 {
 	std::FILE* file = nullptr;
 	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
@@ -475,17 +578,17 @@ DEngine::Std::Opt<DEngine::u64> DEngine::Application::FileInputStream::Tell() co
 		// Handle error
 		return {};
 	else
-		return static_cast<u64>(result);
+		return Std::Opt{ static_cast<u64>(result) };
 }
 
-bool DEngine::Application::FileInputStream::IsOpen() const
+bool Application::FileInputStream::IsOpen() const
 {
 	std::FILE* file = nullptr;
 	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));
 	return file != nullptr;
 }
 
-bool DEngine::Application::FileInputStream::Open(char const* path)
+bool Application::FileInputStream::Open(char const* path)
 {
 	Close();
 	std::FILE* file = std::fopen(path, "rb");
@@ -493,7 +596,7 @@ bool DEngine::Application::FileInputStream::Open(char const* path)
 	return file != nullptr;
 }
 
-void DEngine::Application::FileInputStream::Close()
+void Application::FileInputStream::Close()
 {
 	std::FILE* file = nullptr;
 	std::memcpy(&file, &m_buffer[0], sizeof(std::FILE*));

@@ -12,13 +12,13 @@
     </Expand>
   </Type>
 
-  <Type Name="DEngine::Std::FixedVector&lt;*&gt;">
-    <DisplayString>{{ Size={m_size} }}</DisplayString>
+  <Type Name="DEngine::Std::StackVec&lt;*&gt;">
+    <DisplayString>{{ Size={size} }}</DisplayString>
     <Expand>
-      <Item Name="Size" ExcludeView="simple">m_size</Item>
+      <Item Name="Size" ExcludeView="simple">size</Item>
       <ArrayItems>
-        <Size>m_size</Size>
-        <ValuePointer>m_values</ValuePointer>
+        <Size>size</Size>
+        <ValuePointer>values</ValuePointer>
       </ArrayItems>
     </Expand>
   </Type>

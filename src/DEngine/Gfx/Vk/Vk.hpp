@@ -6,6 +6,8 @@
 #include "DeletionQueue.hpp"
 #include "DynamicDispatch.hpp"
 #include "GlobUtils.hpp"
+#include "GuiResourceManager.hpp"
+#include "NativeWindowManager.hpp"
 #include "ObjectDataManager.hpp"
 #include "QueueData.hpp"
 #include "TextureManager.hpp"
@@ -13,11 +15,10 @@
 #include "VMAIncluder.hpp"
 #include "VulkanIncluder.hpp"
 
-
 #include "DEngine/Gfx/Gfx.hpp"
 
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/StaticVector.hpp"
+#include "DEngine/Containers/StackVec.hpp"
 #include "DEngine/Containers/Array.hpp"
 #include "DEngine/Containers/Pair.hpp"
 
@@ -34,66 +35,10 @@ namespace DEngine::Gfx::Vk
 	template<>
 	[[nodiscard]] inline constexpr bool IsValidIndex<u64>(u64 in) { return in != static_cast<u64>(-1); }
 
-	struct SurfaceInfo
-	{
-	public:
-		vk::SurfaceKHR handle{};
-		vk::SurfaceCapabilitiesKHR capabilities{};
-		vk::CompositeAlphaFlagBitsKHR compositeAlphaFlag = {};
-
-		std::vector<vk::PresentModeKHR> supportedPresentModes;
-		std::vector<vk::SurfaceFormatKHR> supportedSurfaceFormats;
-	};
-
-	struct SwapchainSettings
-	{
-		vk::SurfaceKHR surface{};
-		vk::PresentModeKHR presentMode{};
-		vk::SurfaceFormatKHR surfaceFormat{};
-		vk::SurfaceTransformFlagBitsKHR transform = {};
-		vk::CompositeAlphaFlagBitsKHR compositeAlphaFlag = {};
-		vk::Extent2D extents{};
-		u32 numImages{};
-	};
-
-	struct SwapchainData
-	{
-		vk::SwapchainKHR handle{};
-		u8 uid = 0;
-
-		vk::Extent2D extents{};
-		vk::PresentModeKHR presentMode = vk::PresentModeKHR::eFifo;
-		vk::SurfaceFormatKHR surfaceFormat{};
-
-		Std::StaticVector<vk::Image, Constants::maxSwapchainLength> images{};
-
-		vk::CommandPool cmdPool{};
-		Std::StaticVector<vk::CommandBuffer, Constants::maxSwapchainLength> cmdBuffers{};
-		vk::Semaphore imageAvailableSemaphore{};
-	};
-
 	struct Device
 	{
 		vk::Device handle{};
 		vk::PhysicalDevice physDeviceHandle{};
-	};
-
-	struct GUIRenderTarget
-	{
-		vk::Extent2D extent{};
-		vk::Format format{};
-		VmaAllocation vmaAllocation{};
-		vk::Image img{};
-		vk::ImageView imgView{};
-		vk::Framebuffer framebuffer{};
-	};
-
-	struct GUIData
-	{
-		GUIRenderTarget renderTarget{};
-		vk::CommandPool cmdPool{};
-		// Has length of resource sets
-		Std::StaticVector<vk::CommandBuffer, Constants::maxResourceSets> cmdBuffers{};
 	};
 
 	struct VMA_MemoryTrackingData
@@ -108,33 +53,43 @@ namespace DEngine::Gfx::Vk
 	{
 		APIData();
 		virtual ~APIData() override;
-		virtual void Draw(Data& gfxData, DrawParams const& drawParams) override;
-		// Thread safe
-		virtual void NewViewport(uSize& viewportID, void*& imguiTexID) override;
-		// Thread safe
-		virtual void DeleteViewport(uSize id) override;
+		virtual void Draw(Context& gfxData, DrawParams const& drawParams) override;
 
-		Gfx::ILog* logger = nullptr;
-		Gfx::IWsi* wsiInterface = nullptr;
+		// Thread safe
+		virtual NativeWindowID NewNativeWindow(WsiInterface& wsiConnection) override;
+
+		// Thread safe
+		virtual void NewViewport(ViewportID& viewportID) override;
+		// Thread safe
+		virtual void DeleteViewport(ViewportID id) override;
+
+		// Thread safe
+		virtual void NewFontTexture(
+			u32 id,
+			u32 width,
+			u32 height,
+			u32 pitch,
+			Std::Span<std::byte const> data) override;
+
+		Gfx::LogInterface* logger = nullptr;
 		Gfx::TextureAssetInterface const* test_textureAssetInterface = nullptr;
 
 		SurfaceInfo surface{};
-		SwapchainData swapchain{};
 
-		u8 currentInFlightFrame = 0;
+		u8 currInFlightIndex = 0;
 
 		// Do not touch this.
 		VMA_MemoryTrackingData vma_trackingData{};
 
-		Std::StaticVector<vk::Fence, Constants::maxResourceSets> mainFences{};
-
-		GUIData guiData{};
+		Std::StackVec<vk::Fence, Constants::maxInFlightCount> mainFences{};
 
 		GlobUtils globUtils{};
 
-		ViewportManager viewportManager{};
+		GuiResourceManager guiResourceManager{};
+		NativeWindowManager nativeWindowManager{};
 		ObjectDataManager objectDataManager{};
 		TextureManager textureManager{};
+		ViewportManager viewportManager{};
 
 		vk::PipelineLayout testPipelineLayout{};
 		vk::Pipeline testPipeline{};

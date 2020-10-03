@@ -1,44 +1,41 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/detail/Assert.hpp"
-#include "DEngine/Containers/Optional.hpp"
-
-#include <stdexcept>
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Containers/detail/Assert.hpp>
+#include <DEngine/Containers/Opt.hpp>
+#include <DEngine/Containers/Range.hpp>
 
 namespace DEngine::Std
 {
 	template<typename T>
 	class Span
 	{
-	private:
-		T* m_data = nullptr;
-		uSize m_size = 0;
-
 	public:
-		constexpr Span() noexcept = default;
+		using ValueType = T;
 
+		constexpr Span() noexcept = default;
 		constexpr Span(T* data, uSize size) noexcept;
 
 		[[nodiscard]] constexpr Span<T const> ConstSpan() const noexcept;
 		constexpr operator Span<T const>() const noexcept;
 
+		[[nodiscard]] constexpr Range<T*> AsRange() const noexcept;
+		constexpr operator Range<T*>() const noexcept;
+
 		[[nodiscard]] T* Data() const noexcept;
 
 		[[nodiscard]] uSize Size() const noexcept;
 
-		template<typename Callable>
-		[[nodiscard]] Std::Optional<uSize> FindIf(Callable&& test) const;
-
 		[[nodiscard]] T& At(uSize i) const;
 
-		[[nodiscard]] T& operator[](uSize i);
-		[[nodiscard]] T const& operator[](uSize i) const;
+		[[nodiscard]] T& operator[](uSize i) const;
 
-		[[nodiscard]] T* begin() noexcept;
-		[[nodiscard]] T const* begin() const noexcept;
-		[[nodiscard]] T* end() noexcept;
-		[[nodiscard]] T const* end() const noexcept;
+		[[nodiscard]] T* begin() const noexcept;
+		[[nodiscard]] T* end() const noexcept;
+
+	private:
+		T* m_data = nullptr;
+		uSize m_size = 0;
 	};
 
 	template<typename T>
@@ -51,6 +48,15 @@ namespace DEngine::Std
 	constexpr Span<T const> Span<T>::ConstSpan() const noexcept
 	{
 		return Span<T const>(m_data, m_size);
+	}
+
+	template<typename T>
+	constexpr Range<T*> Span<T>::AsRange() const noexcept
+	{
+		Range<T*> returnVal;
+		returnVal.begin = begin();
+		returnVal.end = end();
+		return returnVal;
 	}
 
 	template<typename T>
@@ -72,61 +78,31 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	template<typename Callable>
-	Std::Optional<uSize> Span<T>::FindIf(Callable&& test) const
-	{
-		if (m_data == nullptr)
-			return {};
-		for (uSize i = 0; i < Size(); i += 1)
-		{
-			if (test(m_data[i]))
-				return i;
-		}
-		return {};
-	}
-
-	template<typename T>
 	T& Span<T>::At(uSize i) const
 	{
-		if (m_data == nullptr)
-			throw std::runtime_error("Tried to .At() a Span with data pointer set to nullptr.");
-		if (i >= m_size)
-			throw std::out_of_range("Tried to .At() a Span with index out of bounds.");
+		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+			m_data != nullptr,
+			"Tried to .At() a Span with data pointer set to nullptr.");
+		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+			i < m_size,
+			"Tried to .At() a Span with index out of bounds.");
 		return m_data[i];
 	}
 
 	template<typename T>
-	T& Span<T>::operator[](uSize i)
+	T& Span<T>::operator[](uSize i) const
 	{
 		return At(i);
 	}
 
 	template<typename T>
-	T const& Span<T>::operator[](uSize i) const
-	{
-		return At(i);
-	}
-
-	template<typename T>
-	T* Span<T>::begin() noexcept
+	T* Span<T>::begin() const noexcept
 	{
 		return m_data;
 	}
 
 	template<typename T>
-	T const* Span<T>::begin() const noexcept
-	{
-		return m_data;
-	}
-
-	template<typename T>
-	T* Span<T>::end() noexcept
-	{
-		return m_data + m_size;
-	}
-
-	template<typename T>
-	T const* Span<T>::end() const noexcept
+	T* Span<T>::end() const noexcept
 	{
 		return m_data + m_size;
 	}

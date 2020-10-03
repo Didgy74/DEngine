@@ -1,11 +1,15 @@
-#include "DEngine/detail/Assert.hpp"
+#include <DEngine/detail/Assert.hpp>
 
 #include <iostream>
 #include <cstdlib>
 
 namespace DEngine::detail
 {
-	void Assert(const char* conditionString, const char* file, unsigned long long line, const char* msg)
+	[[noreturn]] void Assert(
+		char const* conditionString,
+		const char* file,
+		unsigned long long line, 
+		const char* msg)
 	{
 		std::cout << std::endl;
 		std::cout << "#################" << std::endl;
