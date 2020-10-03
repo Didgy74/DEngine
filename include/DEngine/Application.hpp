@@ -95,7 +95,8 @@ namespace DEngine::Application
 	void InsertEventInterface(EventInterface&);
 	void RemoveEventInterface(EventInterface&);
 
-	void OpenSoftInput(std::string_view text);
+	enum class SoftInputFilter : u8;
+	void OpenSoftInput(std::string_view currentText, SoftInputFilter inputFilter);
 	void HideSoftInput();
 
 	class FileInputStream;
@@ -202,13 +203,19 @@ enum class DEngine::Application::TouchEventType : DEngine::u8
 
 struct DEngine::Application::TouchInput
 {
-	using IDType = u8;
 	static constexpr u8 invalidID = static_cast<u8>(-1);
 	u8 id = invalidID;
 	TouchEventType eventType = TouchEventType::Unchanged;
 	f32 x = 0.f;
 	f32 y = 0.f;
 	f32 duration = 0.f;
+};
+
+enum class DEngine::Application::SoftInputFilter : DEngine::u8
+{
+	Integer,
+	UnsignedInteger,
+	Float
 };
 
 class DEngine::Application::FileInputStream

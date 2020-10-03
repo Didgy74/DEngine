@@ -1,9 +1,10 @@
 // TODO: Implement filtering, like only enable . - 1-9 for example. DONE.
 // TODO: Implement filtering for -, it should only be possible to be entered if it's the first character in the string. DONE.
+// TODO: Implement the filtering mentioned above for desktop.
 // TODO: Detect when keyboard appears/disappears, possibly through onGlobalLayoutChange. CANCELLED.
 // TODO: Implement the "Submit" button functionality stuff. DONE.
 // TODO: Fix being only able to open keyboard once then never again. DONE.
-// TODO: Add support for integer type input, needs differing text filters.
+// TODO: Add support for integer type input, needs differing text filters. DONE.
 // TODO: Fix issue where switching between input fields can cause keyboard to close depending on execution order in code.
 
 package didgy.dengine.editor;
@@ -27,8 +28,11 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 
-
 public class DEngineActivity extends NativeActivity  {
+
+    static public final int SOFT_INPUT_FILTER_INTEGER = 0;
+    static public final int SOFT_INPUT_FILTER_UNSIGNED_INTEGER = 1;
+    static public final int SOFT_INPUT_FILTER_FLOAT = 2;
 
     static {
         System.loadLibrary("dengine");
@@ -41,6 +45,113 @@ public class DEngineActivity extends NativeActivity  {
     public native void nativeOnCharRemove();
 
     public native void nativeUpdateWindowContentRect(int top, int bottom, int left, int right);
+
+    public int mInputConnectionCounter = 0;
+    public int softInputFilter = 0;
+    public NativeContentView mNativeContentView = null;
+    public InputEditable mEditable = null;
+    public InputMethodManager mIMM = null;
+
+    @Override
+    protected void onCreate(Bundle savedState) {
+        super.onCreate(savedState);
+
+        mIMM = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+        assert mIMM != null;
+
+        mEditable = new InputEditable(this, "");
+        mNativeContentView = new NativeContentView(this);
+
+        setContentView(mNativeContentView);
+        //mNativeContentView.setFocusableInTouchMode(true);
+        //mNativeContentView.requestFocus();
+        mNativeContentView.getViewTreeObserver().addOnGlobalLayoutListener(this);
+
+        nativeInit();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+    }
+
+    @Override
+    public void onGlobalLayout() {
+        super.onGlobalLayout();
+
+        // TODO: The on-screen display is changed in this event.
+    }
+
+    @Override
+    public void onContentChanged() {
+        super.onContentChanged();
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        super.surfaceCreated(holder);
+
+        android.graphics.Rect test = new android.graphics.Rect();
+        mNativeContentView.getWindowVisibleDisplayFrame(test);
+
+        nativeUpdateWindowContentRect(test.top, test.bottom, test.left, test.right);
+
+        android.graphics.Rect x = new android.graphics.Rect();
+        mNativeContentView.getDrawingRect(x);
+
+        android.graphics.Point pointTest = new android.graphics.Point();
+        mNativeContentView.getDisplay().getSize(pointTest);
+
+        WindowInsets yo = mNativeContentView.getRootWindowInsets();
+    }
+
+    public void openSoftInput(String text, final int softInputFilter) {
+        class OpenSoftInputRunnable implements Runnable {
+            DEngineActivity activity;
+            int softInputFilter;
+            String innerText;
+            OpenSoftInputRunnable(DEngineActivity inActivity, String text, int filter) {
+                activity = inActivity;
+                this.softInputFilter = filter;
+                innerText = text;
+            }
+            public void run() {
+                activity.softInputFilter = softInputFilter;
+                mEditable = new InputEditable(activity, innerText);
+
+                mNativeContentView.setFocusableInTouchMode(true);
+                mNativeContentView.requestFocus();
+                mIMM.showSoftInput(mNativeContentView, 0);
+            }
+        }
+        OpenSoftInputRunnable test = new OpenSoftInputRunnable(this, text, softInputFilter);
+        runOnUiThread(test);
+    }
+
+    public void hideSoftInput()
+    {
+        class HideSoftInputRunnable implements Runnable {
+            DEngineActivity activity;
+            HideSoftInputRunnable() {
+            }
+            public void run() {
+                mEditable = null;
+                mIMM.hideSoftInputFromWindow(mNativeContentView.getWindowToken(), 0);
+            }
+        }
+        HideSoftInputRunnable test = new HideSoftInputRunnable();
+        runOnUiThread(test);
+    }
+
+    public int getCurrentOrientation()
+    {
+        return getResources().getConfiguration().orientation;
+    }
 
     static boolean contains(CharSequence seq, char character) {
         int length = seq.length();
@@ -60,78 +171,21 @@ public class DEngineActivity extends NativeActivity  {
             super(string);
             this.mActivity = activity;
 
-            InputFilter textFilter = new InputFilter() {
-                @Override
-                public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
-                    boolean sourceHasInvalidChar = false;
-                    int sourceLength = end - start;
-                    for (int i = start; i < end; i++) {
-                        char c = source.charAt(i);
-                        if (!(48 <= c && c <= 57) &&
-                            c != '.' &&
-                            c != '-') {
-                            sourceHasInvalidChar = true;
-                            break;
-                        }
-                    }
-                    if (sourceHasInvalidChar) {
-                        StringBuilder returnVal = new StringBuilder(sourceLength);
-                        for (int i = start; i < end; i++) {
-                            char c = source.charAt(i);
-                            if ((48 <= c && c <= 57) ||
-                                c == '.' ||
-                                c == '-')
-                                returnVal.append(c);
-                        }
-                        return returnVal;
-                    }
-                    else
-                        return null;
-                }
-            };
+            InputFilter[] inputFilters = null;
+            switch (mActivity.softInputFilter)
+            {
+                case SOFT_INPUT_FILTER_INTEGER:
+                    inputFilters = new InputFilter[]{ new SignedIntegerTextFilter() };
+                    break;
+                case SOFT_INPUT_FILTER_UNSIGNED_INTEGER:
+                    inputFilters = new InputFilter[]{ new UnsignedIntegerTextFilter(), new MinusFilter() };
+                    break;
+                case SOFT_INPUT_FILTER_FLOAT:
+                    inputFilters = new InputFilter[]{ new FloatTextFilter(), new DotFilter(), new MinusFilter() };
+                    break;
+            }
 
-            InputFilter dotFilter = new InputFilter() {
-                @Override
-                public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
-                    if (source == null || source == "") {
-                        return null;
-                    }
-                    else if (end - start > 0) {
-                        boolean srcHasDot = contains(source, '.');
-                        boolean dstHasDot = contains(dest, '.');
-                        if (dstHasDot && srcHasDot) { // If we already have a dot, we can't submit this dot.
-                            StringBuilder returnString = new StringBuilder(source.length());
-                            int sourceLength = source.length();
-                            for (int i = 0; i < sourceLength; i++)
-                            {
-                                char origChar = source.charAt(i);
-                                if (origChar != '.')
-                                    returnString.append(origChar);
-                            }
-                            return returnString.toString();
-                        }
-                    }
-                    return null;
-                }
-            };
-
-            InputFilter minusFilter = new InputFilter() {
-                @Override
-                public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
-                    if (source == null || source.equals("")) {
-                        return null;
-                    }
-                    else if (end - start > 0) {
-                        boolean srcHasMinus = contains(source, '-');
-                        if (srcHasMinus && dest.length() > 0) { // We can only submit the - if it's the first part of the string.
-                            return "";
-                        }
-                    }
-                    return null;
-                }
-            };
-
-            this.setFilters(new InputFilter[]{ textFilter, dotFilter, minusFilter } );
+            this.setFilters(inputFilters);
         }
 
         @Override
@@ -141,20 +195,25 @@ public class DEngineActivity extends NativeActivity  {
 
             SpannableStringBuilder returnVal = super.replace(st, en, source, start, end);
 
-            Log.e("DEngineActivity", this.toString());
-
             int newLength = length();
 
-            if (st < prevLength) {
-                if (source == null || source == "") {
-                    for (int i = st; i < prevLength; i++) {
-                        mActivity.nativeOnCharRemove();
+            if (prevLength != newLength) { // Length is same. We assume nothing changed (for now).
+                String logString = "Current input field value: ";
+                String currentValueString = this.toString();
+                if (currentValueString.equals(""))
+                    logString += "Empty";
+                else
+                    logString += currentValueString;
+                Log.e("DEngineActivity", logString);
+
+                if (st < prevLength) {
+                    if (source == null || source == "") {
+                        for (int i = st; i < prevLength; i++) {
+                            mActivity.nativeOnCharRemove();
+                        }
                     }
                 }
-            }
-            else
-            {
-                if (prevLength != newLength) {
+                else {
                     if (source != null && source != "") {
                         int j = start;
                         while (j < end) {
@@ -166,6 +225,151 @@ public class DEngineActivity extends NativeActivity  {
             }
 
             return returnVal;
+        }
+
+        static class SignedIntegerTextFilter implements InputFilter {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                boolean sourceHasInvalidChar = false;
+                int sourceLength = end - start;
+                for (int i = start; i < end; i++) {
+                    char c = source.charAt(i);
+                    if (!(48 <= c && c <= 57) &&
+                        c != '-') {
+                        sourceHasInvalidChar = true;
+                        break;
+                    }
+                }
+                if (sourceHasInvalidChar) {
+                    StringBuilder returnVal = new StringBuilder(sourceLength);
+                    for (int i = start; i < end; i++) {
+                        char c = source.charAt(i);
+                        if ((48 <= c && c <= 57) ||
+                            c == '-') {
+                            returnVal.append(c);
+                        }
+                    }
+                    return returnVal;
+                }
+                else
+                    return null;
+            }
+        }
+
+        static class UnsignedIntegerTextFilter implements InputFilter {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                boolean sourceHasInvalidChar = false;
+                int sourceLength = end - start;
+                for (int i = start; i < end; i++) {
+                    char c = source.charAt(i);
+                    if (!(48 <= c && c <= 57)) {
+                        sourceHasInvalidChar = true;
+                        break;
+                    }
+                }
+                if (sourceHasInvalidChar) {
+                    StringBuilder returnVal = new StringBuilder(sourceLength);
+                    for (int i = start; i < end; i++) {
+                        char c = source.charAt(i);
+                        if (48 <= c && c <= 57) {
+                            returnVal.append(c);
+                        }
+                    }
+                    return returnVal;
+                }
+                else
+                    return null;
+            }
+        }
+
+        static class FloatTextFilter implements InputFilter {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                boolean sourceHasInvalidChar = false;
+                int sourceLength = end - start;
+                for (int i = start; i < end; i++) {
+                    char c = source.charAt(i);
+                    if (!(48 <= c && c <= 57) &&
+                        c != '.' &&
+                        c != '-') {
+                        sourceHasInvalidChar = true;
+                        break;
+                    }
+                }
+                if (sourceHasInvalidChar) {
+                    StringBuilder returnVal = new StringBuilder(sourceLength);
+                    for (int i = start; i < end; i++) {
+                        char c = source.charAt(i);
+                        if ((48 <= c && c <= 57) ||
+                            c == '.' ||
+                            c == '-')
+                            returnVal.append(c);
+                    }
+                    return returnVal;
+                }
+                else
+                    return null;
+            }
+        }
+
+        static class DotFilter implements InputFilter {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                boolean sourceHasInvalidChar = false;
+                int sourceLength = end - start;
+                for (int i = start; i < end; i++) {
+                    char c = source.charAt(i);
+                    if (!(48 <= c && c <= 57) &&
+                        c != '.' &&
+                        c != '-') {
+                        sourceHasInvalidChar = true;
+                        break;
+                    }
+                }
+                if (sourceHasInvalidChar) {
+                    StringBuilder returnVal = new StringBuilder(sourceLength);
+                    for (int i = start; i < end; i++) {
+                        char c = source.charAt(i);
+                        if ((48 <= c && c <= 57) ||
+                            c == '.' ||
+                            c == '-')
+                            returnVal.append(c);
+                    }
+                    return returnVal;
+                } else
+                    return null;
+            }
+        }
+
+        static class MinusFilter implements InputFilter {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                boolean sourceHasInvalidChar = false;
+                int sourceLength = end - start;
+                for (int i = start; i < end; i++) {
+                    char c = source.charAt(i);
+                    if (!(48 <= c && c <= 57) &&
+                        c != '.' &&
+                        c != '-') {
+                        sourceHasInvalidChar = true;
+                        break;
+                    }
+                }
+                if (sourceHasInvalidChar) {
+                    StringBuilder returnVal = new StringBuilder(sourceLength);
+                    for (int i = start; i < end; i++) {
+                        char c = source.charAt(i);
+                        if ((48 <= c && c <= 57) ||
+                            c == '.' ||
+                            c == '-')
+                            returnVal.append(c);
+                    }
+                    return returnVal;
+                }
+                else
+                    return null;
+            }
         }
     }
 
@@ -244,7 +448,19 @@ public class DEngineActivity extends NativeActivity  {
             outAttrs.initialSelStart = mActivity.mEditable.length();
             outAttrs.initialSelEnd = mActivity.mEditable.length();
 
-            outAttrs.inputType = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED;
+            switch (mActivity.softInputFilter)
+            {
+                case SOFT_INPUT_FILTER_INTEGER:
+                    outAttrs.inputType = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED;
+                    break;
+                case SOFT_INPUT_FILTER_UNSIGNED_INTEGER:
+                    outAttrs.inputType = InputType.TYPE_CLASS_NUMBER;
+                    break;
+                case SOFT_INPUT_FILTER_FLOAT:
+                    outAttrs.inputType = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED;
+                    break;
+            }
+
             //outAttrs.inputType = InputType.TYPE_CLASS_TEXT;
             return new NativeInputConnection(this, mActivity);
         }
@@ -261,122 +477,5 @@ public class DEngineActivity extends NativeActivity  {
 
             super.finalize();
         }
-    }
-
-    public int mInputConnectionCounter = 0;
-    public NativeContentView mNativeContentView = null;
-    public InputEditable mEditable = null;
-    public InputMethodManager mIMM = null;
-
-    @Override
-    protected void onCreate(Bundle savedState) {
-        super.onCreate(savedState);
-
-        mIMM = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-        assert mIMM != null;
-
-        mEditable = new InputEditable(this, "");
-        mNativeContentView = new NativeContentView(this);
-
-        setContentView(mNativeContentView);
-        //mNativeContentView.setFocusableInTouchMode(true);
-        //mNativeContentView.requestFocus();
-        mNativeContentView.getViewTreeObserver().addOnGlobalLayoutListener(this);
-
-        nativeInit();
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-
-        /*
-        android.graphics.Rect test = new android.graphics.Rect();
-        mNativeContentView.getWindowVisibleDisplayFrame(test);
-
-        android.graphics.Rect x = new android.graphics.Rect();
-        mNativeContentView.getDrawingRect(x);
-
-        android.graphics.Point pointTest = new android.graphics.Point();
-        mNativeContentView.getDisplay().getSize(pointTest);
-
-
-        WindowInsets yo = mNativeContentView.getRootWindowInsets();
-     */
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-    }
-
-    @Override
-    public void onGlobalLayout() {
-        super.onGlobalLayout();
-
-        // TODO: The on-screen display is changed in this event.
-    }
-
-    @Override
-    public void onContentChanged() {
-        super.onContentChanged();
-    }
-
-    @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-        super.surfaceCreated(holder);
-
-        android.graphics.Rect test = new android.graphics.Rect();
-        mNativeContentView.getWindowVisibleDisplayFrame(test);
-
-        nativeUpdateWindowContentRect(test.top, test.bottom, test.left, test.right);
-
-        android.graphics.Rect x = new android.graphics.Rect();
-        mNativeContentView.getDrawingRect(x);
-
-        android.graphics.Point pointTest = new android.graphics.Point();
-        mNativeContentView.getDisplay().getSize(pointTest);
-
-        WindowInsets yo = mNativeContentView.getRootWindowInsets();
-    }
-
-    public void openSoftInput(String text) {
-        class OpenSoftInputRunnable implements Runnable {
-            DEngineActivity activity;
-            String innerText;
-            OpenSoftInputRunnable(DEngineActivity inActivity, String text) {
-                activity = inActivity;
-                innerText = text;
-            }
-            public void run() {
-                mEditable = new InputEditable(activity, innerText);
-
-                mNativeContentView.setFocusableInTouchMode(true);
-                mNativeContentView.requestFocus();
-                mIMM.showSoftInput(mNativeContentView, 0);
-            }
-        }
-        OpenSoftInputRunnable test = new OpenSoftInputRunnable(this, text);
-        runOnUiThread(test);
-    }
-
-    public void hideSoftInput()
-    {
-        class HideSoftInputRunnable implements Runnable {
-            DEngineActivity activity;
-            HideSoftInputRunnable() {
-            }
-            public void run() {
-                mEditable = null;
-                mIMM.hideSoftInputFromWindow(mNativeContentView.getWindowToken(), 0);
-            }
-        }
-        HideSoftInputRunnable test = new HideSoftInputRunnable();
-        runOnUiThread(test);
-    }
-
-    public int getCurrentOrientation()
-    {
-        return getResources().getConfiguration().orientation;
     }
 }

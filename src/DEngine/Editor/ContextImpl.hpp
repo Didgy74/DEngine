@@ -52,6 +52,7 @@ namespace DEngine::Editor
 
 		// Override window-handler methods
 		virtual void SetCursorType(Gui::WindowID, Gui::CursorType) override;
+		virtual void OpenSoftInput(Gui::WindowID, std::string_view, Gui::SoftInputFilter) override;
 
 		// App-specific stuff
 		Gfx::Context* gfxCtx = nullptr;

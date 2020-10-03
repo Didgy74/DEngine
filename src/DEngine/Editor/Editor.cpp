@@ -472,16 +472,7 @@ namespace DEngine::Editor
 					[entityId](decltype(scene->transforms)::value_type const& value) -> bool { return entityId == value.a; });
 
 				Transform& transform = transformIt->b;
-				if (!widget.StringView().empty())
-				{
-					if (widget.StringView().size() == 1 && widget.StringView().front() == '-')
-						return;
-					if (widget.StringView().size() == 1 && widget.StringView().front() == '.')
-						return;
-					transform.position.x = std::stof(widget.StringView().data());
-				}
-				else
-					transform.position.x = 0;
+				transform.position.x = std::stof(widget.StringView().data());
 			};
 
 			// Create the Position input field
@@ -496,16 +487,7 @@ namespace DEngine::Editor
 					[entityId](decltype(scene->transforms)::value_type const& value) -> bool { return entityId == value.a; });
 
 				Transform& transform = transformIt->b;
-				if (!widget.StringView().empty())
-				{
-					if (widget.StringView().size() == 1 && widget.StringView().front() == '-')
-						return;
-					if (widget.StringView().size() == 1 && widget.StringView().front() == '.')
-						return;
-					transform.position.y = std::stof(widget.StringView().data());
-				}
-				else
-					transform.position.y = 0;
+				transform.position.y = std::stof(widget.StringView().data());
 			};
 
 			Gui::LineEdit* positionInputZ = new Gui::LineEdit;
@@ -519,16 +501,7 @@ namespace DEngine::Editor
 					[entityId](decltype(scene->transforms)::value_type const& value) -> bool { return entityId == value.a; });
 
 				Transform& transform = transformIt->b;
-				if (!widget.StringView().empty())
-				{
-					if (widget.StringView().size() == 1 && widget.StringView().front() == '-')
-						return;
-					if (widget.StringView().size() == 1 && widget.StringView().front() == '.')
-						return;
-					transform.position.z = std::stof(widget.StringView().data());
-				}
-				else
-					transform.position.z = 0;
+				transform.position.z = std::stof(widget.StringView().data());
 			};
 		}
 	};
@@ -559,7 +532,7 @@ namespace DEngine::Editor
 			// Create the Position input field
 			Gui::LineEdit* positionInputX = new Gui::LineEdit;
 			positionLayout->AddWidget2(Std::Box<Gui::Widget>{ positionInputX });
-			positionInputX->type = Gui::LineEdit::Type::Integer;
+			positionInputX->type = Gui::LineEdit::Type::UnsignedInteger;
 			positionInputX->String_Set(std::to_string((int)textureId).c_str());
 			positionInputX->textChangedPfn = [entityId, scene](Gui::LineEdit& widget)
 			{
@@ -1192,4 +1165,22 @@ void Editor::ContextImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursor
 		break;
 	}
 	App::SetCursor((App::WindowID)id, appCursorType);
+}
+
+void Editor::ContextImpl::OpenSoftInput(
+	Gui::WindowID windowId, 
+	std::string_view currentText, 
+	Gui::SoftInputFilter inputFilter)
+{
+	App::SoftInputFilter filter{};
+	switch (inputFilter)
+	{
+	case Gui::SoftInputFilter::Float:
+		filter = App::SoftInputFilter::Float;
+		break;
+	case Gui::SoftInputFilter::Integer:
+		filter = App::SoftInputFilter::Integer;
+		break;
+	}
+	App::OpenSoftInput(currentText, filter);
 }

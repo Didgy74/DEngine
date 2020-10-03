@@ -179,6 +179,11 @@ Test::Test(
 
 }
 
+WindowHandler& Test::GetWindowHandler() const
+{
+	return windowHandler;
+}
+
 Context& Gui::Test::GetContext() const
 {
 	return ctx;
@@ -187,6 +192,10 @@ Context& Gui::Test::GetContext() const
 void Test::SetCursorType(CursorType cursorType)
 {
 	windowHandler.SetCursorType(windowId, cursorType);
+}
+
+void Test::OpenSoftInput(std::string_view currentText, SoftInputFilter inputFilter)
+{
 }
 
 namespace DEngine::Gui::impl

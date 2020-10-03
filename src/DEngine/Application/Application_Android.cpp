@@ -460,7 +460,7 @@ bool Application::detail::Backend_Initialize()
 	backendData.jniOpenSoftInput = backendData.gameThreadJniEnv->GetMethodID(
 		activity,
 			"openSoftInput",
-			"(Ljava/lang/String;)V");
+			"(Ljava/lang/String;I)V");
 	backendData.jniHideSoftInput = backendData.gameThreadJniEnv->GetMethodID(
 		activity,
 		"hideSoftInput",
@@ -615,7 +615,7 @@ void Application::detail::Backend_Log(char const* msg)
 
 
 
-void Application::OpenSoftInput(std::string_view text)
+void Application::OpenSoftInput(std::string_view text, SoftInputFilter inputFilter)
 {
 	auto const& backendData = *detail::pBackendData;
 	std::basic_string<jchar> tempString;
@@ -627,7 +627,11 @@ void Application::OpenSoftInput(std::string_view text)
 
 	jstring javaString = backendData.gameThreadJniEnv->NewString(tempString.data(), tempString.length());
 
-	backendData.gameThreadJniEnv->CallVoidMethod(backendData.activity->clazz, backendData.jniOpenSoftInput, javaString);
+	backendData.gameThreadJniEnv->CallVoidMethod(
+		backendData.activity->clazz,
+		backendData.jniOpenSoftInput,
+		javaString,
+		(jint)inputFilter);
 
 	//backendData.gameThreadJniEnv->ReleaseStringChars(javaString, tempString.data());
 }

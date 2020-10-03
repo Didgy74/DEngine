@@ -23,6 +23,8 @@ namespace DEngine::Application::detail
 		bool cursorLocked = false;
 		Math::Vec2Int virtualCursorPos{};
 
+		Std::Opt<SoftInputFilter> charInputFilter;
+
 		GLFWcursor* cursorTypes[(int)CursorType::COUNT] = {};
 	};
 
@@ -103,13 +105,16 @@ void Application::LockCursor(bool state)
 	backendData.cursorLocked = state;
 }
 
-void Application::OpenSoftInput(std::string_view)
+void Application::OpenSoftInput(std::string_view currentText, SoftInputFilter filter)
 {
-	
+	auto& backendData = *detail::pBackendData;
+	backendData.charInputFilter = Std::Opt{ filter };
 }
 
 void Application::HideSoftInput()
 {
+	auto& backendData = *detail::pBackendData;
+	backendData.charInputFilter = Std::nullOpt;
 }
 
 void Application::detail::Backend_Log(char const* msg)
@@ -238,7 +243,33 @@ static void Application::detail::Backend_GLFW_CharCallback(
 	GLFWwindow* window, 
 	unsigned int codepoint)
 {
-	detail::PushCharInput(codepoint);
+	auto& backendData = *detail::pBackendData;
+	if (backendData.charInputFilter.HasValue())
+	{
+		SoftInputFilter filter = backendData.charInputFilter.Value();
+		switch (filter)
+		{
+			case SoftInputFilter::Integer:
+			{
+				if ('0' <= codepoint && codepoint <= '9')
+					detail::PushCharInput(codepoint);
+			}
+				break;
+			case SoftInputFilter::UnsignedInteger:
+				if (('0' <= codepoint && codepoint <= '9') ||
+						codepoint == '-')
+					detail::PushCharInput(codepoint);
+				break;
+			case SoftInputFilter::Float:
+				if (('0' <= codepoint && codepoint <= '9') ||
+					codepoint == '-' ||
+					codepoint == '.')
+					detail::PushCharInput(codepoint);
+				break;
+			}
+	}
+	else
+		detail::PushCharInput(codepoint);
 }
 
 static void Application::detail::Backend_GLFW_MouseButtonCallback(
@@ -346,19 +377,11 @@ static void Application::detail::Backend_GLFW_WindowFramebufferSizeCallback(
 	int width, 
 	int height)
 {
-	/*
-	detail::appData->mainWindowResizeEvent = true;
-	detail::appData->mainWindowFramebufferSize[0] = (u32)width;
-	detail::appData->mainWindowFramebufferSize[1] = (u32)height;
-	*/
 }
 
 static void Application::detail::Backend_GLFW_WindowCloseCallback(
 	GLFWwindow* window)
 {
-	/*
-	detail::appData->shouldShutdown = true;
-	*/
 }
 
 static void Application::detail::Backend_GLFW_WindowFocusCallback(GLFWwindow* window, int focused)
@@ -387,10 +410,8 @@ Std::Opt<u64> Application::CreateVkSurface(
 	auto windowIt = std::find_if(
 		windowContainer.begin(),
 		windowContainer.end(),
-		[window](detail::AppData::WindowNode const& val) -> bool
-		{
-			return val.id == window;
-		});
+		[window](detail::AppData::WindowNode const& val) -> bool {
+			return val.id == window; });
 	if (windowIt == windowContainer.end())
 		throw std::runtime_error("Could not find window.");
 
@@ -472,7 +493,6 @@ Application::Button Application::detail::Backend_GLFW_KeyboardKeyToRawButton(i32
 		return Button::Delete;
 
 	}
-
 
 	return Button::Undefined;
 }

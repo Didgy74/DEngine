@@ -6,10 +6,6 @@ using namespace DEngine::Gui;
 
 Gui::LineEdit::~LineEdit()
 {
-	if (selected)
-	{
-		App::HideSoftInput();
-	}
 }
 
 void LineEdit::Render(
@@ -58,8 +54,12 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 	if (selected)
 	{
 		String_PushBack((u8)charEvent);
-		if (textChangedPfn)
-			textChangedPfn(*this);
+		auto const& string = StringView();
+		if (string != "" && string != "-" && string != "." && string != "-.")
+		{
+			if (textChangedPfn)
+				textChangedPfn(*this);
+		}
 	}
 }
 
@@ -68,8 +68,12 @@ void LineEdit::CharRemoveEvent(Context& ctx)
 	if (selected && !StringView().empty())
 	{
 		String_PopBack();
-		if (textChangedPfn)
-			textChangedPfn(*this);
+		auto const& string = StringView();
+		if (string != "" && string != "-" && string != "." && string != "-.")
+		{
+			if (textChangedPfn)
+				textChangedPfn(*this);
+		}
 	}
 }
 
@@ -112,7 +116,16 @@ void LineEdit::TouchEvent(
 	if (event.id == 0 && event.type == TouchEventType::Down && cursorIsInside && !selected)
 	{
 		selected = true;
-		App::OpenSoftInput(this->StringView());
+		// TEMP
+		WindowHandler* test = nullptr;
+		App::SoftInputFilter filter{};
+		if (this->type == Type::Float)
+			filter = App::SoftInputFilter::Float;
+		else if (this->type == Type::Integer)
+			filter = App::SoftInputFilter::Integer;
+		else if (this->type == Type::UnsignedInteger)
+			filter = App::SoftInputFilter::UnsignedInteger;
+		App::OpenSoftInput(this->StringView(), filter);
 	}
 
 	if (event.id == 0 && event.type == TouchEventType::Down && !cursorIsInside && selected)
