@@ -1,6 +1,8 @@
 #include <DEngine/Gui/LineEdit.hpp>
 #include <DEngine/Application.hpp>
 
+#include <DEngine/Utility.hpp>
+
 using namespace DEngine;
 using namespace DEngine::Gui;
 
@@ -43,6 +45,7 @@ void LineEdit::CharEnterEvent(Context& ctx)
 		if (StringView().empty())
 		{
 			String_Set("0");
+			App::UpdateCharInputContext(StringView()); // TEMPORARY!
 			if (textChangedPfn)
 				textChangedPfn(*this);
 		}
@@ -53,12 +56,61 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 {
 	if (selected)
 	{
-		String_PushBack((u8)charEvent);
-		auto const& string = StringView();
-		if (string != "" && string != "-" && string != "." && string != "-.")
+		bool validChar = false;
+		switch (this->type)
 		{
-			if (textChangedPfn)
-				textChangedPfn(*this);
+		case Type::Float:
+			if ('0' <= charEvent && charEvent <= '9')
+			{
+				validChar = true;
+				break;
+			}
+			if (charEvent == '-' && StringView().length() == 0)
+			{
+				validChar = true;
+				break;
+			}
+			if (charEvent == '.') // Check if we already have dot
+			{
+				bool alreadyHasDot = StringView().find('.') != std::string_view::npos;
+				if (!alreadyHasDot)
+				{
+					validChar = true;
+					break;
+				}
+			}
+			break;
+		case Type::Integer:
+			if ('0' <= charEvent && charEvent <= '9')
+			{
+				validChar = true;
+				break;
+			}
+			if (charEvent == '-' && StringView().length() == 0)
+			{
+				validChar = true;
+				break;
+			}
+			break;
+		case Type::UnsignedInteger:
+			if ('0' <= charEvent && charEvent <= '9')
+			{
+				validChar = true;
+				break;
+			}
+			break;
+		}
+		if (validChar)
+		{
+			String_PushBack((u8)charEvent);
+			App::UpdateCharInputContext(StringView()); // TEMPORARY!
+			auto const& string = StringView();
+			if (string != "" && string != "-" && string != "." && string != "-.")
+			{
+				if (textChangedPfn)
+					textChangedPfn(*this);
+				App::UpdateCharInputContext(StringView());
+			}
 		}
 	}
 }
@@ -68,6 +120,7 @@ void LineEdit::CharRemoveEvent(Context& ctx)
 	if (selected && !StringView().empty())
 	{
 		String_PopBack();
+		App::UpdateCharInputContext(StringView()); // TEMPORARY!
 		auto const& string = StringView();
 		if (string != "" && string != "-" && string != "." && string != "-.")
 		{

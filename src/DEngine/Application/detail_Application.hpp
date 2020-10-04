@@ -19,49 +19,7 @@
 
 namespace DEngine::Application::detail
 {
-	bool Initialize();
-	void ProcessEvents();
-
-	bool Backend_Initialize();
-	void Backend_ProcessEvents();
-	void Backend_Log(char const* msg);
-
 	using LogCallback = void(*)(char const*);
-	void SetLogCallback(LogCallback callback);
-
-	void UpdateWindowSize(
-		void* platformHandle,
-		Extent newSize,
-		Math::Vec2Int visiblePos,
-		Extent visibleSize);
-	void UpdateWindowPosition(
-		void* platformHandle,
-		Math::Vec2Int newPosition);
-	void UpdateWindowFocus(
-		void* platformHandle,
-		bool focused);
-	void UpdateWindowMinimized(
-		void* platformHandle,
-		bool minimized);
-	void UpdateWindowCursorEnter(
-		void* platformHandle,
-		bool entered);
-	void UpdateOrientation(Orientation newOrient);
-
-	void UpdateCursor(
-		void* platformHandle,
-		Math::Vec2Int pos,
-		Math::Vec2Int delta);
-	void UpdateCursor(
-		void* platformHandle,
-		Math::Vec2Int pos);
-
-	void UpdateTouchInput(TouchEventType type, u8 id, f32 x, f32 y);
-
-	void UpdateButton(Button button, bool pressed);
-	void PushCharInput(u32 charValue);
-	void PushCharEnterEvent();
-	void PushCharRemoveEvent();
 
 	struct WindowData
 	{
@@ -120,6 +78,53 @@ namespace DEngine::Application::detail
 	};
 
 	extern AppData* pAppData;
+
+	bool Initialize();
+	void ProcessEvents();
+
+	bool Backend_Initialize();
+	void Backend_ProcessEvents();
+	void Backend_Log(char const* msg);
+
+	void SetLogCallback(LogCallback callback);
+
+	AppData::WindowNode* GetWindowNode(WindowID id);
+	AppData::WindowNode* GetWindowNode(void* platformHandle);
+	void UpdateWindowSize(
+		void* platformHandle,
+		Extent newSize,
+		Math::Vec2Int visiblePos,
+		Extent visibleSize);
+	void UpdateWindowPosition(
+		void* platformHandle,
+		Math::Vec2Int newPosition);
+	void UpdateWindowFocus(
+		void* platformHandle,
+		bool focused);
+	void UpdateWindowMinimized(
+		AppData::WindowNode& windowNode,
+		bool minimized);
+	void UpdateWindowCursorEnter(
+		void* platformHandle,
+		bool entered);
+	void UpdateOrientation(Orientation newOrient);
+
+	void UpdateCursor(
+		void* platformHandle,
+		Math::Vec2Int pos,
+		Math::Vec2Int delta);
+	void UpdateCursor(
+		void* platformHandle,
+		Math::Vec2Int pos);
+
+	void UpdateTouchInput(TouchEventType type, u8 id, f32 x, f32 y);
+
+	void UpdateButton(Button button, bool pressed);
+	void PushCharInput(u32 charValue);
+	void PushCharEnterEvent();
+	void PushCharRemoveEvent();
+
+	
 
 	[[nodiscard]] constexpr bool IsValid(CursorType);
 }

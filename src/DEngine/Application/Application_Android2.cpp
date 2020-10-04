@@ -29,7 +29,7 @@ namespace DEngine::Application::detail
 	struct BackendData
 	{
 		std::thread gameThread;
-		std::mutex lock;
+		std::mutex customEventQueueLock;
 
 		AAssetManager* assetManager = nullptr;
 		AInputQueue* inputQueue = nullptr;

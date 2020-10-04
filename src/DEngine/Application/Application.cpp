@@ -1,12 +1,13 @@
 #include "detail_Application.hpp"
-#include <DEngine/Containers/StackVec.hpp>
 #include "Assert.hpp"
+
+#include <DEngine/Containers/StackVec.hpp>
+#include <DEngine/Utility.hpp>
 
 #include <iostream>
 #include <cstring>
 #include <chrono>
 #include <stdexcept>
-#include <algorithm>
 
 namespace DEngine::Application::detail
 {
@@ -19,7 +20,7 @@ using namespace DEngine;
 Application::Extent Application::GetWindowSize(WindowID window)
 {
 	auto const& appData = *detail::pAppData;
-	auto windowNodeIt = std::find_if(
+	auto windowNodeIt = Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
 		[window](detail::AppData::WindowNode const& val) -> bool {
@@ -32,7 +33,7 @@ Application::Extent Application::GetWindowSize(WindowID window)
 Application::Extent Application::GetWindowVisibleSize(WindowID window)
 {
 	auto const& appData = *detail::pAppData;
-	auto windowNodeIt = std::find_if(
+	auto windowNodeIt = Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
 		[window](detail::AppData::WindowNode const& val) -> bool {
@@ -45,7 +46,7 @@ Application::Extent Application::GetWindowVisibleSize(WindowID window)
 Math::Vec2Int Application::GetWindowPosition(WindowID window)
 {
 	auto const& appData = *detail::pAppData;
-	auto windowNodeIt = std::find_if(
+	auto windowNodeIt = Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
 		[window](detail::AppData::WindowNode const& val) -> bool {
@@ -58,7 +59,7 @@ Math::Vec2Int Application::GetWindowPosition(WindowID window)
 Math::Vec2Int Application::GetWindowVisiblePosition(WindowID window)
 {
 	auto const& appData = *detail::pAppData;
-	auto windowNodeIt = std::find_if(
+	auto windowNodeIt = Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
 		[window](detail::AppData::WindowNode const& val) -> bool {
@@ -71,7 +72,7 @@ Math::Vec2Int Application::GetWindowVisiblePosition(WindowID window)
 bool Application::GetWindowMinimized(WindowID window)
 {
 	auto const& appData = *detail::pAppData;
-	auto windowNodeIt = std::find_if(
+	auto windowNodeIt = Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
 		[window](detail::AppData::WindowNode const& val) -> bool { 
@@ -84,7 +85,7 @@ bool Application::GetWindowMinimized(WindowID window)
 Application::WindowEvents Application::GetWindowEvents(WindowID window)
 {
 	auto const& appData = *detail::pAppData;
-	auto windowNodeIt = std::find_if(
+	auto windowNodeIt = Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
 		[window](detail::AppData::WindowNode const& val) -> bool {
@@ -276,13 +277,39 @@ void Application::detail::SetLogCallback(LogCallback callback)
 	detail::pAppData->logCallback = callback;
 }
 
+Application::detail::AppData::WindowNode* DEngine::Application::detail::GetWindowNode(WindowID id)
+{
+	auto& appData = *detail::pAppData;
+	auto windowNodeIt = Std::FindIf(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[id](AppData::WindowNode const& val) -> bool { return val.id == id; });
+	if (windowNodeIt == appData.windows.end())
+		return nullptr;
+	else
+		return &(*windowNodeIt);
+}
+
+Application::detail::AppData::WindowNode* DEngine::Application::detail::GetWindowNode(void* platformHandle)
+{
+	auto& appData = *detail::pAppData;
+	auto windowNodeIt = Std::FindIf(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[platformHandle](AppData::WindowNode const& val) -> bool { return val.platformHandle == platformHandle; });
+	if (windowNodeIt == appData.windows.end())
+		return nullptr;
+	else
+		return &(*windowNodeIt);
+}
+
 void Application::detail::UpdateWindowSize(
 	void* platformHandle,
 	Extent newSize,
 	Math::Vec2Int visiblePos,
 	Extent visibleSize)
 {
-	auto& windowNode = *std::find_if(
+	auto& windowNode = *Std::FindIf(
 		pAppData->windows.begin(),
 		pAppData->windows.end(),
 		[platformHandle](AppData::WindowNode const& val) -> bool {
@@ -300,7 +327,7 @@ void Application::detail::UpdateWindowPosition(
 	void* platformHandle, 
 	Math::Vec2Int newPosition)
 {
-	auto& windowNode = *std::find_if(
+	auto& windowNode = *Std::FindIf(
 		pAppData->windows.begin(),
 		pAppData->windows.end(),
 		[platformHandle](AppData::WindowNode const& val) -> bool {
@@ -316,7 +343,7 @@ void Application::detail::UpdateWindowFocus(
 	void* platformHandle,
 	bool focused)
 {
-	auto& windowNode = *std::find_if(
+	auto& windowNode = *Std::FindIf(
 		pAppData->windows.begin(),
 		pAppData->windows.end(),
 		[platformHandle](AppData::WindowNode const& val) -> bool {
@@ -332,17 +359,11 @@ void Application::detail::UpdateWindowFocus(
 }
 
 void Application::detail::UpdateWindowMinimized(
-	void* platformHandle,
+	AppData::WindowNode& windowNode, 
 	bool minimized)
 {
 	auto& appData = *detail::pAppData;
-	auto windowNodeIt = std::find_if(
-		appData.windows.begin(),
-		appData.windows.end(),
-		[platformHandle](AppData::WindowNode const& val) -> bool {
-			return val.platformHandle == platformHandle; });
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
-	auto& windowNode = *windowNodeIt;
+
 	windowNode.windowData.isMinimized = minimized;
 	if (minimized)
 		windowNode.events.minimize = true;
@@ -357,7 +378,7 @@ void Application::detail::UpdateWindowCursorEnter(
 	bool entered)
 {
 	auto& appData = *detail::pAppData;
-	auto windowNodeIt = std::find_if(
+	auto windowNodeIt = Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
 		[platformHandle](AppData::WindowNode const& val) -> bool {
@@ -385,7 +406,7 @@ void Application::detail::UpdateCursor(
 	Math::Vec2Int pos,
 	Math::Vec2Int delta)
 {
-	auto const& windowNode = *std::find_if(
+	auto const& windowNode = *Std::FindIf(
 		pAppData->windows.begin(),
 		pAppData->windows.end(),
 		[platformHandle](AppData::WindowNode const& val) -> bool {
@@ -407,7 +428,7 @@ void Application::detail::UpdateCursor(
 	void* platformHandle,
 	Math::Vec2Int pos)
 {
-	auto const& windowNode = *std::find_if(
+	auto const& windowNode = *Std::FindIf(
 		pAppData->windows.begin(),
 		pAppData->windows.end(),
 		[platformHandle](AppData::WindowNode const& val) -> bool {
@@ -483,7 +504,7 @@ void Application::InsertEventInterface(EventInterface& in)
 
 void Application::RemoveEventInterface(EventInterface& in)
 {
-	auto callbackIt = std::find_if(
+	auto callbackIt = Std::FindIf(
 		detail::pAppData->eventCallbacks.begin(),
 		detail::pAppData->eventCallbacks.end(),
 		[&in](EventInterface* const val) -> bool {

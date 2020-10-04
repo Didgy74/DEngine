@@ -97,6 +97,7 @@ namespace DEngine::Application
 
 	enum class SoftInputFilter : u8;
 	void OpenSoftInput(std::string_view currentText, SoftInputFilter inputFilter);
+	void UpdateCharInputContext(std::string_view);
 	void HideSoftInput();
 
 	class FileInputStream;

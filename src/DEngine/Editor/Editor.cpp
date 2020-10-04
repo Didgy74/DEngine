@@ -1073,6 +1073,16 @@ void Editor::ContextImpl::WindowMove(
 	guiCtx->PushEvent(event);
 }
 
+void Editor::ContextImpl::WindowMinimize(
+	App::WindowID window,
+	bool wasMinimized)
+{
+	Gui::WindowMinimizeEvent event{};
+	event.windowId = (Gui::WindowID)window;
+	event.wasMinimized = wasMinimized;
+	guiCtx->PushEvent(event);
+}
+
 void Editor::ContextImpl::WindowCursorEnter(
 	App::WindowID window,
 	bool entered)

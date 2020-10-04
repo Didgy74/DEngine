@@ -1,18 +1,26 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 29
+    compileSdkVersion 30
 
     defaultConfig {
         applicationId  "didgy.dengine.editor"
-        minSdkVersion     27
-        targetSdkVersion  29
+        minSdkVersion 26
+        targetSdkVersion 30
         versionCode  1
         versionName  "0.1"
         externalNativeBuild {
             cmake {
-                //arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=c++_static'
                 abiFilters 'armeabi-v7a', 'arm64-v8a'//, 'x86', 'x86_64'
+            }
+        }
+
+        sourceSets {
+            main {
+                assets.srcDirs "../../data"
+            }
+            debug {
+                jniLibs.srcDirs "src/lib"
             }
         }
     }
@@ -23,10 +31,15 @@ android {
         }
     }
 
-    sourceSets {
-        main {
-            jniLibs.srcDirs "src/lib"
-            assets.srcDirs "../../data"
+    buildTypes {
+        release {
+            minifyEnabled true
+        }
+
+        debug {
+            applicationIdSuffix ".debug"
+            debuggable true
+            jniDebuggable true
         }
     }
 }
@@ -34,9 +47,3 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 }
-/*
-repositories {
-    mavenCentral()
-}
-*/
-

@@ -1,4 +1,7 @@
 #include "detail_Application.hpp"
+#include "Assert.hpp"
+
+#include <DEngine/Utility.hpp>
 
 #include <android/configuration.h>
 #include <android/log.h>
@@ -39,28 +42,35 @@ namespace DEngine::Application::detail
 			CharInput,
 			CharRemove,
 			CharEnter,
+			NativeWindowCreated,
+			NativeWindowDestroyed,
+			InputQueueCreated,
+			VisibleAreaChanged,
 		};
 		Type type;
-		union
+		struct Data
 		{
 			u32 charInput;
+			ANativeWindow* nativeWindow;
+			AInputQueue* inputQueue;
+			Math::Vec2Int visibleAreaChangedOffset;
+			Extent visibleAreaChangedExtent;
 		};
+		Data data{};
 	};
 
 	struct BackendData
 	{
 		ANativeActivity* activity = nullptr;
-
 		AndroidPollSource inputPollSource{};
 
 		std::thread gameThread;
-		std::mutex lock;
+
+		Std::Opt<WindowID> currentWindow;
 		ANativeWindow* nativeWindow = nullptr;
-		u32 nativeWindowVisibleOffsetX = 0;
-		u32 nativeWindowVisibleOffsetY = 0;
-		Extent nativeWindowVisibleExtent{};
-		bool windowVisibleRectInitialized = false;
 		AInputQueue* inputQueue = nullptr;
+		Math::Vec2Int visibleAreaOffset;
+		Extent visibleAreaExtent;
 
 		jobject mainActivity = nullptr;
 		// JNI Envs are per-thread. This is for the game thread, it is created when attaching
@@ -68,6 +78,7 @@ namespace DEngine::Application::detail
 		JNIEnv* gameThreadJniEnv = nullptr;
 		jmethodID jniOpenSoftInput = nullptr;
 		jmethodID jniHideSoftInput = nullptr;
+		std::mutex customEventQueueLock;
 		std::vector<CustomEvent> customEventQueue;
 	};
 
@@ -99,23 +110,70 @@ namespace DEngine::Application::detail
 {
 	static void onStart(ANativeActivity* activity)
 	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+	}
 
+	static void onPause(ANativeActivity* activity)
+	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+	}
+
+	static void onResume(ANativeActivity* activity)
+	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+	}
+
+	static void onStop(ANativeActivity* activity)
+	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+	}
+
+	static void onDestroy(ANativeActivity* activity)
+	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 	}
 
 	static void onNativeWindowCreated(ANativeActivity* activity, ANativeWindow* window)
 	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
-		std::lock_guard _{ backendData.lock };
 
-		backendData.nativeWindow = window;
+		CustomEvent newEvent{};
+		newEvent.type = CustomEvent::Type::NativeWindowCreated;
+		newEvent.data.nativeWindow = window;
+
+		std::lock_guard _{ backendData.customEventQueueLock };
+		backendData.customEventQueue.push_back(newEvent);
+	}
+
+	static void onNativeWindowDestroyed(ANativeActivity* activity, ANativeWindow* window)
+	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+		auto& backendData = *detail::pBackendData;
+
+		CustomEvent newEvent{};
+		newEvent.type = CustomEvent::Type::NativeWindowDestroyed;
+
+		std::lock_guard _{ backendData.customEventQueueLock };
+		backendData.customEventQueue.push_back(newEvent);
 	}
 
 	static void onInputQueueCreated(ANativeActivity* activity, AInputQueue* queue)
 	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
-		std::lock_guard _{ backendData.lock };
 
-		backendData.inputQueue = queue;
+		CustomEvent newEvent{};
+		newEvent.type = CustomEvent::Type::InputQueueCreated;
+		newEvent.data.inputQueue = queue;
+
+		std::lock_guard _{ backendData.customEventQueueLock };
+		backendData.customEventQueue.push_back(newEvent);
+	}
+
+	static void onInputQueueDestroyed(ANativeActivity* activity, AInputQueue* queue)
+	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 	}
 }
 
@@ -135,10 +193,17 @@ JNIEXPORT void JNICALL ANativeActivity_onCreate(
 	backendData.activity = activity;
 
 	activity->callbacks->onStart = &Application::detail::onStart;
+	activity->callbacks->onPause = &Application::detail::onPause;
+	activity->callbacks->onResume = &Application::detail::onResume;
+	activity->callbacks->onStop = &Application::detail::onStop;
+	activity->callbacks->onDestroy = &Application::detail::onDestroy;
 	activity->callbacks->onNativeWindowCreated = &Application::detail::onNativeWindowCreated;
+	activity->callbacks->onNativeWindowDestroyed = &Application::detail::onNativeWindowDestroyed;
 	activity->callbacks->onInputQueueCreated = &Application::detail::onInputQueueCreated;
+	activity->callbacks->onInputQueueDestroyed = &Application::detail::onInputQueueDestroyed;
 }
 
+// Called at the end of onCreate in Java.
 extern "C"
 JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeInit(
 	JNIEnv* env,
@@ -148,6 +213,7 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeInit(
 	using namespace DEngine::Application;
 	using namespace DEngine::Application::detail;
 
+	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
 	backendData.mainActivity = dengineActivity;
@@ -163,7 +229,11 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeInit(
 
 	backendData.gameThread = std::thread(lambda);
 	auto threadName = "MainGameThread";
-	pthread_setname_np(backendData.gameThread.native_handle(), threadName);
+	int result = pthread_setname_np(backendData.gameThread.native_handle(), threadName);
+	if (result != 0)
+	{
+
+	}
 }
 
 extern "C"
@@ -177,11 +247,12 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharInp
 	using namespace DEngine::Application::detail;
 
 	auto& backendData = *Application::detail::pBackendData;
-	std::lock_guard _{ backendData.lock };
 
 	CustomEvent newEvent{};
 	newEvent.type = CustomEvent::Type::CharInput;
-	newEvent.charInput = utfValue;
+	newEvent.data.charInput = utfValue;
+
+	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
 }
 
@@ -194,11 +265,13 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharEnt
 	using namespace DEngine::Application;
 	using namespace DEngine::Application::detail;
 
+	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
-	std::lock_guard _{ backendData.lock };
 
 	CustomEvent newEvent{};
 	newEvent.type = CustomEvent::Type::CharEnter;
+
+	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
 }
 
@@ -211,14 +284,21 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharRem
 	using namespace DEngine::Application;
 	using namespace DEngine::Application::detail;
 
+	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
-	std::lock_guard _{ backendData.lock };
 
 	CustomEvent newEvent{};
 	newEvent.type = CustomEvent::Type::CharRemove;
+
+	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
 }
 
+// We do not use ANativeActivity's View in this implementation,
+// due to not being able to access it Java side and therefore cannot
+// activate the soft input on it. That means ANativeActivity's callback for
+// onContentRectChanged doesn't actually work.
+// We need our own custom event for the View that we actually use.
 extern "C"
 JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeUpdateWindowContentRect(
 	JNIEnv* env,
@@ -232,15 +312,19 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeUpdateWin
 	using namespace DEngine::Application;
 	using namespace DEngine::Application::detail;
 
+	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
-	std::lock_guard _{ backendData.lock };
-	backendData.nativeWindowVisibleOffsetY = (u32)top;
-	backendData.nativeWindowVisibleOffsetX = (u32)left;
-	//std::swap(backendData.nativeWindowVisibleOffsetX, backendData.nativeWindowVisibleOffsetY);
-	backendData.nativeWindowVisibleExtent.width = right - left;
-	backendData.nativeWindowVisibleExtent.height = bottom - top;
-	//std::swap(backendData.nativeWindowVisibleExtent.width, backendData.nativeWindowVisibleExtent.height);
-	backendData.windowVisibleRectInitialized = true;
+
+	CustomEvent newEvent{};
+	newEvent.type = CustomEvent::Type::VisibleAreaChanged;
+	newEvent.data.visibleAreaChangedOffset.x = (i32)left;
+	newEvent.data.visibleAreaChangedOffset.y = (i32)top;
+	newEvent.data.visibleAreaChangedExtent.width = (u32)right - (u32)left;
+	newEvent.data.visibleAreaChangedExtent.height = (u32)bottom - (u32)top;
+
+
+	std::lock_guard _{ backendData.customEventQueueLock };
+	backendData.customEventQueue.push_back(newEvent);
 }
 
 static Application::Orientation Application::detail::Backend_ToOrientation(int aconfiguration_orientation)
@@ -322,52 +406,6 @@ static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, in
 	return handled;
 }
 
-static bool Application::detail::HandleInputKeyEvents_Key(
-		AInputEvent* event,
-		int32_t source)
-{
-	bool handled = false;
-
-	int32_t keyAction = AKeyEvent_getAction(event);
-	if (keyAction != AKEY_EVENT_ACTION_DOWN && keyAction != AKEY_EVENT_ACTION_UP)
-		return false;
-
-	bool buttonValue = false;
-	switch (keyAction)
-	{
-	case AKEY_EVENT_ACTION_DOWN:
-		buttonValue = true;
-		break;
-	case AKEY_EVENT_ACTION_UP:
-		buttonValue = false;
-		break;
-	default:
-		break;
-	}
-
-	return handled;
-}
-
-static void Application::detail::Backend_HandleConfigChanged_Deferred()
-{
-	auto& appData = *detail::pAppData;
-	auto& backendData = *detail::pBackendData;
-
-	// AConfiguration_getOrientation is broken
-	// So we use JNI.
-	Orientation newOrientation = Backend_GetUpdatedOrientation();
-	if (newOrientation == Orientation::Invalid)
-		throw std::runtime_error("DEngine - App: Unable to query for updated Android orientation.");
-
-	detail::UpdateOrientation(newOrientation);
-	// If we had a reorientation and the window is non-square,
-	// we need to resize the window.
-	if (appData.orientationEvent && !appData.windows.empty())
-	{
-		Extent windowExtent = appData.windows.front().windowData.size;
-	}
-}
-
 namespace DEngine::Application::detail
 {
 	int testCallback(int fd, int events, void *data)
@@ -404,6 +442,114 @@ namespace DEngine::Application::detail
 	}
 }
 
+namespace DEngine::Application::detail
+{
+	static void HandleEvent_NativeWindowCreated(
+		ANativeWindow* window,
+		std::lock_guard<std::mutex> const& backendDataLock)
+	{
+		auto& backendData = *detail::pBackendData;
+		auto& appData = *detail::pAppData;
+
+		backendData.nativeWindow = window;
+		// Need to maximize the window
+		if (backendData.currentWindow.HasValue())
+		{
+			AppData::WindowNode* windowNode = detail::GetWindowNode(backendData.currentWindow.Value());
+			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
+			detail::UpdateWindowMinimized(*windowNode, false);
+			windowNode->platformHandle = backendData.nativeWindow;
+		}
+	}
+
+	static void HandleEvent_NativeWindowDestroyed(
+		std::lock_guard<std::mutex> const& backendDataLock)
+	{
+		auto& backendData = *detail::pBackendData;
+		auto& appData = *detail::pAppData;
+
+		// We need to minimize the window
+		if (backendData.currentWindow.HasValue())
+		{
+			AppData::WindowNode* windowNode = detail::GetWindowNode(backendData.currentWindow.Value());
+			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
+			detail::UpdateWindowMinimized(*windowNode, true);
+			windowNode->platformHandle = nullptr;
+		}
+
+		backendData.nativeWindow = nullptr;
+	}
+
+	static void HandleEvent_InputQueueCreated(
+		AInputQueue* queue,
+		std::lock_guard<std::mutex> const& backendDataLock)
+	{
+		auto& backendData = *detail::pBackendData;
+		auto& appData = *detail::pAppData;
+
+		backendData.inputQueue = queue;
+	}
+
+	static void HandleEvent_VisibleAreaChanged(
+		Math::Vec2Int offset,
+		Extent extent)
+	{
+		auto& backendData = *detail::pBackendData;
+		backendData.visibleAreaOffset = offset;
+		backendData.visibleAreaExtent = extent;
+	}
+
+	using ProcessCustomEvents_CallableT = void(*)(CustomEvent);
+	template<typename Callable = ProcessCustomEvents_CallableT>
+	static void ProcessCustomEvents_Internal(
+		Std::Opt<Callable> callable)
+	{
+		auto& backendData = *detail::pBackendData;
+		std::lock_guard backendDataLock{ backendData.customEventQueueLock };
+		for (CustomEvent const event : backendData.customEventQueue)
+		{
+			if (callable.HasValue())
+				callable.Value()(event);
+			switch (event.type)
+			{
+				case CustomEvent::Type::NativeWindowCreated:
+					HandleEvent_NativeWindowCreated(event.data.nativeWindow, backendDataLock);
+					break;
+				case CustomEvent::Type::NativeWindowDestroyed:
+					HandleEvent_NativeWindowDestroyed(backendDataLock);
+					break;
+				case CustomEvent::Type::InputQueueCreated:
+					HandleEvent_InputQueueCreated(event.data.inputQueue, backendDataLock);
+					break;
+				case CustomEvent::Type::VisibleAreaChanged:
+					HandleEvent_VisibleAreaChanged(event.data.visibleAreaChangedOffset, event.data.visibleAreaChangedExtent);
+					break;
+				case CustomEvent::Type::CharInput:
+					detail::PushCharInput(event.data.charInput);
+					break;
+				case CustomEvent::Type::CharRemove:
+					detail::PushCharRemoveEvent();
+					break;
+				case CustomEvent::Type::CharEnter:
+					detail::PushCharEnterEvent();
+					break;
+			}
+		}
+		backendData.customEventQueue.clear();
+	}
+
+	template<typename Callable>
+	static void ProcessCustomEvents(Callable callable)
+	{
+		ProcessCustomEvents_Internal(Std::Opt{ callable });
+	}
+
+	static void ProcessCustomEvents()
+	{
+		ProcessCustomEvents_Internal<ProcessCustomEvents_CallableT>(Std::nullOpt);
+	}
+}
+
 bool Application::detail::Backend_Initialize()
 {
 	auto& appData = *detail::pAppData;
@@ -418,6 +564,13 @@ bool Application::detail::Backend_Initialize()
 		// Attaching failed. Crash the program.
 		std::abort();
 	}
+
+	auto threadName = "MainGameThread";
+	int result = pthread_setname_np(backendData.gameThread.native_handle(), threadName);
+	if (result != 0)
+	{
+	}
+
 	// I have no idea how this code works.
 	// It does some crazy JNI bullshit to get some handles,
 	// which in turn we need to grab Java function-pointer/handles
@@ -446,35 +599,49 @@ bool Application::detail::Backend_Initialize()
 	jobject classLoader = backendData.gameThreadJniEnv->CallObjectMethod(context, getClassLoader);
 	jclass classLoaderClass = backendData.gameThreadJniEnv->GetObjectClass(classLoader);
 	jmethodID loadClass = backendData.gameThreadJniEnv->GetMethodID(
-			classLoaderClass,
-			"loadClass",
-			"(Ljava/lang/String;)Ljava/lang/Class;");
-
-
+		classLoaderClass,
+		"loadClass",
+		"(Ljava/lang/String;)Ljava/lang/Class;");
 	jstring activityName = backendData.gameThreadJniEnv->NewStringUTF("didgy.dengine.editor.DEngineActivity");
 	jclass activity = static_cast<jclass>(backendData.gameThreadJniEnv->CallObjectMethod(
-			classLoader,
-			loadClass,
-			activityName));
+		classLoader,
+		loadClass,
+		activityName));
 
 	backendData.jniOpenSoftInput = backendData.gameThreadJniEnv->GetMethodID(
 		activity,
-			"openSoftInput",
-			"(Ljava/lang/String;I)V");
+		"openSoftInput",
+		"(Ljava/lang/String;I)V");
 	backendData.jniHideSoftInput = backendData.gameThreadJniEnv->GetMethodID(
 		activity,
 		"hideSoftInput",
 		"()V");
 
-	// Figure out current orientation
-	//appData.currentOrientation = Backend_GetUpdatedOrientation();
-
-
-	while (true)
+	// We want to wait until we have received a input queue, a native window and set
+	// the visible area stuff.
+	bool nativeWindowSet = false;
+	bool inputQueueSet = false;
+	bool visibleAreaSet = false;
+	while (!nativeWindowSet || !inputQueueSet || !visibleAreaSet)
 	{
-		std::lock_guard _{ backendData.lock };
-		if (backendData.nativeWindow && backendData.windowVisibleRectInitialized && backendData.inputQueue)
-			break;
+		ProcessCustomEvents(
+			[&nativeWindowSet, &inputQueueSet, &visibleAreaSet](CustomEvent event)
+			{
+				switch (event.type)
+				{
+					case CustomEvent::Type::InputQueueCreated:
+						inputQueueSet = true;
+						break;
+					case CustomEvent::Type::NativeWindowCreated:
+						nativeWindowSet = true;
+						break;
+					case CustomEvent::Type::VisibleAreaChanged:
+						visibleAreaSet = true;
+						break;
+					default:
+						break;
+				}
+			});
 	}
 
 	ALooper* looper = ALooper_prepare(0); // ALOOPER_PREPARE_ALLOW_NON_CALLBACKS ?
@@ -499,6 +666,8 @@ void Application::detail::Backend_ProcessEvents()
 		&fileDescriptor,
 		&eventCount,
 		(void**)&source);
+	// The following if-test might be pointless in this implementation,
+	// due to it being callback based and so this return value is meaningless.
 	if (pollResult >= 0)
 	{
 		auto looperId = (LooperID)fileDescriptor; // This is wrong.
@@ -509,25 +678,7 @@ void Application::detail::Backend_ProcessEvents()
 	}
 
 	// Process our custom events
-	{
-		std::lock_guard _{ backendData.lock };
-		for (auto const event : backendData.customEventQueue)
-		{
-			switch (event.type)
-			{
-				case CustomEvent::Type::CharInput:
-					detail::PushCharInput(event.charInput);
-					break;
-				case CustomEvent::Type::CharRemove:
-					detail::PushCharRemoveEvent();
-					break;
-				case CustomEvent::Type::CharEnter:
-					detail::PushCharEnterEvent();
-					break;
-			}
-		}
-		backendData.customEventQueue.clear();
-	}
+	ProcessCustomEvents();
 }
 
 Application::WindowID Application::CreateWindow(
@@ -537,8 +688,12 @@ Application::WindowID Application::CreateWindow(
 	auto& appData = *detail::pAppData;
 	auto& backendData = *detail::pBackendData;
 
-	detail::AppData::WindowNode newNode{};
+	if (backendData.currentWindow.HasValue())
+		std::abort();
+	else
+		backendData.currentWindow = Std::Opt{ (App::WindowID)appData.windowIdTracker };
 
+	detail::AppData::WindowNode newNode{};
 	newNode.id = (App::WindowID)appData.windowIdTracker;
 	appData.windowIdTracker++;
 
@@ -546,12 +701,13 @@ Application::WindowID Application::CreateWindow(
 	int height = ANativeWindow_getHeight(backendData.nativeWindow);
 	newNode.windowData.size.width = (u32)width;
 	newNode.windowData.size.height = (u32)height;
-	newNode.windowData.visiblePosition = { (i32)backendData.nativeWindowVisibleOffsetX, (i32)backendData.nativeWindowVisibleOffsetY };
-	newNode.windowData.visibleSize = backendData.nativeWindowVisibleExtent;
+	newNode.windowData.visiblePosition = backendData.visibleAreaOffset;
+	newNode.windowData.visibleSize = backendData.visibleAreaExtent;
+	newNode.platformHandle = backendData.nativeWindow;
 
 	appData.windows.push_back(newNode);
 
-	return WindowID(0);
+	return newNode.id;
 }
 
 Std::Opt<u64> Application::CreateVkSurface(
@@ -613,8 +769,6 @@ void Application::detail::Backend_Log(char const* msg)
 	__android_log_print(ANDROID_LOG_ERROR, "DEngine: ", "%s", msg);
 }
 
-
-
 void Application::OpenSoftInput(std::string_view text, SoftInputFilter inputFilter)
 {
 	auto const& backendData = *detail::pBackendData;
@@ -622,7 +776,7 @@ void Application::OpenSoftInput(std::string_view text, SoftInputFilter inputFilt
 	tempString.reserve(text.size());
 	for (auto item : text)
 	{
-		tempString.push_back(item);
+		tempString.push_back((jchar)item);
 	}
 
 	jstring javaString = backendData.gameThreadJniEnv->NewString(tempString.data(), tempString.length());
@@ -636,6 +790,11 @@ void Application::OpenSoftInput(std::string_view text, SoftInputFilter inputFilt
 	//backendData.gameThreadJniEnv->ReleaseStringChars(javaString, tempString.data());
 }
 
+void Application::UpdateCharInputContext(std::string_view)
+{
+
+}
+
 void Application::HideSoftInput()
 {
 	auto const& backendData = *detail::pBackendData;
@@ -646,40 +805,6 @@ void Application::HideSoftInput()
 void Application::LockCursor(bool state)
 {
 
-}
-
-static Application::Button Application::detail::Backend_AndroidKeyCodeToButton(int32_t in)
-{
-	switch (in)
-	{
-		case AKEYCODE_0:
-			return Button::Zero;
-		case AKEYCODE_1:
-			return Button::One;
-		case AKEYCODE_2:
-			return Button::Two;
-		case AKEYCODE_3:
-			return Button::Three;
-		case AKEYCODE_4:
-			return Button::Four;
-		case AKEYCODE_5:
-			return Button::Five;
-		case AKEYCODE_6:
-			return Button::Six;
-		case AKEYCODE_7:
-			return Button::Seven;
-		case AKEYCODE_8:
-			return Button::Eight;
-		case AKEYCODE_9:
-			return Button::Nine;
-
-		case AKEYCODE_DEL:
-			return Button::Delete;
-		case AKEYCODE_BACK:
-			return Button::Back;
-		default:
-			return Button::Undefined;
-	}
 }
 
 //

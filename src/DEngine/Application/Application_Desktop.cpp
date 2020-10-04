@@ -6,6 +6,7 @@
 #define DENGINE_APPLICATION_CURSORTYPE_COUNT
 #define DENGINE_APPLICATION_BUTTON_COUNT
 #include "detail_Application.hpp"
+#include "Assert.hpp"
 
 #include <DEngine/Utility.hpp>
 
@@ -22,8 +23,6 @@ namespace DEngine::Application::detail
 	{
 		bool cursorLocked = false;
 		Math::Vec2Int virtualCursorPos{};
-
-		Std::Opt<SoftInputFilter> charInputFilter;
 
 		GLFWcursor* cursorTypes[(int)CursorType::COUNT] = {};
 	};
@@ -107,14 +106,15 @@ void Application::LockCursor(bool state)
 
 void Application::OpenSoftInput(std::string_view currentText, SoftInputFilter filter)
 {
-	auto& backendData = *detail::pBackendData;
-	backendData.charInputFilter = Std::Opt{ filter };
+}
+
+void Application::UpdateCharInputContext(std::string_view)
+{
+
 }
 
 void Application::HideSoftInput()
 {
-	auto& backendData = *detail::pBackendData;
-	backendData.charInputFilter = Std::nullOpt;
 }
 
 void Application::detail::Backend_Log(char const* msg)
@@ -243,33 +243,7 @@ static void Application::detail::Backend_GLFW_CharCallback(
 	GLFWwindow* window, 
 	unsigned int codepoint)
 {
-	auto& backendData = *detail::pBackendData;
-	if (backendData.charInputFilter.HasValue())
-	{
-		SoftInputFilter filter = backendData.charInputFilter.Value();
-		switch (filter)
-		{
-			case SoftInputFilter::Integer:
-			{
-				if ('0' <= codepoint && codepoint <= '9')
-					detail::PushCharInput(codepoint);
-			}
-				break;
-			case SoftInputFilter::UnsignedInteger:
-				if (('0' <= codepoint && codepoint <= '9') ||
-						codepoint == '-')
-					detail::PushCharInput(codepoint);
-				break;
-			case SoftInputFilter::Float:
-				if (('0' <= codepoint && codepoint <= '9') ||
-					codepoint == '-' ||
-					codepoint == '.')
-					detail::PushCharInput(codepoint);
-				break;
-			}
-	}
-	else
-		detail::PushCharInput(codepoint);
+	detail::PushCharInput(codepoint);
 }
 
 static void Application::detail::Backend_GLFW_MouseButtonCallback(
@@ -398,7 +372,9 @@ static void Application::detail::Backend_GLFW_WindowMinimizeCallback(
 	GLFWwindow* window, 
 	int iconified)
 {
-	detail::UpdateWindowMinimized(window, iconified);
+	AppData::WindowNode* windowNode = detail::GetWindowNode(window);
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
+	detail::UpdateWindowMinimized(*windowNode, iconified);
 }
 
 Std::Opt<u64> Application::CreateVkSurface(

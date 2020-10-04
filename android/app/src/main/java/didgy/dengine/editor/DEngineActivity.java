@@ -316,59 +316,31 @@ public class DEngineActivity extends NativeActivity  {
         static class DotFilter implements InputFilter {
             @Override
             public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
-                boolean sourceHasInvalidChar = false;
-                int sourceLength = end - start;
-                for (int i = start; i < end; i++) {
-                    char c = source.charAt(i);
-                    if (!(48 <= c && c <= 57) &&
-                        c != '.' &&
-                        c != '-') {
-                        sourceHasInvalidChar = true;
-                        break;
+                if (contains(source.subSequence(start, end), '.')) {
+                    if (contains(dest, '.')) {
+                        // We need to build a sequence with no dot.
+                        StringBuilder returnVal = new StringBuilder(end - start);
+                        for (int i = start; i < end; i++) {
+                            char c = source.charAt(i);
+                            if (c != '.')
+                                returnVal.append(c);
+                        }
+                        return returnVal;
                     }
                 }
-                if (sourceHasInvalidChar) {
-                    StringBuilder returnVal = new StringBuilder(sourceLength);
-                    for (int i = start; i < end; i++) {
-                        char c = source.charAt(i);
-                        if ((48 <= c && c <= 57) ||
-                            c == '.' ||
-                            c == '-')
-                            returnVal.append(c);
-                    }
-                    return returnVal;
-                } else
-                    return null;
+                return null;
             }
         }
 
         static class MinusFilter implements InputFilter {
             @Override
             public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
-                boolean sourceHasInvalidChar = false;
-                int sourceLength = end - start;
-                for (int i = start; i < end; i++) {
-                    char c = source.charAt(i);
-                    if (!(48 <= c && c <= 57) &&
-                        c != '.' &&
-                        c != '-') {
-                        sourceHasInvalidChar = true;
-                        break;
+                if (contains(source.subSequence(start, end), '-')) {
+                    if (dest.length() != 0) {
+                        return "";
                     }
                 }
-                if (sourceHasInvalidChar) {
-                    StringBuilder returnVal = new StringBuilder(sourceLength);
-                    for (int i = start; i < end; i++) {
-                        char c = source.charAt(i);
-                        if ((48 <= c && c <= 57) ||
-                            c == '.' ||
-                            c == '-')
-                            returnVal.append(c);
-                    }
-                    return returnVal;
-                }
-                else
-                    return null;
+                return null;
             }
         }
     }

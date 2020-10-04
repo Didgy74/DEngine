@@ -32,6 +32,9 @@ namespace DEngine::Editor
 		virtual void WindowMove(
 			App::WindowID window,
 			Math::Vec2Int position) override;
+		virtual void WindowMinimize(
+			App::WindowID window,
+			bool wasMinimized) override;
 		virtual void WindowCursorEnter(
 			App::WindowID window,
 			bool entered) override;

@@ -202,7 +202,7 @@ namespace DEngine::Gui::impl
 {
 	static void DispatchEvent(ImplData& implData, WindowCursorEnterEvent resize)
 	{
-		auto windowIt = std::find_if(
+		auto windowIt = Std::FindIf(
 			implData.windows.begin(),
 			implData.windows.end(),
 			[resize](WindowNode const& node) -> bool { return node.id == resize.windowId; });
@@ -212,7 +212,7 @@ namespace DEngine::Gui::impl
 
 	static void DispatchEvent(ImplData& implData, WindowMinimizeEvent minimize)
 	{
-		auto windowIt = std::find_if(
+		auto windowIt = Std::FindIf(
 			implData.windows.begin(),
 			implData.windows.end(),
 			[minimize](WindowNode const& node) -> bool { return node.id == minimize.windowId; });
@@ -223,7 +223,7 @@ namespace DEngine::Gui::impl
 
 	static void DispatchEvent(ImplData& implData, WindowMoveEvent move)
 	{
-		auto windowIt = std::find_if(
+		auto windowIt = Std::FindIf(
 			implData.windows.begin(),
 			implData.windows.end(),
 			[move](WindowNode const& node) -> bool { return node.id == move.windowId; });
@@ -234,7 +234,7 @@ namespace DEngine::Gui::impl
 
 	static void DispatchEvent(ImplData& implData, WindowResizeEvent resize)
 	{
-		auto windowIt = std::find_if(
+		auto windowIt = Std::FindIf(
 			implData.windows.begin(),
 			implData.windows.end(),
 			[resize](WindowNode const& node) -> bool { return node.id == resize.windowId; });

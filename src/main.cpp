@@ -161,7 +161,6 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		for (auto item : myScene.moves)
 			item.b.Update(item.a, myScene, Time::Delta());
 
-		
 		detail::SubmitRendering(
 			gfxCtx, 
 			editorCtx, 
