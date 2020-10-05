@@ -710,6 +710,12 @@ Application::WindowID Application::CreateWindow(
 	return newNode.id;
 }
 
+void Application::detail::Backend_DestroyWindow(AppData::WindowNode& windowNode)
+{
+	auto& backendData = *detail::pBackendData;
+	backendData.currentWindow = Std::nullOpt;
+}
+
 Std::Opt<u64> Application::CreateVkSurface(
 		WindowID window,
 		uSize vkInstance,

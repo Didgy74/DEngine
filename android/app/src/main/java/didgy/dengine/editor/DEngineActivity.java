@@ -25,6 +25,8 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.ExtractedText;
+import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 
@@ -358,6 +360,15 @@ public class DEngineActivity extends NativeActivity  {
 
                 mInputConnectionID = mActivity.mInputConnectionCounter;
                 mActivity.mInputConnectionCounter++;
+            }
+
+            @Override
+            public ExtractedText getExtractedText(ExtractedTextRequest request, int flags) {
+                ExtractedText returnVal = new ExtractedText();
+                returnVal.text = mActivity.mEditable;
+                returnVal.selectionStart = returnVal.text.length();
+                returnVal.selectionEnd = returnVal.text.length();
+                return returnVal;
             }
 
             @Override
