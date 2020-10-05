@@ -126,6 +126,16 @@ void Context::PushEvent(TouchEvent event)
 	implData.eventQueue.push_back(newEvent);
 }
 
+void Context::PushEvent(WindowCloseEvent event)
+{
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	impl::Event newEvent{};
+	newEvent.type = impl::Event::Type::Window;
+	newEvent.window.type = impl::Event::Window::Type::Close;
+	newEvent.window.close = event;
+	implData.eventQueue.push_back(newEvent);
+}
+
 void Context::PushEvent(WindowCursorEnterEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
@@ -200,13 +210,25 @@ void Test::OpenSoftInput(std::string_view currentText, SoftInputFilter inputFilt
 
 namespace DEngine::Gui::impl
 {
+	static void DispatchEvent(ImplData& implData, WindowCloseEvent event)
+	{
+		auto windowIt = Std::FindIf(
+			implData.windows.begin(),
+			implData.windows.end(),
+			[event](WindowNode const& node) -> bool { return node.id == event.windowId; });
+		DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
+		WindowID windowId = windowIt->id;
+		implData.windows.erase(windowIt);
+		implData.windowHandler->CloseWindow(windowId);
+	}
+
 	static void DispatchEvent(ImplData& implData, WindowCursorEnterEvent resize)
 	{
 		auto windowIt = Std::FindIf(
 			implData.windows.begin(),
 			implData.windows.end(),
 			[resize](WindowNode const& node) -> bool { return node.id == resize.windowId; });
-
+		DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
 		auto& windowData = windowIt->data;
 	}
 
@@ -216,7 +238,7 @@ namespace DEngine::Gui::impl
 			implData.windows.begin(),
 			implData.windows.end(),
 			[minimize](WindowNode const& node) -> bool { return node.id == minimize.windowId; });
-
+		DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
 		auto& windowData = windowIt->data;
 		windowData.isMinimized = minimize.wasMinimized;
 	}
@@ -227,7 +249,7 @@ namespace DEngine::Gui::impl
 			implData.windows.begin(),
 			implData.windows.end(),
 			[move](WindowNode const& node) -> bool { return node.id == move.windowId; });
-
+		DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
 		auto& windowData = windowIt->data;
 		windowData.rect.position = move.position;
 	}
@@ -238,7 +260,7 @@ namespace DEngine::Gui::impl
 			implData.windows.begin(),
 			implData.windows.end(),
 			[resize](WindowNode const& node) -> bool { return node.id == resize.windowId; });
-
+		DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
 		auto& windowData = windowIt->data;
 		windowData.rect.extent = resize.extent;
 		windowData.visibleRect = resize.visibleRect;
@@ -248,6 +270,9 @@ namespace DEngine::Gui::impl
 	{
 		switch (windowEvent.type)
 		{
+		case Event::Window::Type::Close:
+			DispatchEvent(implData, windowEvent.close);
+			break;
 		case Event::Window::Type::CursorEnter:
 			DispatchEvent(implData, windowEvent.cursorEnter);
 			break;

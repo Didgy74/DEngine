@@ -136,23 +136,17 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	Scene myScene;
 
-	//for (uSize i = 0; i < 250; i++)
-		//myScene.NewEntity();
-
-	//myScene.transforms.push_back({ (Entity)0, {} });
-	//myScene.textureIDs.push_back({ (Entity)0, {} });
-
 	Editor::Context editorCtx = Editor::Context::Create(
 		mainWindow,
 		&myScene,
 		&gfxCtx);
 
-	
-
 	while (true)
 	{
 		Time::TickStart();
 		App::detail::ProcessEvents();
+		if (App::GetWindowCount() == 0)
+			break;
 
 		editorCtx.ProcessEvents();
 

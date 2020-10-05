@@ -17,6 +17,27 @@ namespace DEngine::Application::detail
 
 using namespace DEngine;
 
+void Application::DestroyWindow(WindowID id)
+{
+	auto& appData = *detail::pAppData;
+	auto windowNodeIt = Std::FindIf(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[id](detail::AppData::WindowNode const& val) -> bool {
+			return id== val.id; });
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	
+	detail::Backend_DestroyWindow(*windowNodeIt);
+
+	appData.windows.erase(windowNodeIt);
+}
+
+u32 Application::GetWindowCount()
+{
+	auto const& appData = *detail::pAppData;
+	return (u32)appData.windows.size();
+}
+
 Application::Extent Application::GetWindowSize(WindowID window)
 {
 	auto const& appData = *detail::pAppData;
@@ -371,6 +392,16 @@ void Application::detail::UpdateWindowMinimized(
 		windowNode.events.restore = true;
 	for (EventInterface* eventCallback : appData.eventCallbacks)
 		eventCallback->WindowMinimize(windowNode.id, minimized);
+}
+
+void Application::detail::UpdateWindowClose(
+	AppData::WindowNode& windowNode)
+{
+	auto& appData = *detail::pAppData;
+
+	windowNode.windowData.shouldShutdown = true;
+	for (EventInterface* eventCallback : appData.eventCallbacks)
+		eventCallback->WindowClose(windowNode.id);
 }
 
 void Application::detail::UpdateWindowCursorEnter(

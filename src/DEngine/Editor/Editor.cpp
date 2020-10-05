@@ -946,8 +946,8 @@ void Editor::Context::ProcessEvents()
 {
 	ContextImpl& implData = *static_cast<ContextImpl*>(this->implData);
 
-	if (App::TickCount() % 60 == 0)
-		implData.test_fpsText->String_Set(std::to_string(Time::Delta()).c_str());
+	//if (App::TickCount() % 60 == 0)
+		//implData.test_fpsText->String_Set(std::to_string(Time::Delta()).c_str());
 
 	implData.guiCtx->ProcessEvents();
 }
@@ -1048,6 +1048,13 @@ void Editor::ContextImpl::UnselectEntity()
 		componentList->Clear();
 
 	selectedEntity = Std::nullOpt;
+}
+
+void Editor::ContextImpl::WindowClose(App::WindowID windowId)
+{
+	Gui::WindowCloseEvent event{};
+	event.windowId = (Gui::WindowID)windowId;
+	guiCtx->PushEvent(event);
 }
 
 void Editor::ContextImpl::WindowResize(
@@ -1154,6 +1161,11 @@ void Editor::ContextImpl::TouchEvent(
 	else if (type == App::TouchEventType::Up)
 		event.type = Gui::TouchEventType::Up;
 	guiCtx->PushEvent(event);
+}
+
+void Editor::ContextImpl::CloseWindow(Gui::WindowID id)
+{
+	App::DestroyWindow((App::WindowID)id);
 }
 
 void Editor::ContextImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursorType)

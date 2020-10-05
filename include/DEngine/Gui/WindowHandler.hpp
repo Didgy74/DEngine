@@ -18,6 +18,8 @@ namespace DEngine::Gui
 	public:
 		virtual ~WindowHandler() noexcept = 0;
 
+		virtual void CloseWindow(WindowID) = 0;
+
 		virtual void SetCursorType(WindowID, CursorType) = 0;
 
 		virtual void OpenSoftInput(WindowID, std::string_view currentText, SoftInputFilter inputFilter) = 0;

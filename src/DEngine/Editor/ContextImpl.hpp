@@ -24,6 +24,8 @@ namespace DEngine::Editor
 		Std::Box<Gui::Context> guiCtx;
 
 		// Override app-interface methods
+		virtual void WindowClose(
+			App::WindowID windowId) override;
 		virtual void WindowResize(
 			App::WindowID window,
 			App::Extent newExtent,
@@ -54,6 +56,7 @@ namespace DEngine::Editor
 
 
 		// Override window-handler methods
+		virtual void CloseWindow(Gui::WindowID) override;
 		virtual void SetCursorType(Gui::WindowID, Gui::CursorType) override;
 		virtual void OpenSoftInput(Gui::WindowID, std::string_view, Gui::SoftInputFilter) override;
 

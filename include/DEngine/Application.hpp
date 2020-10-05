@@ -43,6 +43,7 @@ namespace DEngine::Application
 		char const* title, 
 		Extent extents);
 	void DestroyWindow(WindowID);
+	u32 GetWindowCount();
 	Extent GetWindowSize(WindowID);
 	Extent GetWindowVisibleSize(WindowID);
 	Math::Vec2Int GetWindowPosition(WindowID);
@@ -272,6 +273,8 @@ public:
 	virtual void WindowFocus(
 		WindowID window,
 		bool focused) {}
+	virtual void WindowClose(
+		WindowID window) {}
 	virtual void WindowCursorEnter(
 		WindowID window,
 		bool entered) {}

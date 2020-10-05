@@ -85,6 +85,7 @@ namespace DEngine::Application::detail
 	bool Backend_Initialize();
 	void Backend_ProcessEvents();
 	void Backend_Log(char const* msg);
+	void Backend_DestroyWindow(AppData::WindowNode& windowNode);
 
 	void SetLogCallback(LogCallback callback);
 
@@ -104,6 +105,8 @@ namespace DEngine::Application::detail
 	void UpdateWindowMinimized(
 		AppData::WindowNode& windowNode,
 		bool minimized);
+	void UpdateWindowClose(
+		AppData::WindowNode& windowNode);
 	void UpdateWindowCursorEnter(
 		void* platformHandle,
 		bool entered);

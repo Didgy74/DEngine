@@ -42,6 +42,7 @@ namespace DEngine::Gui::impl
 		{
 			enum class Type
 			{
+				Close,
 				CursorEnter,
 				Minimize,
 				Move,
@@ -50,6 +51,7 @@ namespace DEngine::Gui::impl
 			Type type;
 			union
 			{
+				WindowCloseEvent close;
 				WindowCursorEnterEvent cursorEnter;
 				WindowMinimizeEvent minimize;
 				WindowMoveEvent move;

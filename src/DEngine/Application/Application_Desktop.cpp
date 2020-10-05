@@ -173,18 +173,25 @@ Application::WindowID Application::CreateWindow(
 	
 	appData.windows.push_back(newNode);
 
-	glfwSetWindowPosCallback(rawHandle, detail::Backend_GLFW_WindowPosCallback);
-	glfwSetWindowSizeCallback(rawHandle, detail::Backend_GLFW_WindowSizeCallback);
-	glfwSetWindowFocusCallback(rawHandle, detail::Backend_GLFW_WindowFocusCallback);
-	glfwSetWindowIconifyCallback(rawHandle, detail::Backend_GLFW_WindowMinimizeCallback);
-	glfwSetCursorEnterCallback(rawHandle, detail::Backend_GLFW_WindowCursorEnterCallback);
+	glfwSetWindowPosCallback(rawHandle, &detail::Backend_GLFW_WindowPosCallback);
+	glfwSetWindowSizeCallback(rawHandle, &detail::Backend_GLFW_WindowSizeCallback);
+	glfwSetWindowFocusCallback(rawHandle, &detail::Backend_GLFW_WindowFocusCallback);
+	glfwSetWindowIconifyCallback(rawHandle, &detail::Backend_GLFW_WindowMinimizeCallback);
+	glfwSetWindowCloseCallback(rawHandle, &detail::Backend_GLFW_WindowCloseCallback);
+	glfwSetCursorEnterCallback(rawHandle, &detail::Backend_GLFW_WindowCursorEnterCallback);
 
-	glfwSetCursorPosCallback(rawHandle, detail::Backend_GLFW_CursorPosCallback);
-	glfwSetMouseButtonCallback(rawHandle, detail::Backend_GLFW_MouseButtonCallback);
-	glfwSetCharCallback(rawHandle, detail::Backend_GLFW_CharCallback);
-	glfwSetKeyCallback(rawHandle, detail::Backend_GLFW_KeyboardKeyCallback);
+
+	glfwSetCursorPosCallback(rawHandle, &detail::Backend_GLFW_CursorPosCallback);
+	glfwSetMouseButtonCallback(rawHandle, &detail::Backend_GLFW_MouseButtonCallback);
+	glfwSetCharCallback(rawHandle, &detail::Backend_GLFW_CharCallback);
+	glfwSetKeyCallback(rawHandle, &detail::Backend_GLFW_KeyboardKeyCallback);
 
 	return newNode.id;
+}
+
+void Application::detail::Backend_DestroyWindow(AppData::WindowNode& windowNode)
+{
+	glfwDestroyWindow((GLFWwindow*)windowNode.platformHandle);
 }
 
 static void Application::detail::Backend_GLFW_ErrorCallback(
@@ -356,6 +363,9 @@ static void Application::detail::Backend_GLFW_WindowFramebufferSizeCallback(
 static void Application::detail::Backend_GLFW_WindowCloseCallback(
 	GLFWwindow* window)
 {
+	AppData::WindowNode* windowNode = detail::GetWindowNode(window);
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
+	detail::UpdateWindowClose(*windowNode);
 }
 
 static void Application::detail::Backend_GLFW_WindowFocusCallback(GLFWwindow* window, int focused)

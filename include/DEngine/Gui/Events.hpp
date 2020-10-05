@@ -24,6 +24,11 @@ namespace DEngine::Gui
 		bool wasMinimized;
 	};
 
+	struct WindowCloseEvent
+	{
+		WindowID windowId;
+	};
+
 	struct WindowCursorEnterEvent
 	{
 		WindowID windowId;

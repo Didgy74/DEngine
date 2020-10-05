@@ -32,11 +32,11 @@ namespace DEngine::Gui
 		void PushEvent(CursorClickEvent);
 		void PushEvent(CursorMoveEvent);
 		void PushEvent(TouchEvent);
+		void PushEvent(WindowCloseEvent);
 		void PushEvent(WindowCursorEnterEvent);
 		void PushEvent(WindowMinimizeEvent);
 		void PushEvent(WindowMoveEvent);
 		void PushEvent(WindowResizeEvent);
-		
 		
 		// TEMPORARY FIELDS
 		StackLayout* outerLayout = nullptr;
