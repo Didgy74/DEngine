@@ -50,8 +50,6 @@ Context Context::Create(
 		newCtx.outerLayout = outmostLayout;
 	}
 
-
-
 	return static_cast<Context&&>(newCtx);
 }
 
@@ -65,6 +63,33 @@ Context::Context(Context&& other) noexcept :
 {
 	other.pImplData = nullptr;
 	other.outerLayout = nullptr;
+}
+
+void Context::TakeInputConnection(
+	Widget& widget,
+	SoftInputFilter softInputFilter,
+	std::string_view currentText)
+{
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	if (implData.inputConnectionWidget)
+	{
+		implData.inputConnectionWidget->InputConnectionLost(*this);
+	}
+	implData.windowHandler->OpenSoftInput(
+		currentText,
+		softInputFilter);
+	implData.inputConnectionWidget = &widget;
+}
+
+void Context::TakeInputConnection(
+	Widget& widget)
+{
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	DENGINE_IMPL_GUI_ASSERT(&widget == implData.inputConnectionWidget);
+
+	implData.windowHandler->HideSoftInput();
+
+	implData.inputConnectionWidget = nullptr;
 }
 
 void Context::PushEvent(CharEnterEvent)

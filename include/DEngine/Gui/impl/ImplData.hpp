@@ -154,6 +154,8 @@ namespace DEngine::Gui::impl
 
 		WindowHandler* windowHandler = nullptr;
 
+		Widget* inputConnectionWidget = nullptr;
+
 		std::vector<WindowNode> windows;
 
 		Math::Vec2Int cursorPosition{};

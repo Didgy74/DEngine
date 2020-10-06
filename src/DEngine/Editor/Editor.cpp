@@ -1189,8 +1189,12 @@ void Editor::ContextImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursor
 	App::SetCursor((App::WindowID)id, appCursorType);
 }
 
+void Editor::ContextImpl::HideSoftInput()
+{
+	App::HideSoftInput();
+}
+
 void Editor::ContextImpl::OpenSoftInput(
-	Gui::WindowID windowId, 
 	std::string_view currentText, 
 	Gui::SoftInputFilter inputFilter)
 {
@@ -1202,6 +1206,9 @@ void Editor::ContextImpl::OpenSoftInput(
 		break;
 	case Gui::SoftInputFilter::Integer:
 		filter = App::SoftInputFilter::Integer;
+		break;
+	case Gui::SoftInputFilter::UnsignedInteger:
+		filter = App::SoftInputFilter::UnsignedInteger;
 		break;
 	}
 	App::OpenSoftInput(currentText, filter);

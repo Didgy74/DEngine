@@ -11,6 +11,7 @@ namespace DEngine::Gui
 	{
 		Float,
 		Integer,
+		UnsignedInteger
 	};
 
 	class WindowHandler
@@ -22,7 +23,8 @@ namespace DEngine::Gui
 
 		virtual void SetCursorType(WindowID, CursorType) = 0;
 
-		virtual void OpenSoftInput(WindowID, std::string_view currentText, SoftInputFilter inputFilter) = 0;
+		virtual void HideSoftInput() = 0;
+		virtual void OpenSoftInput(std::string_view currentText, SoftInputFilter inputFilter) = 0;
 	};
 
 	inline WindowHandler::~WindowHandler() noexcept {}

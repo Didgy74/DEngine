@@ -1,5 +1,6 @@
 #include <DEngine/Gui/LineEdit.hpp>
-#include <DEngine/Application.hpp>
+
+#include <DEngine/Gui/Context.hpp>
 
 #include <DEngine/Utility.hpp>
 
@@ -41,11 +42,10 @@ void LineEdit::CharEnterEvent(Context& ctx)
 	if (selected)
 	{
 		selected = false;
-		App::HideSoftInput();
+		ctx.TakeInputConnection(*this);
 		if (StringView().empty())
 		{
 			String_Set("0");
-			App::UpdateCharInputContext(StringView()); // TEMPORARY!
 			if (textChangedPfn)
 				textChangedPfn(*this);
 		}
@@ -103,13 +103,11 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 		if (validChar)
 		{
 			String_PushBack((u8)charEvent);
-			App::UpdateCharInputContext(StringView()); // TEMPORARY!
 			auto const& string = StringView();
 			if (string != "" && string != "-" && string != "." && string != "-.")
 			{
 				if (textChangedPfn)
 					textChangedPfn(*this);
-				App::UpdateCharInputContext(StringView());
 			}
 		}
 	}
@@ -120,13 +118,20 @@ void LineEdit::CharRemoveEvent(Context& ctx)
 	if (selected && !StringView().empty())
 	{
 		String_PopBack();
-		App::UpdateCharInputContext(StringView()); // TEMPORARY!
 		auto const& string = StringView();
 		if (string != "" && string != "-" && string != "." && string != "-.")
 		{
 			if (textChangedPfn)
 				textChangedPfn(*this);
 		}
+	}
+}
+
+void LineEdit::InputConnectionLost(Context& ctx)
+{
+	if (selected)
+	{
+		selected = false;
 	}
 }
 
@@ -144,10 +149,24 @@ void LineEdit::CursorClick(
 		if (cursorIsInside && event.clicked && !selected)
 		{
 			selected = true;
+
+			SoftInputFilter filter{};
+			if (this->type == Type::Float)
+				filter = SoftInputFilter::Float;
+			else if (this->type == Type::Integer)
+				filter = SoftInputFilter::Integer;
+			else if (this->type == Type::UnsignedInteger)
+				filter = SoftInputFilter::UnsignedInteger;
+			ctx.TakeInputConnection(
+				*this,
+				filter,
+				StringView());
+
 		}
 		else if (!cursorIsInside && event.clicked && selected)
 		{
 			selected = false;
+			ctx.TakeInputConnection(*this);
 			if (StringView().empty())
 			{
 				String_Set("0");
@@ -169,21 +188,23 @@ void LineEdit::TouchEvent(
 	if (event.id == 0 && event.type == TouchEventType::Down && cursorIsInside && !selected)
 	{
 		selected = true;
-		// TEMP
-		WindowHandler* test = nullptr;
-		App::SoftInputFilter filter{};
+
+		SoftInputFilter filter{};
 		if (this->type == Type::Float)
-			filter = App::SoftInputFilter::Float;
+			filter = SoftInputFilter::Float;
 		else if (this->type == Type::Integer)
-			filter = App::SoftInputFilter::Integer;
+			filter = SoftInputFilter::Integer;
 		else if (this->type == Type::UnsignedInteger)
-			filter = App::SoftInputFilter::UnsignedInteger;
-		App::OpenSoftInput(this->StringView(), filter);
+			filter = SoftInputFilter::UnsignedInteger;
+		ctx.TakeInputConnection(
+			*this,
+			filter,
+			StringView());
 	}
 
 	if (event.id == 0 && event.type == TouchEventType::Down && !cursorIsInside && selected)
 	{
-		App::HideSoftInput();
+		
 		if (StringView().empty())
 		{
 			String_Set("0");
@@ -191,5 +212,6 @@ void LineEdit::TouchEvent(
 				textChangedPfn(*this);
 		}
 		selected = false;
+		ctx.TakeInputConnection(*this);
 	}
 }

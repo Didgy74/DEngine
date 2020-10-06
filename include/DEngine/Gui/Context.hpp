@@ -4,13 +4,14 @@
 #include <DEngine/Gui/WindowHandler.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
 
-// Temporary include.
-#include <DEngine/Gui/StackLayout.hpp>
-
-#include <DEngine/Math/Vector.hpp>
+#include <string_view>
 
 namespace DEngine::Gui
 {
+	class StackLayout; // TEMPORARY
+
+	class Widget;
+
 	class Context
 	{
 	public:
@@ -25,6 +26,14 @@ namespace DEngine::Gui
 
 		void ProcessEvents();
 		void Render() const;
+
+		void TakeInputConnection(
+			Widget& widget,
+			SoftInputFilter softInputFilter,
+			std::string_view currentText);
+
+		void TakeInputConnection(
+			Widget& widget);
 
 		void PushEvent(CharEnterEvent);
 		void PushEvent(CharEvent);
