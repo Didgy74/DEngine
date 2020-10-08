@@ -42,7 +42,7 @@ void LineEdit::CharEnterEvent(Context& ctx)
 	if (selected)
 	{
 		selected = false;
-		ctx.TakeInputConnection(*this);
+		ctx.ClearInputConnection(*this);
 		if (StringView().empty())
 		{
 			String_Set("0");
@@ -166,7 +166,7 @@ void LineEdit::CursorClick(
 		else if (!cursorIsInside && event.clicked && selected)
 		{
 			selected = false;
-			ctx.TakeInputConnection(*this);
+			ctx.ClearInputConnection(*this);
 			if (StringView().empty())
 			{
 				String_Set("0");
@@ -212,6 +212,6 @@ void LineEdit::TouchEvent(
 				textChangedPfn(*this);
 		}
 		selected = false;
-		ctx.TakeInputConnection(*this);
+		ctx.ClearInputConnection(*this);
 	}
 }

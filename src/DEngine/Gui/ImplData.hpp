@@ -29,66 +29,6 @@
 
 namespace DEngine::Gui::impl
 {
-	struct Event
-	{
-		enum class Type
-		{
-			Window,
-			Input
-		};
-		Type type;
-
-		struct Window
-		{
-			enum class Type
-			{
-				Close,
-				CursorEnter,
-				Minimize,
-				Move,
-				Resize,
-			};
-			Type type;
-			union
-			{
-				WindowCloseEvent close;
-				WindowCursorEnterEvent cursorEnter;
-				WindowMinimizeEvent minimize;
-				WindowMoveEvent move;
-				WindowResizeEvent resize;
-			};
-		};
-
-		struct Input
-		{
-			enum class Type
-			{
-				CursorMove,
-				CursorClick,
-				Touch,
-				Char,
-				CharEnter,
-				CharRemove,
-			};
-			Type type;
-			union
-			{
-				CursorMoveEvent cursorMove;
-				CursorClickEvent cursorClick;
-				TouchEvent touch;
-				CharEnterEvent charEnter;
-				CharEvent charEvent;
-				CharRemoveEvent charRemove;
-			};
-		};
-
-		union
-		{
-			Window window;
-			Input input;
-		};
-	};
-
 	struct TextManager
 	{
 		Gfx::Context* gfxCtx = nullptr;
@@ -149,8 +89,6 @@ namespace DEngine::Gui::impl
 	{
 		ImplData() = default;
 		ImplData(ImplData const&) = delete;
-
-		std::vector<Event> eventQueue;
 
 		WindowHandler* windowHandler = nullptr;
 

@@ -1,7 +1,7 @@
 #include <DEngine/Gui/Button.hpp>
 
 #include <DEngine/Gui/Context.hpp>
-#include <DEngine/Gui/impl/ImplData.hpp>
+#include "ImplData.hpp"
 
 using namespace DEngine;
 using namespace DEngine::Gui;

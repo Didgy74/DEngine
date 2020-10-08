@@ -1,7 +1,7 @@
 #include <DEngine/Gui/DockArea.hpp>
 
 #include <DEngine/Gui/Context.hpp>
-#include <DEngine/Gui/impl/ImplData.hpp>
+#include "ImplData.hpp"
 
 #include <DEngine/Containers/Opt.hpp>
 #include <DEngine/Containers/Span.hpp>

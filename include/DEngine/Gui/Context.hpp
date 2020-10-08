@@ -24,16 +24,9 @@ namespace DEngine::Gui
 		Context& operator=(Context const&) = delete;
 		Context& operator=(Context&&) noexcept;
 
-		void ProcessEvents();
+		void Tick();
+
 		void Render() const;
-
-		void TakeInputConnection(
-			Widget& widget,
-			SoftInputFilter softInputFilter,
-			std::string_view currentText);
-
-		void TakeInputConnection(
-			Widget& widget);
 
 		void PushEvent(CharEnterEvent);
 		void PushEvent(CharEvent);
@@ -46,6 +39,14 @@ namespace DEngine::Gui
 		void PushEvent(WindowMinimizeEvent);
 		void PushEvent(WindowMoveEvent);
 		void PushEvent(WindowResizeEvent);
+
+		void TakeInputConnection(
+			Widget& widget,
+			SoftInputFilter softInputFilter,
+			std::string_view currentText);
+
+		void ClearInputConnection(
+			Widget& widget);
 		
 		// TEMPORARY FIELDS
 		StackLayout* outerLayout = nullptr;

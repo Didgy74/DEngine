@@ -1,5 +1,5 @@
 #include <DEngine/Gui/Context.hpp>
-#include <DEngine/Gui/impl/ImplData.hpp>
+#include "ImplData.hpp"
 
 #include <DEngine/Containers/Box.hpp>
 #include <DEngine/Utility.hpp>
@@ -81,7 +81,7 @@ void Context::TakeInputConnection(
 	implData.inputConnectionWidget = &widget;
 }
 
-void Context::TakeInputConnection(
+void Context::ClearInputConnection(
 	Widget& widget)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
@@ -92,113 +92,163 @@ void Context::TakeInputConnection(
 	implData.inputConnectionWidget = nullptr;
 }
 
-void Context::PushEvent(CharEnterEvent)
+void Context::PushEvent(CharEnterEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	impl::Event newEvent{};
-	newEvent.type = impl::Event::Type::Input;
-	newEvent.input.type = impl::Event::Input::Type::CharEnter;
-	implData.eventQueue.push_back(newEvent);
+	for (auto& windowNode : implData.windows)
+	{
+		if (windowNode.data.topLayout)
+		{
+			windowNode.data.topLayout->CharEnterEvent(*this);
+		}
+	}
 }
 
 void Context::PushEvent(CharEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	impl::Event newEvent{};
-	newEvent.type = impl::Event::Type::Input;
-	newEvent.input.type = impl::Event::Input::Type::Char;
-	newEvent.input.charEvent = event;
-	implData.eventQueue.push_back(newEvent);
+	for (auto& windowNode : implData.windows)
+	{
+		if (windowNode.data.topLayout)
+		{
+			windowNode.data.topLayout->CharEvent(
+				*this,
+				event.utfValue);
+		}
+	}
 }
 
 void Context::PushEvent(CharRemoveEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	impl::Event newEvent{};
-	newEvent.type = impl::Event::Type::Input;
-	newEvent.input.type = impl::Event::Input::Type::CharRemove;
-	newEvent.input.charRemove = event;
-	implData.eventQueue.push_back(newEvent);
+	for (auto& windowNode : implData.windows)
+	{
+		if (windowNode.data.topLayout)
+		{
+			windowNode.data.topLayout->CharRemoveEvent(*this);
+		}
+	}
 }
 
 void Context::PushEvent(CursorClickEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	impl::Event newEvent{};
-	newEvent.type = impl::Event::Type::Input;
-	newEvent.input.type = impl::Event::Input::Type::CursorClick;
-	newEvent.input.cursorClick = event;
-	implData.eventQueue.push_back(newEvent);
+	for (auto& windowNode : implData.windows)
+	{
+		if (windowNode.data.topLayout)
+		{
+			windowNode.data.topLayout->CursorClick(
+				*this,
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				implData.cursorPosition - windowNode.data.rect.position,
+				event);
+		}
+	}
 }
 
 void Context::PushEvent(CursorMoveEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	impl::Event newEvent{};
-	newEvent.type = impl::Event::Type::Input;
-	newEvent.input.type = impl::Event::Input::Type::CursorMove;
-	newEvent.input.cursorMove = event;
-	implData.eventQueue.push_back(newEvent);
+	implData.cursorPosition = event.position;
+	for (auto& windowNode : implData.windows)
+	{
+		if (windowNode.data.topLayout)
+		{
+			Test test = Test(
+				*this, 
+				*implData.windowHandler,
+				windowNode.id, 
+				windowNode.data.rect);
+
+			CursorMoveEvent modifiedEvent{};
+			modifiedEvent.position = implData.cursorPosition - windowNode.data.rect.position;
+			modifiedEvent.positionDelta = event.positionDelta;
+
+			windowNode.data.topLayout->CursorMove(
+				test,
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				modifiedEvent);
+		}
+	}
 }
 
 void Context::PushEvent(TouchEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	impl::Event newEvent{};
-	newEvent.type = impl::Event::Type::Input;
-	newEvent.input.type = impl::Event::Input::Type::Touch;
-	newEvent.input.touch = event;
-	implData.eventQueue.push_back(newEvent);
+	for (auto& windowNode : implData.windows)
+	{
+		if (windowNode.data.topLayout)
+		{
+			windowNode.data.topLayout->TouchEvent(
+				*this,
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				event);
+		}
+	}
 }
 
 void Context::PushEvent(WindowCloseEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	impl::Event newEvent{};
-	newEvent.type = impl::Event::Type::Window;
-	newEvent.window.type = impl::Event::Window::Type::Close;
-	newEvent.window.close = event;
-	implData.eventQueue.push_back(newEvent);
+	auto windowIt = Std::FindIf(
+		implData.windows.begin(),
+		implData.windows.end(),
+		[event](auto const& node) -> bool { return node.id == event.windowId; });
+	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
+	WindowID windowId = windowIt->id;
+	implData.windows.erase(windowIt);
+	implData.windowHandler->CloseWindow(windowId);
 }
 
 void Context::PushEvent(WindowCursorEnterEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	impl::Event newEvent{};
-	newEvent.type = impl::Event::Type::Window;
-	newEvent.window.type = impl::Event::Window::Type::CursorEnter;
-	newEvent.window.cursorEnter = event;
-	implData.eventQueue.push_back(newEvent);
+	auto windowIt = Std::FindIf(
+		implData.windows.begin(),
+		implData.windows.end(),
+		[event](auto const& node) -> bool { return node.id == event.windowId; });
+	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
+	auto& windowData = windowIt->data;
 }
 
 void Context::PushEvent(WindowMinimizeEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	impl::Event newEvent{};
-	newEvent.type = impl::Event::Type::Window;
-	newEvent.window.type = impl::Event::Window::Type::Minimize;
-	newEvent.window.minimize = event;
-	implData.eventQueue.push_back(newEvent);
+	auto windowIt = Std::FindIf(
+		implData.windows.begin(),
+		implData.windows.end(),
+		[event](auto const& node) -> bool { return node.id == event.windowId; });
+	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
+	auto& windowData = windowIt->data;
+	windowData.isMinimized = event.wasMinimized;
 }
 
 void Context::PushEvent(WindowMoveEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	impl::Event newEvent{};
-	newEvent.type = impl::Event::Type::Window;
-	newEvent.window.type = impl::Event::Window::Type::Move;
-	newEvent.window.move = event;
-	implData.eventQueue.push_back(newEvent);
+	auto windowIt = Std::FindIf(
+		implData.windows.begin(),
+		implData.windows.end(),
+		[event](auto const& node) -> bool { return node.id == event.windowId; });
+	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
+	auto& windowData = windowIt->data;
+	windowData.rect.position = event.position;
 }
 
 void Context::PushEvent(WindowResizeEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	impl::Event newEvent{};
-	newEvent.type = impl::Event::Type::Window;
-	newEvent.window.type = impl::Event::Window::Type::Resize;
-	newEvent.window.resize = event;
-	implData.eventQueue.push_back(newEvent);
+	auto windowIt = Std::FindIf(
+		implData.windows.begin(),
+		implData.windows.end(),
+		[event](auto const& node) -> bool { return node.id == event.windowId; });
+	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
+	auto& windowData = windowIt->data;
+	windowData.rect.extent = event.extent;
+	windowData.visibleRect = event.visibleRect;
 }
 
 Test::Test(
@@ -233,241 +283,19 @@ void Test::OpenSoftInput(std::string_view currentText, SoftInputFilter inputFilt
 {
 }
 
-namespace DEngine::Gui::impl
-{
-	static void DispatchEvent(ImplData& implData, WindowCloseEvent event)
-	{
-		auto windowIt = Std::FindIf(
-			implData.windows.begin(),
-			implData.windows.end(),
-			[event](WindowNode const& node) -> bool { return node.id == event.windowId; });
-		DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
-		WindowID windowId = windowIt->id;
-		implData.windows.erase(windowIt);
-		implData.windowHandler->CloseWindow(windowId);
-	}
-
-	static void DispatchEvent(ImplData& implData, WindowCursorEnterEvent resize)
-	{
-		auto windowIt = Std::FindIf(
-			implData.windows.begin(),
-			implData.windows.end(),
-			[resize](WindowNode const& node) -> bool { return node.id == resize.windowId; });
-		DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
-		auto& windowData = windowIt->data;
-	}
-
-	static void DispatchEvent(ImplData& implData, WindowMinimizeEvent minimize)
-	{
-		auto windowIt = Std::FindIf(
-			implData.windows.begin(),
-			implData.windows.end(),
-			[minimize](WindowNode const& node) -> bool { return node.id == minimize.windowId; });
-		DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
-		auto& windowData = windowIt->data;
-		windowData.isMinimized = minimize.wasMinimized;
-	}
-
-	static void DispatchEvent(ImplData& implData, WindowMoveEvent move)
-	{
-		auto windowIt = Std::FindIf(
-			implData.windows.begin(),
-			implData.windows.end(),
-			[move](WindowNode const& node) -> bool { return node.id == move.windowId; });
-		DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
-		auto& windowData = windowIt->data;
-		windowData.rect.position = move.position;
-	}
-
-	static void DispatchEvent(ImplData& implData, WindowResizeEvent resize)
-	{
-		auto windowIt = Std::FindIf(
-			implData.windows.begin(),
-			implData.windows.end(),
-			[resize](WindowNode const& node) -> bool { return node.id == resize.windowId; });
-		DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
-		auto& windowData = windowIt->data;
-		windowData.rect.extent = resize.extent;
-		windowData.visibleRect = resize.visibleRect;
-	}
-
-	static void DispatchWindowEvents(ImplData& implData, Event::Window windowEvent)
-	{
-		switch (windowEvent.type)
-		{
-		case Event::Window::Type::Close:
-			DispatchEvent(implData, windowEvent.close);
-			break;
-		case Event::Window::Type::CursorEnter:
-			DispatchEvent(implData, windowEvent.cursorEnter);
-			break;
-		case Event::Window::Type::Minimize:
-			DispatchEvent(implData, windowEvent.minimize);
-			break;
-		case Event::Window::Type::Move:
-			DispatchEvent(implData, windowEvent.move);
-			break;
-		case Event::Window::Type::Resize:
-			DispatchEvent(implData, windowEvent.resize);
-			break;
-		}
-	}
-
-	static void DispatchEvent(Context& ctx, ImplData& implData, CharEnterEvent event)
-	{
-		for (auto& windowNode : implData.windows)
-		{
-			if (windowNode.data.topLayout)
-			{
-				windowNode.data.topLayout->CharEnterEvent(ctx);
-			}
-		}
-	}
-
-	static void DispatchEvent(Context& ctx, ImplData& implData, CharEvent event)
-	{
-		for (auto& windowNode : implData.windows)
-		{
-			if (windowNode.data.topLayout)
-			{
-				windowNode.data.topLayout->CharEvent(
-					ctx,
-					event.utfValue);
-			}
-		}
-	}
-
-	static void DispatchEvent(Context& ctx, ImplData& implData, CharRemoveEvent event)
-	{
-		for (auto& windowNode : implData.windows)
-		{
-			if (windowNode.data.topLayout)
-			{
-				windowNode.data.topLayout->CharRemoveEvent(ctx);
-			}
-		}
-	}
-
-	static void DispatchEvent(Context& ctx, ImplData& implData, CursorClickEvent event)
-	{
-		for (auto& windowNode : implData.windows)
-		{
-			if (windowNode.data.topLayout)
-			{
-				windowNode.data.topLayout->CursorClick(
-					ctx,
-					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-					implData.cursorPosition - windowNode.data.rect.position,
-					event);
-			}
-		}
-	}
-
-	static void DispatchEvent(Context& ctx, ImplData& implData, CursorMoveEvent event)
-	{
-		implData.cursorPosition = event.position;
-		for (auto& windowNode : implData.windows)
-		{
-			if (windowNode.data.topLayout)
-			{
-				Test test = Test(ctx, *implData.windowHandler, windowNode.id, windowNode.data.rect);
-
-				CursorMoveEvent modifiedEvent{};
-				modifiedEvent.position = implData.cursorPosition - windowNode.data.rect.position;
-				modifiedEvent.positionDelta = event.positionDelta;
-
-				windowNode.data.topLayout->CursorMove(
-					test,
-					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-					modifiedEvent);
-			}
-		}
-	}
-
-	static void DispatchEvent(Context& ctx, ImplData& implData, TouchEvent event)
-	{
-		for (auto& windowNode : implData.windows)
-		{
-			if (windowNode.data.topLayout)
-			{
-				windowNode.data.topLayout->TouchEvent(
-					ctx,
-					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-					event);
-			}
-		}
-	}
-
-	static void ProcessInputEvent(Context& ctx, ImplData& implData, Event::Input inputEvent)
-	{
-		switch (inputEvent.type)
-		{
-		case Event::Input::Type::Char:
-			DispatchEvent(ctx, implData, inputEvent.charEvent);
-			break;
-		case Event::Input::Type::CharEnter:
-			DispatchEvent(ctx, implData, inputEvent.charEnter);
-			break;
-		case Event::Input::Type::CharRemove:
-			DispatchEvent(ctx, implData, inputEvent.charRemove);
-			break;
-		case Event::Input::Type::CursorClick:
-			DispatchEvent(ctx, implData, inputEvent.cursorClick);
-			break;
-		case Event::Input::Type::CursorMove:
-			DispatchEvent(ctx, implData, inputEvent.cursorMove);
-			break;
-		case Event::Input::Type::Touch:
-			DispatchEvent(ctx, implData, inputEvent.touch);
-			break;
-		}
-	}
-
-	void ProcessEvents(Context& ctx, ImplData& implData)
-	{
-		for (auto const& event : implData.eventQueue)
-		{
-			switch (event.type)
-			{
-			case Event::Type::Window:
-				DispatchWindowEvents(implData, event.window);
-				break;
-			case Event::Type::Input:
-				ProcessInputEvent(ctx, implData, event.input);
-				break;
-			}
-		}
-		implData.eventQueue.clear();
-	}
-
-	void Tick(Context& ctx, ImplData& implData)
-	{
-		for (auto& windowNode : implData.windows)
-		{
-			if (windowNode.data.topLayout)
-			{
-				windowNode.data.topLayout->Tick(
-					ctx,
-					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent });
-			}
-		}
-	}
-}
-
-void Context::ProcessEvents()
+void Context::Tick()
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-
-	impl::ProcessEvents(*this, implData);
-
-	impl::Tick(*this, implData);
-
-	// Render stuff
-	Render();
+	for (auto& windowNode : implData.windows)
+	{
+		if (windowNode.data.topLayout)
+		{
+			windowNode.data.topLayout->Tick(
+				*this,
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent });
+		}
+	}
 }
 
 void Context::Render() const

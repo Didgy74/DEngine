@@ -1,5 +1,9 @@
+#include "ViewportWidget.hpp"
+
 #include "Editor.hpp"
 #include "ContextImpl.hpp"
+
+
 
 #include <DEngine/Gui/Button.hpp>
 #include <DEngine/Gui/DockArea.hpp>
@@ -27,414 +31,6 @@
 
 namespace DEngine::Editor
 {
-	class ViewportWidget : public Gui::Image
-	{
-	public:
-		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
-		Gfx::Context* gfxCtx = nullptr;
-		ContextImpl* implData = nullptr;
-
-		mutable bool isVisible = false;
-
-		Gui::Extent currentExtent{};
-		Gui::Extent newExtent{};
-		bool currentlyResizing = false;
-		u32 extentCorrectTickCounter = 0;
-		bool extentsAreInitialized = false;
-
-		bool isCurrentlyClicked = false;
-
-		int joystickPixelRadius = 50;
-		int joystickPixelDeadZone = 10;
-		struct JoyStick
-		{
-			Std::Opt<u8> touchID{};
-			bool isClicked = false;
-			Math::Vec2Int startPosition{};
-			Math::Vec2Int currentPosition{};
-		};
-		// 0 is left, 1 is right
-		JoyStick joysticks[2]{};
-
-		struct Camera
-		{
-			Math::Vec3 position{ 0.f, 0.f, 2.f };
-			Math::UnitQuat rotation = Math::UnitQuat::FromEulerAngles(0, 180.f, 0.f);
-			f32 verticalFov = 60.f;
-		};
-		Camera cam{};
-
-		ViewportWidget(ContextImpl& implData, Gfx::Context& gfxCtxIn) :
-			Gui::Image(),
-			gfxCtx(&gfxCtxIn),
-			implData(&implData)
-		{
-			implData.viewportWidget = this;
-
-			auto newViewportRef = gfxCtx->NewViewport();
-			viewportId = newViewportRef.ViewportID();
-		}
-
-		virtual ~ViewportWidget() override
-		{
-			gfxCtx->DeleteViewport(viewportId);
-			implData->viewportWidget = nullptr;
-		}
-
-		virtual void CursorClick(
-			Gui::Context& ctx,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			Gui::CursorClickEvent event) override
-		{
-			UpdateCircleStartPosition(widgetRect);
-
-			if (event.button == Gui::CursorButton::Right && event.clicked && !isCurrentlyClicked)
-			{
-				bool isInside = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
-				if (isInside)
-				{
-					isCurrentlyClicked = true;
-					App::LockCursor(true);
-				}
-			}
-
-			if (event.button == Gui::CursorButton::Right && !event.clicked && isCurrentlyClicked)
-			{
-				isCurrentlyClicked = false;
-				App::LockCursor(false);
-			}
-
-			UpdateCircleStartPosition(widgetRect);
-			if (event.button == Gui::CursorButton::Left && event.clicked)
-			{
-				for (auto& joystick : joysticks)
-				{
-					Math::Vec2Int relativeVector = cursorPos - joystick.startPosition;
-					if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelRadius))
-					{
-						// Cursor is inside circle
-						joystick.isClicked = true;
-						joystick.currentPosition = cursorPos;
-					}
-				}
-			}
-
-			if (event.button == Gui::CursorButton::Left && !event.clicked)
-			{
-				for (auto& joystick : joysticks)
-				{
-					joystick.isClicked = false;
-					joystick.currentPosition = joystick.startPosition;
-				}
-			}
-		}
-
-		virtual void CursorMove(
-			Gui::Test& test,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Gui::CursorMoveEvent event) override 
-		{
-			UpdateCircleStartPosition(widgetRect);
-
-			// Handle regular kb+mouse style camera movement
-			if (isCurrentlyClicked)
-			{
-				f32 sensitivity = 0.25f;
-				Math::Vec2 amount = { (f32)event.positionDelta.x, (f32)-event.positionDelta.y };
-				ApplyCameraRotation(amount * sensitivity * Math::degToRad);
-			}
-
-			for (auto& joystick : joysticks)
-			{
-				if (joystick.isClicked)
-				{
-					joystick.currentPosition = event.position;
-					Math::Vec2Int relativeVector = joystick.currentPosition - joystick.startPosition;
-					Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
-					if (relativeVectorFloat.MagnitudeSqrd() >= Math::Sqrd(joystickPixelRadius))
-					{
-						relativeVectorFloat = relativeVectorFloat.Normalized() * (f32)joystickPixelRadius;
-						joystick.currentPosition.x = joystick.startPosition.x + (i32)Math::Round(relativeVectorFloat.x);
-						joystick.currentPosition.y = joystick.startPosition.y + (i32)Math::Round(relativeVectorFloat.y);
-					}
-				}
-			}
-		}
-
-		virtual void TouchEvent(
-			Gui::Context& ctx,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Gui::TouchEvent touch) override
-		{
-			UpdateCircleStartPosition(widgetRect);
-			if (touch.type == Gui::TouchEventType::Down)
-			{
-				for (auto& joystick : joysticks)
-				{
-					if (joystick.touchID.HasValue())
-						continue;
-					Math::Vec2Int fingerPos = { (i32)touch.position.x, (i32)touch.position.y };
-					Math::Vec2Int relativeVector = fingerPos - joystick.startPosition;
-					if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelRadius))
-					{
-						// Cursor is inside circle
-						joystick.touchID = touch.id;
-						joystick.currentPosition = fingerPos;
-					}
-				}
-			}
-
-			if (touch.type == Gui::TouchEventType::Moved)
-			{
-				for (auto& joystick : joysticks)
-				{
-					if (joystick.touchID.HasValue() && joystick.touchID.Value() == touch.id)
-					{
-						joystick.currentPosition = { (i32)Math::Round(touch.position.x), (i32)Math::Round(touch.position.y) };
-						Math::Vec2Int relativeVector = joystick.currentPosition - joystick.startPosition;
-						Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
-						if (relativeVectorFloat.MagnitudeSqrd() >= Math::Sqrd(joystickPixelRadius))
-						{
-							relativeVectorFloat = relativeVectorFloat.Normalized() * (f32)joystickPixelRadius;
-							joystick.currentPosition.x = joystick.startPosition.x + (i32)Math::Round(relativeVectorFloat.x);
-							joystick.currentPosition.y = joystick.startPosition.y + (i32)Math::Round(relativeVectorFloat.y);
-						}
-					}
-				}
-			}
-			else if (touch.type == Gui::TouchEventType::Up)
-			{
-				for (auto& joystick : joysticks)
-				{
-					if (joystick.touchID.HasValue() && joystick.touchID.Value() == touch.id)
-					{
-						joystick.touchID = Std::nullOpt;
-						joystick.currentPosition = joystick.startPosition;
-						break;
-					}
-				}
-			}
-		}
-
-		void ApplyCameraRotation(Math::Vec2 input)
-		{
-			cam.rotation = Math::UnitQuat::FromVector(Math::Vec3::Up(), -input.x) * cam.rotation;
-			// Limit rotation up and down
-			Math::Vec3 forward = Math::LinTran3D::ForwardVector(cam.rotation);
-			f32 dot = Math::Vec3::Dot(forward, Math::Vec3::Up());
-			constexpr f32 upDownDotProductLimit = 0.9f;
-			if ((dot <= -upDownDotProductLimit && input.y < 0) || (dot >= upDownDotProductLimit && input.y > 0))
-				input.y = 0;
-			cam.rotation = Math::UnitQuat::FromVector(Math::LinTran3D::RightVector(cam.rotation), -input.y) * cam.rotation;
-		}
-
-		void ApplyCameraMovement(Math::Vec3 move, f32 speed)
-		{
-			if (move.MagnitudeSqrd() > 0.f)
-			{
-				if (move.MagnitudeSqrd() > 1.f)
-					move.Normalize();
-				Math::Vec3 moveVector{};
-				moveVector += Math::LinTran3D::ForwardVector(cam.rotation) * move.z;
-				moveVector += Math::LinTran3D::RightVector(cam.rotation) * -move.x;
-				moveVector += Math::Vec3::Up() * move.y;
-				
-				if (moveVector.MagnitudeSqrd() > 1.f)
-					moveVector.Normalize();
-				cam.position += moveVector * speed;
-			}
-		}
-
-		virtual void Tick(
-			Gui::Context& ctx,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect) override
-		{
-			this->isVisible = false;
-			if (!extentsAreInitialized)
-			{
-				currentExtent = widgetRect.extent;
-				newExtent = widgetRect.extent;
-				extentsAreInitialized = true;
-			}
-			else
-			{
-				if (newExtent != widgetRect.extent)
-				{
-					currentlyResizing = true;
-					newExtent = widgetRect.extent;
-				}
-				else
-				{
-					if (currentlyResizing)
-					{
-						currentlyResizing = false;
-						extentCorrectTickCounter = 0;
-					}
-					newExtent = widgetRect.extent;
-					extentCorrectTickCounter += 1;
-					if (extentCorrectTickCounter >= 15)
-						currentExtent = newExtent;
-				}
-			}
-			
-			UpdateCircleStartPosition(widgetRect);
-
-			// Handle camera movement
-			if (isCurrentlyClicked)
-			{
-				f32 moveSpeed = 5.f;
-				Math::Vec3 moveVector{};
-				if (App::ButtonValue(App::Button::W))
-					moveVector.z += 1;
-				if (App::ButtonValue(App::Button::S))
-					moveVector.z -= 1;
-				if (App::ButtonValue(App::Button::D))
-					moveVector.x += 1;
-				if (App::ButtonValue(App::Button::A))
-					moveVector.x -= 1;
-				if (App::ButtonValue(App::Button::Space))
-					moveVector.y += 1;
-				if (App::ButtonValue(App::Button::LeftCtrl))
-					moveVector.y -= 1;
-				ApplyCameraMovement(moveVector, moveSpeed * Time::Delta());
-			}
-
-			for (uSize i = 0; i < 2; i++)
-			{
-				auto& joystick = joysticks[i];
-				if (joystick.isClicked || joystick.touchID.HasValue())
-				{
-					// Find vector between circle start position, and current position
-					// Then apply the logic
-					Math::Vec2Int relativeVector = joystick.currentPosition - joystick.startPosition;
-					if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelDeadZone))
-						continue;
-					Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
-					relativeVectorFloat.x /= joystickPixelRadius;
-					relativeVectorFloat.y /= joystickPixelRadius;
-
-					if (i == 0)
-					{
-						f32 moveSpeed = 5.f;
-						ApplyCameraMovement({ relativeVectorFloat.x, 0.f, -relativeVectorFloat.y }, moveSpeed * Time::Delta());
-					}
-					else
-					{
-						f32 sensitivity = 1.5f;
-						ApplyCameraRotation(Math::Vec2{ relativeVectorFloat.x, -relativeVectorFloat.y } * sensitivity * Time::Delta());
-					}
-				}
-				else
-					joystick.currentPosition = joystick.startPosition;
-			}
-		}
-
-		virtual Gui::SizeHint SizeHint(
-			Gui::Context const& ctx) const override
-		{
-			Gui::SizeHint returnVal{};
-			returnVal.preferred = { 450, 450 };
-			returnVal.expand = true;
-			return returnVal;
-		}
-
-		virtual Gui::SizeHint SizeHint_Tick(
-			Gui::Context const& ctx) override
-		{
-			return SizeHint(ctx);
-		}
-
-		virtual void Render(
-			Gui::Context const& ctx,
-			Gui::Extent framebufferExtent,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Gui::DrawInfo& drawInfo) const override
-		{
-			this->isVisible = true;
-
-			// First draw the viewport.
-			Gfx::GuiDrawCmd drawCmd{};
-			drawCmd.type = Gfx::GuiDrawCmd::Type::Viewport;
-			drawCmd.viewport.id = viewportId;
-			drawCmd.rectPosition.x = (f32)widgetRect.position.x / framebufferExtent.width;
-			drawCmd.rectPosition.y = (f32)widgetRect.position.y / framebufferExtent.height;
-			drawCmd.rectExtent.x = (f32)widgetRect.extent.width / framebufferExtent.width;
-			drawCmd.rectExtent.y = (f32)widgetRect.extent.height / framebufferExtent.height;
-			drawInfo.drawCmds.push_back(drawCmd);
-
-			// Draw a circle, start from the top, move clockwise
-			Gfx::GuiDrawCmd::MeshSpan circleMeshSpan{};
-			{
-				u32 circleVertexCount = 30;
-				circleMeshSpan.vertexOffset = (u32)drawInfo.vertices.size();
-				circleMeshSpan.indexOffset = (u32)drawInfo.indices.size();
-				circleMeshSpan.indexCount = circleVertexCount * 3;
-				// Create the vertices, we insert the middle vertex first.
-				drawInfo.vertices.push_back({});
-				for (u32 i = 0; i < circleVertexCount; i++)
-				{
-					Gfx::GuiVertex newVertex{};
-					f32 currentRadians = 2 * Math::pi / circleVertexCount * i;
-					newVertex.position.x += Math::Sin(currentRadians);
-					newVertex.position.y += Math::Cos(currentRadians);
-					drawInfo.vertices.push_back(newVertex);
-				}
-				// Build indices
-				for (u32 i = 0; i < circleVertexCount - 1; i++)
-				{
-					drawInfo.indices.push_back(i + 1);
-					drawInfo.indices.push_back(0);
-					drawInfo.indices.push_back(i + 2);
-				}
-				drawInfo.indices.push_back(circleVertexCount);
-				drawInfo.indices.push_back(0);
-				drawInfo.indices.push_back(1);
-			}
-			// Draw both joysticks using said circle mesh
-			for (auto const& joystick : joysticks)
-			{
-				{
-					Gfx::GuiDrawCmd cmd{};
-					cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-					cmd.filledMesh.color = { 0.f, 0.f, 0.f, 0.25f };
-					cmd.filledMesh.mesh = circleMeshSpan;
-					cmd.rectPosition.x = (f32)joystick.startPosition.x / framebufferExtent.width;
-					cmd.rectPosition.y = (f32)joystick.startPosition.y / framebufferExtent.height;
-					cmd.rectExtent.x = (f32)joystickPixelRadius * 2 / framebufferExtent.width;
-					cmd.rectExtent.y = (f32)joystickPixelRadius * 2 / framebufferExtent.height;
-					drawInfo.drawCmds.push_back(cmd);
-				}
-
-
-				Gfx::GuiDrawCmd cmd{};
-				cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-				cmd.filledMesh.color = { 1.f, 1.f, 1.f, 0.75f };
-				cmd.filledMesh.mesh = circleMeshSpan;
-				cmd.rectPosition.x = (f32)joystick.currentPosition.x / framebufferExtent.width;
-				cmd.rectPosition.y = (f32)joystick.currentPosition.y / framebufferExtent.height;
-				cmd.rectExtent.x = (f32)joystickPixelRadius / framebufferExtent.width;
-				cmd.rectExtent.y = (f32)joystickPixelRadius / framebufferExtent.height;
-				drawInfo.drawCmds.push_back(cmd);
-			}
-		}
-
-		// Pixel space
-	  void UpdateCircleStartPosition(Gui::Rect widgetRect)
-		{
-			joysticks[0].startPosition.x = widgetRect.position.x + joystickPixelRadius * 2;
-			joysticks[0].startPosition.y = widgetRect.position.y + widgetRect.extent.height - joystickPixelRadius * 2;
-
-			joysticks[1].startPosition.x = widgetRect.position.x + widgetRect.extent.width - joystickPixelRadius * 2;
-			joysticks[1].startPosition.y = widgetRect.position.y + widgetRect.extent.height - joystickPixelRadius * 2;
-		}
-	};
-
 	class TransformWidget : public Gui::StackLayout
 	{
 	public:
@@ -936,7 +532,6 @@ Editor::Context Editor::Context::Create(
 
 			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
 		}
-
 	}
 	
 	return newCtx;
@@ -946,10 +541,56 @@ void Editor::Context::ProcessEvents()
 {
 	ContextImpl& implData = *static_cast<ContextImpl*>(this->implData);
 
-	//if (App::TickCount() % 60 == 0)
-		//implData.test_fpsText->String_Set(std::to_string(Time::Delta()).c_str());
+	if (App::TickCount() % 60 == 0)
+		implData.test_fpsText->String_Set(std::to_string(Time::Delta()).c_str());
 
-	implData.guiCtx->ProcessEvents();
+	for (auto const& event : implData.queuedGuiEvents)
+	{
+		switch (event.type)
+		{
+		case impl::GuiEvent::Type::CharEnterEvent: implData.guiCtx->PushEvent(event.charEnter); break;
+		case impl::GuiEvent::Type::CharEvent: implData.guiCtx->PushEvent(event.charEvent); break;
+		case impl::GuiEvent::Type::CharRemoveEvent: implData.guiCtx->PushEvent(event.charRemove); break;
+		case impl::GuiEvent::Type::CursorClickEvent: implData.guiCtx->PushEvent(event.cursorClick); break;
+		case impl::GuiEvent::Type::CursorMoveEvent: implData.guiCtx->PushEvent(event.cursorMove); break;
+		case impl::GuiEvent::Type::TouchEvent: implData.guiCtx->PushEvent(event.touch); break;
+		case impl::GuiEvent::Type::WindowCloseEvent: implData.guiCtx->PushEvent(event.windowClose); break;
+		case impl::GuiEvent::Type::WindowCursorEnterEvent: implData.guiCtx->PushEvent(event.windowCursorEnter); break;
+		case impl::GuiEvent::Type::WindowMinimizeEvent: implData.guiCtx->PushEvent(event.windowMinimize); break;
+		case impl::GuiEvent::Type::WindowMoveEvent: implData.guiCtx->PushEvent(event.windowMove); break;
+		case impl::GuiEvent::Type::WindowResizeEvent: implData.guiCtx->PushEvent(event.windowResize); break;
+		}
+	}
+	implData.queuedGuiEvents.clear();
+
+	if (implData.viewportWidget)
+	{
+		implData.viewportWidget->isVisible = false;
+		// Handle camera movement
+		if (implData.viewportWidget->isCurrentlyClicked)
+		{
+			f32 moveSpeed = 5.f;
+			Math::Vec3 moveVector{};
+			if (App::ButtonValue(App::Button::W))
+				moveVector.z += 1;
+			if (App::ButtonValue(App::Button::S))
+				moveVector.z -= 1;
+			if (App::ButtonValue(App::Button::D))
+				moveVector.x += 1;
+			if (App::ButtonValue(App::Button::A))
+				moveVector.x -= 1;
+			if (App::ButtonValue(App::Button::Space))
+				moveVector.y += 1;
+			if (App::ButtonValue(App::Button::LeftCtrl))
+				moveVector.y -= 1;
+			implData.viewportWidget->ApplyCameraMovement(moveVector, moveSpeed * Time::Delta());
+		}
+
+		implData.viewportWidget->TickTest(Time::Delta());
+	}
+
+	implData.guiCtx->Tick();
+	implData.guiCtx->Render();
 }
 
 Editor::Context::Context(Context&& other) noexcept :
@@ -1050,66 +691,6 @@ void Editor::ContextImpl::UnselectEntity()
 	selectedEntity = Std::nullOpt;
 }
 
-void Editor::ContextImpl::WindowClose(App::WindowID windowId)
-{
-	Gui::WindowCloseEvent event{};
-	event.windowId = (Gui::WindowID)windowId;
-	guiCtx->PushEvent(event);
-}
-
-void Editor::ContextImpl::WindowResize(
-	App::WindowID window,
-	App::Extent newExtent,
-	Math::Vec2Int visiblePos,
-	App::Extent visibleSize)
-{
-	Gui::WindowResizeEvent event{};
-	event.windowId = (Gui::WindowID)window;
-	event.extent = { newExtent.width, newExtent.height };
-	event.visibleRect = { visiblePos, { newExtent.width, newExtent.height } };
-	guiCtx->PushEvent(event);
-}
-
-void Editor::ContextImpl::WindowMove(
-	App::WindowID window,
-	Math::Vec2Int position)
-{
-	Gui::WindowMoveEvent event{};
-	event.windowId = (Gui::WindowID)window;
-	event.position = position;
-	guiCtx->PushEvent(event);
-}
-
-void Editor::ContextImpl::WindowMinimize(
-	App::WindowID window,
-	bool wasMinimized)
-{
-	Gui::WindowMinimizeEvent event{};
-	event.windowId = (Gui::WindowID)window;
-	event.wasMinimized = wasMinimized;
-	guiCtx->PushEvent(event);
-}
-
-void Editor::ContextImpl::WindowCursorEnter(
-	App::WindowID window,
-	bool entered)
-{
-	Gui::WindowCursorEnterEvent event{};
-	event.windowId = (Gui::WindowID)window;
-	event.entered = entered;
-	guiCtx->PushEvent(event);
-}
-
-void Editor::ContextImpl::CursorMove(
-	Math::Vec2Int position,
-	Math::Vec2Int positionDelta)
-{
-	Gui::CursorMoveEvent event{};
-	event.position = position;
-	event.positionDelta = positionDelta;
-	guiCtx->PushEvent(event);
-}
-
 void Editor::ContextImpl::ButtonEvent(
 	App::Button button,
 	bool state)
@@ -1126,24 +707,40 @@ void Editor::ContextImpl::ButtonEvent(
 	}
 }
 
+void DEngine::Editor::ContextImpl::CharEnterEvent()
+{
+	impl::GuiEvent event{};
+	event.type = impl::GuiEvent::Type::CharEnterEvent;
+	event.charEnter = {};
+	queuedGuiEvents.push_back(event);
+}
+
 void Editor::ContextImpl::CharEvent(
 	u32 value)
 {
-	Gui::CharEvent event{};
-	event.utfValue = value;
-	guiCtx->PushEvent(event);
-}
-
-void DEngine::Editor::ContextImpl::CharEnterEvent()
-{
-	Gui::CharEnterEvent event{};
-	guiCtx->PushEvent(event);
+	impl::GuiEvent event{};
+	event.type = impl::GuiEvent::Type::CharEvent;
+	event.charEvent.utfValue = value;
+	queuedGuiEvents.push_back(event);
 }
 
 void Editor::ContextImpl::CharRemoveEvent()
 {
-	Gui::CharRemoveEvent event{};
-	guiCtx->PushEvent(event);
+	impl::GuiEvent event{};
+	event.type = impl::GuiEvent::Type::CharRemoveEvent;
+	event.charRemove = {};
+	queuedGuiEvents.push_back(event);
+}
+
+void Editor::ContextImpl::CursorMove(
+	Math::Vec2Int position,
+	Math::Vec2Int positionDelta)
+{
+	impl::GuiEvent event{};
+	event.type = impl::GuiEvent::Type::CursorMoveEvent;
+	event.cursorMove.position = position;
+	event.cursorMove.positionDelta = positionDelta;
+	queuedGuiEvents.push_back(event);
 }
 
 void Editor::ContextImpl::TouchEvent(
@@ -1151,16 +748,72 @@ void Editor::ContextImpl::TouchEvent(
 	App::TouchEventType type,
 	Math::Vec2 position)
 {
-	Gui::TouchEvent event{};
-	event.id = id;
-	event.position = position;
+	impl::GuiEvent event{};
+	event.type = impl::GuiEvent::Type::TouchEvent;
+	event.touch.id = id;
+	event.touch.position = position;
 	if (type == App::TouchEventType::Down)
-		event.type = Gui::TouchEventType::Down;
+		event.touch.type = Gui::TouchEventType::Down;
 	else if (type == App::TouchEventType::Moved)
-		event.type = Gui::TouchEventType::Moved;
+		event.touch.type = Gui::TouchEventType::Moved;
 	else if (type == App::TouchEventType::Up)
-		event.type = Gui::TouchEventType::Up;
-	guiCtx->PushEvent(event);
+		event.touch.type = Gui::TouchEventType::Up;
+	queuedGuiEvents.push_back(event);
+}
+
+void Editor::ContextImpl::WindowClose(App::WindowID windowId)
+{
+	impl::GuiEvent event{};
+	event.type = impl::GuiEvent::Type::WindowCloseEvent;
+	event.windowClose.windowId = (Gui::WindowID)windowId;
+	queuedGuiEvents.push_back(event);
+}
+
+void Editor::ContextImpl::WindowCursorEnter(
+	App::WindowID window,
+	bool entered)
+{
+	impl::GuiEvent event{};
+	event.type = impl::GuiEvent::Type::WindowCursorEnterEvent;
+	event.windowCursorEnter.windowId = (Gui::WindowID)window;
+	event.windowCursorEnter.entered = entered;
+	queuedGuiEvents.push_back(event);
+}
+
+void Editor::ContextImpl::WindowMinimize(
+	App::WindowID window,
+	bool wasMinimized)
+{
+	impl::GuiEvent event{};
+	event.type = impl::GuiEvent::Type::WindowMinimizeEvent;
+	event.windowMinimize.windowId = (Gui::WindowID)window;
+	event.windowMinimize.wasMinimized = wasMinimized;
+	queuedGuiEvents.push_back(event);
+}
+
+void Editor::ContextImpl::WindowMove(
+	App::WindowID window,
+	Math::Vec2Int position)
+{
+	impl::GuiEvent event{};
+	event.type = impl::GuiEvent::Type::WindowMoveEvent;
+	event.windowMove.windowId = (Gui::WindowID)window;
+	event.windowMove.position = position;
+	queuedGuiEvents.push_back(event);
+}
+
+void Editor::ContextImpl::WindowResize(
+	App::WindowID window,
+	App::Extent newExtent,
+	Math::Vec2Int visiblePos,
+	App::Extent visibleSize)
+{
+	impl::GuiEvent event{};
+	event.type = impl::GuiEvent::Type::WindowResizeEvent;
+	event.windowResize.windowId = (Gui::WindowID)window;
+	event.windowResize.extent = Gui::Extent{ newExtent.width, newExtent.height };
+	event.windowResize.visibleRect = Gui::Rect{ visiblePos, Gui::Extent{ newExtent.width, newExtent.height } };
+	queuedGuiEvents.push_back(event);
 }
 
 void Editor::ContextImpl::CloseWindow(Gui::WindowID id)

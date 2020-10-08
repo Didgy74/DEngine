@@ -259,44 +259,38 @@ class DEngine::Application::EventInterface
 public:
 	inline virtual ~EventInterface() = 0;
 
-	virtual void WindowResize(
-		WindowID window, 
-		Extent extent,
-		Math::Vec2Int visiblePos,
-		Extent visibleExtent) {}
-	virtual void WindowMove(
-		WindowID window, 
-		Math::Vec2Int position) {}
-	virtual void WindowMinimize(
-		WindowID window,
-		bool wasMinimized) {}
-	virtual void WindowFocus(
-		WindowID window,
-		bool focused) {}
+	virtual void ButtonEvent(
+		Button button,
+		bool state) {}
+	virtual void CharEnterEvent() {}
+	virtual void CharEvent(u32 utfValue) {}
+	virtual void CharRemoveEvent() {}
+	virtual void CursorMove(
+		Math::Vec2Int position,
+		Math::Vec2Int positionDelta) {}
+	virtual void TouchEvent(
+		u8 id,
+		TouchEventType type,
+		Math::Vec2 position) {}
 	virtual void WindowClose(
 		WindowID window) {}
 	virtual void WindowCursorEnter(
 		WindowID window,
 		bool entered) {}
-
-	virtual void CursorMove(
-		Math::Vec2Int position,
-		Math::Vec2Int positionDelta) {}
-
-	virtual void TouchEvent(
-		u8 id,
-		TouchEventType type,
-		Math::Vec2 position) {}
-
-
-	virtual void ButtonEvent(
-		Button button,
-		bool state) {}
-
-	virtual void CharEvent(u32 utfValue) {}
-	virtual void CharEnterEvent() {}
-	virtual void CharRemoveEvent() {}
-
+	virtual void WindowFocus(
+		WindowID window,
+		bool focused) {}
+	virtual void WindowMinimize(
+		WindowID window,
+		bool wasMinimized) {}
+	virtual void WindowMove(
+		WindowID window, 
+		Math::Vec2Int position) {}
+	virtual void WindowResize(
+		WindowID window,
+		Extent extent,
+		Math::Vec2Int visiblePos,
+		Extent visibleExtent) {}
 	
 	virtual void Log(char const* msg) {};
 };
