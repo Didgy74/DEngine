@@ -125,11 +125,6 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		virtual void Tick(
-			Context& ctx,
-			Rect widgetRect,
-			Rect visibleRect) override;
-
 		virtual void CursorMove(
 			Test& test,
 			Rect widgetRect,

@@ -116,11 +116,6 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			Gui::TouchEvent event) override;
 
-		virtual void Tick(
-			Context& ctx,
-			Rect widgetRect,
-			Rect visibleRect) override;
-
 	protected:
 		struct LayoutItem
 		{

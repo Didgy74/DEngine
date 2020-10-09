@@ -24,8 +24,6 @@ namespace DEngine::Gui
 		Context& operator=(Context const&) = delete;
 		Context& operator=(Context&&) noexcept;
 
-		void Tick();
-
 		void Render() const;
 
 		void PushEvent(CharEnterEvent);

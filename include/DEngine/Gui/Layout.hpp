@@ -60,11 +60,6 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchEvent event) = 0;
-
-		virtual void Tick(
-			Context& ctx,
-			Rect widgetRect,
-			Rect visibleRect) = 0;
 	};
 }
 
@@ -105,8 +100,3 @@ inline void DEngine::Gui::Layout::TouchEvent(
 	Rect widgetRect,
 	Rect visibleRect,
 	Gui::TouchEvent event) {}
-
-inline void DEngine::Gui::Layout::Tick(
-	Context& ctx,
-	Rect widgetRect,
-	Rect visibleRect) {}

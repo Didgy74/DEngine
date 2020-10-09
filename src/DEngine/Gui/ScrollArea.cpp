@@ -130,52 +130,6 @@ void ScrollArea::Render(
   }
 }
 
-#include <DEngine/Application.hpp>
-void ScrollArea::Tick(
-  Context& ctx, 
-  Rect widgetRect,
-  Rect visibleRect)
-{
-  if (widget || layout)
-  {
-    Gui::SizeHint childSizeHint{};
-    if (childType == ChildType::Layout)
-      childSizeHint = layout->SizeHint_Tick(ctx);
-    else
-      childSizeHint = widget->SizeHint_Tick(ctx);
-
-    // Our child is larger than the scroll-area widget, so we now have a scrollbar.
-    if (widgetRect.extent.height < childSizeHint.preferred.height)
-    {
-      if (App::ButtonEvent(App::Button::Up) == App::KeyEventType::Pressed && scrollBarPos > 0)
-      {
-        scrollBarPos -= Math::Min((u32)10, scrollBarPos);
-      }
-      if (App::ButtonEvent(App::Button::Down) == App::KeyEventType::Pressed)
-      {
-        u32 test = childSizeHint.preferred.height - widgetRect.extent.height - scrollBarPos;
-
-        scrollBarPos += Math::Min((u32)10, test);
-      }
-    }
-
-
-    Rect childRect = widgetRect;
-    childRect.position.y -= scrollBarPos;
-    childRect.extent = childSizeHint.preferred;
-    if (childType == ChildType::Layout)
-      layout->Tick(
-        ctx,
-        childRect,
-        Rect::Intersection(childRect, visibleRect));
-    else if (childType == ChildType::Widget)
-      widget->Tick(
-        ctx,
-        childRect,
-        Rect::Intersection(childRect, visibleRect));
-  }
-}
-
 void ScrollArea::CursorMove(
   Test& test, 
   Rect widgetRect,

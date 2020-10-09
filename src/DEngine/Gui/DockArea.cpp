@@ -596,60 +596,6 @@ void DockArea::Render(
 	drawInfo.PopScissor();
 }
 
-void DockArea::Tick(
-	Context& ctx, 
-	Rect widgetRect, 
-	Rect visibleRect)
-{
-	bool continueIterating = true;
-	impl::DockArea_IterateTopLevelNodes(
-		impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-		Std::Span{ this->topLevelNodes.data(), this->topLevelNodes.size() },
-		widgetRect,
-		continueIterating,
-		[&ctx](
-			DockArea::TopLevelNode const& topLevelNode,
-			Rect topLevelRect,
-			uSize topLevelIndex,
-			bool& continueIterating)
-		{
-			impl::DockArea_IterateNode(
-				*topLevelNode.node,
-				topLevelRect,
-				continueIterating,
-				impl::DockArea_IterateNode_SplitCallableOrder::First,
-				[&ctx](
-					Node& node,
-					Rect rect,
-					Node* parentNode,
-					bool& continueIterating)
-				{
-					if (node.type != DockArea::Node::Type::Window)
-						return;
-					// Iterate over each window in a node
-					for (uSize windowIndex = 0; windowIndex < node.windows.size(); windowIndex += 1)
-					{
-						auto& window = node.windows[windowIndex];
-						Rect childVisibleRect = windowIndex == node.selectedWindow ? rect : Rect{};
-						if (window.widget)
-						{
-							window.widget->Tick(
-								ctx,
-								rect,
-								childVisibleRect);
-						}
-						else if (window.layout)
-						{
-							window.layout->Tick(
-								ctx,
-								rect,
-								childVisibleRect);
-						}
-					}
-				});
-		});
-}
-
 namespace DEngine::Gui::impl
 {
 	static void DockArea_CursorMove_Behavior_Normal(

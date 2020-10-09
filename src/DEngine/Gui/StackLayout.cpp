@@ -574,32 +574,3 @@ void StackLayout::TouchEvent(
 					event);
 		});
 }
-
-void StackLayout::Tick(
-	Context& ctx,
-	Rect widgetRect,
-	Rect visibleRect)
-{
-	ParentType::Tick(
-		ctx,
-		widgetRect,
-		visibleRect);
-
-	impl::StackLayout_IterateOverChildren<true>(
-		ctx,
-		*this,
-		widgetRect,
-		[&ctx, visibleRect](LayoutItem& child, Rect childRect)
-		{
-			if (child.type == LayoutItem::Type::Layout)
-				child.layout->Tick(
-					ctx,
-					childRect,
-					Rect::Intersection(visibleRect, childRect));
-			else
-				child.widget->Tick(
-					ctx,
-					childRect,
-					Rect::Intersection(visibleRect, childRect));
-		});
-}

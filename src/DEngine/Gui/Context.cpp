@@ -283,21 +283,6 @@ void Test::OpenSoftInput(std::string_view currentText, SoftInputFilter inputFilt
 {
 }
 
-void Context::Tick()
-{
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	for (auto& windowNode : implData.windows)
-	{
-		if (windowNode.data.topLayout)
-		{
-			windowNode.data.topLayout->Tick(
-				*this,
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent });
-		}
-	}
-}
-
 void Context::Render() const
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
