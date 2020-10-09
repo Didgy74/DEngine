@@ -8,7 +8,7 @@
 
 namespace DEngine::Gui::impl
 {
-	template<bool tick, typename T, typename Callable>
+	template<typename T, typename Callable>
 	void StackLayout_IterateOverChildren(
 		Context const& ctx,
 		T& layout,
@@ -76,9 +76,6 @@ namespace DEngine::Gui
 
 		[[nodiscard]] virtual Gui::SizeHint SizeHint(
 			Context const& ctx) const override;
-
-		[[nodiscard]] virtual Gui::SizeHint SizeHint_Tick(
-			Context const& ctx) override;
 
 		virtual void Render(
 			Context const& ctx,
@@ -153,7 +150,7 @@ namespace DEngine::Gui
 		mutable std::vector<InsertRemoveJob> insertionJobs;
 		mutable bool currentlyIterating = false;
 
-		template<bool tick, typename T, typename Callable>
+		template<typename T, typename Callable>
 		friend void impl::StackLayout_IterateOverChildren(
 			Context const& ctx,
 			T& layout,

@@ -196,9 +196,3 @@ SizeHint Button::SizeHint(
 {
 	return textWidget.SizeHint(ctx);
 }
-
-SizeHint Button::SizeHint_Tick(
-	Context const& ctx)
-{
-	return textWidget.SizeHint_Tick(ctx);
-}

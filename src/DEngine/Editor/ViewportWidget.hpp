@@ -273,12 +273,6 @@ namespace DEngine::Editor
 			return returnVal;
 		}
 
-		virtual Gui::SizeHint SizeHint_Tick(
-			Gui::Context const& ctx) override
-		{
-			return SizeHint(ctx);
-		}
-
 		virtual void Render(
 			Gui::Context const& ctx,
 			Gui::Extent framebufferExtent,

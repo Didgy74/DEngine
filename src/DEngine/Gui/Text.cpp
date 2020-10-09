@@ -46,11 +46,6 @@ Gui::SizeHint Text::SizeHint(
 	return cachedSizeHint;
 }
 
-SizeHint Text::SizeHint_Tick(Context const& ctx)
-{
-	return SizeHint(ctx);
-}
-
 void Text::Render(
 	Context const& ctx,
 	Extent framebufferExtent,

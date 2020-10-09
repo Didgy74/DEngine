@@ -5,7 +5,7 @@
 
 namespace DEngine::Gui::impl
 {
-	template<bool tick, typename T, typename Callable>
+	template<typename T, typename Callable>
 	void StackLayout_IterateOverChildren(
 		Context const& ctx,
 		T& layout,
@@ -35,20 +35,10 @@ namespace DEngine::Gui::impl
 			auto& child = layout.children[i];
 			auto& childSizeHint = childSizeHints[i];
 			// Call SizeHint on child.
-			if constexpr (tick)
-			{
-				if (child.type == StackLayout::LayoutItem::Type::Layout)
-					childSizeHint = child.layout->SizeHint_Tick(ctx);
-				else
-					childSizeHint = child.widget->SizeHint_Tick(ctx);
-			}
+			if (child.type == StackLayout::LayoutItem::Type::Layout)
+				childSizeHint = child.layout->SizeHint(ctx);
 			else
-			{
-				if (child.type == StackLayout::LayoutItem::Type::Layout)
-					childSizeHint = child.layout->SizeHint(ctx);
-				else
-					childSizeHint = child.widget->SizeHint(ctx);
-			}
+				childSizeHint = child.widget->SizeHint(ctx);
 
 			// Add to the sum size.
 			if (!childSizeHint.expand)
@@ -318,50 +308,6 @@ SizeHint StackLayout::SizeHint(
 	return returnVal;
 }
 
-SizeHint StackLayout::SizeHint_Tick(Context const& ctx)
-{
-	Gui::SizeHint returnVal{};
-	u32 childCount = 0;
-	for (auto& child : children)
-	{
-		if (!child.widget && !child.layout)
-			continue;
-
-		childCount += 1;
-
-		Gui::SizeHint childSizeHint{};
-		if (child.type == LayoutItem::Type::Layout)
-			childSizeHint = child.layout->SizeHint_Tick(ctx);
-		else
-			childSizeHint = child.widget->SizeHint_Tick(ctx);
-
-		u32& directionLength = direction == Direction::Horizontal ? returnVal.preferred.width : returnVal.preferred.height;
-		u32 const& childDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.width : childSizeHint.preferred.height;
-		directionLength += childDirectionLength;
-
-		u32& nonDirectionLength = direction == Direction::Horizontal ? returnVal.preferred.height : returnVal.preferred.width;
-		u32 const& childNonDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.height : childSizeHint.preferred.width;
-		nonDirectionLength = Math::Max(nonDirectionLength, childNonDirectionLength);
-	}
-	// Add spacing
-	if (childCount > 1)
-	{
-		if (direction == Direction::Horizontal)
-		{
-			returnVal.preferred.width += spacing * (childCount - 1);
-		}
-		else
-		{
-			returnVal.preferred.height += spacing * (childCount - 1);
-		}
-	}
-
-	if (test_expand)
-		returnVal.expand = true;
-
-	return returnVal;
-}
-
 void StackLayout::Render(
 	Context const& ctx,
 	Extent framebufferExtent,
@@ -390,7 +336,7 @@ void StackLayout::Render(
 		drawInfo.drawCmds.push_back(cmd);
 	}
 
-	impl::StackLayout_IterateOverChildren<false>(
+	impl::StackLayout_IterateOverChildren(
 		ctx,
 		*this,
 		widgetRect,
@@ -484,7 +430,7 @@ void StackLayout::CursorMove(
 		visibleRect,
 		event);
 
-	impl::StackLayout_IterateOverChildren<false>(
+	impl::StackLayout_IterateOverChildren(
 		test.GetContext(),
 		*this,
 		widgetRect,
@@ -519,7 +465,7 @@ void StackLayout::CursorClick(
 		cursorPos,
 		event);
 
-	impl::StackLayout_IterateOverChildren<false>(
+	impl::StackLayout_IterateOverChildren(
 		ctx,
 		*this,
 		widgetRect,
@@ -554,7 +500,7 @@ void StackLayout::TouchEvent(
 		visibleRect,
 		event);
 
-	impl::StackLayout_IterateOverChildren<false>(
+	impl::StackLayout_IterateOverChildren(
 		ctx,
 		*this,
 		widgetRect,

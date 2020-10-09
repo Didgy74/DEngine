@@ -330,15 +330,6 @@ SizeHint DockArea::SizeHint(
 	return returnVal;
 }
 
-SizeHint DockArea::SizeHint_Tick(
-	Context const& ctx)
-{
-	Gui::SizeHint returnVal{};
-	returnVal.expand = true;
-
-	return returnVal;
-}
-
 namespace DEngine::Gui::impl
 {
 	static void DockArea_RenderWindows(

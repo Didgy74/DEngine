@@ -22,9 +22,6 @@ namespace DEngine::Gui
 		[[nodiscard]] virtual Gui::SizeHint SizeHint(
 			Context const& ctx) const = 0;
 
-		[[nodiscard]] virtual Gui::SizeHint SizeHint_Tick(
-			Context const& ctx) = 0;
-
 		virtual void Render(
 			Context const& ctx,
 			Extent framebufferExtent,

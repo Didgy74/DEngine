@@ -52,12 +52,6 @@ SizeHint ScrollArea::SizeHint(
   return returnVal;
 }
 
-SizeHint ScrollArea::SizeHint_Tick(
-  Context const& ctx)
-{
-  return SizeHint(ctx);
-}
-
 void ScrollArea::Render(
   Context const& ctx,
   Extent framebufferExtent,
