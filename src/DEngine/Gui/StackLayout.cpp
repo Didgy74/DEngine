@@ -14,9 +14,11 @@ namespace DEngine::Gui::impl
 	{
 		static_assert(Std::Trait::IsSame<decltype(layout), StackLayout&> || Std::Trait::IsSame<decltype(layout), StackLayout const&>);
 		
-		u32 childCount = layout.children.size();;
+		uSize childCount = (uSize)layout.children.size();
 		if (childCount == 0)
 			return;
+
+		std::vector<SizeHint> childSizeHints(childCount);
 
 		// The internal extent of the parent widget with padding and spacing applied.
 		Extent const innerExtent = {
@@ -31,7 +33,8 @@ namespace DEngine::Gui::impl
 		for (uSize i = 0; i < childCount; i += 1)
 		{
 			auto& child = layout.children[i];
-			auto& childSizeHint = child.lastKnownSizeHint;
+			auto& childSizeHint = childSizeHints[i];
+			// Call SizeHint on child.
 			if constexpr (tick)
 			{
 				if (child.type == StackLayout::LayoutItem::Type::Layout)
@@ -47,7 +50,7 @@ namespace DEngine::Gui::impl
 					childSizeHint = child.widget->SizeHint(ctx);
 			}
 
-
+			// Add to the sum size.
 			if (!childSizeHint.expand)
 			{
 				u32& directionLength = layout.direction == StackLayout::Direction::Horizontal ? 
@@ -68,13 +71,12 @@ namespace DEngine::Gui::impl
 
 		i32 remainingDirectionSpace = 0;
 		if (layout.direction == StackLayout::Direction::Horizontal)
-		{
 			remainingDirectionSpace = innerExtent.width - sumChildPreferredSize.width;
-		}
 		else
-		{
 			remainingDirectionSpace = innerExtent.height - sumChildPreferredSize.height;
-		}
+
+		// Set the StackLayout's internal state to currently iterating
+		layout.currentlyIterating = true;
 
 		Rect childRect{};
 		childRect.position.x += widgetRect.position.x + layout.padding;
@@ -85,7 +87,7 @@ namespace DEngine::Gui::impl
 			childRect.extent.width = innerExtent.width;
 		for (uSize i = 0; i < childCount; i++)
 		{
-			SizeHint childSizeHint = layout.children[i].lastKnownSizeHint;
+			SizeHint const childSizeHint = childSizeHints[i];
 			if (childSizeHint.expand)
 			{
 				if (layout.direction == StackLayout::Direction::Horizontal)
@@ -101,14 +103,41 @@ namespace DEngine::Gui::impl
 					childRect.extent.height = childSizeHint.preferred.height;
 			}
 
-			auto& child = layout.children[i];
-			if (child.widget || child.layout)
-				callable(child, childRect);
+			// Translate the i in the SizeHint array back to the Children array's corresponding element.
+			uSize modifiedIndex = i;
+			bool childExists = true;
+			for (StackLayout::InsertRemoveJob job : layout.insertionJobs)
+			{
+				switch (job.type)
+				{
+				case StackLayout::InsertRemoveJob::Type::Insert:
+					if (job.insert.index <= modifiedIndex)
+						modifiedIndex += 1;
+					break;
+				case StackLayout::InsertRemoveJob::Type::Remove:
+					if (job.remove.index == modifiedIndex)
+						childExists = false;
+					else if (job.remove.index < modifiedIndex)
+						modifiedIndex -= 1;
+					break;
+				}
+			}
+			if (childExists)
+			{
+				auto& child = layout.children[modifiedIndex];
+				if (child.widget || child.layout)
+					callable(child, childRect);
+			}
+
 
 			i32& childPosDirection = layout.direction == StackLayout::Direction::Horizontal ? childRect.position.x : childRect.position.y;
 			u32 const& childExtentDirection = layout.direction == StackLayout::Direction::Horizontal ? childRect.extent.width : childRect.extent.height;
 			childPosDirection += childExtentDirection + layout.spacing;
 		}
+
+		// Reset the "changed indices stuff"
+		layout.currentlyIterating = false;
+		layout.insertionJobs.clear();
 	}
 
 }
@@ -122,13 +151,7 @@ StackLayout::~StackLayout()
 
 u32 StackLayout::ChildCount() const
 {
-	uSize count = children.size();
-	for (auto const& child : children)
-	{
-		if (!child.layout && !child.widget)
-			count -= 1;
-	}
-	return (u32)count;
+	return (u32)children.size();
 }
 
 StackLayout::Child StackLayout::At(u32 index)
@@ -179,25 +202,36 @@ void StackLayout::AddWidget2(Std::Box<Widget>&& in)
 {
 	DENGINE_IMPL_GUI_ASSERT(in);
 
-	InsertRemoveJob newJob{};
-	newJob.type = InsertRemoveJob::Type::Insert;
-	newJob.insert.index = InsertRemoveJob::Insert::pushBackIndex;
-	newJob.insert.item.type = LayoutItem::Type::Widget;
-	newJob.insert.item.widget = static_cast<Std::Box<Widget>&&>(in);
+	LayoutItem newItem{};
+	newItem.type = LayoutItem::Type::Widget;
+	newItem.widget = static_cast<Std::Box<Widget>&&>(in);
+	children.emplace_back(static_cast<LayoutItem&&>(newItem));
 
-	addWidgetJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+	if (currentlyIterating)
+	{
+		InsertRemoveJob newJob{};
+		newJob.type = InsertRemoveJob::Type::Insert;
+		newJob.insert.index = InsertRemoveJob::Insert::pushBackIndex;
+		insertionJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+	}
 }
 
 void StackLayout::AddLayout2(Std::Box<Layout>&& in)
 {
 	DENGINE_IMPL_GUI_ASSERT(in);
 
-	InsertRemoveJob newJob{};
-	newJob.type = InsertRemoveJob::Type::Insert;
-	newJob.insert.index = InsertRemoveJob::Insert::pushBackIndex;
-	newJob.insert.item.type = LayoutItem::Type::Layout;
-	newJob.insert.item.layout = static_cast<Std::Box<Layout>&&>(in);
-	addWidgetJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+	LayoutItem newItem{};
+	newItem.type = LayoutItem::Type::Layout;
+	newItem.layout = static_cast<Std::Box<Layout>&&>(in);
+	children.emplace_back(static_cast<LayoutItem&&>(newItem));
+
+	if (currentlyIterating)
+	{
+		InsertRemoveJob newJob{};
+		newJob.type = InsertRemoveJob::Type::Insert;
+		newJob.insert.index = InsertRemoveJob::Insert::pushBackIndex;
+		insertionJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+	}
 }
 
 void StackLayout::InsertLayout(u32 index, Std::Box<Layout>&& in)
@@ -205,25 +239,33 @@ void StackLayout::InsertLayout(u32 index, Std::Box<Layout>&& in)
 	DENGINE_IMPL_GUI_ASSERT(index < children.size());
 	DENGINE_IMPL_GUI_ASSERT(in);
 
-	InsertRemoveJob newJob{};
-	newJob.type = InsertRemoveJob::Type::Insert;
-	newJob.insert.index = index;
-	newJob.insert.item.type = LayoutItem::Type::Layout;
-	newJob.insert.item.layout = static_cast<Std::Box<Layout>&&>(in);
-	addWidgetJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+	LayoutItem newItem{};
+	newItem.type = LayoutItem::Type::Layout;
+	newItem.layout = static_cast<Std::Box<Layout>&&>(in);
+	children.insert(children.begin() + index, static_cast<LayoutItem&&>(newItem));
+
+	if (currentlyIterating)
+	{
+		InsertRemoveJob newJob{};
+		newJob.type = InsertRemoveJob::Type::Insert;
+		newJob.insert.index = index;
+		insertionJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+	}
 }
 
 void StackLayout::RemoveItem(u32 index)
 {
 	DENGINE_IMPL_GUI_ASSERT(index < children.size());
 
-	children[index].layout = {};
-	children[index].widget = {};
+	children.erase(children.begin() + index);
 
-	InsertRemoveJob newJob{};
-	newJob.type = InsertRemoveJob::Type::Remove;
-	newJob.remove.index = index;
-	addWidgetJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+	if (currentlyIterating)
+	{
+		InsertRemoveJob newJob{};
+		newJob.type = InsertRemoveJob::Type::Remove;
+		newJob.remove.index = index;
+		insertionJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+	}
 }
 
 void StackLayout::ClearChildren()
@@ -278,7 +320,6 @@ SizeHint StackLayout::SizeHint(
 
 SizeHint StackLayout::SizeHint_Tick(Context const& ctx)
 {
-	ResolveWidgetAddRemoves();
 	Gui::SizeHint returnVal{};
 	u32 childCount = 0;
 	for (auto& child : children)
@@ -379,7 +420,6 @@ void StackLayout::Render(
 void StackLayout::CharEnterEvent(Context& ctx)
 {
 	ParentType::CharEnterEvent(ctx);
-	ResolveWidgetAddRemoves();
 
 	for (auto& child : children)
 	{
@@ -402,8 +442,6 @@ void StackLayout::CharEvent(
 		ctx,
 		utfValue);
 
-	ResolveWidgetAddRemoves();
-
 	for (auto& child : children)
 	{
 		if (child.type == LayoutItem::Type::Layout)
@@ -420,8 +458,6 @@ void StackLayout::CharEvent(
 void StackLayout::CharRemoveEvent(Context& ctx)
 {
 	ParentType::CharRemoveEvent(ctx);
-
-	ResolveWidgetAddRemoves();
 
 	for (auto& child : children)
 	{
@@ -447,8 +483,6 @@ void StackLayout::CursorMove(
 		widgetRect,
 		visibleRect,
 		event);
-
-	ResolveWidgetAddRemoves();
 
 	impl::StackLayout_IterateOverChildren<false>(
 		test.GetContext(),
@@ -485,8 +519,6 @@ void StackLayout::CursorClick(
 		cursorPos,
 		event);
 
-	ResolveWidgetAddRemoves();
-
 	impl::StackLayout_IterateOverChildren<false>(
 		ctx,
 		*this,
@@ -522,8 +554,6 @@ void StackLayout::TouchEvent(
 		visibleRect,
 		event);
 
-	ResolveWidgetAddRemoves();
-
 	impl::StackLayout_IterateOverChildren<false>(
 		ctx,
 		*this,
@@ -555,8 +585,6 @@ void StackLayout::Tick(
 		widgetRect,
 		visibleRect);
 
-	ResolveWidgetAddRemoves();
-
 	impl::StackLayout_IterateOverChildren<true>(
 		ctx,
 		*this,
@@ -574,30 +602,4 @@ void StackLayout::Tick(
 					childRect,
 					Rect::Intersection(visibleRect, childRect));
 		});
-}
-
-void StackLayout::ResolveWidgetAddRemoves()
-{
-	for (auto& job : addWidgetJobs)
-	{
-		DENGINE_IMPL_GUI_ASSERT(
-			job.type == InsertRemoveJob::Type::Insert ||
-			job.type == InsertRemoveJob::Type::Remove);
-
-		if (job.type == InsertRemoveJob::Type::Insert)
-		{
-			auto& insert = job.insert;
-			if (insert.index == InsertRemoveJob::Insert::pushBackIndex)
-				children.emplace_back(static_cast<LayoutItem&&>(insert.item));
-			else
-				children.emplace(children.begin() + insert.index, static_cast<LayoutItem&&>(insert.item));
-		}
-		else if (job.type == InsertRemoveJob::Type::Remove)
-		{
-			auto& remove = job.remove;
-
-			children.erase(children.begin() + remove.index);
-		}
-	}
-	addWidgetJobs.clear();
 }

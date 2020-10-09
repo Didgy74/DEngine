@@ -121,7 +121,7 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect) override;
 
-	private:
+	protected:
 		struct LayoutItem
 		{
 			enum class Type
@@ -132,7 +132,6 @@ namespace DEngine::Gui
 			Type type;
 			Std::Box<Widget> widget;
 			Std::Box<Layout> layout;
-			mutable Gui::SizeHint lastKnownSizeHint{};
 		};
 		std::vector<LayoutItem> children;
 
@@ -143,22 +142,21 @@ namespace DEngine::Gui
 				Insert,
 				Remove
 			};
-			Type type;
+			Type type{};
 			struct Insert
 			{
-				LayoutItem item{};
 				static constexpr u32 pushBackIndex = static_cast<u32>(-1);
 				u32 index{};
 			};
+			Insert insert;
 			struct Remove
 			{
 				u32 index;
 			};
-			Insert insert;
 			Remove remove;
 		};
-		std::vector<InsertRemoveJob> addWidgetJobs;
-		void ResolveWidgetAddRemoves();
+		mutable std::vector<InsertRemoveJob> insertionJobs;
+		mutable bool currentlyIterating = false;
 
 		template<bool tick, typename T, typename Callable>
 		friend void impl::StackLayout_IterateOverChildren(

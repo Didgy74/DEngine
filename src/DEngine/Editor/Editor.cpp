@@ -589,7 +589,7 @@ void Editor::Context::ProcessEvents()
 		implData.viewportWidget->TickTest(Time::Delta());
 	}
 
-	implData.guiCtx->Tick();
+	//implData.guiCtx->Tick();
 	implData.guiCtx->Render();
 }
 
