@@ -94,6 +94,7 @@ namespace DEngine::Gui::impl
 			}
 
 			// Translate the i in the SizeHint array back to the Children array's corresponding element.
+			// Note! This code is likely bugged in some cases still. Prepare to fix.
 			uSize modifiedIndex = i;
 			bool childExists = true;
 			for (StackLayout::InsertRemoveJob job : layout.insertionJobs)

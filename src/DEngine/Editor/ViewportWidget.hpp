@@ -125,7 +125,7 @@ namespace DEngine::Editor
 			// Handle regular kb+mouse style camera movement
 			if (isCurrentlyClicked)
 			{
-				f32 sensitivity = 0.25f;
+				f32 sensitivity = 0.2f;
 				Math::Vec2 amount = { (f32)event.positionDelta.x, (f32)-event.positionDelta.y };
 				ApplyCameraRotation(amount * sensitivity * Math::degToRad);
 			}
@@ -232,8 +232,68 @@ namespace DEngine::Editor
 			}
 		}
 
+		Math::Vec2 GetLeftJoystickVec() const
+		{
+			auto& joystick = joysticks[0];
+			if (joystick.isClicked || joystick.touchID.HasValue())
+			{
+				// Find vector between circle start position, and current position
+				// Then apply the logic
+				Math::Vec2Int relativeVector = joystick.currentPosition - joystick.originPosition;
+				if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelDeadZone))
+					return {};
+				Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
+				relativeVectorFloat.x /= joystickPixelRadius;
+				relativeVectorFloat.y /= joystickPixelRadius;
+
+				return relativeVectorFloat;
+			}
+			return {};
+		}
+
+		Math::Vec2 GetRightJoystickVec() const
+		{
+			auto& joystick = joysticks[1];
+			if (joystick.isClicked || joystick.touchID.HasValue())
+			{
+				// Find vector between circle start position, and current position
+				// Then apply the logic
+				Math::Vec2Int relativeVector = joystick.currentPosition - joystick.originPosition;
+				if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelDeadZone))
+					return {};
+				Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
+				relativeVectorFloat.x /= joystickPixelRadius;
+				relativeVectorFloat.y /= joystickPixelRadius;
+
+				return relativeVectorFloat;
+			}
+			return {};
+		}
+
 		void TickTest(f32 deltaTime)
 		{
+			this->isVisible = false;
+
+			// Handle camera movement
+			if (isCurrentlyClicked)
+			{
+				f32 moveSpeed = 5.f;
+				Math::Vec3 moveVector{};
+				if (App::ButtonValue(App::Button::W))
+					moveVector.z += 1;
+				if (App::ButtonValue(App::Button::S))
+					moveVector.z -= 1;
+				if (App::ButtonValue(App::Button::D))
+					moveVector.x += 1;
+				if (App::ButtonValue(App::Button::A))
+					moveVector.x -= 1;
+				if (App::ButtonValue(App::Button::Space))
+					moveVector.y += 1;
+				if (App::ButtonValue(App::Button::LeftCtrl))
+					moveVector.y -= 1;
+				ApplyCameraMovement(moveVector, moveSpeed * deltaTime);
+			}
+
 			for (uSize i = 0; i < 2; i++)
 			{
 				auto& joystick = joysticks[i];
@@ -256,7 +316,7 @@ namespace DEngine::Editor
 					else
 					{
 						f32 sensitivity = 1.5f;
-						ApplyCameraRotation(Math::Vec2{ relativeVectorFloat.x, -relativeVectorFloat.y } *sensitivity * deltaTime);
+						ApplyCameraRotation(Math::Vec2{ relativeVectorFloat.x, -relativeVectorFloat.y } * sensitivity * deltaTime);
 					}
 				}
 				else

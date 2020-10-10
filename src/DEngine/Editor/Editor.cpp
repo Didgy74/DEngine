@@ -544,7 +544,7 @@ void Editor::Context::ProcessEvents()
 	if (App::TickCount() % 60 == 0)
 		implData.test_fpsText->String_Set(std::to_string(Time::Delta()).c_str());
 
-	for (auto const& event : implData.queuedGuiEvents)
+	for (impl::GuiEvent const& event : implData.queuedGuiEvents)
 	{
 		switch (event.type)
 		{
@@ -565,27 +565,6 @@ void Editor::Context::ProcessEvents()
 
 	if (implData.viewportWidget)
 	{
-		implData.viewportWidget->isVisible = false;
-		// Handle camera movement
-		if (implData.viewportWidget->isCurrentlyClicked)
-		{
-			f32 moveSpeed = 5.f;
-			Math::Vec3 moveVector{};
-			if (App::ButtonValue(App::Button::W))
-				moveVector.z += 1;
-			if (App::ButtonValue(App::Button::S))
-				moveVector.z -= 1;
-			if (App::ButtonValue(App::Button::D))
-				moveVector.x += 1;
-			if (App::ButtonValue(App::Button::A))
-				moveVector.x -= 1;
-			if (App::ButtonValue(App::Button::Space))
-				moveVector.y += 1;
-			if (App::ButtonValue(App::Button::LeftCtrl))
-				moveVector.y -= 1;
-			implData.viewportWidget->ApplyCameraMovement(moveVector, moveSpeed * Time::Delta());
-		}
-
 		implData.viewportWidget->TickTest(Time::Delta());
 	}
 

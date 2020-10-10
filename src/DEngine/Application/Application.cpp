@@ -452,7 +452,7 @@ void Application::detail::UpdateCursor(
 	cursorData.positionDelta += delta;
 	
 	for (EventInterface* eventCallback : pAppData->eventCallbacks)
-		eventCallback->CursorMove(cursorData.position, cursorData.positionDelta);
+		eventCallback->CursorMove(cursorData.position, delta);
 }
 
 void Application::detail::UpdateCursor(
@@ -470,11 +470,14 @@ void Application::detail::UpdateCursor(
 		pos.y + windowNode.windowData.position.y };
 
 	CursorData& cursorData = pAppData->cursorOpt.Value();
-	cursorData.positionDelta = newPosition - cursorData.position;
+
+	Math::Vec2Int positionDelta = newPosition - cursorData.position;
+
+	cursorData.positionDelta = positionDelta;
 	cursorData.position = newPosition;
 
 	for (EventInterface* eventCallback : pAppData->eventCallbacks)
-		eventCallback->CursorMove(cursorData.position, cursorData.positionDelta);
+		eventCallback->CursorMove(cursorData.position, positionDelta);
 }
 
 void Application::detail::UpdateTouchInput(TouchEventType type, u8 id, f32 x, f32 y)
