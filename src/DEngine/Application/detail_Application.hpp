@@ -5,8 +5,8 @@
 #include "DEngine/Application.hpp"
 
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/Opt.hpp"
-#include "DEngine/Containers/StackVec.hpp"
+#include "DEngine/Std/Containers/Opt.hpp"
+#include "DEngine/Std/Containers/StackVec.hpp"
 
 #include <chrono>
 #include <vector>

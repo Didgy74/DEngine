@@ -1,7 +1,7 @@
 #include "detail_Application.hpp"
 #include "Assert.hpp"
 
-#include <DEngine/Utility.hpp>
+#include <DEngine/Std/Utility.hpp>
 
 #include <android/configuration.h>
 #include <android/log.h>

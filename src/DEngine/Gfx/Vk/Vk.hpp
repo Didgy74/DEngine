@@ -17,10 +17,10 @@
 
 #include "DEngine/Gfx/Gfx.hpp"
 
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/StackVec.hpp"
-#include "DEngine/Containers/Array.hpp"
-#include "DEngine/Containers/Pair.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/Containers/StackVec.hpp>
+#include <DEngine/Std/Containers/Array.hpp>
+#include <DEngine/Std/Containers/Pair.hpp>
 
 #include <vector>
 

@@ -329,7 +329,8 @@ namespace DEngine::Editor
 		{
 			Gui::SizeHint returnVal{};
 			returnVal.preferred = { 450, 450 };
-			returnVal.expand = true;
+			returnVal.expandX = true;
+			returnVal.expandY = true;
 			return returnVal;
 		}
 

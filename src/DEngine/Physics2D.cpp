@@ -2,7 +2,7 @@
 
 #include <DEngine/Scene.hpp>
 
-#include <DEngine/Utility.hpp>
+#include <DEngine/Std/Utility.hpp>
 
 
 namespace DEngine::Physics
@@ -32,7 +32,7 @@ void DEngine::Physics::Update(Scene& scene, f32 deltaTime)
 		Entity const& entity = scene.rigidbodies[i].a;
 		Rigidbody2D& rb = scene.rigidbodies[i].b;
 
-		auto leftPosIt = std::find_if(
+		auto leftPosIt = Std::FindIf(
 			scene.transforms.begin(),
 			scene.transforms.end(),
 			[entity](decltype(Scene::transforms)::value_type const& val) -> bool { return val.a == entity; });

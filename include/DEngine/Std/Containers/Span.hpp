@@ -1,9 +1,8 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
-#include <DEngine/Containers/detail/Assert.hpp>
-#include <DEngine/Containers/Opt.hpp>
-#include <DEngine/Containers/Range.hpp>
+#include <DEngine/Std/Containers/detail/Assert.hpp>
+#include <DEngine/Std/Containers/Range.hpp>
 
 namespace DEngine::Std
 {

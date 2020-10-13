@@ -1,8 +1,8 @@
 #pragma once
 
-#include <DEngine/Containers/Range.hpp>
+#include <DEngine/Std/Containers/Range.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
-#include <DEngine/Trait.hpp>
+#include <DEngine/Std/Trait.hpp>
 
 namespace DEngine::Std
 {

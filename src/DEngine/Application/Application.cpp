@@ -1,8 +1,8 @@
 #include "detail_Application.hpp"
 #include "Assert.hpp"
 
-#include <DEngine/Containers/StackVec.hpp>
-#include <DEngine/Utility.hpp>
+#include <DEngine/Std/Containers/StackVec.hpp>
+#include <DEngine/Std/Utility.hpp>
 
 #include <iostream>
 #include <cstring>

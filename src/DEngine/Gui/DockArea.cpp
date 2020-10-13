@@ -3,9 +3,9 @@
 #include <DEngine/Gui/Context.hpp>
 #include "ImplData.hpp"
 
-#include <DEngine/Containers/Opt.hpp>
-#include <DEngine/Containers/Span.hpp>
-#include <DEngine/Utility.hpp>
+#include <DEngine/Std/Containers/Opt.hpp>
+#include <DEngine/Std/Containers/Span.hpp>
+#include <DEngine/Std/Utility.hpp>
 
 namespace DEngine::Gui::impl
 {
@@ -325,7 +325,8 @@ SizeHint DockArea::SizeHint(
 	Context const& ctx) const
 {
 	Gui::SizeHint returnVal{};
-	returnVal.expand = true;
+	returnVal.expandX = true;
+	returnVal.expandY = true;
 
 	return returnVal;
 }

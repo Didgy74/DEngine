@@ -6,7 +6,7 @@
 
 #include "DEngine/Gfx/Gfx.hpp"
 #include <DEngine/FixedWidthTypes.hpp>
-#include "DEngine/Utility.hpp"
+#include <DEngine/Std/Utility.hpp>
 #include <DEngine/Math/Vector.hpp>
 #include <DEngine/Math/UnitQuaternion.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
@@ -42,7 +42,7 @@ class GfxTexAssetInterfacer : public DEngine::Gfx::TextureAssetInterface
 
 void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 {
-	auto rbIt = std::find_if(
+	auto rbIt = Std::FindIf(
 		scene.rigidbodies.begin(),
 		scene.rigidbodies.end(),
 		[entity](Std::Pair<Entity, Physics::Rigidbody2D> const& val) -> bool { return entity == val.a; });
@@ -177,7 +177,7 @@ void DEngine::detail::SubmitRendering(
 		auto& entity = item.a;
 
 		// First check if this entity has a position
-		auto posIt = std::find_if(
+		auto posIt = Std::FindIf(
 			scene.transforms.begin(),
 			scene.transforms.end(),
 			[&entity](decltype(scene.transforms)::value_type const& val) -> bool { return val.a == entity; });

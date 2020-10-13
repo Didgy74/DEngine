@@ -3,7 +3,7 @@
 #include <DEngine/Gui/Layout.hpp>
 #include <DEngine/Gui/Widget.hpp>
 
-#include <DEngine/Containers/Box.hpp>
+#include <DEngine/Std/Containers/Box.hpp>
 
 namespace DEngine::Gui
 {
@@ -13,8 +13,8 @@ namespace DEngine::Gui
 		using ParentType = Layout;
 
 		u32 scrollBarCursorRelativePosY = 0;
-		u32 scrollBarPos = 0;
-		u32 scrollBarWidthPixels = 50;
+		mutable u32 scrollBarPos = 0;
+		u32 scrollBarThickness = 50;
 		enum class ScrollBarState
 		{
 			Normal,

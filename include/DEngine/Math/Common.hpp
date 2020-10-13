@@ -10,9 +10,9 @@ namespace DEngine::Math
 	[[nodiscard]] constexpr i64 Abs(i64 input);
 	[[nodiscard]] constexpr f32 Abs(f32 input);
 	[[nodiscard]] constexpr f64 Abs(f64 input);
-	
-	[[nodiscard]] constexpr f32 Ceil(f32 input);
-	[[nodiscard]] constexpr f64 Ceil(f64 input);
+
+	[[nodiscard]] f32 Ceil(f32 input);
+	[[nodiscard]] f64 Ceil(f64 input);
 
 	[[nodiscard]] constexpr u8 CeilToMultiple(u8 value, u8 multiple);
 	[[nodiscard]] constexpr u16 CeilToMultiple(u16 value, u16 multiple);
@@ -90,8 +90,8 @@ namespace DEngine::Math::detail
 	}
 
 	template <typename T>
-	constexpr T Clamp(T value, T min, T max) 
-	{ 
+	constexpr T Clamp(T value, T min, T max)
+	{
 		if (value < min)
 			return min;
 		else if (value > max)

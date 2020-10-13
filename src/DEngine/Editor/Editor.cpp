@@ -3,12 +3,11 @@
 #include "Editor.hpp"
 #include "ContextImpl.hpp"
 
-
-
 #include <DEngine/Gui/Button.hpp>
 #include <DEngine/Gui/DockArea.hpp>
 #include <DEngine/Gui/Image.hpp>
 #include <DEngine/Gui/LineEdit.hpp>
+#include <DEngine/Gui/LineList.hpp>
 #include <DEngine/Gui/ScrollArea.hpp>
 #include <DEngine/Gui/StackLayout.hpp>
 #include <DEngine/Gui/Text.hpp>
@@ -18,8 +17,8 @@
 #include <DEngine/Gfx/Gfx.hpp>
 #include <DEngine/Time.hpp>
 
-#include <DEngine/Containers/Box.hpp>
-#include <DEngine/Utility.hpp>
+#include <DEngine/Std/Containers/Box.hpp>
+#include <DEngine/Std/Utility.hpp>
 
 #include <DEngine/Math/Constant.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
@@ -188,9 +187,20 @@ namespace DEngine::Editor
 			Gui::ScrollArea* entityListScrollArea = new Gui::ScrollArea();
 			this->AddLayout2(Std::Box<Gui::Layout>{ entityListScrollArea });
 
-			entitiesListLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
-			entityListScrollArea->childType = Gui::ScrollArea::ChildType::Layout;
-			entityListScrollArea->layout = Std::Box<Gui::Layout>{ entitiesListLayout };
+			entitiesList = new Gui::LineList();
+			entitiesList->SetCanSelect(true);
+			entitiesList->selectedLineChangedCallback = [this](Gui::LineList& widget)
+			{
+				Std::Opt<uSize> selectedLineOpt = widget.GetSelectedLine();
+				if (selectedLineOpt.HasValue())
+				{
+					uSize selectedLine = selectedLineOpt.Value();
+					std::string_view lineText = widget.GetLine(selectedLine);
+					this->ctxImpl->SelectEntity((Entity)std::atoi(lineText.data()));
+				}
+			};
+			entityListScrollArea->childType = Gui::ScrollArea::ChildType::Widget;
+			entityListScrollArea->widget = Std::Box<Gui::Widget>{ entitiesList};
 
 			for (uSize i = 0; i < ctxImpl->scene->entities.size(); i++)
 			{
@@ -200,31 +210,24 @@ namespace DEngine::Editor
 			}
 		}
 
-		Gui::StackLayout* entitiesListLayout = nullptr;
+		Gui::LineList* entitiesList = nullptr;
 		ContextImpl* ctxImpl = nullptr;
-		std::vector<Std::Pair<Entity, Gui::StackLayout*>> entityEntries;
 
 		void AddEntityToList(Entity id)
 		{
-			Gui::StackLayout* entityListItemLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-			entitiesListLayout->AddLayout2(Std::Box<Gui::Layout>{ entityListItemLayout });
-			entityEntries.push_back({ id, entityListItemLayout });
-
-			Gui::Text* textWidget = new Gui::Text;
-			entityListItemLayout->AddWidget2(Std::Box<Gui::Widget>{ textWidget });
-			textWidget->String_Set(std::to_string((u64)id).c_str());
-
-			Gui::Button* entitySelectButton = new Gui::Button;
-			entityListItemLayout->AddWidget2(Std::Box<Gui::Widget>{ entitySelectButton });
-			entitySelectButton->textWidget.String_Set("Select");
-			entitySelectButton->activatePfn = [this, id](Gui::Button& btn)
-			{
-				ctxImpl->SelectEntity(id);
-			};
+			entitiesList->AddLine(std::to_string((u64)id));
 		}
 
 		void RemoveEntityFromList(Entity id)
 		{
+			Std::Opt<uSize> selectedLineOpt = entitiesList->GetSelectedLine();
+			if (selectedLineOpt.HasValue())
+			{
+				uSize selectedLine = selectedLineOpt.Value();
+				entitiesList->RemoveLine(selectedLine);
+			}
+
+			/*
 			auto it = Std::FindIf(
 				entityEntries.begin(),
 				entityEntries.end(),
@@ -243,6 +246,7 @@ namespace DEngine::Editor
 			}
 
 			entityEntries.erase(it);
+			*/
 		}
 
 		void SelectEntity(Std::Opt<Entity> previousId, Entity newId)
@@ -251,26 +255,10 @@ namespace DEngine::Editor
 			{
 				UnselectEntity(previousId.Value());
 			}
-
-			auto entityEntryIt = Std::FindIf(
-				entityEntries.begin(),
-				entityEntries.end(),
-				[newId](decltype(entityEntries)::value_type const& val) -> bool {
-					return val.a == newId; });
-			Gui::StackLayout* entityItem = entityEntryIt->b;
-			entityItem->color.w = 0.2f;
 		}
 
 		void UnselectEntity(Entity id)
 		{
-
-			auto entityEntryIt = Std::FindIf(
-				entityEntries.begin(),
-				entityEntries.end(),
-				[id](decltype(entityEntries)::value_type const& val) -> bool {
-					return val.a == id; });
-			Gui::StackLayout* entityItem = entityEntryIt->b;
-			entityItem->color.w = 0.f;
 		}
 	};
 

@@ -41,7 +41,7 @@ namespace DEngine::Gui::impl
 				childSizeHint = child.widget->SizeHint(ctx);
 
 			// Add to the sum size.
-			if (!childSizeHint.expand)
+			if (!childSizeHint.expandX)
 			{
 				u32& directionLength = layout.direction == StackLayout::Direction::Horizontal ? 
 					sumChildPreferredSize.width : 
@@ -78,7 +78,7 @@ namespace DEngine::Gui::impl
 		for (uSize i = 0; i < childCount; i++)
 		{
 			SizeHint const childSizeHint = childSizeHints[i];
-			if (childSizeHint.expand)
+			if (childSizeHint.expandX)
 			{
 				if (layout.direction == StackLayout::Direction::Horizontal)
 					childRect.extent.width = remainingDirectionSpace;
@@ -304,7 +304,11 @@ SizeHint StackLayout::SizeHint(
 	}
 
 	if (test_expand)
-		returnVal.expand = true;
+	{
+		returnVal.expandX = true;
+		returnVal.expandY = true;
+	}
+		
 
 	return returnVal;
 }

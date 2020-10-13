@@ -1,7 +1,7 @@
 #pragma once
 
 #include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Trait.hpp"
+#include "DEngine/Std/Trait.hpp"
 
 #include "DEngine/Math/detail/MatrixBase.hpp"
 #include "DEngine/Math/detail/MatrixBaseSquare.hpp"

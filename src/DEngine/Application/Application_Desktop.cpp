@@ -8,7 +8,7 @@
 #include "detail_Application.hpp"
 #include "Assert.hpp"
 
-#include <DEngine/Utility.hpp>
+#include <DEngine/Std/Utility.hpp>
 
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
@@ -393,7 +393,7 @@ Std::Opt<u64> Application::CreateVkSurface(
 	void const* vkAllocationCallbacks)
 {
 	auto const& windowContainer = detail::pAppData->windows;
-	auto windowIt = std::find_if(
+	auto windowIt = Std::FindIf(
 		windowContainer.begin(),
 		windowContainer.end(),
 		[window](detail::AppData::WindowNode const& val) -> bool {

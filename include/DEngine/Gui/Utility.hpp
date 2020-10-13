@@ -37,6 +37,11 @@ namespace DEngine::Gui
 		Math::Vec2Int position{};
 		Extent extent{};
 
+		[[nodiscard]] constexpr i32 Top() const noexcept;
+		[[nodiscard]] constexpr i32 Bottom() const noexcept;
+		[[nodiscard]] constexpr i32 Left() const noexcept;
+		[[nodiscard]] constexpr i32 Right() const noexcept;
+
 		[[nodiscard]] constexpr bool IsNothing() const noexcept;
 
 		[[nodiscard]] constexpr bool PointIsInside(Math::Vec2Int point) const noexcept;
@@ -58,6 +63,11 @@ constexpr bool DEngine::Gui::Extent::operator!=(Extent const& other) const noexc
 {
 	return !(*this == other);
 }
+
+constexpr DEngine::i32 DEngine::Gui::Rect::Top() const noexcept { return (i32)position.y; }
+constexpr DEngine::i32 DEngine::Gui::Rect::Bottom() const noexcept { return (i32)position.y + (i32)extent.height; }
+constexpr DEngine::i32 DEngine::Gui::Rect::Left() const noexcept { return (i32)position.x; }
+constexpr DEngine::i32 DEngine::Gui::Rect::Right() const noexcept { return (i32)position.x + (i32)extent.width; }
 
 constexpr bool DEngine::Gui::Rect::IsNothing() const noexcept { return extent.width == 0 || extent.height == 0; }
 

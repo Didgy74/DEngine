@@ -4,10 +4,10 @@
 #include "DynamicDispatch.hpp"
 #include "GlobUtils.hpp"
 
-#include "DEngine/Containers/Array.hpp"
+#include <DEngine/Std/Containers/Array.hpp>
 
 // For file IO
-#include "DEngine/Application.hpp"
+#include <DEngine/Application.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Gfx;

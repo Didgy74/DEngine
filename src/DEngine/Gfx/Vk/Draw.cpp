@@ -482,7 +482,6 @@ void DEngine::Gfx::Vk::APIData::Draw(Context& gfxData, DrawParams const& drawPar
 			throw std::runtime_error("DEngine - Vulkan: Acquiring next swapchain image did not return success result.");
 		u32 index = acquireResult.value;
 
-
 		presentIndices.push_back(index);
 		swapchains.push_back(windowsToPresent[i]->swapchain);
 		swapchainCopyCmdBuffers.push_back(windowsToPresent[i]->copyCmdBuffers[index]);
@@ -506,8 +505,8 @@ void DEngine::Gfx::Vk::APIData::Draw(Context& gfxData, DrawParams const& drawPar
 		presentInfo.pSwapchains = swapchains.data();
 		presentInfo.swapchainCount = (u32)swapchains.size();
 		vkResult = globUtils.queues.graphics.presentKHR(presentInfo);
-		if (vkResult != vk::Result::eSuccess)
-			throw std::runtime_error("DEngine - Vulkan: Presentation submission did not return success result.");
+		//if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eSuboptimalKHR)
+			//throw std::runtime_error("DEngine - Vulkan: Presentation submission did not return success result.");
 	}
 
 	DeletionQueue::ExecuteCurrentTick(

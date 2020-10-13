@@ -5,8 +5,8 @@
 #include <DEngine/Gui/SizeHint.hpp>
 #include <DEngine/Gui/WindowHandler.hpp>
 
-#include <DEngine/Containers/Array.hpp>
-#include <DEngine/Containers/Box.hpp>
+#include <DEngine/Std/Containers/Array.hpp>
+#include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
 

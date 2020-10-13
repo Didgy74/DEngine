@@ -5,9 +5,9 @@
 #include "DynamicDispatch.hpp"
 
 #include <DEngine/Gfx/detail/Assert.hpp>
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Containers/StackVec.hpp"
-#include "DEngine/Containers/Pair.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/Containers/StackVec.hpp>
+#include <DEngine/Std/Containers/Pair.hpp>
 
 #include "VMAIncluder.hpp"
 

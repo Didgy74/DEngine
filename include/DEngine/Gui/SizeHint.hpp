@@ -9,6 +9,7 @@ namespace DEngine::Gui
 	struct SizeHint
 	{
 		Extent preferred{};
-		bool expand = false;
+		bool expandX = false;
+		bool expandY = false;
 	};
 }

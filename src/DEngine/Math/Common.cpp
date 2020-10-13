@@ -7,44 +7,54 @@
 
 using namespace DEngine;
 
+f32 Math::Ceil(f32 input)
+{
+	return std::ceilf(input);
+}
+
+f64 Math::Ceil(f64 input)
+{
+	return std::ceill(input);
+}
+
 f32 Math::Round(f32 input)
 {
-    return std::roundf(input);
+	return std::roundf(input);
 }
 
 f32 Math::Sqrt(f32 input)
 {
-    return sqrtf(input);
+	return sqrtf(input);
 }
 
 f64 Math::Sqrt(f64 input)
 {
-    return sqrtl(input);
+	return sqrtl(input);
 }
 
 f32 Math::Pow(f32 coefficient, f32 exponent)
 {
-    return powf(coefficient, exponent);
+	return powf(coefficient, exponent);
 }
 
 f64 Math::Pow(f64 coefficient, f64 exponent)
 {
-    return powl(coefficient, exponent);
+	return powl(coefficient, exponent);
 }
 
 f32 Math::Sin(f32 radians)
 {
-    return sinf(radians);
+	return sinf(radians);
 }
 
 f32 Math::Cos(f32 radians)
 {
-    return cosf(radians);
+	return cosf(radians);
 }
 
 f32 Math::Tan(f32 radians)
 {
-    return tanf(radians);
+	return tanf(radians);
 }
 
 Math::Matrix<3, 3, f32> Math::LinearTransform3D::Rotate(ElementaryAxis axis, f32 amountRadians)

@@ -1,8 +1,8 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
-#include <DEngine/Containers/Pair.hpp>
-#include <DEngine/Containers/StackVec.hpp>
+#include <DEngine/Std/Containers/Pair.hpp>
+#include <DEngine/Std/Containers/StackVec.hpp>
 
 // Temp
 #include <DEngine/Math/Vector.hpp>

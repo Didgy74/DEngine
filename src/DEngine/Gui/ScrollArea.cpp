@@ -5,23 +5,51 @@ using namespace DEngine::Gui;
 
 namespace DEngine::Gui::impl
 {
+  static Rect GetChildRect(
+    Rect widgetRect,
+    SizeHint childSizeHint,
+    u32 scrollBarPos,
+    u32 scrollBarThickness)
+  {
+    Rect childRect{};
+    childRect.position = widgetRect.position;
+    if (childSizeHint.expandX)
+    {
+      childRect.extent.width = widgetRect.extent.width - scrollBarThickness;
+    }
+    else
+    {
+      childRect.extent.width = childSizeHint.preferred.width;
+    }
+    if (childSizeHint.expandY)
+    {
+      childRect.extent.height = widgetRect.extent.height;
+    }
+    else
+    {
+      childRect.position.y -= scrollBarPos;
+      childRect.extent.height = childSizeHint.preferred.height;
+    }
+    return childRect;
+  }
+
   static Rect GetScrollbarRect(
     ScrollArea const& widget,
     Rect widgetRect,
-    SizeHint childSizeHint)
+    u32 widgetHeight)
   {
     Rect scrollbarRect{};
-    scrollbarRect.extent.width = widget.scrollBarWidthPixels;
+    scrollbarRect.extent.width = widget.scrollBarThickness;
     scrollbarRect.extent.height = widgetRect.extent.height;
-    scrollbarRect.position.x = widgetRect.position.x + widgetRect.extent.width - widget.scrollBarWidthPixels;
+    scrollbarRect.position.x = widgetRect.position.x + widgetRect.extent.width - widget.scrollBarThickness;
     scrollbarRect.position.y = widgetRect.position.y;
-    if (widgetRect.extent.height < childSizeHint.preferred.height)
+    if (widgetRect.extent.height < widgetHeight)
     {
-      f32 factor = (f32)widgetRect.extent.height / childSizeHint.preferred.height;
+      f32 factor = (f32)widgetRect.extent.height / widgetHeight;
       if (factor < 1.f)
         scrollbarRect.extent.height *= factor;
 
-      f32 test = (f32)widget.scrollBarPos / (childSizeHint.preferred.height - widgetRect.extent.height);
+      f32 test = (f32)widget.scrollBarPos / (widgetHeight - widgetRect.extent.height);
 
       scrollbarRect.position.y += test * (widgetRect.extent.height - scrollbarRect.extent.height);
     }
@@ -34,7 +62,8 @@ SizeHint ScrollArea::SizeHint(
 {
   Gui::SizeHint returnVal{};
   returnVal.preferred = { 50, 50 };
-  returnVal.expand = true;
+  returnVal.expandX = true;
+  returnVal.expandY = true;
 
   if (childType == ChildType::Layout)
   {
@@ -47,7 +76,7 @@ SizeHint ScrollArea::SizeHint(
     returnVal.preferred.width = childSizeHint.preferred.width;
   }
 
-  returnVal.preferred.width += scrollBarWidthPixels;
+  returnVal.preferred.width += scrollBarThickness;
 
   return returnVal;
 }
@@ -65,62 +94,60 @@ void ScrollArea::Render(
   else
     childSizeHint = widget->SizeHint(ctx);
 
-  Rect childRect = widgetRect;
-  childRect.position.y -= scrollBarPos;
-  childRect.extent = childSizeHint.preferred;
+  Rect childRect = impl::GetChildRect(
+    widgetRect,
+    childSizeHint,
+    scrollBarPos,
+    scrollBarThickness);
+  if (childSizeHint.expandY)
+  {
+    scrollBarPos = 0;
+  }
 
   Rect childVisibleRect = Rect::Intersection(childRect, visibleRect);
 
-  bool scissorAdded = false;
   if ((layout || widget) && !childVisibleRect.IsNothing())
   {
-    scissorAdded = true;
     drawInfo.PushScissor(childVisibleRect);
-  }
 
-  if (childType == ChildType::Layout)
-  {
-    layout->Render(
-      ctx,
-      framebufferExtent,
-      childRect,
-      childVisibleRect,
-      drawInfo);
-  } 
-  else if (childType == ChildType::Widget)
-  {
-    widget->Render(
-      ctx,
-      framebufferExtent,
-      childRect,
-      childVisibleRect,
-      drawInfo);
-  }
+    if (childType == ChildType::Layout)
+    {
+      layout->Render(
+        ctx,
+        framebufferExtent,
+        childRect,
+        childVisibleRect,
+        drawInfo);
+    }
+    else if (childType == ChildType::Widget)
+    {
+      widget->Render(
+        ctx,
+        framebufferExtent,
+        childRect,
+        childVisibleRect,
+        drawInfo);
+    }
 
-  // Add scissor remove drawcmd
-  if (scissorAdded)
+    // Add scissor remove drawcmd
     drawInfo.PopScissor();
+  }
 
   // Draw scrollbar
   {
-    Gfx::GuiDrawCmd cmd{};
-    cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
     Rect scrollBarRect = impl::GetScrollbarRect(
       *this,
       widgetRect,
-      childSizeHint);
-    cmd.rectPosition.x = (f32)scrollBarRect.position.x / framebufferExtent.width;
-    cmd.rectPosition.y = (f32)scrollBarRect.position.y / framebufferExtent.height;
-    cmd.rectExtent.x = (f32)scrollBarRect.extent.width / framebufferExtent.width;
-    cmd.rectExtent.y = (f32)scrollBarRect.extent.height / framebufferExtent.height;
-    cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
+      childRect.extent.height);
+
+    Math::Vec4 color{};
     if (scrollBarState == ScrollBarState::Normal)
-      cmd.filledMesh.color = { 0.5f, 0.5f, 0.5f, 1.f };
+      color = { 0.5f, 0.5f, 0.5f, 1.f };
     else if (scrollBarState == ScrollBarState::Hovered)
-      cmd.filledMesh.color = { 0.75f, 0.75f, 0.75f, 1.f };
+      color = { 0.75f, 0.75f, 0.75f, 1.f };
     else if (scrollBarState == ScrollBarState::Pressed)
-      cmd.filledMesh.color = { 1.f, 1.f, 1.f, 1.f };
-    drawInfo.drawCmds.push_back(cmd);
+      color = { 1.f, 1.f, 1.f, 1.f };
+    drawInfo.PushFilledQuad(scrollBarRect, color);
   }
 }
 
@@ -138,19 +165,24 @@ void ScrollArea::CursorMove(
     else
       childSizeHint = widget->SizeHint(test.GetContext());
 
+    Rect childRect = impl::GetChildRect(
+      widgetRect,
+      childSizeHint,
+      scrollBarPos,
+      scrollBarThickness);
 
     // Check if mouse is over
     if (scrollBarState == ScrollBarState::Pressed)
     {
-      if (widgetRect.extent.height < childSizeHint.preferred.height)
+      if (widgetRect.extent.height < childRect.extent.height)
       {
         // The scroll-bar is currently pressed so we need to move it with the cursor.
         // Find out where mouse is relative to the scroll bar position
         i32 test = event.position.y - widgetRect.position.y - scrollBarCursorRelativePosY;
-        u32 scrollBarHeight = widgetRect.extent.height * widgetRect.extent.height / childSizeHint.preferred.height;
+        u32 scrollBarHeight = (f32)widgetRect.extent.height * (f32)widgetRect.extent.height / (f32)childRect.extent.height;
         f32 factor = (f32)test / (widgetRect.extent.height - scrollBarHeight);
         factor = Math::Clamp(factor, 0.f, 1.f);
-        scrollBarPos = u32(factor * (childSizeHint.preferred.height - widgetRect.extent.height));
+        scrollBarPos = u32(factor * (childRect.extent.height - widgetRect.extent.height));
       }
     }
     else
@@ -158,7 +190,7 @@ void ScrollArea::CursorMove(
       Rect scrollBarRect = impl::GetScrollbarRect(
         *this,
         widgetRect,
-        childSizeHint);
+        childRect.extent.height);
 
       bool cursorIsHovering = scrollBarRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
       if (cursorIsHovering)
@@ -167,9 +199,6 @@ void ScrollArea::CursorMove(
         scrollBarState = ScrollBarState::Normal;
     }
 
-    Rect childRect = widgetRect;
-    childRect.position.y -= scrollBarPos;
-    childRect.extent = childSizeHint.preferred;
     if (childType == ChildType::Layout)
       layout->CursorMove(
         test,
@@ -200,10 +229,16 @@ void ScrollArea::CursorClick(
     else
       childSizeHint = widget->SizeHint(ctx);
 
+    Rect childRect = impl::GetChildRect(
+      widgetRect,
+      childSizeHint,
+      scrollBarPos,
+      scrollBarThickness);
+
     Rect scrollBarRect = impl::GetScrollbarRect(
       *this,
       widgetRect,
-      childSizeHint);
+      childRect.extent.height);
     bool cursorIsHovered = scrollBarRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
     if (cursorIsHovered)
     {
@@ -221,9 +256,6 @@ void ScrollArea::CursorClick(
         scrollBarState = ScrollBarState::Normal;
     }
 
-    Rect childRect = widgetRect;
-    childRect.position.y -= scrollBarPos;
-    childRect.extent = childSizeHint.preferred;
     if (childType == ChildType::Layout)
       layout->CursorClick(
         ctx,
@@ -261,10 +293,17 @@ void ScrollArea::TouchEvent(
     else
       childSizeHint = widget->SizeHint(ctx);
 
+    Rect childRect = impl::GetChildRect(
+      widgetRect,
+      childSizeHint,
+      scrollBarPos,
+      scrollBarThickness);
+
     Rect scrollBarRect = impl::GetScrollbarRect(
       *this,
       widgetRect,
-      childSizeHint);
+      childRect.extent.height);
+
     bool cursorIsHovered = scrollBarRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
     if (cursorIsHovered && event.type == TouchEventType::Down && !scrollBarTouchIndex.HasValue())
     {
@@ -293,9 +332,6 @@ void ScrollArea::TouchEvent(
       }
     }
 
-    Rect childRect = widgetRect;
-    childRect.position.y -= scrollBarPos;
-    childRect.extent = childSizeHint.preferred;
     if (childType == ChildType::Layout)
       layout->TouchEvent(
         ctx,
