@@ -92,6 +92,32 @@ void Context::ClearInputConnection(
 	implData.inputConnectionWidget = nullptr;
 }
 
+WindowHandler& Context::GetWindowHandler() const
+{
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	return *implData.windowHandler;
+}
+
+void Context::Test(
+	WindowID windowId, 
+	Std::Box<Layout> layout, 
+	Rect rect)
+{
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	
+	auto windowNodeIt = Std::FindIf(
+		implData.windows.begin(),
+		implData.windows.end(),
+		[windowId](decltype(implData.windows.front()) const& val) -> bool { return windowId == val.id; });
+	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != implData.windows.end());
+	auto& windowNode = *windowNodeIt;
+
+	impl::Test_Menu yo{};
+	yo.rect = rect;
+	yo.topLayout = static_cast<Std::Box<Layout>&&>(layout);
+	windowNode.test_Menu = Std::Move(yo);
+}
+
 void Context::PushEvent(CharEnterEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
@@ -137,12 +163,40 @@ void Context::PushEvent(CursorClickEvent event)
 	{
 		if (windowNode.data.topLayout)
 		{
-			windowNode.data.topLayout->CursorClick(
-				*this,
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				implData.cursorPosition - windowNode.data.rect.position,
-				event);
+			bool bleh = false;
+			if (windowNode.test_Menu.HasValue() && windowNode.test_Menu.Value().topLayout)
+			{
+				auto& yo = windowNode.test_Menu.Value();
+				SizeHint sizeHint = yo.topLayout->SizeHint(*this);
+				Rect widgetRect = { yo.rect.position, sizeHint.preferred };
+				Math::Vec2Int cursorPos = implData.cursorPosition - windowNode.data.rect.position;
+				if (widgetRect.PointIsInside(cursorPos))
+				{
+					bleh = true;
+					yo.topLayout->CursorClick(
+						*this,
+						windowNode.id,
+						{ yo.rect.position, sizeHint.preferred },
+						{ yo.rect.position, sizeHint.preferred },
+						cursorPos,
+						event);
+				}
+				else
+				{
+					windowNode.test_Menu = Std::nullOpt;
+				}
+			}
+
+			if (!bleh)
+			{
+				windowNode.data.topLayout->CursorClick(
+					*this,
+					windowNode.id,
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+					implData.cursorPosition - windowNode.data.rect.position,
+					event);
+			}
 		}
 	}
 }
@@ -155,21 +209,37 @@ void Context::PushEvent(CursorMoveEvent event)
 	{
 		if (windowNode.data.topLayout)
 		{
-			Test test = Test(
-				*this, 
-				*implData.windowHandler,
-				windowNode.id, 
-				windowNode.data.rect);
-
 			CursorMoveEvent modifiedEvent{};
 			modifiedEvent.position = implData.cursorPosition - windowNode.data.rect.position;
 			modifiedEvent.positionDelta = event.positionDelta;
 
-			windowNode.data.topLayout->CursorMove(
-				test,
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				modifiedEvent);
+			bool bleh = false;
+			if (windowNode.test_Menu.HasValue() && windowNode.test_Menu.Value().topLayout)
+			{
+				auto& yo = windowNode.test_Menu.Value();
+				SizeHint sizeHint = yo.topLayout->SizeHint(*this);
+				Rect widgetRect = { yo.rect.position, sizeHint.preferred };
+				if (widgetRect.PointIsInside(modifiedEvent.position))
+				{
+					yo.topLayout->CursorMove(
+						*this,
+						windowNode.id,
+						{ yo.rect.position, sizeHint.preferred },
+						{ yo.rect.position, sizeHint.preferred },
+						modifiedEvent);
+					bleh = true;
+				}
+			}
+
+			if (!bleh)
+			{
+				windowNode.data.topLayout->CursorMove(
+					*this,
+					windowNode.id,
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+					{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+					modifiedEvent);
+			}
 		}
 	}
 }
@@ -181,8 +251,32 @@ void Context::PushEvent(TouchEvent event)
 	{
 		if (windowNode.data.topLayout)
 		{
+			bool bleh = false;
+			if (windowNode.test_Menu.HasValue() && windowNode.test_Menu.Value().topLayout)
+			{
+				auto& yo = windowNode.test_Menu.Value();
+				SizeHint sizeHint = yo.topLayout->SizeHint(*this);
+				Rect widgetRect = { yo.rect.position, sizeHint.preferred };
+				Math::Vec2Int cursorPos = implData.cursorPosition - windowNode.data.rect.position;
+				if (widgetRect.PointIsInside(cursorPos) && event.type == TouchEventType::Down)
+				{
+					bleh = true;
+					yo.topLayout->TouchEvent(
+						*this,
+						windowNode.id,
+						{ yo.rect.position, sizeHint.preferred },
+						{ yo.rect.position, sizeHint.preferred },
+						event);
+				}
+				else
+				{
+					windowNode.test_Menu = Std::nullOpt;
+				}
+			}
+
 			windowNode.data.topLayout->TouchEvent(
 				*this,
+				windowNode.id,
 				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 				event);
@@ -251,38 +345,6 @@ void Context::PushEvent(WindowResizeEvent event)
 	windowData.visibleRect = event.visibleRect;
 }
 
-Test::Test(
-	Context& ctx,
-	WindowHandler& windowHandler,
-	WindowID windowId,
-	Rect windowRect) noexcept :
-	ctx{ ctx },
-	windowHandler{ windowHandler },
-	windowId{ windowId },
-	windowRect{ windowRect }
-{
-
-}
-
-WindowHandler& Test::GetWindowHandler() const
-{
-	return windowHandler;
-}
-
-Context& Gui::Test::GetContext() const
-{
-	return ctx;
-}
-
-void Test::SetCursorType(CursorType cursorType)
-{
-	windowHandler.SetCursorType(windowId, cursorType);
-}
-
-void Test::OpenSoftInput(std::string_view currentText, SoftInputFilter inputFilter)
-{
-}
-
 void Context::Render() const
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
@@ -305,12 +367,25 @@ void Context::Render() const
 				vertices,
 				indices,
 				drawCmds);
+
 			windowNode.data.topLayout->Render(
 				*this,
 				windowNode.data.rect.extent,
 				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 				drawInfo);
+
+			if (windowNode.test_Menu.HasValue() && windowNode.test_Menu.Value().topLayout)
+			{
+				auto& yo = windowNode.test_Menu.Value();
+				SizeHint sizeHint = yo.topLayout->SizeHint(*this);
+				yo.topLayout->Render(
+					*this,
+					windowNode.data.rect.extent,
+					{ yo.rect.position, sizeHint.preferred },
+					{ yo.rect.position, sizeHint.preferred },
+					drawInfo);
+			}
 		}
 
 		windowNode.data.drawCmdCount = (u32)this->drawCmds.size() - windowNode.data.drawCmdOffset;

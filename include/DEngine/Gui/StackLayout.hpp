@@ -95,13 +95,15 @@ namespace DEngine::Gui
 			Context& ctx) override;
 
 		virtual void CursorMove(
-			Test& test,
+			Context& ctx,
+			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			CursorMoveEvent event) override;
 
 		virtual void CursorClick(
 			Context& ctx,
+			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
@@ -109,6 +111,7 @@ namespace DEngine::Gui
 
 		virtual void TouchEvent(
 			Context& ctx,
+			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchEvent event) override;

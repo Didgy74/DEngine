@@ -40,24 +40,24 @@ namespace DEngine::Application
 	};
 	
 	WindowID CreateWindow(
-		char const* title, 
+		char const* title,
 		Extent extents);
-	void DestroyWindow(WindowID);
-	u32 GetWindowCount();
-	Extent GetWindowSize(WindowID);
-	Extent GetWindowVisibleSize(WindowID);
-	Math::Vec2Int GetWindowPosition(WindowID);
-	Math::Vec2Int GetWindowVisiblePosition(WindowID);
-	bool GetWindowMinimized(WindowID);
-	WindowEvents GetWindowEvents(WindowID);
-	Std::StackVec<char const*, 5> RequiredVulkanInstanceExtensions();
+	void DestroyWindow(WindowID) noexcept;
+	u32 GetWindowCount() noexcept;
+	Extent GetWindowSize(WindowID) noexcept;
+	Extent GetWindowVisibleSize(WindowID) noexcept;
+	Math::Vec2Int GetWindowPosition(WindowID) noexcept;
+	Math::Vec2Int GetWindowVisiblePosition(WindowID) noexcept;
+	bool GetWindowMinimized(WindowID) noexcept;
+	WindowEvents GetWindowEvents(WindowID) noexcept;
+	Std::StackVec<char const*, 5> RequiredVulkanInstanceExtensions() noexcept;
 	Std::Opt<u64> CreateVkSurface(
 		WindowID window,
 		uSize vkInstance,
 		void const* vkAllocationCallbacks);
 
 	enum class CursorType : u8;
-	void SetCursor(WindowID window, CursorType cursor);
+	void SetCursor(WindowID window, CursorType cursor) noexcept;
 
 	enum class Orientation : u8;
 	Orientation GetOrientation();
@@ -70,12 +70,12 @@ namespace DEngine::Application
 
 	enum class Button : u16;
 	enum class KeyEventType : u8;
-	bool ButtonValue(Button input);
-	KeyEventType ButtonEvent(Button input);
-	f32 ButtonDuration(Button input);
+	bool ButtonValue(Button input) noexcept;
+	KeyEventType ButtonEvent(Button input) noexcept;
+	f32 ButtonDuration(Button input) noexcept;
 
 	struct CursorData;
-	Std::Opt<CursorData> Cursor();
+	Std::Opt<CursorData> Cursor() noexcept;
 	void LockCursor(bool state);
 
 	constexpr uSize maxTouchEventCount = 10;

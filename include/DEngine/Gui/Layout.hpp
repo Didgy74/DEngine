@@ -5,8 +5,6 @@
 #include <DEngine/Gui/Events.hpp>
 #include <DEngine/Gui/Utility.hpp>
 
-#include <DEngine/Gui/Test.hpp>
-
 namespace DEngine::Gui
 {
 	class Context;
@@ -40,13 +38,15 @@ namespace DEngine::Gui
 			Context& ctx) = 0;
 
 		virtual void CursorMove(
-			Test& test,
+			Context& ctx,
+			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			CursorMoveEvent event) = 0;
 
 		virtual void CursorClick(
 			Context& ctx,
+			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
@@ -54,6 +54,7 @@ namespace DEngine::Gui
 
 		virtual void TouchEvent(
 			Context& ctx,
+			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchEvent event) = 0;
@@ -80,13 +81,15 @@ inline void DEngine::Gui::Layout::CharRemoveEvent(
 	Context& ctx) {}
 
 inline void DEngine::Gui::Layout::CursorMove(
-	Test& test,
+	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	CursorMoveEvent event) {}
 
 inline void DEngine::Gui::Layout::CursorClick(
 	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	Math::Vec2Int cursorPos,
@@ -94,6 +97,7 @@ inline void DEngine::Gui::Layout::CursorClick(
 
 inline void DEngine::Gui::Layout::TouchEvent(
 	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	Gui::TouchEvent event) {}

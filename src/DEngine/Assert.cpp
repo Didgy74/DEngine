@@ -9,7 +9,7 @@ namespace DEngine::detail
 		char const* conditionString,
 		const char* file,
 		unsigned long long line, 
-		const char* msg)
+		const char* msg) noexcept
 	{
 		std::cout << std::endl;
 		std::cout << "#################" << std::endl;

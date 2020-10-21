@@ -161,7 +161,12 @@ namespace DEngine::Editor
 			Gui::Button* newEntityButton = new Gui::Button;
 			topElementLayout->AddWidget2(Std::Box<Gui::Widget>{ newEntityButton });
 			newEntityButton->textWidget.String_Set("New");
-			newEntityButton->activatePfn = [this](Gui::Button& btn)
+			newEntityButton->activatePfn = [this](
+				Gui::Button& btn,
+				Gui::Context& ctx,
+				Gui::WindowID windowId,
+				Gui::Rect widgetRect,
+				Gui::Rect visibleRect)
 			{
 				Entity newId = this->ctxImpl->scene->NewEntity();
 				AddEntityToList(newId);
@@ -170,7 +175,12 @@ namespace DEngine::Editor
 			Gui::Button* entityDeleteButton = new Gui::Button;
 			topElementLayout->AddWidget2(Std::Box<Gui::Widget>{ entityDeleteButton });
 			entityDeleteButton->textWidget.String_Set("Delete");
-			entityDeleteButton->activatePfn = [this](Gui::Button& btn)
+			entityDeleteButton->activatePfn = [this](
+				Gui::Button& btn,
+				Gui::Context& ctx,
+				Gui::WindowID windowId,
+				Gui::Rect widgetRect,
+				Gui::Rect visibleRect)
 			{
 				if (!this->ctxImpl->selectedEntity.HasValue())
 					return;
@@ -288,7 +298,12 @@ namespace DEngine::Editor
 			componentWidgetListLayout->AddWidget2(Std::Box<Gui::Widget>{ transformButton });
 			transformButton->textWidget.String_Set("Transform");
 			transformButton->type = Gui::Button::Type::Toggle;
-			transformButton->activatePfn = [id, this](Gui::Button& btn)
+			transformButton->activatePfn = [id, this](
+				Gui::Button& btn,
+				Gui::Context& ctx,
+				Gui::WindowID windowId,
+				Gui::Rect widgetRect,
+				Gui::Rect visibleRect)
 			{
 				if (btn.GetToggled())
 				{
@@ -341,7 +356,12 @@ namespace DEngine::Editor
 			transformButton->type = Gui::Button::Type::Toggle;
 			Scene* scene = this->ctxImpl->scene;
 			Gui::StackLayout* componentWidgetListLayout = this->componentWidgetListLayout;
-			transformButton->activatePfn = [id, scene, componentWidgetListLayout](Gui::Button& btn)
+			transformButton->activatePfn = [id, scene, componentWidgetListLayout](
+				Gui::Button& btn,
+				Gui::Context& ctx,
+				Gui::WindowID windowId,
+				Gui::Rect widgetRect,
+				Gui::Rect visibleRect)
 			{
 				if (btn.GetToggled())
 				{
@@ -428,6 +448,8 @@ namespace DEngine::Editor::detail
 
 using namespace DEngine;
 
+#include "../Gui/ImplData.hpp" // TODO: THIS IS ONLY FOR TESTING.
+
 Editor::Context Editor::Context::Create(
 	App::WindowID mainWindow,
 	Scene* scene,
@@ -445,30 +467,42 @@ Editor::Context Editor::Context::Create(
 	{
 		Gui::StackLayout* outmostLayout = implData.guiCtx->outerLayout;
 
+		// Add horizontal layout for top navigation bar
+		Gui::StackLayout* navigationBarLayout = new Gui::StackLayout;
+		outmostLayout->AddLayout2(Std::Box<Gui::Layout>{ navigationBarLayout });
+		
+		// New test button
+		Gui::Button* testButton = new Gui::Button;
+		navigationBarLayout->AddWidget2(Std::Box<Gui::Widget>{ testButton });
+		testButton->textWidget.String_Set("Test");
+		testButton->activatePfn = [](
+			Gui::Button& btn,
+			Gui::Context& ctx,
+			Gui::WindowID windowId,
+			Gui::Rect widgetRect,
+			Gui::Rect visibleRect)
+		{
+			Gui::StackLayout* vertLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
+			vertLayout->padding = 10;
+			vertLayout->color = { 0.25f, 0.f, 0.25f, 1.f };
+
+			Gui::Button* topText = new Gui::Button;
+			vertLayout->AddWidget2(Std::Box<Gui::Widget>{ topText });
+			topText->textWidget.String_Set("Test button");
+			topText->normalColor.w = 0.f;
+
+			ctx.Test(
+				windowId,
+				Std::Box<Gui::Layout>{ vertLayout }, 
+				{ { widgetRect.position.x, widgetRect.position.y + (i32)widgetRect.extent.height }, { 200, 200 } });			
+
+		};
+
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;
 		implData.test_fpsText = deltaText;
 		deltaText->String_Set("Child text");
-		outmostLayout->AddWidget2(Std::Box<Gui::Widget>{ deltaText });
-
-		/*
-		Gui::StackLayout* innerHorizLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-		innerHorizLayout->test_expand = true;
-		outmostLayout->AddLayout2(innerHorizLayout);
-
-		EntityIdList* entityIdList = new EntityIdList(&implData);
-		innerHorizLayout->AddLayout2(entityIdList);
-
-		ViewportWidget* viewport = new ViewportWidget(implData, *implData.gfxCtx);
-		innerHorizLayout->AddWidget2(viewport);
-		
-		ComponentList* componentList = new ComponentList(&implData);
-		innerHorizLayout->AddLayout2(componentList);
-
-		Gui::Text* logWidget = new Gui::Text;
-		outmostLayout->AddWidget2({ logWidget });
-		logWidget->String_Set("Log widget");
-		*/
+		navigationBarLayout->AddWidget2(Std::Box<Gui::Widget>{ deltaText });
 
 		Gui::DockArea* dockArea = new Gui::DockArea;
 		outmostLayout->AddLayout2(Std::Box<Gui::Layout>{ dockArea });
@@ -499,8 +533,8 @@ Editor::Context Editor::Context::Create(
 			auto& newWindow = topNode->windows.back();
 			newWindow.title = "Viewport";
 			newWindow.titleBarColor = { 0.5f, 0.f, 0.5f, 1.f };
-			ViewportWidget* viewport = new ViewportWidget(implData, *implData.gfxCtx);
-			newWindow.widget = Std::Box<Gui::Widget>{ viewport };
+			ViewportWidget* viewport = new ViewportWidget(implData, *gfxCtx);
+			newWindow.layout = Std::Box<Gui::Layout>{ viewport };
 
 			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
 		}

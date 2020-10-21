@@ -4,6 +4,8 @@
 #include <DEngine/Gui/WindowHandler.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
 
+#include <DEngine/Std/Containers/Box.hpp>
+
 #include <string_view>
 
 namespace DEngine::Gui
@@ -11,6 +13,7 @@ namespace DEngine::Gui
 	class StackLayout; // TEMPORARY
 
 	class Widget;
+	class Layout;
 
 	class Context
 	{
@@ -45,6 +48,10 @@ namespace DEngine::Gui
 
 		void ClearInputConnection(
 			Widget& widget);
+
+		WindowHandler& GetWindowHandler() const;
+
+		void Test(WindowID windowId, Std::Box<Layout> layout, Rect rect);
 		
 		// TEMPORARY FIELDS
 		StackLayout* outerLayout = nullptr;

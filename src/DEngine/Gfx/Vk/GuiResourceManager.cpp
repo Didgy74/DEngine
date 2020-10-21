@@ -582,34 +582,34 @@ void Vk::GuiResourceManager::Init(
 {
 	vk::Result vkResult{};
 
-	vk::BufferCreateInfo vertexBufferInfo{};
-	vertexBufferInfo.sharingMode = vk::SharingMode::eExclusive;
-	vertexBufferInfo.size = sizeof(GuiVertex) * minVertexCapacity * inFlightCount;
-	vertexBufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer;
-	VmaAllocationCreateInfo vertexVmaAllocInfo{};
-	vertexVmaAllocInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	vertexVmaAllocInfo.usage = VmaMemoryUsage::VMA_MEMORY_USAGE_CPU_TO_GPU;
-	VmaAllocationInfo vertexVmaAllocResultInfo;
+	vk::BufferCreateInfo vtxBufferInfo{};
+	vtxBufferInfo.sharingMode = vk::SharingMode::eExclusive;
+	vtxBufferInfo.size = sizeof(GuiVertex) * minVtxCapacity * inFlightCount;
+	vtxBufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer;
+	VmaAllocationCreateInfo vtxVmaAllocInfo{};
+	vtxVmaAllocInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	vtxVmaAllocInfo.usage = VmaMemoryUsage::VMA_MEMORY_USAGE_CPU_TO_GPU;
+	VmaAllocationInfo vtxVmaAllocResultInfo;
 	vkResult = (vk::Result)vmaCreateBuffer(
 		vma,
-		(VkBufferCreateInfo*)&vertexBufferInfo,
-		&vertexVmaAllocInfo,
-		(VkBuffer*)&manager.vertexBuffer,
-		&manager.vertexVmaAlloc,
-		&vertexVmaAllocResultInfo);
+		(VkBufferCreateInfo*)&vtxBufferInfo,
+		&vtxVmaAllocInfo,
+		(VkBuffer*)&manager.vtxBuffer,
+		&manager.vtxVmaAlloc,
+		&vtxVmaAllocResultInfo);
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate memory for GUI vertices.");
 	if (debugUtils)
 	{
 		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkBuffer)manager.vertexBuffer;
-		nameInfo.objectType = manager.vertexBuffer.objectType;
+		nameInfo.objectHandle = (u64)(VkBuffer)manager.vtxBuffer;
+		nameInfo.objectType = manager.vtxBuffer.objectType;
 		std::string name = "GuiResourceManager - VertexBuffer";
 		nameInfo.pObjectName = name.c_str();
 		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
 	}
-	manager.vertexCapacity = minVertexCapacity;
-	manager.vertexBufferData = vertexVmaAllocResultInfo.pMappedData;
+	manager.vtxMappedMem = { (u8*)vtxVmaAllocResultInfo.pMappedData, (uSize)vtxVmaAllocResultInfo.size };
+	manager.vtxInFlightCapacity = manager.vtxMappedMem.Size() / inFlightCount;
 
 
 	vk::BufferCreateInfo indexBufferInfo{};
@@ -638,8 +638,8 @@ void Vk::GuiResourceManager::Init(
 		nameInfo.pObjectName = name.c_str();
 		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
 	}
-	manager.indexCapacity = minIndexCapacity;
-	manager.indexBufferData = indexVmaAllocResultInfo.pMappedData;
+	manager.indexMappedMem = { (u8*)indexVmaAllocResultInfo.pMappedData, (uSize)indexVmaAllocResultInfo.size };
+	manager.indexInFlightCapacity = manager.indexMappedMem.Size() / inFlightCount;
 
 
 	GuiResourceManagerImpl::CreateFilledMeshShader(
@@ -668,15 +668,23 @@ void Vk::GuiResourceManager::Update(
 	Std::Span<u32 const> guiIndices,
 	u8 inFlightIndex)
 {
-	std::memcpy(
-		(char*)manager.vertexBufferData + manager.vertexCapacity * inFlightIndex * sizeof(decltype(guiVertices)::ValueType),
-		guiVertices.Data(),
-		guiVertices.Size() * sizeof(decltype(guiVertices)::ValueType));
+	DENGINE_DETAIL_GFX_ASSERT(inFlightIndex < globUtils.inFlightCount);
+	DENGINE_DETAIL_GFX_ASSERT(manager.vtxMappedMem.Size() % globUtils.inFlightCount == 0);
 
+	uSize srcVtxDataSize = guiVertices.Size() * sizeof(decltype(guiVertices)::ValueType);
+	DENGINE_DETAIL_GFX_ASSERT(srcVtxDataSize <= manager.vtxInFlightCapacity);
 	std::memcpy(
-		(char*)manager.indexBufferData + manager.indexCapacity * inFlightIndex * sizeof(decltype(guiIndices)::ValueType),
+		manager.vtxMappedMem.Data() + manager.vtxInFlightCapacity * inFlightIndex,
+		guiVertices.Data(),
+		srcVtxDataSize);
+
+	DENGINE_DETAIL_GFX_ASSERT(manager.indexMappedMem.Size() % globUtils.inFlightCount == 0);
+	uSize srcIndexDataSize = guiIndices.Size() * sizeof(decltype(guiIndices)::ValueType);
+	DENGINE_DETAIL_GFX_ASSERT(srcIndexDataSize <= manager.indexInFlightCapacity);
+	std::memcpy(
+		manager.indexMappedMem.Data() + manager.indexInFlightCapacity * inFlightIndex,
 		guiIndices.Data(),
-		guiIndices.Size() * sizeof(decltype(guiIndices)::ValueType));
+		srcIndexDataSize);
 
 }
 

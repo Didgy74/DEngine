@@ -79,17 +79,17 @@ namespace DEngine::Application::detail
 
 	extern AppData* pAppData;
 
-	bool Initialize();
+	bool Initialize() noexcept;
 	void ProcessEvents();
 
-	bool Backend_Initialize();
+	bool Backend_Initialize() noexcept;
 	void Backend_ProcessEvents();
 	void Backend_Log(char const* msg);
 	void Backend_DestroyWindow(AppData::WindowNode& windowNode);
 
 	void SetLogCallback(LogCallback callback);
 
-	AppData::WindowNode* GetWindowNode(WindowID id);
+	AppData::WindowNode* GetWindowNode(WindowID id) noexcept;
 	AppData::WindowNode* GetWindowNode(void* platformHandle);
 	void UpdateWindowSize(
 		void* platformHandle,

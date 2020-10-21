@@ -309,6 +309,9 @@ SizeHint StackLayout::SizeHint(
 		returnVal.expandY = true;
 	}
 		
+	// Add padding
+	returnVal.preferred.width += padding * 2;
+	returnVal.preferred.height += padding * 2;
 
 	return returnVal;
 }
@@ -424,32 +427,36 @@ void StackLayout::CharRemoveEvent(Context& ctx)
 }
 
 void StackLayout::CursorMove(
-	Test& test,
+	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	CursorMoveEvent event)
 {
 	ParentType::CursorMove(
-		test,
+		ctx,
+		windowId,
 		widgetRect,
 		visibleRect,
 		event);
 
 	impl::StackLayout_IterateOverChildren(
-		test.GetContext(),
+		ctx,
 		*this,
 		widgetRect,
-		[visibleRect, event, &test](LayoutItem& child, Rect childRect)
+		[&ctx, windowId, visibleRect, event](LayoutItem& child, Rect childRect)
 		{
 			if (child.type == LayoutItem::Type::Layout)
 				child.layout->CursorMove(
-					test,
+					ctx,
+					windowId,
 					childRect,
 					Rect::Intersection(childRect, visibleRect),
 					event);
 			else
 				child.widget->CursorMove(
-					test,
+					ctx,
+					windowId,
 					childRect,
 					Rect::Intersection(childRect, visibleRect),
 					event);
@@ -458,6 +465,7 @@ void StackLayout::CursorMove(
 
 void StackLayout::CursorClick(
 	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	Math::Vec2Int cursorPos,
@@ -465,6 +473,7 @@ void StackLayout::CursorClick(
 {
 	ParentType::CursorClick(
 		ctx,
+		windowId,
 		widgetRect,
 		visibleRect,
 		cursorPos,
@@ -474,11 +483,12 @@ void StackLayout::CursorClick(
 		ctx,
 		*this,
 		widgetRect,
-		[&ctx, visibleRect, cursorPos, event](LayoutItem& child, Rect childRect)
+		[&ctx, windowId, visibleRect, cursorPos, event](LayoutItem& child, Rect childRect)
 		{
 			if (child.type == LayoutItem::Type::Layout)
 				child.layout->CursorClick(
 					ctx,
+					windowId,
 					childRect,
 					Rect::Intersection(childRect, visibleRect),
 					cursorPos,
@@ -486,6 +496,7 @@ void StackLayout::CursorClick(
 			else
 				child.widget->CursorClick(
 					ctx,
+					windowId,
 					childRect,
 					Rect::Intersection(childRect, visibleRect),
 					cursorPos,
@@ -495,12 +506,14 @@ void StackLayout::CursorClick(
 
 void StackLayout::TouchEvent(
 	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	Gui::TouchEvent event)
 {
 	ParentType::TouchEvent(
 		ctx,
+		windowId,
 		widgetRect,
 		visibleRect,
 		event);
@@ -509,17 +522,19 @@ void StackLayout::TouchEvent(
 		ctx,
 		*this,
 		widgetRect,
-		[&ctx, visibleRect, event](LayoutItem& child, Rect childRect)
+		[&ctx, windowId, visibleRect, event](LayoutItem& child, Rect childRect)
 		{
 			if (child.type == LayoutItem::Type::Layout)
 				child.layout->TouchEvent(
 					ctx,
+					windowId,
 					childRect,
 					Rect::Intersection(childRect, visibleRect),
 					event);
 			else
 				child.widget->TouchEvent(
 					ctx,
+					windowId,
 					childRect,
 					Rect::Intersection(childRect, visibleRect),
 					event);

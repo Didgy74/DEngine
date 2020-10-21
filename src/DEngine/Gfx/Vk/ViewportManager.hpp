@@ -38,8 +38,7 @@ namespace DEngine::Gfx::Vk
 		Std::StackVec<vk::DescriptorSet, Constants::maxInFlightCount> camDataDescrSets{};
 		VmaAllocation camVmaAllocation{};
 		vk::Buffer camDataBuffer{};
-		void* camDataMappedMem = nullptr;
-		uSize camElementSize = 0;
+		Std::Span<u8> camDataMappedMem;
 
 		// This is temporary and shit
 		// But it works. This is controlled by the GuiResourceManager
@@ -67,7 +66,7 @@ namespace DEngine::Gfx::Vk
 			ViewportID id;
 			ViewportData viewport;
 		};
-		std::vector<Node> viewportData{};
+		std::vector<Node> viewportNodes{};
 
 		static constexpr uSize minimumCamDataCapacity = 8;
 		// Thread safe to access
@@ -81,8 +80,12 @@ namespace DEngine::Gfx::Vk
 			uSize minUniformBufferOffsetAlignment,
 			DebugUtilsDispatch const* debugUtils);
 
-		void NewViewport(ViewportID& viewportID);
-		void DeleteViewport(ViewportID id);
+		static void NewViewport(
+			ViewportManager& viewportManager, 
+			ViewportID& viewportID);
+		static void DeleteViewport(
+			ViewportManager& viewportManager, 
+			ViewportID id);
 
 		// Making it static made it more explicit.
 		// Easier to identify in the main loop
@@ -91,5 +94,11 @@ namespace DEngine::Gfx::Vk
 			GlobUtils const& globUtils,
 			Std::Span<ViewportUpdate const> viewportUpdates,
 			GuiResourceManager const& guiResourceManager);
+
+		static void UpdateCameras(
+			ViewportManager& viewportManager,
+			GlobUtils const& globUtils,
+			Std::Span<ViewportUpdate const> viewportUpdates,
+			u8 inFlightIndex);
 	};
 }

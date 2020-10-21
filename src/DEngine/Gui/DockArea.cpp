@@ -591,16 +591,14 @@ void DockArea::Render(
 namespace DEngine::Gui::impl
 {
 	static void DockArea_CursorMove_Behavior_Normal(
-		Test& test,
+		Context& ctx,
+		WindowID windowId,
 		DockArea& dockArea,
 		ImplData& implData,
 		Rect widgetRect,
 		Rect visibleRect,
 		Gui::CursorMoveEvent event)
 	{
-		//bool cursorInsideWidget = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
-		//if (!cursorInsideWidget)
-			//return;
 
 		// Check if we are hovering a resize rect.
 		bool rectWasHit = false;
@@ -611,7 +609,7 @@ namespace DEngine::Gui::impl
 			Std::Span{ dockArea.topLevelNodes.data(), dockArea.topLevelNodes.size() },
 			widgetRect,
 			continueIterating,
-			[&test, &dockArea, &implData, event, &rectWasHit](
+			[&ctx, windowId, &dockArea, &implData, event, &rectWasHit](
 				DockArea::TopLevelNode const& topLevelNode,
 				Rect topLevelRect,
 				uSize topLevelIndex,
@@ -643,11 +641,11 @@ namespace DEngine::Gui::impl
 					{
 					case DockArea_ResizeRect::Top:
 					case DockArea_ResizeRect::Bottom:
-						test.SetCursorType(CursorType::VerticalResize);
+						ctx.GetWindowHandler().SetCursorType(windowId, CursorType::VerticalResize);
 						break;
 					case DockArea_ResizeRect::Left:
 					case DockArea_ResizeRect::Right:
-						test.SetCursorType(CursorType::HorizontalResize);
+						ctx.GetWindowHandler().SetCursorType(windowId, CursorType::HorizontalResize);
 						break;
 					}
 					return;
@@ -661,7 +659,7 @@ namespace DEngine::Gui::impl
 						topLevelRect,
 						continueIterating2,
 						impl::DockArea_IterateNode_SplitCallableOrder::First,
-						[&dockArea, &implData, &test, event, &rectWasHit](
+						[&ctx, windowId, &implData, &dockArea, event, &rectWasHit](
 							DockArea::Node& node,
 							Rect rect,
 							DockArea::Node* parentNode,
@@ -680,9 +678,9 @@ namespace DEngine::Gui::impl
 									continueIterating = false;
 									rectWasHit = true;
 									if (node.type == DockArea::Node::Type::HoriSplit)
-										test.SetCursorType(CursorType::HorizontalResize);
+										ctx.GetWindowHandler().SetCursorType(windowId, CursorType::HorizontalResize);
 									else if (node.type == DockArea::Node::Type::VertSplit)
-										test.SetCursorType(CursorType::VerticalResize);
+										ctx.GetWindowHandler().SetCursorType(windowId, CursorType::VerticalResize);
 									return;
 								}
 							}
@@ -697,7 +695,8 @@ namespace DEngine::Gui::impl
 									if (window.widget)
 									{
 										window.widget->CursorMove(
-											test,
+											ctx,
+											windowId,
 											contentRect,
 											contentRect,
 											event);
@@ -705,7 +704,8 @@ namespace DEngine::Gui::impl
 									else if (window.layout)
 									{
 										window.layout->CursorMove(
-											test,
+											ctx,
+											windowId,
 											contentRect,
 											contentRect,
 											event);
@@ -718,7 +718,7 @@ namespace DEngine::Gui::impl
 		if (rectWasHit)
 			return;
 		else
-			test.SetCursorType(CursorType::Arrow);
+			ctx.GetWindowHandler().SetCursorType(windowId, CursorType::Arrow);
 	}
 
 	static void DockArea_CursorMove_Behavior_Moving(
@@ -990,19 +990,21 @@ namespace DEngine::Gui::impl
 }
 
 void DockArea::CursorMove(
-	Test& test,
+	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect, 
 	Rect visibleRect, 
 	CursorMoveEvent event)
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(test.GetContext().Internal_ImplData());
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 
 	bool cursorInsideWidget = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
 
 	if (this->behavior == Behavior::Normal)
 	{
 		impl::DockArea_CursorMove_Behavior_Normal(
-			test,
+			ctx,
+			windowId,
 			*this,
 			implData,
 			widgetRect,
@@ -1042,6 +1044,7 @@ namespace DEngine::Gui::impl
 {
 	static void DockArea_CursorClick_Behavior_Normal(
 		Context& ctx,
+		WindowID windowId,
 		DockArea& dockArea,
 		Rect widgetRect,
 		Rect visibleRect,
@@ -1059,7 +1062,7 @@ namespace DEngine::Gui::impl
 			Std::Span{ dockArea.topLevelNodes.data(), dockArea.topLevelNodes.size() },
 			widgetRect,
 			continueIterating,
-			[&ctx, &dockArea, &implData, event, cursorPos](
+			[&ctx, windowId, &dockArea, &implData, event, cursorPos](
 				DockArea::TopLevelNode& topLevelNode,
 				Rect topLevelRect,
 				uSize topLevelIndex,
@@ -1101,7 +1104,7 @@ namespace DEngine::Gui::impl
 						topLevelRect,
 						continueIterating,
 						impl::DockArea_IterateNode_SplitCallableOrder::First,
-						[&ctx, &dockArea, &implData, cursorPos, event, topLevelRect, topLevelIndex](
+						[&ctx, windowId, &dockArea, &implData, cursorPos, event, topLevelRect, topLevelIndex](
 							DockArea::Node& node,
 							Rect rect,
 							DockArea::Node* parentNode,
@@ -1190,6 +1193,7 @@ namespace DEngine::Gui::impl
 										{
 											window.widget->CursorClick(
 												ctx,
+												windowId,
 												contentRect,
 												contentRect,
 												cursorPos,
@@ -1199,6 +1203,7 @@ namespace DEngine::Gui::impl
 										{
 											window.layout->CursorClick(
 												ctx,
+												windowId,
 												contentRect,
 												contentRect,
 												cursorPos,
@@ -1341,6 +1346,7 @@ namespace DEngine::Gui::impl
 
 void DockArea::CursorClick(
 	Context& ctx, 
+	WindowID windowId,
 	Rect widgetRect, 
 	Rect visibleRect, 
 	Math::Vec2Int cursorPos, 
@@ -1354,6 +1360,7 @@ void DockArea::CursorClick(
 	{
 		impl::DockArea_CursorClick_Behavior_Normal(
 			ctx,
+			windowId,
 			*this,
 			widgetRect,
 			visibleRect,
@@ -1396,6 +1403,7 @@ namespace DEngine::Gui::impl
 		Context& ctx,
 		ImplData& implData,
 		DockArea& dockArea,
+		WindowID windowId,
 		Rect widgetRect,
 		Rect visibleRect,
 		Gui::TouchEvent event)
@@ -1410,7 +1418,7 @@ namespace DEngine::Gui::impl
 				Std::Span{dockArea.topLevelNodes.data(), dockArea.topLevelNodes.size()},
 				widgetRect,
 				continueIterating,
-				[&ctx, &dockArea, &implData, event](
+				[&ctx, &dockArea, &implData, windowId, event](
 					DockArea::TopLevelNode &topLevelNode,
 					Rect topLevelRect,
 					uSize topLevelIndex,
@@ -1460,7 +1468,7 @@ namespace DEngine::Gui::impl
 							topLevelRect,
 							continueIterating,
 							impl::DockArea_IterateNode_SplitCallableOrder::First,
-							[&ctx, &dockArea, &implData, event, topLevelRect, topLevelIndex](
+							[&ctx, &dockArea, &implData, windowId, event, topLevelRect, topLevelIndex](
 								DockArea::Node &node,
 								Rect rect,
 								DockArea::Node *parentNode,
@@ -1567,6 +1575,7 @@ namespace DEngine::Gui::impl
 												{
 													window.widget->TouchEvent(
 														ctx,
+														windowId,
 														contentRect,
 														contentRect,
 														event);
@@ -1575,6 +1584,7 @@ namespace DEngine::Gui::impl
 												{
 													window.layout->TouchEvent(
 														ctx,
+														windowId,
 														contentRect,
 														contentRect,
 														event);
@@ -1980,6 +1990,7 @@ namespace DEngine::Gui::impl
 
 void DockArea::TouchEvent(
 	Context& ctx, 
+	WindowID windowId,
 	Rect widgetRect, 
 	Rect visibleRect,
 	Gui::TouchEvent event)
@@ -1993,6 +2004,7 @@ void DockArea::TouchEvent(
 			ctx,
 			implData,
 			dockArea,
+			windowId,
 			widgetRect,
 			visibleRect,
 			event);

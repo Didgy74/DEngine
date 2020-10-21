@@ -122,7 +122,7 @@ void Application::detail::Backend_Log(char const* msg)
 	std::cout << msg << std::endl;
 }
 
-void Application::SetCursor(WindowID windowIn, CursorType cursor)
+void Application::SetCursor(WindowID windowIn, CursorType cursor) noexcept
 {
 	auto& appData = *detail::pAppData;
 	auto& backendData = *detail::pBackendData;
@@ -138,7 +138,6 @@ void Application::SetCursor(WindowID windowIn, CursorType cursor)
 		glfwSetCursor((GLFWwindow*)window.platformHandle, backendData.cursorTypes[(u8)cursor]);
 		window.windowData.currentCursorType = cursor;
 	}
-		
 }
 
 Application::WindowID Application::CreateWindow(
@@ -201,12 +200,12 @@ static void Application::detail::Backend_GLFW_ErrorCallback(
 	fputs(description, stderr);
 }
 
-bool Application::detail::Backend_Initialize()
+bool Application::detail::Backend_Initialize() noexcept
 {
 	glfwSetErrorCallback(Backend_GLFW_ErrorCallback);
 
 	if (!glfwInit())
-		exit(EXIT_FAILURE);
+		return false;
 
 	pAppData->cursorOpt = CursorData();
 
@@ -414,7 +413,7 @@ Std::Opt<u64> Application::CreateVkSurface(
 		return Std::Opt{ (u64)newSurface };
 }
 
-Std::StackVec<char const*, 5> Application::RequiredVulkanInstanceExtensions()
+Std::StackVec<char const*, 5> Application::RequiredVulkanInstanceExtensions() noexcept
 {
 	uint32_t count = 0;
 

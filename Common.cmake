@@ -3,7 +3,7 @@
 # Set DEngine options
 # -------------------
 # START
-	option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ON)
+	option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" OFF)
 	if (${DENGINE_ENABLE_ASSERT})
 		set(DENGINE_DEFINES ${DENGINE_DEFINES} DENGINE_ENABLE_ASSERT)
 	endif()

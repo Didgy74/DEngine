@@ -27,18 +27,6 @@ namespace DEngine::Gui
 
 		[[nodiscard]] virtual Gui::SizeHint SizeHint(Context const& ctx) const override;
 	
-		virtual void CursorClick(
-			Context& ctx,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorClickEvent event) override;
-
-		virtual void TouchEvent(
-			Context& ctx,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchEvent event) override;
 
 		virtual void Render(
 			Context const& ctx,
@@ -46,6 +34,22 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
+
+		virtual void CursorClick(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Math::Vec2Int cursorPos,
+			CursorClickEvent event) override;
+
+		virtual void TouchEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchEvent event) override;
+
 
 	protected:
 		bool canSelect = false;

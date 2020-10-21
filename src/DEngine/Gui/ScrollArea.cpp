@@ -152,7 +152,8 @@ void ScrollArea::Render(
 }
 
 void ScrollArea::CursorMove(
-  Test& test, 
+  Context& ctx,
+  WindowID windowId,
   Rect widgetRect,
   Rect visibleRect,
   CursorMoveEvent event)
@@ -161,9 +162,9 @@ void ScrollArea::CursorMove(
   {
     Gui::SizeHint childSizeHint{};
     if (childType == ChildType::Layout)
-      childSizeHint = layout->SizeHint(test.GetContext());
+      childSizeHint = layout->SizeHint(ctx);
     else
-      childSizeHint = widget->SizeHint(test.GetContext());
+      childSizeHint = widget->SizeHint(ctx);
 
     Rect childRect = impl::GetChildRect(
       widgetRect,
@@ -201,13 +202,15 @@ void ScrollArea::CursorMove(
 
     if (childType == ChildType::Layout)
       layout->CursorMove(
-        test,
+        ctx,
+        windowId,
         childRect,
         Rect::Intersection(childRect, visibleRect),
         event);
     else if (childType == ChildType::Widget)
       widget->CursorMove(
-        test,
+        ctx,
+        windowId,
         childRect,
         Rect::Intersection(childRect, visibleRect),
         event);
@@ -215,7 +218,8 @@ void ScrollArea::CursorMove(
 }
 
 void ScrollArea::CursorClick(
-  Context& ctx, 
+  Context& ctx,
+  WindowID windowId,
   Rect widgetRect, 
   Rect visibleRect,
   Math::Vec2Int cursorPos, 
@@ -259,6 +263,7 @@ void ScrollArea::CursorClick(
     if (childType == ChildType::Layout)
       layout->CursorClick(
         ctx,
+        windowId,
         childRect,
         Rect::Intersection(childRect, visibleRect),
         cursorPos,
@@ -266,6 +271,7 @@ void ScrollArea::CursorClick(
     else if (childType == ChildType::Widget)
       widget->CursorClick(
         ctx,
+        windowId,
         childRect,
         Rect::Intersection(childRect, visibleRect),
         cursorPos,
@@ -275,12 +281,14 @@ void ScrollArea::CursorClick(
 
 void ScrollArea::TouchEvent(
   Context& ctx, 
+  WindowID windowId,
   Rect widgetRect, 
   Rect visibleRect, 
   Gui::TouchEvent event)
 {
   ParentType::TouchEvent(
     ctx,
+    windowId,
     widgetRect,
     visibleRect,
     event);
@@ -335,12 +343,14 @@ void ScrollArea::TouchEvent(
     if (childType == ChildType::Layout)
       layout->TouchEvent(
         ctx,
+        windowId,
         childRect,
         Rect::Intersection(childRect, visibleRect),
         event);
     else if (childType == ChildType::Widget)
       widget->TouchEvent(
         ctx,
+        windowId,
         childRect,
         Rect::Intersection(childRect, visibleRect),
         event);

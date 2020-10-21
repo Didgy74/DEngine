@@ -22,33 +22,40 @@ namespace DEngine::Gfx::Vk
 	}
 }
 
-DEngine::Gfx::Vk::APIData::APIData()
+using namespace DEngine;
+using namespace DEngine::Gfx;
+
+Vk::APIData::APIData()
 {
 }
 
-DEngine::Gfx::Vk::APIData::~APIData()
+Vk::APIData::~APIData()
 {
 	APIData& apiData = *this;
 
 	apiData.globUtils.device.waitIdle();
 }
 
-void DEngine::Gfx::Vk::APIData::NewViewport(ViewportID& viewportID)
+void Vk::APIData::NewViewport(ViewportID& viewportID)
 {
 	APIData& apiData = *this;
 
-	apiData.viewportManager.NewViewport(viewportID);
+	ViewportManager::NewViewport(
+		apiData.viewportManager,
+		viewportID);
 }
 
-void DEngine::Gfx::Vk::APIData::DeleteViewport(ViewportID id)
+void Vk::APIData::DeleteViewport(ViewportID id)
 {
 	//vk::Result vkResult{};
 	APIData& apiData = *this;
 
-	apiData.viewportManager.DeleteViewport(id);
+	ViewportManager::NewViewport(
+		apiData.viewportManager,
+		id);
 }
 
-void DEngine::Gfx::Vk::APIData::NewFontTexture(
+void Vk::APIData::NewFontTexture(
 	u32 id,
 	u32 width,
 	u32 height,
@@ -67,11 +74,11 @@ void DEngine::Gfx::Vk::APIData::NewFontTexture(
 		data);
 }
 
-DEngine::Gfx::Vk::GlobUtils::GlobUtils()
+Vk::GlobUtils::GlobUtils()
 {
 }
 
-bool DEngine::Gfx::Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& apiDataBuffer)
+bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& apiDataBuffer)
 {
 	apiDataBuffer = new APIData;
 	APIData& apiData = *static_cast<APIData*>(apiDataBuffer);
@@ -84,9 +91,8 @@ bool DEngine::Gfx::Vk::InitializeBackend(Context& gfxData, InitInfo const& initI
 	apiData.globUtils.logger = initInfo.optional_logger;
 	apiData.test_textureAssetInterface = initInfo.texAssetInterface;
 
-	globUtils.inFlightCount = 2;
-	apiData.currInFlightIndex = 0;
 	globUtils.editorMode = true;
+	globUtils.inFlightCount = Constants::preferredInFlightCount;
 
 	// Make the VkInstance
 	PFN_vkGetInstanceProcAddr instanceProcAddr = Vk::loadInstanceProcAddressPFN();
@@ -249,7 +255,7 @@ bool DEngine::Gfx::Vk::InitializeBackend(Context& gfxData, InitInfo const& initI
 	return true;
 }
 
-void DEngine::Gfx::Vk::Init::Test(APIData& apiData)
+void Vk::Init::Test(APIData& apiData)
 {
 	vk::Result vkResult{};
 

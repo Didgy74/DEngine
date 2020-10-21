@@ -1,18 +1,17 @@
 #pragma once
 
+#include "DEngine/detail/Assert.hpp"
+
 #ifndef DENGINE_APPLICATION_ENABLE_ASSERT
 
-#define DENGINE_DETAIL_APPLICATION_ASSERT(expression)
+#define DENGINE_DETAIL_APPLICATION_ASSERT(expression) DENGINE_DETAIL_ASSUME(condition)
 
-#define DENGINE_DETAIL_APPLICATION_ASSERT_MSG(condition, msg)
+#define DENGINE_DETAIL_APPLICATION_ASSERT_MSG(condition, msg) DENGINE_DETAIL_ASSUME(condition)
 
 #else
 
-#include "DEngine/detail/Assert.hpp"
+#define DENGINE_DETAIL_APPLICATION_ASSERT(condition) DENGINE_DETAIL_ASSERT(condition)
 
-#define DENGINE_DETAIL_APPLICATION_ASSERT(expression) DENGINE_DETAIL_ASSERT(expression)
-
-
-#define DENGINE_DETAIL_APPLICATION_ASSERT_MSG(expression, msg) DENGINE_DETAIL_ASSERT_MSG(expression, msg)
+#define DENGINE_DETAIL_APPLICATION_ASSERT_MSG(condition, msg) DENGINE_DETAIL_ASSERT_MSG(condition, msg)
 
 #endif

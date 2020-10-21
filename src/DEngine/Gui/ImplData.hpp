@@ -79,10 +79,18 @@ namespace DEngine::Gui::impl
 		Std::Box<Layout> topLayout{};
 	};
 
+	struct Test_Menu
+	{
+		Rect rect{};
+		Std::Box<Layout> topLayout{};
+	};
+
 	struct WindowNode
 	{
 		WindowID id;
 		WindowData data;
+
+		Std::Opt<Test_Menu> test_Menu{};
 	};
 
 	struct ImplData

@@ -116,16 +116,20 @@ namespace DEngine::Std
 		if (this == &other)
 			return *this;
 
-		if (hasValue)
-			value.~T();
-
 		if (other.hasValue)
 		{
-			value = static_cast<T&&>(other.value);
-			hasValue = true;
+			if (!hasValue)
+				new(&value) T(static_cast<T&&>(other.value));
+			else
+				value = static_cast<T&&>(other.value);
 		}
 		else
-			hasValue = false;
+		{
+			if (hasValue)
+				value.~T();
+		}
+
+		hasValue = other.hasValue;
 
 		return *this;
 	}

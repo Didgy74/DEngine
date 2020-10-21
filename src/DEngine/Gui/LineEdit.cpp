@@ -137,6 +137,7 @@ void LineEdit::InputConnectionLost(Context& ctx)
 
 void LineEdit::CursorClick(
 	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	Math::Vec2Int cursorPos,
@@ -179,6 +180,7 @@ void LineEdit::CursorClick(
 
 void LineEdit::TouchEvent(
 	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	Gui::TouchEvent event)

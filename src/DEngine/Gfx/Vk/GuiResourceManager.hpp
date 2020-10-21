@@ -25,17 +25,17 @@ namespace DEngine::Gfx::Vk
 	class GuiResourceManager
 	{
 	public:
-		static constexpr uSize minVertexCapacity = 4096;
-		vk::Buffer vertexBuffer{};
-		VmaAllocation vertexVmaAlloc{};
-		uSize vertexCapacity{};
-		void* vertexBufferData = nullptr;
+		static constexpr uSize minVtxCapacity = 4096;
+		vk::Buffer vtxBuffer{};
+		VmaAllocation vtxVmaAlloc{};
+		Std::Span<u8> vtxMappedMem;
+		uSize vtxInFlightCapacity = 0;
 
 		static constexpr uSize minIndexCapacity = 4096;
 		vk::Buffer indexBuffer{};
 		VmaAllocation indexVmaAlloc{};
-		uSize indexCapacity{};
-		void* indexBufferData = nullptr;
+		Std::Span<u8> indexMappedMem;
+		uSize indexInFlightCapacity = 0;
 
 		struct FilledMeshPushConstant
 		{

@@ -40,20 +40,22 @@ namespace DEngine::Gui
 		Math::Vec4 pressedTextColor = Math::Vec4::Zero();
 		Text textWidget{};
 
-		void* pUserData{};
-		std::function<void(Button& btn)> activatePfn = nullptr;
+		using ActivateCallback = void(Button&, Context&, WindowID, Rect, Rect);
+		std::function<ActivateCallback> activatePfn = nullptr;
 
 		void SetToggled(bool toggled);
 		bool GetToggled() const;
 
 		virtual void CursorMove(
-			Test& test,
+			Context& ctx,
+			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			CursorMoveEvent event) override;
 
 		virtual void CursorClick(
 			Context& ctx,
+			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
@@ -61,6 +63,7 @@ namespace DEngine::Gui
 
 		virtual void TouchEvent(
 			Context& ctx,
+			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchEvent event) override;
@@ -79,6 +82,10 @@ namespace DEngine::Gui
 		bool toggled = false;
 		
 		void SetState(State newState);
-		void Activate();
+		void Activate(
+			Context& ctx,
+			WindowID windowId, 
+			Rect widgetRect, 
+			Rect visibleRect);
 	};
 }

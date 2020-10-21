@@ -7,17 +7,16 @@
 #include <iostream>
 #include <cstring>
 #include <chrono>
-#include <stdexcept>
 
 namespace DEngine::Application::detail
 {
 	AppData* pAppData = nullptr;
-	static bool IsValid(Button in);
+	static constexpr bool IsValid(Button in) noexcept;
 }
 
 using namespace DEngine;
 
-void Application::DestroyWindow(WindowID id)
+void Application::DestroyWindow(WindowID id) noexcept
 {
 	auto& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -32,13 +31,13 @@ void Application::DestroyWindow(WindowID id)
 	appData.windows.erase(windowNodeIt);
 }
 
-u32 Application::GetWindowCount()
+u32 Application::GetWindowCount() noexcept
 {
 	auto const& appData = *detail::pAppData;
 	return (u32)appData.windows.size();
 }
 
-Application::Extent Application::GetWindowSize(WindowID window)
+Application::Extent Application::GetWindowSize(WindowID window) noexcept
 {
 	auto const& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -51,7 +50,7 @@ Application::Extent Application::GetWindowSize(WindowID window)
 	return windowNode.windowData.size;
 }
 
-Application::Extent Application::GetWindowVisibleSize(WindowID window)
+Application::Extent Application::GetWindowVisibleSize(WindowID window) noexcept
 {
 	auto const& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -64,7 +63,7 @@ Application::Extent Application::GetWindowVisibleSize(WindowID window)
 	return windowNode.windowData.visibleSize;
 }
 
-Math::Vec2Int Application::GetWindowPosition(WindowID window)
+Math::Vec2Int Application::GetWindowPosition(WindowID window) noexcept
 {
 	auto const& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -77,7 +76,7 @@ Math::Vec2Int Application::GetWindowPosition(WindowID window)
 	return windowNode.windowData.position;
 }
 
-Math::Vec2Int Application::GetWindowVisiblePosition(WindowID window)
+Math::Vec2Int Application::GetWindowVisiblePosition(WindowID window) noexcept
 {
 	auto const& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -90,7 +89,7 @@ Math::Vec2Int Application::GetWindowVisiblePosition(WindowID window)
 	return windowNode.windowData.visiblePosition;
 }
 
-bool Application::GetWindowMinimized(WindowID window)
+bool Application::GetWindowMinimized(WindowID window) noexcept
 {
 	auto const& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -103,7 +102,7 @@ bool Application::GetWindowMinimized(WindowID window)
 	return windowNode.windowData.isMinimized;
 }
 
-Application::WindowEvents Application::GetWindowEvents(WindowID window)
+Application::WindowEvents Application::GetWindowEvents(WindowID window) noexcept
 {
 	auto const& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -116,9 +115,9 @@ Application::WindowEvents Application::GetWindowEvents(WindowID window)
 	return windowNode.events;
 }
 
-static bool Application::detail::IsValid(Button in)
+static constexpr bool Application::detail::IsValid(Button in) noexcept
 {
-	return static_cast<u64>(in) < static_cast<u64>(Button::COUNT);
+	return static_cast<unsigned int>(in) < static_cast<unsigned int>(Button::COUNT);
 }
 
 u64 Application::TickCount()
@@ -126,10 +125,10 @@ u64 Application::TickCount()
 	return detail::pAppData->tickCount;
 }
 
-bool Application::ButtonValue(Button input)
+bool Application::ButtonValue(Button input) noexcept
 {
-	if (!detail::IsValid(input))
-		throw std::runtime_error("Called DEngine::Application::ButtonValue with invalid Button value.");
+	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
+	DENGINE_DETAIL_APPLICATION_ASSERT(detail::IsValid(input));
 	return detail::pAppData->buttonValues[(int)input];
 }
 
@@ -139,6 +138,7 @@ void Application::detail::UpdateButton(
 {
 	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(button));
 
+	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
 
 	appData.buttonValues[(int)button] = pressed;
@@ -166,6 +166,7 @@ void Application::detail::UpdateButton(
 
 void Application::detail::PushCharInput(u32 charValue)
 {
+	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
 
 	appData.charInputs.push_back(charValue);
@@ -176,6 +177,7 @@ void Application::detail::PushCharInput(u32 charValue)
 
 void DEngine::Application::detail::PushCharEnterEvent()
 {
+	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
 	for (EventInterface* eventCallback : appData.eventCallbacks)
 		eventCallback->CharEnterEvent();
@@ -183,33 +185,35 @@ void DEngine::Application::detail::PushCharEnterEvent()
 
 void Application::detail::PushCharRemoveEvent()
 {
+	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
 	for (EventInterface* eventCallback : appData.eventCallbacks)
 		eventCallback->CharRemoveEvent();
 }
 
-Application::KeyEventType Application::ButtonEvent(Button input)
+Application::KeyEventType Application::ButtonEvent(Button input) noexcept
 {
-	if (!detail::IsValid(input))
-		throw std::runtime_error("Called DEngine::Application::ButtonEvent with invalid Button value.");
+	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
+	DENGINE_DETAIL_APPLICATION_ASSERT(detail::IsValid(input));
 	return detail::pAppData->buttonEvents[(int)input];
 }
 
-f32 Application::ButtonDuration(Button input)
+f32 Application::ButtonDuration(Button input) noexcept
 {
-	if (!detail::IsValid(input))
-		throw std::runtime_error("Called DEngine::Application::ButtonDuration with invalid Button value.");
+	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
+	DENGINE_DETAIL_APPLICATION_ASSERT(detail::IsValid(input));
 	return detail::pAppData->buttonHeldDuration[(int)input];
 }
 
-Std::Opt<Application::CursorData> Application::Cursor()
+Std::Opt<Application::CursorData> Application::Cursor() noexcept
 {
+	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
 	return detail::pAppData->cursorOpt;
 }
 
 namespace DEngine::Application::detail
 {
-	static bool TouchInputIDExists(u8 id)
+	static bool TouchInputIDExists(u8 id) noexcept
 	{
 		for (auto const& item : detail::pAppData->touchInputs)
 		{
@@ -225,13 +229,11 @@ Std::StackVec<Application::TouchInput, 10> Application::TouchInputs()
 	return detail::pAppData->touchInputs;
 }
 
-bool Application::detail::Initialize()
+bool Application::detail::Initialize() noexcept
 {
 	pAppData = new AppData();
 
-	Backend_Initialize();
-
-	return true;
+	return Backend_Initialize();
 }
 
 void Application::detail::ProcessEvents()
@@ -298,7 +300,7 @@ void Application::detail::SetLogCallback(LogCallback callback)
 	detail::pAppData->logCallback = callback;
 }
 
-Application::detail::AppData::WindowNode* DEngine::Application::detail::GetWindowNode(WindowID id)
+Application::detail::AppData::WindowNode* DEngine::Application::detail::GetWindowNode(WindowID id) noexcept
 {
 	auto& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(

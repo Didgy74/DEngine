@@ -1,16 +1,19 @@
 #pragma once
 
+#include <DEngine/Gui/StackLayout.hpp>
+#include <DEngine/Gui/Widget.hpp>
+#include <DEngine/Gui/Button.hpp>
+
 #include "ContextImpl.hpp"
 
 #include <DEngine/Gfx/Gfx.hpp>
 
-#include <DEngine/Gui/Image.hpp>
-
+#include <DEngine/Std/Utility.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
 
 namespace DEngine::Editor
 {
-	class ViewportWidget : public Gui::Image
+	class InternalViewportWidget : public Gui::Widget
 	{
 	public:
 		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
@@ -47,8 +50,7 @@ namespace DEngine::Editor
 		};
 		Camera cam{};
 
-		ViewportWidget(ContextImpl& implData, Gfx::Context& gfxCtxIn) :
-			Gui::Image(),
+		InternalViewportWidget(ContextImpl& implData, Gfx::Context& gfxCtxIn) :
 			gfxCtx(&gfxCtxIn),
 			implData(&implData)
 		{
@@ -58,7 +60,7 @@ namespace DEngine::Editor
 			viewportId = newViewportRef.ViewportID();
 		}
 
-		virtual ~ViewportWidget() override
+		virtual ~InternalViewportWidget() override
 		{
 			gfxCtx->DeleteViewport(viewportId);
 			implData->viewportWidget = nullptr;
@@ -66,6 +68,7 @@ namespace DEngine::Editor
 
 		virtual void CursorClick(
 			Gui::Context& ctx,
+			Gui::WindowID windowId,
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect,
 			Math::Vec2Int cursorPos,
@@ -115,7 +118,8 @@ namespace DEngine::Editor
 		}
 
 		virtual void CursorMove(
-			Gui::Test& test,
+			Gui::Context& ctx,
+			Gui::WindowID windowId,
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect,
 			Gui::CursorMoveEvent event) override
@@ -149,6 +153,7 @@ namespace DEngine::Editor
 
 		virtual void TouchEvent(
 			Gui::Context& ctx,
+			Gui::WindowID windowId,
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect,
 			Gui::TouchEvent touch) override
@@ -446,6 +451,48 @@ namespace DEngine::Editor
 
 			joysticks[1].originPosition.x = widgetRect.position.x + widgetRect.extent.width - joystickPixelRadius * 2;
 			joysticks[1].originPosition.y = widgetRect.position.y + widgetRect.extent.height - joystickPixelRadius * 2;
+		}
+	};
+
+
+	class ViewportWidget : public Gui::StackLayout 
+	{
+	public:
+		ViewportWidget(ContextImpl& implData, Gfx::Context& ctx) :
+			Gui::StackLayout(Gui::StackLayout::Direction::Vertical)
+		{
+			// Generate top navigation bar
+			Gui::StackLayout* menuBar = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
+			AddLayout2(Std::Box<Gui::Layout>{ menuBar });
+			menuBar->color = { 0.25f, 0.25f, 0.25f, 1.f };
+			
+			Gui::Button* camMenuButton = new Gui::Button;
+			menuBar->AddWidget2(Std::Box<Gui::Widget>{ camMenuButton });
+			camMenuButton->textWidget.String_Set("Camera");
+			camMenuButton->activatePfn = [](
+				Gui::Button& btn,
+				Gui::Context& ctx,
+				Gui::WindowID windowId,
+				Gui::Rect widgetRect,
+				Gui::Rect visibleRect)
+			{
+				Gui::StackLayout* cameraList = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
+				Std::Box<Gui::Layout> layout{ cameraList };
+
+				Gui::Button* thisCamButton = new Gui::Button;
+				cameraList->AddWidget2(Std::Box<Gui::Widget>{ thisCamButton });
+				thisCamButton->textWidget.String_Set("FreeLook");
+				thisCamButton->SetToggled(true);
+
+				ctx.Test(
+					windowId,
+					Std::Move(layout),
+					Gui::Rect{ { widgetRect.position.x, widgetRect.position.y + (i32)widgetRect.extent.height}, {} });
+			};
+
+
+			InternalViewportWidget* viewport = new InternalViewportWidget(implData, ctx);
+			AddWidget2(Std::Box<Gui::Widget>{ viewport });
 		}
 	};
 }

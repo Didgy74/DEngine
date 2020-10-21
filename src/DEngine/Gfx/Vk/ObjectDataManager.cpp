@@ -125,7 +125,7 @@ void DEngine::Gfx::Vk::ObjectDataManager::Update(
 bool DEngine::Gfx::Vk::ObjectDataManager::Init(
 	ObjectDataManager& manager,
 	uSize minUniformBufferOffsetAlignment,
-	u8 resourceSetCount,
+	u8 inFlightCount,
 	VmaAllocator vma,
 	DeviceDispatch const& device,
 	DebugUtilsDispatch const* debugUtils)
@@ -140,7 +140,7 @@ bool DEngine::Gfx::Vk::ObjectDataManager::Init(
 	// Allocate the buffer
 	vk::BufferCreateInfo buffInfo{};
 	buffInfo.sharingMode = vk::SharingMode::eExclusive;
-	buffInfo.size = manager.elementSize * manager.capacity * resourceSetCount;
+	buffInfo.size = manager.elementSize * manager.capacity * inFlightCount;
 	buffInfo.usage = vk::BufferUsageFlagBits::eUniformBuffer;
 	VmaAllocationCreateInfo vmaAllocInfo{};
 	vmaAllocInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_MAPPED_BIT;

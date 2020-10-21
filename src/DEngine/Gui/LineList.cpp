@@ -77,6 +77,7 @@ Gui::SizeHint DEngine::Gui::LineList::SizeHint(Context const& ctx) const
 
 void LineList::CursorClick(
 	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	Math::Vec2Int cursorPos,
@@ -112,6 +113,7 @@ void LineList::CursorClick(
 
 void LineList::TouchEvent(
 	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	Gui::TouchEvent event)

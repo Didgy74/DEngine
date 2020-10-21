@@ -1,9 +1,12 @@
 #include "Vk.hpp"
 #include <DEngine/Gfx/detail/Assert.hpp>
 
+#include <DEngine/Std/Utility.hpp>
+
 #include "Init.hpp"
 
-#include <iostream>
+using namespace DEngine;
+using namespace DEngine::Gfx;
 
 namespace DEngine::Gfx::Vk
 {
@@ -73,10 +76,10 @@ namespace DEngine::Gfx::Vk
 					if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90 ||
 						guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)
 						std::swap(rotatedFramebufferExtent.width, rotatedFramebufferExtent.height);
-					scissor.extent.width = u32(drawCmd.rectExtent.x * rotatedFramebufferExtent.width);
-					scissor.extent.height = u32(drawCmd.rectExtent.y * rotatedFramebufferExtent.height);
-					i32 scissorPosX = i32(drawCmd.rectPosition.x * rotatedFramebufferExtent.width);
-					i32 scissorPosY = i32(drawCmd.rectPosition.y * rotatedFramebufferExtent.height);
+					scissor.extent.width = u32(Math::Round(drawCmd.rectExtent.x * rotatedFramebufferExtent.width));
+					scissor.extent.height = u32(Math::Round(drawCmd.rectExtent.y * rotatedFramebufferExtent.height));
+					i32 scissorPosX = i32(Math::Round(drawCmd.rectPosition.x * rotatedFramebufferExtent.width));
+					i32 scissorPosY = i32(Math::Round(drawCmd.rectPosition.y * rotatedFramebufferExtent.height));
 					if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eIdentity)
 					{
 						scissor.offset.x = scissorPosX;
@@ -129,12 +132,12 @@ namespace DEngine::Gfx::Vk
 					device.cmdBindVertexBuffers(
 						cmdBuffer,
 						0,
-						guiResManager.vertexBuffer,
-						(guiResManager.vertexCapacity * inFlightIndex + drawCmd.filledMesh.mesh.vertexOffset) * sizeof(GuiVertex));
+						guiResManager.vtxBuffer,
+						(guiResManager.vtxInFlightCapacity * inFlightIndex) + (drawCmd.filledMesh.mesh.vertexOffset * sizeof(GuiVertex)));
 					device.cmdBindIndexBuffer(
 						cmdBuffer,
 						guiResManager.indexBuffer,
-						(guiResManager.indexCapacity * inFlightIndex + drawCmd.filledMesh.mesh.indexOffset) * sizeof(u32),
+						(guiResManager.indexInFlightCapacity * inFlightIndex) + (drawCmd.filledMesh.mesh.indexOffset * sizeof(u32)),
 						vk::IndexType::eUint32);
 					device.cmdDrawIndexed(
 						cmdBuffer,
@@ -213,9 +216,9 @@ namespace DEngine::Gfx::Vk
 						sizeof(pushConstant),
 						&pushConstant);
 					auto const& viewportData = *std::find_if(
-						viewportManager.viewportData.begin(),
-						viewportManager.viewportData.end(),
-						[&drawCmd](decltype(viewportManager.viewportData)::value_type const& val) -> bool {
+						viewportManager.viewportNodes.begin(),
+						viewportManager.viewportNodes.end(),
+						[&drawCmd](decltype(viewportManager.viewportNodes)::value_type const& val) -> bool {
 							return drawCmd.viewport.id == val.id; });
 					device.cmdBindDescriptorSets(
 						cmdBuffer,
@@ -247,16 +250,10 @@ namespace DEngine::Gfx::Vk
 		ObjectDataManager const& objectDataManager,
 		TextureManager const& textureManager,
 		ViewportData const& viewportInfo,
-		ViewportUpdate const& viewportUpdate,
 		DrawParams const& drawParams,
 		u8 inFlightIndex,
 		APIData& apiData)
 	{
-		std::memcpy(
-			(char*)viewportInfo.camDataMappedMem + viewportInfo.camElementSize * inFlightIndex,
-			&viewportUpdate.transform,
-			viewportInfo.camElementSize);
-
 		vk::CommandBuffer cmdBuffer = viewportInfo.cmdBuffers[inFlightIndex];
 
 		// We need to rename the command buffer every time we record it
@@ -347,11 +344,12 @@ namespace DEngine::Gfx::Vk
 	}
 }
 
-void DEngine::Gfx::Vk::APIData::Draw(Context& gfxData, DrawParams const& drawParams)
+void Vk::APIData::Draw(
+	Context& gfxData,
+	DrawParams const& drawParams)
 {
 	vk::Result vkResult{};
 	APIData& apiData = *this;
-	GlobUtils const& globUtils = apiData.globUtils;
 	DevDispatch const& device = globUtils.device;
 
 	NativeWindowManager::Update(
@@ -363,7 +361,7 @@ void DEngine::Gfx::Vk::APIData::Draw(Context& gfxData, DrawParams const& drawPar
 		apiData.viewportManager,
 		globUtils,
 		{ drawParams.viewportUpdates.data(), drawParams.viewportUpdates.size() },
-		guiResourceManager);
+		apiData.guiResourceManager);
 	// Resizes the buffer if the new size is too large.
 	ObjectDataManager::HandleResizeEvent(
 		apiData.objectDataManager,
@@ -377,8 +375,6 @@ void DEngine::Gfx::Vk::APIData::Draw(Context& gfxData, DrawParams const& drawPar
 
 
 	u8 currentInFlightIndex = apiData.currInFlightIndex;
-
-
 
 	// Wait for fences, so we know the resources are available.
 	vkResult = globUtils.device.waitForFences(
@@ -402,14 +398,21 @@ void DEngine::Gfx::Vk::APIData::Draw(Context& gfxData, DrawParams const& drawPar
 		{ drawParams.guiVerts.data(), drawParams.guiVerts.size() },
 		{ drawParams.guiIndices.data(), drawParams.guiIndices.size() },
 		currentInFlightIndex);
+	ViewportManager::UpdateCameras(
+		apiData.viewportManager,
+		apiData.globUtils,
+		{ drawParams.viewportUpdates.data(), drawParams.viewportUpdates.size() },
+		currentInFlightIndex);
+
+
 
 	std::vector<vk::CommandBuffer> graphicsCmdBuffers{};
 	for (auto const& viewportUpdate : drawParams.viewportUpdates)
 	{
-		auto viewportDataIt = std::find_if(
-			apiData.viewportManager.viewportData.begin(),
-			apiData.viewportManager.viewportData.end(),
-			[&viewportUpdate](decltype(apiData.viewportManager.viewportData)::value_type const& val) -> bool {
+		auto viewportDataIt = Std::FindIf(
+			apiData.viewportManager.viewportNodes.begin(),
+			apiData.viewportManager.viewportNodes.end(),
+			[&viewportUpdate](decltype(apiData.viewportManager.viewportNodes)::value_type const& val) -> bool {
 				return viewportUpdate.id == val.id; });
 		ViewportData const& viewport = viewportDataIt->viewport;
 		vk::CommandBuffer cmdBuffer = viewport.cmdBuffers[currentInFlightIndex];
@@ -419,7 +422,6 @@ void DEngine::Gfx::Vk::APIData::Draw(Context& gfxData, DrawParams const& drawPar
 			apiData.objectDataManager,
 			apiData.textureManager,
 			viewport,
-			viewportUpdate,
 			drawParams,
 			currentInFlightIndex,
 			apiData);
@@ -443,7 +445,11 @@ void DEngine::Gfx::Vk::APIData::Draw(Context& gfxData, DrawParams const& drawPar
 
 		Std::Span<GuiDrawCmd const> drawCmds;
 		if (!drawParams.guiDrawCmds.empty())
+		{
+			DENGINE_DETAIL_GFX_ASSERT(windowUpdate.drawCmdOffset + windowUpdate.drawCmdCount <= drawParams.guiDrawCmds.size());
 			drawCmds = { &drawParams.guiDrawCmds[windowUpdate.drawCmdOffset], windowUpdate.drawCmdCount };
+		}
+			
 
 		RecordGUICmdBuffer(
 			globUtils,

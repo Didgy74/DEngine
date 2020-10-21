@@ -55,7 +55,7 @@ namespace DEngine::Editor
 
 	class EntityIdList;
 	class ComponentList;
-	class ViewportWidget;
+	class InternalViewportWidget;
 
 	struct ContextImpl : public App::EventInterface, public Gui::WindowHandler
 	{
@@ -109,7 +109,7 @@ namespace DEngine::Editor
 		Std::Opt<Entity> selectedEntity;
 		EntityIdList* entityIdList = nullptr;
 		ComponentList* componentList = nullptr;
-		ViewportWidget* viewportWidget = nullptr;
+		InternalViewportWidget* viewportWidget = nullptr;
 		void SelectEntity(Entity id);
 		void UnselectEntity();
 	};

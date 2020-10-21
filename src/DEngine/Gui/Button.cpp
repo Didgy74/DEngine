@@ -86,7 +86,11 @@ void Button::SetState(State newState)
 	state = newState;
 }
 
-void Button::Activate()
+void Button::Activate(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect)
 {
 	if (type == Type::Toggle)
 	{
@@ -94,7 +98,12 @@ void Button::Activate()
 	}
 
 	if (activatePfn)
-		activatePfn(*this);
+		activatePfn(
+			*this,
+			ctx,
+			windowId,
+			widgetRect,
+			visibleRect);
 }
 
 void Button::SetToggled(bool toggled)
@@ -117,7 +126,8 @@ bool Button::GetToggled() const
 }
 
 void Button::CursorMove(
-	Test& test,
+	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	CursorMoveEvent event)
@@ -139,6 +149,7 @@ void Button::CursorMove(
 
 void Button::CursorClick(
 	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	Math::Vec2Int cursorPos,
@@ -156,7 +167,11 @@ void Button::CursorClick(
 			{
 				if (state == State::Pressed)
 				{
-					Activate();
+					Activate(
+						ctx,
+						windowId,
+						widgetRect,
+						visibleRect);
 				}
 				SetState(State::Hovered);
 			}
@@ -166,6 +181,7 @@ void Button::CursorClick(
 
 void Button::TouchEvent(
 	Context& ctx,
+	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
 	Gui::TouchEvent event)
@@ -180,7 +196,11 @@ void Button::TouchEvent(
 			else if (event.type == TouchEventType::Up)
 			{
 				if (state == State::Pressed)
-					Activate();
+					Activate(
+						ctx,
+						(WindowID)0,
+						widgetRect,
+						visibleRect);
 				SetState(State::Normal);
 			}
 		}
