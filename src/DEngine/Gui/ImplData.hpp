@@ -90,7 +90,21 @@ namespace DEngine::Gui::impl
 		WindowID id;
 		WindowData data;
 
-		Std::Opt<Test_Menu> test_Menu{};
+		// The first element is the front-most one.
+		std::vector<Test_Menu> test_Menus{};
+		std::vector<Test_Menu> pendingMenuDestroys;
+		struct MenuAddRemove
+		{
+			
+			enum class Type : u8
+			{
+				Add,
+				Remove
+			};
+			Type type = static_cast<Type>(-1);
+			uSize index = static_cast<uSize>(-1);
+		};
+		std::vector<MenuAddRemove> menuAddRemoves;
 	};
 
 	struct ImplData

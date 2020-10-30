@@ -9,6 +9,7 @@
 
 namespace DEngine::Gui::impl
 {
+	
 	using DockArea_WindowCallablePFN = void(*)(
 		DockArea::Node& node,
 		Rect rect,
@@ -116,7 +117,7 @@ namespace DEngine::Gui::impl
 		Rect rect,
 		bool& continueIterating,
 		DockArea_IterateNode_SplitCallableOrder splitCallableOrder,
-		Callable callable)
+		Callable const& callable)
 	{
 		DENGINE_IMPL_GUI_ASSERT(continueIterating);
 		DockArea_IterateNode_Internal(
@@ -321,10 +322,10 @@ DockArea::DockArea() : behaviorData{BehaviorData()}
 	
 }
 
-SizeHint DockArea::SizeHint(
+SizeHint DockArea::GetSizeHint(
 	Context const& ctx) const
 {
-	Gui::SizeHint returnVal{};
+	SizeHint returnVal{};
 	returnVal.expandX = true;
 	returnVal.expandY = true;
 
@@ -392,7 +393,7 @@ namespace DEngine::Gui::impl
 							for (uSize i = 0; i < node.windows.size(); i += 1)
 							{
 								auto& window = node.windows[i];
-								Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
+								SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
 									implData.textManager,
 									window.title);
 								Rect tabRect{};
@@ -610,7 +611,7 @@ namespace DEngine::Gui::impl
 			widgetRect,
 			continueIterating,
 			[&ctx, windowId, &dockArea, &implData, event, &rectWasHit](
-				DockArea::TopLevelNode const& topLevelNode,
+				DockArea::TopLevelNode& topLevelNode,
 				Rect topLevelRect,
 				uSize topLevelIndex,
 				bool& continueIterating)
@@ -743,7 +744,7 @@ namespace DEngine::Gui::impl
 				widgetRect,
 				continueIterating,
 				[&dockArea, &implData, cursorPos, &windowContentWasHit](
-					DockArea::TopLevelNode const& topLevelNode,
+					DockArea::TopLevelNode& topLevelNode,
 					Rect topLevelRect,
 					uSize topLevelIndex,
 					bool& continueIterating)
@@ -757,9 +758,9 @@ namespace DEngine::Gui::impl
 						continueIterating,
 						impl::DockArea_IterateNode_SplitCallableOrder::First,
 						[&dockArea, &implData, cursorPos, &windowContentWasHit](
-							DockArea::Node const& node,
+							DockArea::Node& node,
 							Rect rect,
-							DockArea::Node const* parentNode,
+							DockArea::Node* parentNode,
 							bool& continueIterating)
 						{
 							if (node.type != DockArea::Node::Type::Window)
@@ -834,7 +835,7 @@ namespace DEngine::Gui::impl
 				[&dockArea, cursorPos, widgetRect](
 					DockArea::Node& node,
 					Rect rect,
-					DockArea::Node const* parentNode,
+					DockArea::Node* parentNode,
 					bool& continueIterating)
 				{
 					if ((node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit) &&
@@ -932,7 +933,7 @@ namespace DEngine::Gui::impl
 					for (uSize nodeWindowIndex = 0; nodeWindowIndex < node.windows.size(); nodeWindowIndex += 1)
 					{
 						auto& window = node.windows[nodeWindowIndex];
-						Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
+						SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
 							implData.textManager,
 							window.title);
 						tabRect.position.x += titleBarSizeHint.preferred.width;
@@ -1150,7 +1151,7 @@ namespace DEngine::Gui::impl
 											for (uSize windowIndex = 0; !tabWasHit && windowIndex < node.windows.size(); windowIndex += 1)
 											{
 												auto& window = node.windows[windowIndex];
-												Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
+												SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
 													implData.textManager,
 													window.title);
 												Rect tabRect{};
@@ -1523,7 +1524,7 @@ namespace DEngine::Gui::impl
 														 !tabWasHit && windowIndex < node.windows.size(); windowIndex += 1)
 												{
 													auto &window = node.windows[windowIndex];
-													Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
+													SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
 														implData.textManager,
 														window.title);
 													Rect tabRect{};
@@ -1625,7 +1626,7 @@ namespace DEngine::Gui::impl
 					widgetRect,
 					continueIterating,
 					[&dockArea, &implData, cursorPos, &windowContentWasHit](
-						DockArea::TopLevelNode const& topLevelNode,
+						DockArea::TopLevelNode& topLevelNode,
 						Rect topLevelRect,
 						uSize topLevelIndex,
 						bool& continueIterating)
@@ -1639,9 +1640,9 @@ namespace DEngine::Gui::impl
 							continueIterating,
 							impl::DockArea_IterateNode_SplitCallableOrder::First,
 							[&dockArea, &implData, cursorPos, &windowContentWasHit](
-								DockArea::Node const& node,
+								DockArea::Node& node,
 								Rect rect,
-								DockArea::Node const* parentNode,
+								DockArea::Node* parentNode,
 								bool& continueIterating)
 							{
 								if (node.type != DockArea::Node::Type::Window)
@@ -1695,7 +1696,7 @@ namespace DEngine::Gui::impl
 				widgetRect,
 				continueIterating,
 				[&dockArea, &implData, event, &windowContentWasHit](
-					DockArea::TopLevelNode const& topLevelNode,
+					DockArea::TopLevelNode& topLevelNode,
 					Rect topLevelRect,
 					uSize topLevelIndex,
 					bool& continueIterating)
@@ -1818,7 +1819,7 @@ namespace DEngine::Gui::impl
 					[&dockArea, event, widgetRect](
 						DockArea::Node& node,
 						Rect rect,
-						DockArea::Node const* parentNode,
+						DockArea::Node* parentNode,
 						bool& continueIterating)
 					{
 						if ((node.type == DockArea::Node::Type::HoriSplit || node.type == DockArea::Node::Type::VertSplit) &&
@@ -1927,7 +1928,7 @@ namespace DEngine::Gui::impl
 								 nodeWindowIndex < node.windows.size(); nodeWindowIndex += 1)
 						{
 							auto &window = node.windows[nodeWindowIndex];
-							Gui::SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
+							SizeHint titleBarSizeHint = impl::TextManager::GetSizeHint(
 								implData.textManager,
 								window.title);
 							tabRect.position.x += titleBarSizeHint.preferred.width;
@@ -2052,7 +2053,7 @@ void DEngine::Gui::DockArea::CharEnterEvent(Context& ctx)
 		Rect{},
 		continueIterating,
 		[&ctx](
-			DockArea::TopLevelNode const& topLevelNode,
+			DockArea::TopLevelNode& topLevelNode,
 			Rect topLevelRect,
 			uSize topLevelIndex,
 			bool& continueIterating)
@@ -2093,7 +2094,7 @@ void DockArea::CharEvent(
 		Rect{},
 		continueIterating,
 		[&ctx, utfValue](
-			DockArea::TopLevelNode const& topLevelNode,
+			DockArea::TopLevelNode& topLevelNode,
 			Rect topLevelRect,
 			uSize topLevelIndex,
 			bool& continueIterating)
@@ -2135,7 +2136,7 @@ void DockArea::CharRemoveEvent(
 		Rect{},
 		continueIterating,
 		[&ctx](
-			DockArea::TopLevelNode const& topLevelNode,
+			DockArea::TopLevelNode& topLevelNode,
 			Rect topLevelRect,
 			uSize topLevelIndex,
 			bool& continueIterating)

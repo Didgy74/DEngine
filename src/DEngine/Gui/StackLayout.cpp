@@ -36,9 +36,9 @@ namespace DEngine::Gui::impl
 			auto& childSizeHint = childSizeHints[i];
 			// Call SizeHint on child.
 			if (child.type == StackLayout::LayoutItem::Type::Layout)
-				childSizeHint = child.layout->SizeHint(ctx);
+				childSizeHint = child.layout->GetSizeHint(ctx);
 			else
-				childSizeHint = child.widget->SizeHint(ctx);
+				childSizeHint = child.widget->GetSizeHint(ctx);
 
 			// Add to the sum size.
 			if (!childSizeHint.expandX)
@@ -140,12 +140,12 @@ StackLayout::~StackLayout()
 {
 }
 
-u32 StackLayout::ChildCount() const
+uSize StackLayout::ChildCount() const
 {
-	return (u32)children.size();
+	return (uSize)children.size();
 }
 
-StackLayout::Child StackLayout::At(u32 index)
+StackLayout::Child StackLayout::At(uSize index)
 {
 	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
 	auto& child = children[index];
@@ -167,7 +167,7 @@ StackLayout::Child StackLayout::At(u32 index)
 	return returnVal;
 }
 
-StackLayout::ConstChild StackLayout::At(u32 index) const
+StackLayout::ConstChild StackLayout::At(uSize index) const
 {
 	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
 
@@ -225,9 +225,9 @@ void StackLayout::AddLayout2(Std::Box<Layout>&& in)
 	}
 }
 
-void StackLayout::InsertLayout(u32 index, Std::Box<Layout>&& in)
+void StackLayout::InsertLayout(uSize index, Std::Box<Layout>&& in)
 {
-	DENGINE_IMPL_GUI_ASSERT(index < children.size());
+	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
 	DENGINE_IMPL_GUI_ASSERT(in);
 
 	LayoutItem newItem{};
@@ -244,9 +244,9 @@ void StackLayout::InsertLayout(u32 index, Std::Box<Layout>&& in)
 	}
 }
 
-void StackLayout::RemoveItem(u32 index)
+void StackLayout::RemoveItem(uSize index)
 {
-	DENGINE_IMPL_GUI_ASSERT(index < children.size());
+	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
 
 	children.erase(children.begin() + index);
 
@@ -264,10 +264,10 @@ void StackLayout::ClearChildren()
 	children.clear();
 }
 
-SizeHint StackLayout::SizeHint(
+SizeHint StackLayout::GetSizeHint(
 	Context const& ctx) const
 {
-	Gui::SizeHint returnVal{};
+	SizeHint returnVal{};
 	u32 childCount = 0;
 	for (auto const& child : children)
 	{
@@ -276,11 +276,11 @@ SizeHint StackLayout::SizeHint(
 
 		childCount += 1;
 
-		Gui::SizeHint childSizeHint{};
+		SizeHint childSizeHint{};
 		if (child.type == LayoutItem::Type::Layout)
-			childSizeHint = child.layout->SizeHint(ctx);
+			childSizeHint = child.layout->GetSizeHint(ctx);
 		else
-			childSizeHint = child.widget->SizeHint(ctx);
+			childSizeHint = child.widget->GetSizeHint(ctx);
 
 		u32& directionLength = direction == Direction::Horizontal ? returnVal.preferred.width : returnVal.preferred.height;
 		u32& childDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.width : childSizeHint.preferred.height;

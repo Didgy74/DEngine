@@ -43,7 +43,7 @@ namespace DEngine::Gui
 
 		bool test_expand = false;
 
-		u32 ChildCount() const;
+		uSize ChildCount() const;
 		struct Child
 		{
 			enum class Type
@@ -55,7 +55,7 @@ namespace DEngine::Gui
 			Widget* widget = nullptr;
 			Layout* layout = nullptr;
 		};
-		Child At(u32 index);
+		Child At(uSize index);
 		struct ConstChild
 		{
 			enum class Type
@@ -67,14 +67,14 @@ namespace DEngine::Gui
 			Widget const* widget = nullptr;
 			Layout const* layout = nullptr;
 		};
-		ConstChild At(u32 index) const;
+		ConstChild At(uSize index) const;
 		void AddWidget2(Std::Box<Widget>&& in);
 		void AddLayout2(Std::Box<Layout>&& in);
-		void InsertLayout(u32 index, Std::Box<Layout>&& in);
-		void RemoveItem(u32 index);
+		void InsertLayout(uSize index, Std::Box<Layout>&& in);
+		void RemoveItem(uSize index);
 		void ClearChildren();
 
-		[[nodiscard]] virtual Gui::SizeHint SizeHint(
+		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
 
 		virtual void Render(
@@ -140,13 +140,13 @@ namespace DEngine::Gui
 			Type type{};
 			struct Insert
 			{
-				static constexpr u32 pushBackIndex = static_cast<u32>(-1);
-				u32 index{};
+				static constexpr uSize pushBackIndex = static_cast<uSize>(-1);
+				uSize index{};
 			};
 			Insert insert;
 			struct Remove
 			{
-				u32 index;
+				uSize index;
 			};
 			Remove remove;
 		};

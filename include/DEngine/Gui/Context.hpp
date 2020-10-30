@@ -51,7 +51,8 @@ namespace DEngine::Gui
 
 		WindowHandler& GetWindowHandler() const;
 
-		void Test(WindowID windowId, Std::Box<Layout> layout, Rect rect);
+		void Test_AddMenu(WindowID windowId, Std::Box<Layout> layout, Rect rect);
+		void Test_DestroyMenu(WindowID windowId, Layout* layout);
 		
 		// TEMPORARY FIELDS
 		StackLayout* outerLayout = nullptr;

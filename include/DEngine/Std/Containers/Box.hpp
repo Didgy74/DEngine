@@ -23,7 +23,8 @@ namespace DEngine::Std
 		[[nodiscard]] T const* Get() const noexcept;
 		[[nodiscard]] T* operator->() noexcept;
 		[[nodiscard]] T const* operator->() const noexcept;
-		[[nodiscard]] T& operator*() const noexcept;
+		[[nodiscard]] T& operator*() noexcept;
+		[[nodiscard]] T const& operator*() const noexcept;
 
 		[[nodiscard]] operator bool() const noexcept;
 
@@ -98,7 +99,16 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	inline T& Box<T>::operator*() const noexcept
+	inline T& Box<T>::operator*() noexcept
+	{
+		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+			data != nullptr,
+			"Attempted to dereference a Std::Box with a nullptr value.");
+		return *data;
+	}
+
+	template<typename T>
+	inline T const& Box<T>::operator*() const noexcept
 	{
 		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
 			data != nullptr,

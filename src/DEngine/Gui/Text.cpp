@@ -30,7 +30,7 @@ std::string_view Text::StringView() const
 	return text;
 }
 
-Gui::SizeHint Text::SizeHint(
+SizeHint Text::GetSizeHint(
 	Context const& ctx) const
 {
 	if (invalidated)

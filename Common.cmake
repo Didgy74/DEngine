@@ -3,7 +3,7 @@
 # Set DEngine options
 # -------------------
 # START
-	option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" OFF)
+	option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ON)
 	if (${DENGINE_ENABLE_ASSERT})
 		set(DENGINE_DEFINES ${DENGINE_DEFINES} DENGINE_ENABLE_ASSERT)
 	endif()
@@ -52,6 +52,7 @@
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/Image.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/LineEdit.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/LineList.cpp
+		${DENGINE_ROOT_DIR}/src/DEngine/Gui/MenuBar.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/ScrollArea.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/StackLayout.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/Text.cpp

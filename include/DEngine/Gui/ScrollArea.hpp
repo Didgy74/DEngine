@@ -34,7 +34,7 @@ namespace DEngine::Gui
 		Std::Box<Layout> layout;
 		Std::Box<Widget> widget;
 
-		[[nodiscard]] virtual Gui::SizeHint SizeHint(
+		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
 
 		virtual void Render(

@@ -17,7 +17,7 @@ namespace DEngine::Gui
 		Layout(Layout&&) noexcept = default;
 		inline virtual ~Layout() = 0;
 
-		[[nodiscard]] virtual Gui::SizeHint SizeHint(
+		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const = 0;
 
 		virtual void Render(

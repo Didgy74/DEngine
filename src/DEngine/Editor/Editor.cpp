@@ -8,6 +8,7 @@
 #include <DEngine/Gui/Image.hpp>
 #include <DEngine/Gui/LineEdit.hpp>
 #include <DEngine/Gui/LineList.hpp>
+#include <DEngine/Gui/MenuBar.hpp>
 #include <DEngine/Gui/ScrollArea.hpp>
 #include <DEngine/Gui/StackLayout.hpp>
 #include <DEngine/Gui/Text.hpp>
@@ -25,7 +26,6 @@
 
 #include <vector>
 #include <string>
-#include <iostream>
 #include <functional>
 
 namespace DEngine::Editor
@@ -37,7 +37,7 @@ namespace DEngine::Editor
 		{
 			direction = Direction::Vertical;
 
-			auto transformIt = std::find_if(
+			auto transformIt = Std::FindIf(
 				scene->transforms.begin(),
 				scene->transforms.end(),
 				[entityId](decltype(scene->transforms)::value_type const& value) -> bool { return value.a == entityId; });
@@ -450,6 +450,113 @@ using namespace DEngine;
 
 #include "../Gui/ImplData.hpp" // TODO: THIS IS ONLY FOR TESTING.
 
+namespace DEngine::Editor
+{
+	static Std::Box<Gui::Layout> CreateNavigationBar(
+		ContextImpl& implData)
+	{
+		// Menu button
+		Gui::MenuBar* menuBarA = new Gui::MenuBar(nullptr, Gui::MenuBar::Direction::Horizontal);
+
+		Gui::MenuBar::Button* menuBarButtonA = new Gui::MenuBar::Button(menuBarA, "BtnA");
+		menuBarA->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ menuBarButtonA });
+		menuBarButtonA->activateCallback = [&implData, menuBarA](
+			Gui::Context& ctx,
+			Gui::WindowID windowId,
+			Gui::MenuBar::Button& btn,
+			Gui::Rect widgetRect)
+		{
+			Gui::MenuBar* menuBarB = new Gui::MenuBar(menuBarA, Gui::MenuBar::Direction::Vertical);
+			btn.menuPtr = menuBarB;
+			ctx.Test_AddMenu(
+				windowId,
+				Std::Box<Gui::Layout>{ menuBarB },
+				{ { widgetRect.position.x, widgetRect.position.y + (i32)widgetRect.extent.height }, {} });
+			menuBarB->stackLayout.color = { 0.25f, 0.f, 0.25f, 1.f };
+
+			Gui::Text* topText = new Gui::Text;
+			menuBarB->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ topText });
+			topText->String_Set("Yoyobro");
+
+			Gui::MenuBar::Button* topButton = new Gui::MenuBar::Button(menuBarB, "Btn A element #0");
+			menuBarB->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ topButton });
+			topButton->activateCallback = [&implData, menuBarB](
+				Gui::Context& ctx,
+				Gui::WindowID windowId,
+				Gui::MenuBar::Button& btn,
+				Gui::Rect widgetRect)
+			{
+				Gui::MenuBar* menuBarC = new Gui::MenuBar(menuBarB, Gui::MenuBar::Direction::Vertical);
+				btn.menuPtr = menuBarC;
+				ctx.Test_AddMenu(
+					windowId,
+					Std::Box<Gui::Layout>{ menuBarC },
+					{ { widgetRect.position.x + (i32)widgetRect.extent.width, widgetRect.position.y }, {} });
+				menuBarC->stackLayout.color = { 0.25f, 0.f, 0.25f, 1.f };
+
+				for (uSize i = 0; i < 5; i++)
+				{
+					Gui::Text* otherText = new Gui::Text;
+					menuBarC->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ otherText });
+					otherText->String_Set("Yo B ##");
+				}
+
+				Gui::MenuBar::ActivatableButton* newViewportBtn = new Gui::MenuBar::ActivatableButton(menuBarC, "New viewport");
+				menuBarC->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ newViewportBtn });
+				newViewportBtn->activateCallback = [&implData]()
+				{
+					Gui::DockArea::TopLevelNode newTop{};
+					newTop.rect = { { 150, 150 }, { 400, 400 } };
+					Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
+					newTop.node = Std::Box{ topNode };
+					topNode->type = Gui::DockArea::Node::Type::Window;
+					topNode->windows.push_back(Gui::DockArea::Window{});
+					auto& newWindow = topNode->windows.back();
+					newWindow.title = "Viewport";
+					newWindow.titleBarColor = { 0.5f, 0.f, 0.5f, 1.f };
+					ViewportWidget* viewport = new ViewportWidget(implData, *implData.gfxCtx);
+					newWindow.layout = Std::Box<Gui::Layout>{ viewport };
+
+					implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
+				};
+			};
+		};
+
+		Gui::MenuBar::Button* menuBarButtonB = new Gui::MenuBar::Button(menuBarA, "TestB");
+		menuBarA->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ menuBarButtonB });
+		menuBarButtonB->activateCallback = [](
+			Gui::Context& ctx,
+			Gui::WindowID windowId,
+			Gui::MenuBar::Button& btn,
+			Gui::Rect widgetRect)
+		{
+			Gui::StackLayout* stackLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
+			btn.menuPtr = stackLayout;
+			ctx.Test_AddMenu(
+				windowId,
+				Std::Box<Gui::Layout>{ stackLayout },
+				{ { widgetRect.position.x, widgetRect.position.y + (i32)widgetRect.extent.height }, {} });
+			stackLayout->color = { 0.25f, 0.f, 0.25f, 1.f };
+
+			Gui::Text* topText = new Gui::Text;
+			stackLayout->AddWidget2(Std::Box<Gui::Widget>{ topText });
+			topText->String_Set("Other menu");
+
+			Gui::Text* otherText = new Gui::Text;
+			stackLayout->AddWidget2(Std::Box<Gui::Widget>{ otherText });
+			otherText->String_Set("Yo yo bro");
+		};
+
+		// Delta time counter at the top
+		Gui::Text* deltaText = new Gui::Text;
+		implData.test_fpsText = deltaText;
+		deltaText->String_Set("Child text");
+		menuBarA->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ deltaText });
+
+		return Std::Box<Gui::Layout>{ menuBarA };
+	}
+}
+
 Editor::Context Editor::Context::Create(
 	App::WindowID mainWindow,
 	Scene* scene,
@@ -467,44 +574,10 @@ Editor::Context Editor::Context::Create(
 	{
 		Gui::StackLayout* outmostLayout = implData.guiCtx->outerLayout;
 
-		// Add horizontal layout for top navigation bar
-		Gui::StackLayout* navigationBarLayout = new Gui::StackLayout;
-		outmostLayout->AddLayout2(Std::Box<Gui::Layout>{ navigationBarLayout });
-		
-		// New test button
-		Gui::Button* testButton = new Gui::Button;
-		navigationBarLayout->AddWidget2(Std::Box<Gui::Widget>{ testButton });
-		testButton->textWidget.String_Set("Test");
-		testButton->activatePfn = [](
-			Gui::Button& btn,
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect)
-		{
-			Gui::StackLayout* vertLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
-			vertLayout->padding = 10;
-			vertLayout->color = { 0.25f, 0.f, 0.25f, 1.f };
-
-			Gui::Button* topText = new Gui::Button;
-			vertLayout->AddWidget2(Std::Box<Gui::Widget>{ topText });
-			topText->textWidget.String_Set("Test button");
-			topText->normalColor.w = 0.f;
-
-			ctx.Test(
-				windowId,
-				Std::Box<Gui::Layout>{ vertLayout }, 
-				{ { widgetRect.position.x, widgetRect.position.y + (i32)widgetRect.extent.height }, { 200, 200 } });			
-
-		};
-
-		// Delta time counter at the top
-		Gui::Text* deltaText = new Gui::Text;
-		implData.test_fpsText = deltaText;
-		deltaText->String_Set("Child text");
-		navigationBarLayout->AddWidget2(Std::Box<Gui::Widget>{ deltaText });
+		outmostLayout->AddLayout2(CreateNavigationBar(implData));
 
 		Gui::DockArea* dockArea = new Gui::DockArea;
+		implData.dockArea = dockArea;
 		outmostLayout->AddLayout2(Std::Box<Gui::Layout>{ dockArea });
 
 		{
@@ -585,9 +658,9 @@ void Editor::Context::ProcessEvents()
 	}
 	implData.queuedGuiEvents.clear();
 
-	if (implData.viewportWidget)
+	for (auto viewportPtr : implData.viewportWidgets)
 	{
-		implData.viewportWidget->TickTest(Time::Delta());
+		viewportPtr->TickTest(Time::Delta());
 	}
 
 	//implData.guiCtx->Tick();
@@ -622,42 +695,45 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 
 	returnVal.windowUpdates = implData.guiCtx->windowUpdates;
 
-	if (implData.viewportWidget && implData.viewportWidget->isVisible)
+	for (auto viewportWidgetPtr : implData.viewportWidgets)
 	{
-		DENGINE_DETAIL_ASSERT(implData.viewportWidget->currentExtent.width > 0 && implData.viewportWidget->currentExtent.height > 0);
-		DENGINE_DETAIL_ASSERT(implData.viewportWidget->newExtent.width > 0 && implData.viewportWidget->newExtent.height > 0);
+		if (viewportWidgetPtr && viewportWidgetPtr->isVisible)
+		{
+			auto& viewportWidget = *viewportWidgetPtr;
+			DENGINE_DETAIL_ASSERT(viewportWidget.currentExtent.width > 0 && viewportWidget.currentExtent.height > 0);
+			DENGINE_DETAIL_ASSERT(viewportWidget.newExtent.width > 0 && viewportWidget.newExtent.height > 0);
 
-		Gfx::ViewportUpdate update{};
-		update.id = implData.viewportWidget->viewportId;
-		update.width = implData.viewportWidget->currentExtent.width;
-		update.height = implData.viewportWidget->currentExtent.height;
+			Gfx::ViewportUpdate update{};
+			update.id = viewportWidget.viewportId;
+			update.width = viewportWidget.currentExtent.width;
+			update.height = viewportWidget.currentExtent.height;
 
-		Math::Mat4 test = Math::Mat4::Identity();
-		test.At(0, 0) = -1;
-		//test.At(1, 1) = -1;
-		test.At(2, 2) = -1;
-		
-		Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(implData.viewportWidget->cam.rotation) * test;
-		Math::LinTran3D::SetTranslation(camMat, implData.viewportWidget->cam.position);
+			Math::Mat4 test = Math::Mat4::Identity();
+			test.At(0, 0) = -1;
+			//test.At(1, 1) = -1;
+			test.At(2, 2) = -1;
 
-		Math::Mat4 test2 = Math::Mat4::Identity();
-		//test2.At(0, 0) = -1;
-		//test2.At(1, 1) = -1;
-		//test2.At(2, 2) = -1;
-		camMat = test2 * camMat;
+			Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(viewportWidget.cam.rotation) * test;
+			Math::LinTran3D::SetTranslation(camMat, viewportWidget.cam.position);
 
-
-		camMat = camMat.GetInverse().Value();
-		f32 aspectRatio = (f32)implData.viewportWidget->newExtent.width / implData.viewportWidget->newExtent.height;
-
-		camMat = Math::LinTran3D::Perspective_RH_ZO(implData.viewportWidget->cam.verticalFov * Math::degToRad, aspectRatio, 0.1f, 100.f) * camMat;
+			Math::Mat4 test2 = Math::Mat4::Identity();
+			//test2.At(0, 0) = -1;
+			//test2.At(1, 1) = -1;
+			//test2.At(2, 2) = -1;
+			camMat = test2 * camMat;
 
 
-		//camMat = test * camMat;
+			camMat = camMat.GetInverse().Value();
+			f32 aspectRatio = (f32)viewportWidget.newExtent.width / viewportWidget.newExtent.height;
 
-		update.transform = camMat;
+			camMat = Math::LinTran3D::Perspective_RH_ZO(viewportWidget.cam.verticalFov * Math::degToRad, aspectRatio, 0.1f, 100.f) * camMat;
 
-		returnVal.viewportUpdates.push_back(update);
+			//camMat = test * camMat;
+
+			update.transform = camMat;
+
+			returnVal.viewportUpdates.push_back(update);
+		}
 	}
 
 	return returnVal;
@@ -698,13 +774,14 @@ void Editor::ContextImpl::ButtonEvent(
 {
 	if (button == App::Button::LeftMouse || button == App::Button::RightMouse)
 	{
-		Gui::CursorClickEvent event{};
+		impl::GuiEvent event{};
+		event.type = impl::GuiEvent::Type::CursorClickEvent;
 		if (button == App::Button::LeftMouse)
-			event.button = Gui::CursorButton::Left;
+			event.cursorClick.button = Gui::CursorButton::Left;
 		else if (button == App::Button::RightMouse)
-			event.button = Gui::CursorButton::Right;
-		event.clicked = state;
-		guiCtx->PushEvent(event);
+			event.cursorClick.button = Gui::CursorButton::Right;
+		event.cursorClick.clicked = state;
+		queuedGuiEvents.push_back(event);
 	}
 }
 
@@ -837,7 +914,6 @@ void Editor::ContextImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursor
 		appCursorType = App::CursorType::VerticalResize;
 		break;
 	default:
-		throw std::runtime_error("Error. This Gui::CursorType has not been implemented.");
 		break;
 	}
 	App::SetCursor((App::WindowID)id, appCursorType);

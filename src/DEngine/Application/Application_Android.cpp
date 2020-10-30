@@ -550,7 +550,7 @@ namespace DEngine::Application::detail
 	}
 }
 
-bool Application::detail::Backend_Initialize()
+bool Application::detail::Backend_Initialize() noexcept
 {
 	auto& appData = *detail::pAppData;
 	auto& backendData = *detail::pBackendData;
@@ -757,7 +757,7 @@ Std::Opt<u64> Application::CreateVkSurface(
 	return Std::Opt{ temp };
 }
 
-Std::StackVec<char const*, 5> Application::RequiredVulkanInstanceExtensions()
+Std::StackVec<char const*, 5> Application::RequiredVulkanInstanceExtensions() noexcept
 {
 	Std::StackVec<char const*, 5> returnVal{};
 	returnVal.PushBack("VK_KHR_surface");
@@ -765,7 +765,7 @@ Std::StackVec<char const*, 5> Application::RequiredVulkanInstanceExtensions()
 	return returnVal;
 }
 
-void Application::SetCursor(WindowID id, CursorType cursorType)
+void Application::SetCursor(WindowID id, CursorType cursorType) noexcept
 {
 
 }

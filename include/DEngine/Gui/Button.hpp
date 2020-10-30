@@ -68,7 +68,7 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			Gui::TouchEvent event) override;
 
-		[[nodiscard]] virtual Gui::SizeHint SizeHint(
+		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
 
 		virtual void Render(

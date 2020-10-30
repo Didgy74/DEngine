@@ -54,7 +54,7 @@ namespace DEngine::Editor
 			gfxCtx(&gfxCtxIn),
 			implData(&implData)
 		{
-			implData.viewportWidget = this;
+			implData.viewportWidgets.push_back(this);
 
 			auto newViewportRef = gfxCtx->NewViewport();
 			viewportId = newViewportRef.ViewportID();
@@ -63,7 +63,12 @@ namespace DEngine::Editor
 		virtual ~InternalViewportWidget() override
 		{
 			gfxCtx->DeleteViewport(viewportId);
-			implData->viewportWidget = nullptr;
+			auto ptrIt = Std::FindIf(
+				implData->viewportWidgets.begin(),
+				implData->viewportWidgets.end(),
+				[this](decltype(implData->viewportWidgets.front()) const& val) -> bool { return val == this; });
+			DENGINE_DETAIL_ASSERT(ptrIt != implData->viewportWidgets.end());
+			implData->viewportWidgets.erase(ptrIt);
 		}
 
 		virtual void CursorClick(
@@ -329,7 +334,7 @@ namespace DEngine::Editor
 			}
 		}
 
-		virtual Gui::SizeHint SizeHint(
+		virtual Gui::SizeHint GetSizeHint(
 			Gui::Context const& ctx) const override
 		{
 			Gui::SizeHint returnVal{};
@@ -484,7 +489,7 @@ namespace DEngine::Editor
 				thisCamButton->textWidget.String_Set("FreeLook");
 				thisCamButton->SetToggled(true);
 
-				ctx.Test(
+				ctx.Test_AddMenu(
 					windowId,
 					Std::Move(layout),
 					Gui::Rect{ { widgetRect.position.x, widgetRect.position.y + (i32)widgetRect.extent.height}, {} });

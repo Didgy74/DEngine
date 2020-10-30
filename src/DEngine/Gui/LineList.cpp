@@ -59,14 +59,14 @@ void LineList::SetCanSelect(bool in)
 	canSelect = in;
 }
 
-Gui::SizeHint DEngine::Gui::LineList::SizeHint(Context const& ctx) const
+SizeHint LineList::GetSizeHint(Context const& ctx) const
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-	Gui::SizeHint returnVal{};
+	SizeHint returnVal{};
 	returnVal.preferred.height = static_cast<u32>(implData.textManager.lineheight * lines.size());
 	for (auto const& line : lines)
 	{
-		Gui::SizeHint sizeHint = impl::TextManager::GetSizeHint(
+		SizeHint sizeHint = impl::TextManager::GetSizeHint(
 			implData.textManager, 
 			line);
 		returnVal.preferred.width = Math::Max(returnVal.preferred.width, sizeHint.preferred.width);

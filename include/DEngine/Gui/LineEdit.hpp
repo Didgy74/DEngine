@@ -18,7 +18,6 @@ namespace DEngine::Gui
 		};
 		Type type = Type::Float;
 
-
 		Math::Vec4 backgroundColor = { 0.25f, 0.25f, 0.25f, 1.f };
 		bool selected = false;
 

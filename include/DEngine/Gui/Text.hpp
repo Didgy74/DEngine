@@ -23,7 +23,7 @@ namespace DEngine::Gui
 		void String_PopBack();
 		[[nodiscard]] std::string_view StringView() const;
 
-		[[nodiscard]] virtual Gui::SizeHint SizeHint(
+		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
 
 		virtual void Render(

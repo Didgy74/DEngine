@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <string>
+#include <string_view>
 
 namespace DEngine::Gui
 {
@@ -112,7 +113,12 @@ namespace DEngine::Gui
 		};
 		BehaviorData behaviorData{};
 
-		[[nodiscard]] virtual Gui::SizeHint SizeHint(
+		void AddWindow(
+			Rect windowRect,
+			std::string_view title,
+			Std::Box<Widget> widget);
+
+		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
 
 		virtual void Render(

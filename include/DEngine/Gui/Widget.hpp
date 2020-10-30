@@ -20,7 +20,7 @@ namespace DEngine::Gui
 		Widget& operator=(Widget const&) = delete;
 		Widget& operator=(Widget&&) = delete;
 
-		[[nodiscard]] virtual Gui::SizeHint SizeHint(
+		[[nodiscard]] virtual Gui::SizeHint GetSizeHint(
 			Context const& ctx) const = 0;
 
 		virtual void Render(

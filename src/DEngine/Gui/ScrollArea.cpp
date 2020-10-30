@@ -57,22 +57,22 @@ namespace DEngine::Gui::impl
   }
 }
 
-SizeHint ScrollArea::SizeHint(
+SizeHint ScrollArea::GetSizeHint(
   Context const& ctx) const
 {
-  Gui::SizeHint returnVal{};
+  SizeHint returnVal{};
   returnVal.preferred = { 50, 50 };
   returnVal.expandX = true;
   returnVal.expandY = true;
 
   if (childType == ChildType::Layout)
   {
-    Gui::SizeHint childSizeHint = layout->SizeHint(ctx);
+    Gui::SizeHint childSizeHint = layout->GetSizeHint(ctx);
     returnVal.preferred.width = childSizeHint.preferred.width;
   }
   else if (childType == ChildType::Widget)
   {
-    Gui::SizeHint childSizeHint = widget->SizeHint(ctx);
+    Gui::SizeHint childSizeHint = widget->GetSizeHint(ctx);
     returnVal.preferred.width = childSizeHint.preferred.width;
   }
 
@@ -88,11 +88,11 @@ void ScrollArea::Render(
   Rect visibleRect,
   DrawInfo& drawInfo) const
 {
-  Gui::SizeHint childSizeHint{};
+  SizeHint childSizeHint{};
   if (layout)
-    childSizeHint = layout->SizeHint(ctx);
+    childSizeHint = layout->GetSizeHint(ctx);
   else
-    childSizeHint = widget->SizeHint(ctx);
+    childSizeHint = widget->GetSizeHint(ctx);
 
   Rect childRect = impl::GetChildRect(
     widgetRect,
@@ -160,11 +160,11 @@ void ScrollArea::CursorMove(
 {
   if (childType == ChildType::Layout || childType == ChildType::Widget)
   {
-    Gui::SizeHint childSizeHint{};
+    SizeHint childSizeHint{};
     if (childType == ChildType::Layout)
-      childSizeHint = layout->SizeHint(ctx);
+      childSizeHint = layout->GetSizeHint(ctx);
     else
-      childSizeHint = widget->SizeHint(ctx);
+      childSizeHint = widget->GetSizeHint(ctx);
 
     Rect childRect = impl::GetChildRect(
       widgetRect,
@@ -227,11 +227,11 @@ void ScrollArea::CursorClick(
 {
   if (childType == ChildType::Layout || childType == ChildType::Widget)
   {
-    Gui::SizeHint childSizeHint{};
+    SizeHint childSizeHint{};
     if (childType == ChildType::Layout)
-      childSizeHint = layout->SizeHint(ctx);
+      childSizeHint = layout->GetSizeHint(ctx);
     else
-      childSizeHint = widget->SizeHint(ctx);
+      childSizeHint = widget->GetSizeHint(ctx);
 
     Rect childRect = impl::GetChildRect(
       widgetRect,
@@ -295,11 +295,11 @@ void ScrollArea::TouchEvent(
 
   if (childType == ChildType::Layout || childType == ChildType::Widget)
   {
-    Gui::SizeHint childSizeHint{};
+    SizeHint childSizeHint{};
     if (childType == ChildType::Layout)
-      childSizeHint = layout->SizeHint(ctx);
+      childSizeHint = layout->GetSizeHint(ctx);
     else
-      childSizeHint = widget->SizeHint(ctx);
+      childSizeHint = widget->GetSizeHint(ctx);
 
     Rect childRect = impl::GetChildRect(
       widgetRect,

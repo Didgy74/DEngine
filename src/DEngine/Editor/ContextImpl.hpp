@@ -2,6 +2,7 @@
 
 #include <DEngine/Gui/Context.hpp>
 #include <DEngine/Gui/Text.hpp>
+#include <DEngine/Gui/DockArea.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
@@ -109,7 +110,8 @@ namespace DEngine::Editor
 		Std::Opt<Entity> selectedEntity;
 		EntityIdList* entityIdList = nullptr;
 		ComponentList* componentList = nullptr;
-		InternalViewportWidget* viewportWidget = nullptr;
+		Gui::DockArea* dockArea = nullptr;
+		std::vector<InternalViewportWidget*> viewportWidgets;
 		void SelectEntity(Entity id);
 		void UnselectEntity();
 	};

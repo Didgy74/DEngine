@@ -211,8 +211,8 @@ void Button::TouchEvent(
 	}
 }
 
-SizeHint Button::SizeHint(
+SizeHint Button::GetSizeHint(
 	Context const& ctx) const
 {
-	return textWidget.SizeHint(ctx);
+	return textWidget.GetSizeHint(ctx);
 }
