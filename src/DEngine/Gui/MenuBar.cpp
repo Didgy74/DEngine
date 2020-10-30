@@ -368,4 +368,21 @@ void MenuBar::ActivatableButton::TouchEvent(
 	Rect visibleRect,
 	Gui::TouchEvent event)
 {
+	if (event.type == TouchEventType::Down && event.id == 0)
+	{
+		bool cursorIsInside = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
+		if (cursorIsInside)
+		{
+			activateCallback();
+
+			//ctx.Test_DestroyMenu(windowId, parentMenuBar);
+			MenuBar* temp = parentMenuBar;
+			while (temp)
+			{
+				if (temp->activeButton)
+					temp->ClearActiveButton(ctx, windowId);
+				temp = temp->parentMenuBar;
+			}
+		}
+	}
 }
