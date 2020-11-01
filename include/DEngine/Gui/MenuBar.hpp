@@ -18,6 +18,7 @@ namespace DEngine::Gui
 			MenuBar& newMenuBar);
 		using ButtonActivateCallback = void();
 
+	private:
 		class Button : public Widget
 		{
 		public:
@@ -108,6 +109,8 @@ namespace DEngine::Gui
 				Gui::TouchEvent event) override;
 		};
 
+	public:
+
 		enum class Direction : u8
 		{
 			Horizontal,
@@ -118,7 +121,11 @@ namespace DEngine::Gui
 		StackLayout stackLayout;
 		Button* activeButton = nullptr;
 
+	public:
+		MenuBar(Direction dir);
+	private:
 		MenuBar(MenuBar* parentMenuBar, Direction dir);
+	public:
 
 		void ClearActiveButton(
 			Context& ctx,

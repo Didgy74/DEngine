@@ -20,6 +20,12 @@ namespace DEngine::Gui::impl
 using namespace DEngine;
 using namespace DEngine::Gui;
 
+MenuBar::MenuBar(Direction dir) : 
+	parentMenuBar{ nullptr },
+	stackLayout{ impl::toStackLayoutDir(dir) }
+{
+}
+
 MenuBar::MenuBar(MenuBar* parentMenuBar, Direction dir) :
 	parentMenuBar{ parentMenuBar },
 	stackLayout{ impl::toStackLayoutDir(dir) }

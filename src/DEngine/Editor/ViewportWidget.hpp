@@ -468,7 +468,7 @@ namespace DEngine::Editor
 			Gui::StackLayout(Gui::StackLayout::Direction::Vertical)
 		{
 			// Generate top navigation bar
-			Gui::MenuBar* menuBar = new Gui::MenuBar(nullptr, Gui::MenuBar::Direction::Horizontal);
+			Gui::MenuBar* menuBar = new Gui::MenuBar(Gui::MenuBar::Direction::Horizontal);
 			AddLayout2(Std::Box<Gui::Layout>{ menuBar });
 			
 			menuBar->AddSubmenuButton(

@@ -456,7 +456,7 @@ namespace DEngine::Editor
 		ContextImpl& implData)
 	{
 		// Menu button
-		Gui::MenuBar* menuBarA = new Gui::MenuBar(nullptr, Gui::MenuBar::Direction::Horizontal);
+		Gui::MenuBar* menuBarA = new Gui::MenuBar(Gui::MenuBar::Direction::Horizontal);
 
 		menuBarA->AddSubmenuButton(
 			"Submenu A",
