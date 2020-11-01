@@ -458,69 +458,55 @@ namespace DEngine::Editor
 		// Menu button
 		Gui::MenuBar* menuBarA = new Gui::MenuBar(nullptr, Gui::MenuBar::Direction::Horizontal);
 
-		Gui::MenuBar::Button* menuBarButtonA = new Gui::MenuBar::Button(menuBarA, "BtnA");
-		menuBarA->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ menuBarButtonA });
-		menuBarButtonA->activateCallback = [&implData, menuBarA](
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::MenuBar::Button& btn,
-			Gui::Rect widgetRect)
-		{
-			Gui::MenuBar* menuBarB = new Gui::MenuBar(menuBarA, Gui::MenuBar::Direction::Vertical);
-			btn.menuPtr = menuBarB;
-			ctx.Test_AddMenu(
-				windowId,
-				Std::Box<Gui::Layout>{ menuBarB },
-				{ { widgetRect.position.x, widgetRect.position.y + (i32)widgetRect.extent.height }, {} });
-			menuBarB->stackLayout.color = { 0.25f, 0.f, 0.25f, 1.f };
-
-			Gui::Text* topText = new Gui::Text;
-			menuBarB->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ topText });
-			topText->String_Set("Yoyobro");
-
-			Gui::MenuBar::Button* topButton = new Gui::MenuBar::Button(menuBarB, "Btn A element #0");
-			menuBarB->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ topButton });
-			topButton->activateCallback = [&implData, menuBarB](
-				Gui::Context& ctx,
-				Gui::WindowID windowId,
-				Gui::MenuBar::Button& btn,
-				Gui::Rect widgetRect)
+		menuBarA->AddSubmenuButton(
+			"Submenu A",
+			[&implData](
+				Gui::MenuBar& newMenuBar)
 			{
-				Gui::MenuBar* menuBarC = new Gui::MenuBar(menuBarB, Gui::MenuBar::Direction::Vertical);
-				btn.menuPtr = menuBarC;
-				ctx.Test_AddMenu(
-					windowId,
-					Std::Box<Gui::Layout>{ menuBarC },
-					{ { widgetRect.position.x + (i32)widgetRect.extent.width, widgetRect.position.y }, {} });
-				menuBarC->stackLayout.color = { 0.25f, 0.f, 0.25f, 1.f };
+				newMenuBar.stackLayout.color = { 0.25f, 0.f, 0.25f, 1.f };
 
-				for (uSize i = 0; i < 5; i++)
-				{
-					Gui::Text* otherText = new Gui::Text;
-					menuBarC->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ otherText });
-					otherText->String_Set("Yo B ##");
-				}
+				Gui::Text* topText = new Gui::Text;
+				newMenuBar.stackLayout.AddWidget2(Std::Box<Gui::Widget>{ topText });
+				topText->String_Set("Some text");
 
-				Gui::MenuBar::ActivatableButton* newViewportBtn = new Gui::MenuBar::ActivatableButton(menuBarC, "New viewport");
-				menuBarC->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ newViewportBtn });
-				newViewportBtn->activateCallback = [&implData]()
-				{
-					Gui::DockArea::TopLevelNode newTop{};
-					newTop.rect = { { 150, 150 }, { 400, 400 } };
-					Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
-					newTop.node = Std::Box{ topNode };
-					topNode->type = Gui::DockArea::Node::Type::Window;
-					topNode->windows.push_back(Gui::DockArea::Window{});
-					auto& newWindow = topNode->windows.back();
-					newWindow.title = "Viewport";
-					newWindow.titleBarColor = { 0.5f, 0.f, 0.5f, 1.f };
-					ViewportWidget* viewport = new ViewportWidget(implData, *implData.gfxCtx);
-					newWindow.layout = Std::Box<Gui::Layout>{ viewport };
+				newMenuBar.AddSubmenuButton(
+					"Subsubmenu button",
+					[&implData](
+						Gui::MenuBar& newMenuBar)
+					{
+						newMenuBar.stackLayout.color = { 0.25f, 0.f, 0.25f, 1.f };
 
-					implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
-				};
-			};
-		};
+						for (uSize i = 0; i < 5; i++)
+						{
+							Gui::Text* otherText = new Gui::Text;
+							newMenuBar.stackLayout.AddWidget2(Std::Box<Gui::Widget>{ otherText });
+							otherText->String_Set("Some text");
+						}
+
+						newMenuBar.AddMenuButton(
+							"New viewport",
+							[&implData]()
+							{
+								Gui::DockArea::TopLevelNode newTop{};
+								newTop.rect = { { 150, 150 }, { 400, 400 } };
+								Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
+								newTop.node = Std::Box{ topNode };
+								topNode->type = Gui::DockArea::Node::Type::Window;
+								topNode->windows.push_back(Gui::DockArea::Window{});
+								auto& newWindow = topNode->windows.back();
+								newWindow.title = "Viewport";
+								newWindow.titleBarColor = { 0.5f, 0.f, 0.5f, 1.f };
+								ViewportWidget* viewport = new ViewportWidget(implData, *implData.gfxCtx);
+								newWindow.layout = Std::Box<Gui::Layout>{ viewport };
+
+								implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
+							});
+					});
+			});
+		
+	
+
+		/*
 
 		Gui::MenuBar::Button* menuBarButtonB = new Gui::MenuBar::Button(menuBarA, "TestB");
 		menuBarA->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ menuBarButtonB });
@@ -546,6 +532,7 @@ namespace DEngine::Editor
 			stackLayout->AddWidget2(Std::Box<Gui::Widget>{ otherText });
 			otherText->String_Set("Yo yo bro");
 		};
+		*/
 
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;

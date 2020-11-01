@@ -112,10 +112,10 @@ void Context::Test_AddMenu(
 	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != implData.windows.end());
 	auto& windowNode = *windowNodeIt;
 
-  impl::WindowNode::MenuAddRemove newVal{};
-  newVal.index = 0;
-  newVal.type = impl::WindowNode::MenuAddRemove::Type::Add;
-  windowNode.menuAddRemoves.push_back(newVal);
+	impl::WindowNode::MenuAddRemove newVal{};
+	newVal.index = 0;
+	newVal.type = impl::WindowNode::MenuAddRemove::Type::Add;
+	windowNode.menuAddRemoves.push_back(newVal);
 
 	impl::Test_Menu yo{};
 	yo.rect = rect;
@@ -494,13 +494,13 @@ namespace DEngine::Gui::impl
 		u32 utfValue)
 	{
 		if (utfValue == 0)
-			return TextManager::GlyphData{};
+			return {};
 
 		// Load glyph data
 		FT_UInt glyphIndex = FT_Get_Char_Index(manager.face, utfValue);
 		if (glyphIndex == 0) // 0 is an error index
 			//throw std::runtime_error("Unable to load glyph index");
-			return TextManager::GlyphData{};
+			return {};
 
 		FT_Error ftError = FT_Load_Glyph(
 			manager.face,

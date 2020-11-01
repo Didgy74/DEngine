@@ -37,6 +37,30 @@ void MenuBar::ClearActiveButton(
 	activeButton = nullptr;
 }
 
+void MenuBar::AddSubmenuButton(
+	std::string_view title, 
+	std::function<SubmenuActivateCallback> callback)
+{
+	MenuBar::Button* newButton = new MenuBar::Button(this, title, callback);
+	stackLayout.AddWidget2(Std::Box<Widget>{ newButton });
+}
+
+void MenuBar::AddMenuButton(
+	std::string_view title, 
+	std::function<ButtonActivateCallback> callback)
+{
+	MenuBar::ActivatableButton* newButton = new MenuBar::ActivatableButton(this, title, callback);
+	stackLayout.AddWidget2(Std::Box<Widget>{ newButton });
+}
+
+MenuBar::Direction MenuBar::GetDirection() const
+{
+	if (stackLayout.direction == StackLayout::Direction::Horizontal)
+		return Direction::Horizontal;
+	else
+		return Direction::Vertical;
+}
+
 SizeHint MenuBar::GetSizeHint(Context const& ctx) const
 {
 	return stackLayout.GetSizeHint(ctx);
@@ -143,9 +167,13 @@ void MenuBar::TouchEvent(
 		event);
 }
 
-MenuBar::Button::Button(MenuBar* parentMenuBar, std::string_view title) :
+MenuBar::Button::Button(
+	MenuBar* parentMenuBar, 
+	std::string_view title,
+	std::function<SubmenuActivateCallback> callback) :
 	parentMenuBar{ parentMenuBar },
-	title{ title }
+	title{ title },
+	activateCallback{ callback }
 {
 
 }
@@ -209,28 +237,7 @@ void MenuBar::Button::CursorMove(
 	Rect visibleRect,
 	CursorMoveEvent event)
 {
-	return;
 
-	impl::ImplData& implData = *(impl::ImplData*)ctx.Internal_ImplData();
-
-	// First check if any other button is active in parent MenuBar
-	// Then check if we are inside this button
-	// If we are inside this button, close old menu, open new one.
-
-	bool cursorIsInside = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
-
-	if (cursorIsInside && parentMenuBar->activeButton && parentMenuBar->activeButton != this)
-	{
-		parentMenuBar->ClearActiveButton(ctx, windowId);
-
-		active = true;
-		parentMenuBar->activeButton = this;
-		activateCallback(
-			ctx,
-			windowId,
-			*this,
-			widgetRect);
-	}
 }
 
 void MenuBar::Button::CursorClick(
@@ -255,11 +262,27 @@ void MenuBar::Button::CursorClick(
 		
 		active = true;
 		parentMenuBar->activeButton = this;
-		activateCallback(
-			ctx,
+		Gui::MenuBar* newMenuBar = new MenuBar(parentMenuBar, Direction::Vertical);
+		this->menuPtr = newMenuBar;
+		Math::Vec2Int menuPos{};
+		if (parentMenuBar->GetDirection() == Direction::Horizontal)
+		{
+			menuPos.x = widgetRect.position.x;
+			menuPos.y = widgetRect.position.y + (i32)widgetRect.extent.height;
+		}
+		else
+		{
+			menuPos.x = widgetRect.position.x + (i32)widgetRect.extent.width;
+			menuPos.y = widgetRect.position.y;
+		}
+		ctx.Test_AddMenu(
 			windowId,
-			*this,
-			widgetRect);
+			Std::Box<Layout>{ newMenuBar },
+			{ menuPos, {} });
+
+		activateCallback(
+			*newMenuBar);
+
 	}
 	else if (active && cursorIsInside && event.clicked && event.button == CursorButton::Left)
 	{
@@ -290,18 +313,36 @@ void MenuBar::Button::TouchEvent(
 
 			active = true;
 			parentMenuBar->activeButton = this;
-			activateCallback(
-				ctx,
+			Gui::MenuBar* newMenuBar = new MenuBar(parentMenuBar, Direction::Vertical);
+			this->menuPtr = newMenuBar;
+			Math::Vec2Int menuPos{};
+			if (parentMenuBar->GetDirection() == Direction::Horizontal)
+			{
+				menuPos.x = widgetRect.position.x;
+				menuPos.y = widgetRect.position.y + (i32)widgetRect.extent.height;
+			}
+			else
+			{
+				menuPos.x = widgetRect.position.x + (i32)widgetRect.extent.width;
+				menuPos.y = widgetRect.position.y;
+			}
+			ctx.Test_AddMenu(
 				windowId,
-				*this,
-				widgetRect);
+				Std::Box<Layout>{ newMenuBar },
+				{ menuPos, {} });
+			activateCallback(
+				*newMenuBar);
 		}
 	}
 }
 
-MenuBar::ActivatableButton::ActivatableButton(MenuBar* parentMenuBar, std::string_view title) :
+MenuBar::ActivatableButton::ActivatableButton(
+	MenuBar* parentMenuBar, 
+	std::string_view title,
+	std::function<ButtonActivateCallback> callback) :
 	title{ title },
-	parentMenuBar{ parentMenuBar }
+	parentMenuBar{ parentMenuBar },
+	activateCallback{ callback }
 {
 
 }

@@ -3,6 +3,7 @@
 #include <DEngine/Gui/StackLayout.hpp>
 #include <DEngine/Gui/Widget.hpp>
 #include <DEngine/Gui/Button.hpp>
+#include <DEngine/Gui/MenuBar.hpp>
 
 #include "ContextImpl.hpp"
 
@@ -467,34 +468,21 @@ namespace DEngine::Editor
 			Gui::StackLayout(Gui::StackLayout::Direction::Vertical)
 		{
 			// Generate top navigation bar
-			Gui::StackLayout* menuBar = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
+			Gui::MenuBar* menuBar = new Gui::MenuBar(nullptr, Gui::MenuBar::Direction::Horizontal);
 			AddLayout2(Std::Box<Gui::Layout>{ menuBar });
-			menuBar->color = { 0.25f, 0.25f, 0.25f, 1.f };
 			
-			Gui::Button* camMenuButton = new Gui::Button;
-			menuBar->AddWidget2(Std::Box<Gui::Widget>{ camMenuButton });
-			camMenuButton->textWidget.String_Set("Camera");
-			camMenuButton->activatePfn = [](
-				Gui::Button& btn,
-				Gui::Context& ctx,
-				Gui::WindowID windowId,
-				Gui::Rect widgetRect,
-				Gui::Rect visibleRect)
-			{
-				Gui::StackLayout* cameraList = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
-				Std::Box<Gui::Layout> layout{ cameraList };
+			menuBar->AddSubmenuButton(
+				"Camera",
+				[](
+					Gui::MenuBar& newMenuBar)
+				{
+					newMenuBar.AddMenuButton(
+						"FreeLook",
+						[]()
+						{
 
-				Gui::Button* thisCamButton = new Gui::Button;
-				cameraList->AddWidget2(Std::Box<Gui::Widget>{ thisCamButton });
-				thisCamButton->textWidget.String_Set("FreeLook");
-				thisCamButton->SetToggled(true);
-
-				ctx.Test_AddMenu(
-					windowId,
-					Std::Move(layout),
-					Gui::Rect{ { widgetRect.position.x, widgetRect.position.y + (i32)widgetRect.extent.height}, {} });
-			};
-
+						});
+				});
 
 			InternalViewportWidget* viewport = new InternalViewportWidget(implData, ctx);
 			AddWidget2(Std::Box<Gui::Widget>{ viewport });

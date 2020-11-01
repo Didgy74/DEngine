@@ -14,6 +14,10 @@ namespace DEngine::Gui
 	class MenuBar : public Layout
 	{
 	public:
+		using SubmenuActivateCallback = void(
+			MenuBar& newMenuBar);
+		using ButtonActivateCallback = void();
+
 		class Button : public Widget
 		{
 		public:
@@ -21,14 +25,12 @@ namespace DEngine::Gui
 			bool active = false;
 			MenuBar* parentMenuBar = nullptr;
 			Layout* menuPtr = nullptr;
-			using ActivateCallback = void(
-				Context& ctx, 
-				WindowID windowId,
-				Button& btn,
-				Rect widgetRect);
-			std::function<ActivateCallback> activateCallback;
+			std::function<SubmenuActivateCallback> activateCallback;
 
-			Button(MenuBar* parentMenuBar, std::string_view title);
+			Button(
+				MenuBar* parentMenuBar,
+				std::string_view title,
+				std::function<SubmenuActivateCallback> callback);
 
 			void Clear(
 				Context& ctx,
@@ -73,12 +75,14 @@ namespace DEngine::Gui
 			std::string title;
 			MenuBar* parentMenuBar = nullptr;
 
-			using ActivateCallback = void();
-			std::function<ActivateCallback> activateCallback;
+			std::function<ButtonActivateCallback> activateCallback;
 
-			ActivatableButton(MenuBar* parentMenuBar, std::string_view title);
+			ActivatableButton(
+				MenuBar* parentMenuBar, 
+				std::string_view title,
+				std::function<ButtonActivateCallback> callback);
 
-			[[nodiscard]] virtual Gui::SizeHint GetSizeHint(
+			[[nodiscard]] virtual SizeHint GetSizeHint(
 				Context const& ctx) const override;
 
 			virtual void Render(
@@ -119,6 +123,16 @@ namespace DEngine::Gui
 		void ClearActiveButton(
 			Context& ctx,
 			WindowID windowId);
+		
+		void AddSubmenuButton(
+			std::string_view title,
+			std::function<SubmenuActivateCallback> callback);
+
+		void AddMenuButton(
+			std::string_view title,
+			std::function<ButtonActivateCallback> callback);
+
+		Direction GetDirection() const;
 
 		[[nodiscard]] virtual Gui::SizeHint GetSizeHint(
 			Context const& ctx) const override;
