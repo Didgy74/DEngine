@@ -3,6 +3,7 @@ project(dengine)
 
 set(CMAKE_CXX_STANDARD 17)
 
+
 set(DENGINE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 include(Common.cmake)
 
@@ -12,6 +13,7 @@ include(Common.cmake)
 # START
 
 	add_executable(dengine ${DENGINE_SRC_FILES})
+	set_target_properties(dengine PROPERTIES CXX_STANDARD 17)
 	target_include_directories(dengine PRIVATE ${DENGINE_INCLUDE_DIRS})
 	target_compile_definitions(dengine PRIVATE ${DENGINE_DEFINES})
 	target_link_libraries(dengine PRIVATE ${CMAKE_DL_LIBS})

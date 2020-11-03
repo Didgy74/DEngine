@@ -112,11 +112,13 @@ void Context::Test_AddMenu(
 	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != implData.windows.end());
 	auto& windowNode = *windowNodeIt;
 
-	impl::WindowNode::MenuAddRemove newVal{};
-	newVal.index = 0;
-	newVal.type = impl::WindowNode::MenuAddRemove::Type::Add;
-	windowNode.menuAddRemoves.push_back(newVal);
-
+	if (windowNode.currentlyIterating)
+	{
+		impl::WindowNode::MenuAddRemove newVal{};
+		newVal.index = 0;
+		newVal.type = impl::WindowNode::MenuAddRemove::Type::Add;
+		windowNode.menuAddRemoves.push_back(newVal);
+	}
 	impl::Test_Menu yo{};
 	yo.rect = rect;
 	yo.topLayout = static_cast<Std::Box<Layout>&&>(layout);
@@ -140,14 +142,22 @@ void Context::Test_DestroyMenu(WindowID windowId, Layout* layout)
 		[layout](decltype(windowNode.test_Menus.front()) const& val) -> bool { return val.topLayout.Get() == layout; });
 	DENGINE_IMPL_GUI_ASSERT(menuIt != windowNode.test_Menus.end());
 
-	impl::WindowNode::MenuAddRemove newVal{};
-	newVal.index = uSize(menuIt - windowNode.test_Menus.begin());
-	newVal.type = impl::WindowNode::MenuAddRemove::Type::Remove;
-	windowNode.menuAddRemoves.push_back(newVal);
+	if (windowNode.currentlyIterating)
+	{
+		impl::WindowNode::MenuAddRemove newVal{};
+		newVal.index = uSize(menuIt - windowNode.test_Menus.begin());
+		newVal.type = impl::WindowNode::MenuAddRemove::Type::Remove;
+		windowNode.menuAddRemoves.push_back(newVal);
 
-	impl::Test_Menu temp = Std::Move(*menuIt);
-	windowNode.test_Menus.erase(menuIt);
-	windowNode.pendingMenuDestroys.emplace_back(Std::Move(temp));
+		impl::Test_Menu temp = Std::Move(*menuIt);
+		windowNode.test_Menus.erase(menuIt);
+		windowNode.pendingMenuDestroys.emplace_back(Std::Move(temp));
+	}
+	else
+	{
+		windowNode.test_Menus.erase(menuIt);
+	}
+
 }
 
 void Context::PushEvent(CharEnterEvent event)
@@ -221,6 +231,8 @@ void Context::PushEvent(CursorClickEvent event)
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 	for (auto& windowNode : implData.windows)
 	{
+		windowNode.currentlyIterating = true;
+		
 		bool bleh = false;
 		uSize menusLength = windowNode.test_Menus.size();
 		for (uSize n = 0; n < menusLength; n += 1)
@@ -262,6 +274,7 @@ void Context::PushEvent(CursorClickEvent event)
 		}
 
 		windowNode.menuAddRemoves.clear();
+		windowNode.currentlyIterating = false;
 	}
 }
 
@@ -271,6 +284,8 @@ void Context::PushEvent(CursorMoveEvent event)
 	implData.cursorPosition = event.position;
 	for (auto& windowNode : implData.windows)
 	{
+		windowNode.currentlyIterating = true;
+
 		CursorMoveEvent modifiedEvent{};
 		modifiedEvent.position = implData.cursorPosition - windowNode.data.rect.position;
 		modifiedEvent.positionDelta = event.positionDelta;
@@ -314,6 +329,7 @@ void Context::PushEvent(CursorMoveEvent event)
 		}
 
 		windowNode.menuAddRemoves.clear();
+		windowNode.currentlyIterating = false;
 	}
 }
 
@@ -322,6 +338,8 @@ void Context::PushEvent(TouchEvent event)
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 	for (auto& windowNode : implData.windows)
 	{
+		windowNode.currentlyIterating = true;
+
 		bool bleh = false;
 		uSize menusLength = windowNode.test_Menus.size();
 		for (uSize n = 0; n < menusLength; n += 1)
@@ -360,6 +378,7 @@ void Context::PushEvent(TouchEvent event)
 		}
 
 		windowNode.menuAddRemoves.clear();
+		windowNode.currentlyIterating = false;
 	}
 }
 

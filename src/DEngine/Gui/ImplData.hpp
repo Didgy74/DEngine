@@ -92,6 +92,7 @@ namespace DEngine::Gui::impl
 
 		// The first element is the front-most one.
 		std::vector<Test_Menu> test_Menus{};
+		bool currentlyIterating = false;
 		std::vector<Test_Menu> pendingMenuDestroys;
 		struct MenuAddRemove
 		{

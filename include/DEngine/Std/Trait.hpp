@@ -23,6 +23,11 @@ namespace DEngine::Std::Trait::impl
 	struct IsSame<T, T> : public BoolValue<true> {};
 
 	template<typename T>
+	struct RemoveConst { using Type = T; };
+	template<typename T>
+	struct RemoveConst<T const> { using Type = T; };
+
+	template<typename T>
 	struct RemoveRef { using Type = T; };
 	template<typename T>
 	struct RemoveRef<T&> { using Type = T; };
@@ -45,5 +50,10 @@ namespace DEngine::Std::Trait
 	constexpr bool IsSame = impl::IsSame<T, U>::value;
 
 	template<typename T>
+	using RemoveConst = typename impl::RemoveConst<T>::Type;
+	
+	template<typename T>
 	using RemoveRef = typename impl::RemoveRef<T>::Type;
+
+
 }
