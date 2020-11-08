@@ -3,6 +3,8 @@ Essentially a sandbox for learning anything related to 3D simulations and game e
 
 This repository also serves as part of my own portfolio for showing future employers whenever I am job-hunting.
 
+![Screenshot](https://github.com/Didgy74/DEngine/raw/master/Screenshot.jpg)
+[Click here](https://github.com/Didgy74/DEngine/raw/master/Usage%20showcase.mp4) for MP4 showcasing the app in action
 ## Highlights
  ### - Powered by Vulkan
 Rendering is powered by Vulkan only, and supports rendering GUI as well as the 3D scene. Includes support for multiple 3D viewports and rendering separately to multiple OS windows. Rendering is (almost) completely decoupled from the other modules, i.e GUI or any other logic.
@@ -31,3 +33,4 @@ Requires
  - GLFW 3
  - Texas
  - FreeType2
+
