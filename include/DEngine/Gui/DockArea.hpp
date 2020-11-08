@@ -60,8 +60,8 @@ namespace DEngine::Gui
 		std::vector<TopLevelNode> topLevelNodes;
 		
 		u32 tabDisconnectRadius = 25;
-		u32 gizmoSize = 50;
-		u32 gizmoPadding = 10;
+		u32 gizmoSize = 75;
+		u32 gizmoPadding = 15;
 		u32 resizeAreaThickness = 30;
 		u32 resizeHandleLength = 50;
 

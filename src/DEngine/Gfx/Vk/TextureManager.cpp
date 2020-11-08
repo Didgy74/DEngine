@@ -2,10 +2,11 @@
 
 #include "GlobUtils.hpp"
 
-#include "Texas/Texas.hpp"
-#include "Texas/Tools.hpp"
-#include "Texas/VkTools.hpp"
-#include "DEngine/Application.hpp"
+#include <Texas/Texas.hpp>
+#include <Texas/Tools.hpp>
+#include <Texas/VkTools.hpp>
+#include <Texas/GLTools.hpp>
+#include <DEngine/Application.hpp>
 
 namespace DEngine::Gfx::Vk
 {

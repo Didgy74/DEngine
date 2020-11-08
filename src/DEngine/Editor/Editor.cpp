@@ -148,9 +148,13 @@ namespace DEngine::Editor
 	class EntityIdList : public Gui::StackLayout
 	{
 	public:
+		Gui::LineList* entitiesList = nullptr;
+		ContextImpl* ctxImpl = nullptr;
+
 		EntityIdList(ContextImpl* ctxImpl) :
 			ctxImpl(ctxImpl)
 		{
+			DENGINE_DETAIL_ASSERT(!ctxImpl->entityIdList);
 			ctxImpl->entityIdList = this;
 
 			this->direction = Direction::Vertical;
@@ -220,8 +224,11 @@ namespace DEngine::Editor
 			}
 		}
 
-		Gui::LineList* entitiesList = nullptr;
-		ContextImpl* ctxImpl = nullptr;
+		virtual ~EntityIdList()
+		{
+			DENGINE_DETAIL_ASSERT(ctxImpl->entityIdList == this);
+			ctxImpl->entityIdList = nullptr;
+		}
 
 		void AddEntityToList(Entity id)
 		{
@@ -236,27 +243,6 @@ namespace DEngine::Editor
 				uSize selectedLine = selectedLineOpt.Value();
 				entitiesList->RemoveLine(selectedLine);
 			}
-
-			/*
-			auto it = Std::FindIf(
-				entityEntries.begin(),
-				entityEntries.end(),
-				[id](decltype(entityEntries)::value_type const& val) -> bool {
-					return val.a == id; });
-			Gui::StackLayout* targetLayoutPtr = it->b;
-
-			for (u32 i = 0; i < entitiesListLayout->ChildCount(); i++)
-			{
-				auto item = entitiesListLayout->At(i);
-				if (targetLayoutPtr == item.layout)
-				{
-					entitiesListLayout->RemoveItem(i);
-					break;
-				}
-			}
-
-			entityEntries.erase(it);
-			*/
 		}
 
 		void SelectEntity(Std::Opt<Entity> previousId, Entity newId)
@@ -281,12 +267,24 @@ namespace DEngine::Editor
 		ComponentList(ContextImpl* ctxImpl) :
 			ctxImpl(ctxImpl)
 		{
+			DENGINE_DETAIL_ASSERT(!ctxImpl->componentList);
 			ctxImpl->componentList = this;
 
 			direction = Direction::Vertical;
 
 			componentWidgetListLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
 			this->AddLayout2(Std::Box<Gui::Layout>{ componentWidgetListLayout });
+
+			if (ctxImpl->selectedEntity.HasValue())
+			{
+				EntitySelected(ctxImpl->selectedEntity.Value());
+			}
+		}
+
+		virtual ~ComponentList()
+		{
+			DENGINE_DETAIL_ASSERT(ctxImpl->componentList == this);
+			ctxImpl->componentList = nullptr;
 		}
 
 	private:
@@ -448,8 +446,6 @@ namespace DEngine::Editor::detail
 
 using namespace DEngine;
 
-#include "../Gui/ImplData.hpp" // TODO: THIS IS ONLY FOR TESTING.
-
 namespace DEngine::Editor
 {
 	static Std::Box<Gui::Layout> CreateNavigationBar(
@@ -458,81 +454,86 @@ namespace DEngine::Editor
 		// Menu button
 		Gui::MenuBar* menuBarA = new Gui::MenuBar(Gui::MenuBar::Direction::Horizontal);
 
+		menuBarA->stackLayout.spacing = 25;
+		
 		menuBarA->AddSubmenuButton(
-			"Submenu A",
+			"Submenu",
 			[&implData](
 				Gui::MenuBar& newMenuBar)
 			{
 				newMenuBar.stackLayout.color = { 0.25f, 0.f, 0.25f, 1.f };
+				newMenuBar.stackLayout.spacing = 10;
+				newMenuBar.stackLayout.padding = 10;
 
-				Gui::Text* topText = new Gui::Text;
-				newMenuBar.stackLayout.AddWidget2(Std::Box<Gui::Widget>{ topText });
-				topText->String_Set("Some text");
-
-				newMenuBar.AddSubmenuButton(
-					"Subsubmenu button",
+				
+				newMenuBar.AddToggleMenuButton(
+					"Entities",
+					implData.entityIdList != nullptr,
 					[&implData](
-						Gui::MenuBar& newMenuBar)
+						bool activated)
 					{
-						newMenuBar.stackLayout.color = { 0.25f, 0.f, 0.25f, 1.f };
-
-						for (uSize i = 0; i < 5; i++)
+						if (activated)
 						{
-							Gui::Text* otherText = new Gui::Text;
-							newMenuBar.stackLayout.AddWidget2(Std::Box<Gui::Widget>{ otherText });
-							otherText->String_Set("Some text");
+							Gui::DockArea::TopLevelNode newTop{};
+							newTop.rect = { { 0, 0 }, { 400, 400 } };
+							Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
+							newTop.node = Std::Box{ topNode };
+							topNode->type = Gui::DockArea::Node::Type::Window;
+							topNode->windows.push_back(Gui::DockArea::Window{});
+							auto& newWindow = topNode->windows.back();
+							newWindow.title = "Entities";
+							newWindow.titleBarColor = { 0.5f, 0.5f, 0.f, 1.f };
+							EntityIdList* entityIdList = new EntityIdList(&implData);
+							newWindow.layout = Std::Box<Gui::Layout>{ entityIdList };
+
+							implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
 						}
+					});
 
-						newMenuBar.AddMenuButton(
-							"New viewport",
-							[&implData]()
-							{
-								Gui::DockArea::TopLevelNode newTop{};
-								newTop.rect = { { 150, 150 }, { 400, 400 } };
-								Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
-								newTop.node = Std::Box{ topNode };
-								topNode->type = Gui::DockArea::Node::Type::Window;
-								topNode->windows.push_back(Gui::DockArea::Window{});
-								auto& newWindow = topNode->windows.back();
-								newWindow.title = "Viewport";
-								newWindow.titleBarColor = { 0.5f, 0.f, 0.5f, 1.f };
-								ViewportWidget* viewport = new ViewportWidget(implData, *implData.gfxCtx);
-								newWindow.layout = Std::Box<Gui::Layout>{ viewport };
+				newMenuBar.AddToggleMenuButton(
+					"Components",
+					implData.componentList != nullptr,
+					[&implData](
+						bool activated)
+					{
+						if (activated)
+						{
+							Gui::DockArea::TopLevelNode newTop{};
+							newTop.rect = { { 250, 250 }, { 400, 400 } };
+							Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
+							newTop.node = Std::Box{ topNode };
+							topNode->type = Gui::DockArea::Node::Type::Window;
+							topNode->windows.push_back(Gui::DockArea::Window{});
+							auto& newWindow = topNode->windows.back();
+							newWindow.title = "Components";
+							newWindow.titleBarColor = { 0.f, 0.5f, 0.5f, 1.f };
+							ComponentList* componentList = new ComponentList(&implData);
+							newWindow.layout = Std::Box<Gui::Layout>{ componentList };
 
-								implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
-							});
+							implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
+						}
+					});
+
+
+				newMenuBar.AddMenuButton(
+					"New viewport",
+					[&implData]()
+					{
+						Gui::DockArea::TopLevelNode newTop{};
+						newTop.rect = { { 150, 150 }, { 400, 400 } };
+						Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
+						newTop.node = Std::Box{ topNode };
+						topNode->type = Gui::DockArea::Node::Type::Window;
+						topNode->windows.push_back(Gui::DockArea::Window{});
+						auto& newWindow = topNode->windows.back();
+						newWindow.title = "Viewport";
+						newWindow.titleBarColor = { 0.5f, 0.f, 0.5f, 1.f };
+						ViewportWidget* viewport = new ViewportWidget(implData, *implData.gfxCtx);
+						newWindow.layout = Std::Box<Gui::Layout>{ viewport };
+
+						implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
 					});
 			});
-		
-	
-
-		/*
-
-		Gui::MenuBar::Button* menuBarButtonB = new Gui::MenuBar::Button(menuBarA, "TestB");
-		menuBarA->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ menuBarButtonB });
-		menuBarButtonB->activateCallback = [](
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::MenuBar::Button& btn,
-			Gui::Rect widgetRect)
-		{
-			Gui::StackLayout* stackLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
-			btn.menuPtr = stackLayout;
-			ctx.Test_AddMenu(
-				windowId,
-				Std::Box<Gui::Layout>{ stackLayout },
-				{ { widgetRect.position.x, widgetRect.position.y + (i32)widgetRect.extent.height }, {} });
-			stackLayout->color = { 0.25f, 0.f, 0.25f, 1.f };
-
-			Gui::Text* topText = new Gui::Text;
-			stackLayout->AddWidget2(Std::Box<Gui::Widget>{ topText });
-			topText->String_Set("Other menu");
-
-			Gui::Text* otherText = new Gui::Text;
-			stackLayout->AddWidget2(Std::Box<Gui::Widget>{ otherText });
-			otherText->String_Set("Yo yo bro");
-		};
-		*/
 
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;

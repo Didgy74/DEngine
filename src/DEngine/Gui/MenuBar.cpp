@@ -59,6 +59,20 @@ void MenuBar::AddMenuButton(
 	stackLayout.AddWidget2(Std::Box<Widget>{ newButton });
 }
 
+void MenuBar::AddToggleMenuButton(
+	std::string_view title, 
+	bool toggled, 
+	std::function<ToggleButtonActivateCallback> callback)
+{
+	MenuBar::ToggleButton* newButton = new MenuBar::ToggleButton(
+		this,
+		title,
+		toggled,
+		callback);
+
+	stackLayout.AddWidget2(Std::Box<Widget>{ newButton });
+}
+
 MenuBar::Direction MenuBar::GetDirection() const
 {
 	if (stackLayout.direction == StackLayout::Direction::Horizontal)
@@ -433,3 +447,106 @@ void MenuBar::ActivatableButton::TouchEvent(
 		}
 	}
 }
+
+MenuBar::ToggleButton::ToggleButton(
+	MenuBar* parentMenuBar,
+	std::string_view title,
+	bool toggled,
+	std::function<ToggleButtonActivateCallback> callback) :
+	parentMenuBar{ parentMenuBar },
+	title{ title },
+	toggled{ toggled },
+	activateCallback{ callback }
+{
+
+}
+
+SizeHint MenuBar::ToggleButton::GetSizeHint(
+	Context const& ctx) const
+{
+	impl::ImplData& implData = *(impl::ImplData*)ctx.Internal_ImplData();
+
+	return impl::TextManager::GetSizeHint(
+		implData.textManager,
+		title);
+}
+
+void MenuBar::ToggleButton::Render(
+	Context const& ctx, 
+	Extent framebufferExtent,
+	Rect widgetRect, 
+	Rect visibleRect, 
+	DrawInfo& drawInfo) const
+{
+	impl::ImplData& implData = *(impl::ImplData*)ctx.Internal_ImplData();
+
+	if (toggled)
+	{
+		drawInfo.PushFilledQuad(widgetRect, { 1.f, 1.f, 1.f, 0.25f });
+	}
+
+	impl::TextManager::RenderText(
+		implData.textManager,
+		title,
+		{ 1.f, 1.f, 1.f, 1.f },
+		widgetRect,
+		drawInfo);
+}
+
+void MenuBar::ToggleButton::CursorClick(
+	Context& ctx, 
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect, 
+	Math::Vec2Int cursorPos,
+	CursorClickEvent event)
+{
+	impl::ImplData& implData = *(impl::ImplData*)ctx.Internal_ImplData();
+
+	bool cursorIsInside = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
+
+	// First check if we clicked this button, then invoke callback and remove the menu?
+	if (cursorIsInside && event.clicked && event.button == CursorButton::Left)
+	{
+		toggled = !toggled;
+		
+		activateCallback(toggled);
+
+		//ctx.Test_DestroyMenu(windowId, parentMenuBar);
+		MenuBar* temp = parentMenuBar;
+		while (temp)
+		{
+			if (temp->activeButton)
+				temp->ClearActiveButton(ctx, windowId);
+			temp = temp->parentMenuBar;
+		}
+	}
+}
+
+void MenuBar::ToggleButton::TouchEvent(
+	Context& ctx, 
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchEvent event)
+{
+	if (event.type == TouchEventType::Down && event.id == 0)
+	{
+		bool cursorIsInside = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
+		if (cursorIsInside)
+		{
+			toggled = !toggled;
+			activateCallback(toggled);
+
+			//ctx.Test_DestroyMenu(windowId, parentMenuBar);
+			MenuBar* temp = parentMenuBar;
+			while (temp)
+			{
+				if (temp->activeButton)
+					temp->ClearActiveButton(ctx, windowId);
+				temp = temp->parentMenuBar;
+			}
+		}
+	}
+}
+

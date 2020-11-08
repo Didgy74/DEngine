@@ -548,7 +548,7 @@ namespace DEngine::Gui::impl
 				impl::DockArea_LayoutGizmo gizmo,
 				Rect rect)
 			{
-				drawInfo.PushFilledQuad(rect, { 1.f, 1.f, 1.f, 0.9f });
+				drawInfo.PushFilledQuad(rect, { 1.f, 1.f, 1.f, 0.75f });
 			});
 
 		// Draw the highlight rect on top
@@ -616,7 +616,7 @@ void DockArea::Render(
 		}
 
 		Rect deleteGizmoRect = impl::DockArea_GetDeleteGizmoRect(widgetRect, this->gizmoSize);
-		drawInfo.PushFilledQuad(deleteGizmoRect, { 1.f, 0.f, 0.f, 1.f });
+		drawInfo.PushFilledQuad(deleteGizmoRect, { 1.f, 0.f, 0.f, 0.75f });
 		
 	}
 
@@ -1664,9 +1664,9 @@ namespace DEngine::Gui::impl
 		Rect visibleRect,
 		Gui::TouchEvent event)
 	{
+		Math::Vec2Int cursorPos = Math::Vec2Int{ (i32)event.position.x, (i32)event.position.y };
 		if (event.id == 0 && event.type == TouchEventType::Moved)
 		{
-			Math::Vec2Int cursorPos = Math::Vec2Int{ (i32)event.position.x, (i32)event.position.y };
 			bool cursorInsideWidget = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
 			if (cursorInsideWidget)
 			{
@@ -1675,6 +1675,7 @@ namespace DEngine::Gui::impl
 				topLevelNode.rect.position = cursorPos - widgetRect.position - dockArea.behaviorData.moving.windowMovedRelativePos;
 
 				bool continueIterating = true;
+
 				bool windowContentWasHit = false;
 				impl::DockArea_IterateTopLevelNodes(
 					impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
@@ -1744,92 +1745,103 @@ namespace DEngine::Gui::impl
 		else if (event.id == 0 && event.type == TouchEventType::Up)
 		{
 			// We don't need to test the front-most node, since that's the one being moved.
-			bool windowContentWasHit = false;
 			bool continueIterating = true;
-			impl::DockArea_IterateTopLevelNodes(
-				impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-				dockArea.topLevelNodes,
-				widgetRect,
-				continueIterating,
-				[&dockArea, &implData, event, &windowContentWasHit](
-					DockArea::TopLevelNode& topLevelNode,
-					Rect topLevelRect,
-					uSize topLevelIndex,
-					bool& continueIterating)
-			{
-				if (topLevelIndex == 0)
-					return;
 
-				DockArea_IterateNode(
-					*topLevelNode.node,
-					topLevelRect,
+			// Check if we are above the delete gizmo
+			Rect deleteGizmo = impl::DockArea_GetDeleteGizmoRect(widgetRect, dockArea.gizmoSize);
+			if (deleteGizmo.PointIsInside(cursorPos))
+			{
+				// Delete the front-most top-level node.
+				continueIterating = false;
+				dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
+			}
+
+			if (continueIterating)
+			{
+				impl::DockArea_IterateTopLevelNodes(
+					impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+					dockArea.topLevelNodes,
+					widgetRect,
 					continueIterating,
-					impl::DockArea_IterateNode_SplitCallableOrder::First,
 					[&dockArea, &implData, event](
-						DockArea::Node& node,
-						Rect rect,
-						DockArea::Node* parentNode,
+						DockArea::TopLevelNode& topLevelNode,
+						Rect topLevelRect,
+						uSize topLevelIndex,
 						bool& continueIterating)
-				{
-					if (&node != dockArea.behaviorData.moving.showLayoutNodePtr)
-						return;
-					auto cursorPos = Math::Vec2Int{ (i32)event.position.x, (i32)event.position.y };
-					continueIterating = false;
-					auto& window = node.windows[node.selectedWindow];
-					// Check if we are within the window's main area first
-					Rect contentRect = rect;
-					contentRect.position.y += implData.textManager.lineheight;
-					contentRect.extent.height -= implData.textManager.lineheight;
-					if (contentRect.PointIsInside(cursorPos))
 					{
-						bool gizmoWasHit = false;
-						DockArea_IterateLayoutGizmos(
-							contentRect,
-							dockArea.gizmoSize,
-							dockArea.gizmoPadding,
-							[&dockArea, &node, cursorPos, &gizmoWasHit](
-								DockArea_LayoutGizmo gizmo,
-								Rect rect)
+						if (topLevelIndex == 0)
+							return;
+						DockArea_IterateNode(
+							*topLevelNode.node,
+							topLevelRect,
+							continueIterating,
+							impl::DockArea_IterateNode_SplitCallableOrder::First,
+							[&dockArea, &implData, event](
+								DockArea::Node& node,
+								Rect rect,
+								DockArea::Node* parentNode,
+								bool& continueIterating)
 							{
-								if (!gizmoWasHit && rect.PointIsInside(cursorPos))
+								if (&node != dockArea.behaviorData.moving.showLayoutNodePtr)
+									return;
+								auto cursorPos = Math::Vec2Int{ (i32)event.position.x, (i32)event.position.y };
+								continueIterating = false;
+								auto& window = node.windows[node.selectedWindow];
+								// Check if we are within the window's main area first
+								Rect contentRect = rect;
+								contentRect.position.y += implData.textManager.lineheight;
+								contentRect.extent.height -= implData.textManager.lineheight;
+								if (contentRect.PointIsInside(cursorPos))
 								{
-									gizmoWasHit = true;
-									if (gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Right)
-										node.type = DockArea::Node::Type::HoriSplit;
-									else if (gizmo == DockArea_LayoutGizmo::Top || gizmo == DockArea_LayoutGizmo::Bottom)
-										node.type = DockArea::Node::Type::VertSplit;
-									if (gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Right ||
-										gizmo == DockArea_LayoutGizmo::Top || gizmo == DockArea_LayoutGizmo::Bottom)
-									{
-										DockArea::Node* newNode = new DockArea::Node;
-										auto& nodeA = gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Top ? node.split.a : node.split.b;
-										auto& nodeB = gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Top ? node.split.b : node.split.a;
-										nodeB = Std::Box{ newNode };
-										newNode->type = DockArea::Node::Type::Window;
-										newNode->windows = Std::Move(node.windows);
-										newNode->selectedWindow = node.selectedWindow;
-										node.selectedWindow = 0;
-										nodeA = Std::Move(dockArea.topLevelNodes.front().node);
-										dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
-										dockArea.behavior = DockArea::Behavior::Normal;
-										dockArea.behaviorData.normal = {};
-									}
-									else if (gizmo == DockArea_LayoutGizmo::Center && dockArea.topLevelNodes.front().node->type == DockArea::Node::Type::Window)
-									{
-										node.selectedWindow = node.windows.size() + dockArea.topLevelNodes.front().node->selectedWindow;
-										for (auto& window : dockArea.topLevelNodes.front().node->windows)
-											node.windows.emplace_back(Std::Move(window));
-										dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
-										dockArea.behavior = DockArea::Behavior::Normal;
-										dockArea.behaviorData.normal = {};
-									}
+									bool gizmoWasHit = false;
+									DockArea_IterateLayoutGizmos(
+										contentRect,
+										dockArea.gizmoSize,
+										dockArea.gizmoPadding,
+										[&dockArea, &node, cursorPos, &gizmoWasHit](
+											DockArea_LayoutGizmo gizmo,
+											Rect rect)
+										{
+											if (!gizmoWasHit && rect.PointIsInside(cursorPos))
+											{
+												gizmoWasHit = true;
+												if (gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Right)
+													node.type = DockArea::Node::Type::HoriSplit;
+												else if (gizmo == DockArea_LayoutGizmo::Top || gizmo == DockArea_LayoutGizmo::Bottom)
+													node.type = DockArea::Node::Type::VertSplit;
+												if (gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Right ||
+														gizmo == DockArea_LayoutGizmo::Top || gizmo == DockArea_LayoutGizmo::Bottom)
+												{
+													DockArea::Node* newNode = new DockArea::Node;
+													auto& nodeA = gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Top ? node.split.a : node.split.b;
+													auto& nodeB = gizmo == DockArea_LayoutGizmo::Left || gizmo == DockArea_LayoutGizmo::Top ? node.split.b : node.split.a;
+													nodeB = Std::Box{ newNode };
+													newNode->type = DockArea::Node::Type::Window;
+													newNode->windows = Std::Move(node.windows);
+													newNode->selectedWindow = node.selectedWindow;
+													node.selectedWindow = 0;
+													nodeA = Std::Move(dockArea.topLevelNodes.front().node);
+													dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
+													dockArea.behavior = DockArea::Behavior::Normal;
+													dockArea.behaviorData.normal = {};
+												}
+												else if (gizmo == DockArea_LayoutGizmo::Center && dockArea.topLevelNodes.front().node->type == DockArea::Node::Type::Window)
+												{
+													node.selectedWindow = node.windows.size() + dockArea.topLevelNodes.front().node->selectedWindow;
+													for (auto& window : dockArea.topLevelNodes.front().node->windows)
+														node.windows.emplace_back(Std::Move(window));
+													dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
+													dockArea.behavior = DockArea::Behavior::Normal;
+													dockArea.behaviorData.normal = {};
+												}
+											}
+										});
 								}
 							});
-					}
-				});
-				if (!continueIterating)
-					return;
-			});
+						if (!continueIterating)
+							return;
+					});
+			}
 
 			dockArea.behavior = DockArea::Behavior::Normal;
 			dockArea.behaviorData.normal = {};
