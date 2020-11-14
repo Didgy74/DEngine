@@ -46,28 +46,6 @@ namespace DEngine::Gui
 		void SetToggled(bool toggled);
 		bool GetToggled() const;
 
-		virtual void CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event) override;
-
-		virtual void CursorClick(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorClickEvent event) override;
-
-		virtual void TouchEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchEvent event) override;
-
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
 
@@ -77,6 +55,30 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
+
+		virtual void CursorClick(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Math::Vec2Int cursorPos,
+			CursorClickEvent event) override;
+
+		virtual void CursorMove(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			CursorMoveEvent event) override;
+
+		virtual void TouchEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchEvent event) override;
+
+
 
 	private:
 		bool toggled = false;

@@ -352,6 +352,7 @@ SizeHint DockArea::GetSizeHint(
 	Context const& ctx) const
 {
 	SizeHint returnVal{};
+	returnVal.preferred = { 50, 50 };
 	returnVal.expandX = true;
 	returnVal.expandY = true;
 

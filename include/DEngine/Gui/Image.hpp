@@ -9,7 +9,7 @@ namespace DEngine::Gui
 	class Image : public Gui::Widget 
 	{
 	public:
-		Gfx::TextureID textureID = Gfx::noTextureID;
+		Gfx::TextureID textureID = Gfx::TextureID::Invalid;
 
 		virtual void Render(
 			Context const& ctx,

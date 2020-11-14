@@ -20,6 +20,8 @@ namespace DEngine::Editor
 		std::vector<Gfx::ViewportUpdate> viewportUpdates;
 	};
 
+	class EditorImpl;
+
 	class Context
 	{
 	public:
@@ -29,7 +31,7 @@ namespace DEngine::Editor
 		Context& operator=(Context&&) noexcept;
 		virtual ~Context();
 
-		void* ImplData() const { return implData; }
+		EditorImpl& ImplData() const { return *implData; }
 
 		void ProcessEvents();
 
@@ -44,6 +46,6 @@ namespace DEngine::Editor
 	private:
 		Context() = default;
 
-		void* implData = nullptr;
+		EditorImpl* implData = nullptr;
 	};
 }

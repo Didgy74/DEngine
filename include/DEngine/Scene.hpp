@@ -12,8 +12,7 @@
 
 namespace DEngine
 {
-	enum class Entity : u64;
-	constexpr Entity invalidEntity = Entity(-1);
+	enum class Entity : u64 { Invalid = u64(-1) };
 
 	class Scene;
 
@@ -26,14 +25,18 @@ namespace DEngine
 	{
 	public:
 		Math::Vector<3, f32> position{};
-		Math::UnitQuaternion<f32> rotation{};
-		Math::Vector<3, f32> scale{};
 	};
 
 	class Scene
 	{
 	public:
 		Scene() = default;
+		Scene(Scene const&) = delete;
+		Scene(Scene&&) = default;
+		Scene& operator=(Scene const&) = delete;
+		Scene& operator=(Scene&&) = default;
+
+		bool play = false;
 
 		std::vector<Entity> entities;
 		std::vector<Std::Pair<Entity, Transform>> transforms;

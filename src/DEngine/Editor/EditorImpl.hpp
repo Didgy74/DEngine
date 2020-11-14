@@ -58,8 +58,9 @@ namespace DEngine::Editor
 	class ComponentList;
 	class InternalViewportWidget;
 
-	struct ContextImpl : public App::EventInterface, public Gui::WindowHandler
+	class EditorImpl : public App::EventInterface, public Gui::WindowHandler
 	{
+	public:
 		Std::Box<Gui::Context> guiCtx;
 
 		// Override app-interface methods

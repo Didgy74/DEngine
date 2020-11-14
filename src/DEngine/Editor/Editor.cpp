@@ -1,7 +1,8 @@
 #include "ViewportWidget.hpp"
 
 #include "Editor.hpp"
-#include "ContextImpl.hpp"
+#include "EditorImpl.hpp"
+#include "ComponentWidgets.hpp"
 
 #include <DEngine/Gui/Button.hpp>
 #include <DEngine/Gui/DockArea.hpp>
@@ -18,6 +19,8 @@
 #include <DEngine/Gfx/Gfx.hpp>
 #include <DEngine/Time.hpp>
 
+#include <DEngine/Physics.hpp>
+
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Utility.hpp>
 
@@ -30,128 +33,13 @@
 
 namespace DEngine::Editor
 {
-	class TransformWidget : public Gui::StackLayout
-	{
-	public:
-		TransformWidget(Entity entityId, Scene* scene)
-		{
-			direction = Direction::Vertical;
-
-			auto transformIt = Std::FindIf(
-				scene->transforms.begin(),
-				scene->transforms.end(),
-				[entityId](decltype(scene->transforms)::value_type const& value) -> bool { return value.a == entityId; });
-
-			Transform& transform = transformIt->b;
-
-			// Create the horizontal position stuff layout
-			Gui::StackLayout* positionLayout = new StackLayout(StackLayout::Direction::Horizontal);
-			this->AddLayout2(Std::Box<Layout>{ positionLayout });
-			positionLayout->spacing = 10;
-
-			// Create the Position: text
-			Gui::Text* positionText = new Gui::Text;
-			positionLayout->AddWidget2(Std::Box<Gui::Widget>{ positionText });
-			positionText->String_Set("Position: ");
-
-			// Create the Position input field
-			Gui::LineEdit* positionInputX = new Gui::LineEdit;
-			positionLayout->AddWidget2(Std::Box<Gui::Widget>{ positionInputX });
-			positionInputX->type = Gui::LineEdit::Type::Float;
-			positionInputX->String_Set(std::to_string(transform.position.x).c_str());
-			positionInputX->textChangedPfn = [entityId, scene](Gui::LineEdit& widget)
-			{
-				auto transformIt = std::find_if(
-					scene->transforms.begin(),
-					scene->transforms.end(),
-					[entityId](decltype(scene->transforms)::value_type const& value) -> bool { return entityId == value.a; });
-
-				Transform& transform = transformIt->b;
-				transform.position.x = std::stof(widget.StringView().data());
-			};
-
-			// Create the Position input field
-			Gui::LineEdit* positionInputY = new Gui::LineEdit;
-			positionLayout->AddWidget2(Std::Box<Gui::Widget>{ positionInputY });
-			positionInputY->String_Set(std::to_string(transform.position.y).c_str());
-			positionInputY->textChangedPfn = [entityId, scene](Gui::LineEdit& widget)
-			{
-				auto transformIt = std::find_if(
-					scene->transforms.begin(),
-					scene->transforms.end(),
-					[entityId](decltype(scene->transforms)::value_type const& value) -> bool { return entityId == value.a; });
-
-				Transform& transform = transformIt->b;
-				transform.position.y = std::stof(widget.StringView().data());
-			};
-
-			Gui::LineEdit* positionInputZ = new Gui::LineEdit;
-			positionLayout->AddWidget2(Std::Box<Gui::Widget>{ positionInputZ });
-			positionInputZ->String_Set(std::to_string(transform.position.z).data());
-			positionInputZ->textChangedPfn = [entityId, scene](Gui::LineEdit& widget)
-			{
-				auto transformIt = std::find_if(
-					scene->transforms.begin(),
-					scene->transforms.end(),
-					[entityId](decltype(scene->transforms)::value_type const& value) -> bool { return entityId == value.a; });
-
-				Transform& transform = transformIt->b;
-				transform.position.z = std::stof(widget.StringView().data());
-			};
-		}
-	};
-
-	class TextureIdWidget : public Gui::StackLayout
-	{
-	public:
-		TextureIdWidget(Entity entityId, Scene* scene)
-		{
-			direction = Direction::Vertical;
-
-			auto componentIt = std::find_if(
-				scene->textureIDs.begin(),
-				scene->textureIDs.end(),
-				[entityId](decltype(scene->textureIDs)::value_type const& value) -> bool { return value.a == entityId; });
-
-			Gfx::TextureID& textureId = componentIt->b;
-
-			// Create the horizontal position stuff layout
-			Gui::StackLayout* positionLayout = new StackLayout(StackLayout::Direction::Horizontal);
-			this->AddLayout2(Std::Box<Gui::Layout>{ positionLayout });
-
-			// Create the Position: text
-			Gui::Text* positionText = new Gui::Text;
-			positionLayout->AddWidget2(Std::Box<Gui::Widget>{positionText });
-			positionText->String_Set("Texture: ");
-
-			// Create the Position input field
-			Gui::LineEdit* positionInputX = new Gui::LineEdit;
-			positionLayout->AddWidget2(Std::Box<Gui::Widget>{ positionInputX });
-			positionInputX->type = Gui::LineEdit::Type::UnsignedInteger;
-			positionInputX->String_Set(std::to_string((int)textureId).c_str());
-			positionInputX->textChangedPfn = [entityId, scene](Gui::LineEdit& widget)
-			{
-				if (!widget.StringView().empty())
-				{
-					auto transformIt = std::find_if(
-						scene->textureIDs.begin(),
-						scene->textureIDs.end(),
-						[entityId](Std::Pair<Entity, Gfx::TextureID> const& value) -> bool { return entityId == value.a; });
-					
-					Gfx::TextureID& texId = transformIt->b;
-					texId = (Gfx::TextureID)std::stoi(widget.StringView().data());
-				}
-			};
-		}
-	};
-
 	class EntityIdList : public Gui::StackLayout
 	{
 	public:
 		Gui::LineList* entitiesList = nullptr;
-		ContextImpl* ctxImpl = nullptr;
+		EditorImpl* ctxImpl = nullptr;
 
-		EntityIdList(ContextImpl* ctxImpl) :
+		EntityIdList(EditorImpl* ctxImpl) :
 			ctxImpl(ctxImpl)
 		{
 			DENGINE_DETAIL_ASSERT(!ctxImpl->entityIdList);
@@ -261,19 +149,24 @@ namespace DEngine::Editor
 	class ComponentList : public Gui::StackLayout
 	{
 	public:
-		ContextImpl* ctxImpl = nullptr;
-		Gui::StackLayout* componentWidgetListLayout = nullptr;
+		EditorImpl* ctxImpl = nullptr;
 
-		ComponentList(ContextImpl* ctxImpl) :
+		MoveWidget* moveWidget = nullptr;
+		TransformWidget* transformWidget = nullptr;
+		SpriteRenderer2DWidget* spriteRendererWidget = nullptr;
+		Rigidbody2DWidget* rbWidget = nullptr;
+		CircleCollider2DWidget* circleColliderWidget = nullptr;
+		BoxCollider2DWidget* boxColliderWidget = nullptr;
+
+		ComponentList(EditorImpl* ctxImpl) :
 			ctxImpl(ctxImpl)
 		{
 			DENGINE_DETAIL_ASSERT(!ctxImpl->componentList);
 			ctxImpl->componentList = this;
 
 			direction = Direction::Vertical;
-
-			componentWidgetListLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
-			this->AddLayout2(Std::Box<Gui::Layout>{ componentWidgetListLayout });
+			spacing = 10;
+			this->expandNonDirection = true;
 
 			if (ctxImpl->selectedEntity.HasValue())
 			{
@@ -287,134 +180,33 @@ namespace DEngine::Editor
 			ctxImpl->componentList = nullptr;
 		}
 
-	private:
-		void HandleTransformComponent(Entity id)
-		{
-			// Add a Transform toggle button
-			// check if Entity has a Transform component
-			Gui::Button* transformButton = new Gui::Button;
-			componentWidgetListLayout->AddWidget2(Std::Box<Gui::Widget>{ transformButton });
-			transformButton->textWidget.String_Set("Transform");
-			transformButton->type = Gui::Button::Type::Toggle;
-			transformButton->activatePfn = [id, this](
-				Gui::Button& btn,
-				Gui::Context& ctx,
-				Gui::WindowID windowId,
-				Gui::Rect widgetRect,
-				Gui::Rect visibleRect)
-			{
-				if (btn.GetToggled())
-				{
-					// Add the transform component widget.
-					ctxImpl->scene->transforms.push_back(Std::Pair<Entity, Transform>{ id, Transform() });
-
-					TransformWidget* transformWidget = new TransformWidget(id, ctxImpl->scene);
-					componentWidgetListLayout->InsertLayout(1, Std::Box<Gui::Layout>{ transformWidget });
-				}
-				else
-				{
-					// Remove the transform component widget.
-					// Find the transform button, remove the component after it.
-					componentWidgetListLayout->RemoveItem(1);
-					auto transformIt = Std::FindIf(
-						ctxImpl->scene->transforms.begin(),
-						ctxImpl->scene->transforms.end(),
-						[id](decltype(ctxImpl->scene->transforms)::value_type const& val) -> bool {
-							return val.a == id; });
-					ctxImpl->scene->transforms.erase(transformIt);
-				}
-			};
-
-			// We check if the entity already has a Transform
-			// If it does, we set the transform button to toggled state
-			// And add the Transform component widget.
-			auto transformIt = std::find_if(
-				ctxImpl->scene->transforms.begin(),
-				ctxImpl->scene->transforms.end(),
-				[id](decltype(ctxImpl->scene->transforms)::value_type const& item) -> bool { 
-					return item.a == id; });
-				
-			if (transformIt != ctxImpl->scene->transforms.end())
-			{
-				Transform& transform = transformIt->b;
-				transformButton->SetToggled(true);
-
-				TransformWidget* transformWidget = new TransformWidget(id, ctxImpl->scene);
-				componentWidgetListLayout->AddLayout2(Std::Box<Gui::Layout>{ transformWidget });
-			}
-		}
-
-		void HandleTextureIdComponent(Entity id)
-		{
-			// Add a Transform toggle button,
-			// check if Entity has a Transform component
-			Gui::Button* transformButton = new Gui::Button;
-			componentWidgetListLayout->AddWidget2(Std::Box<Gui::Widget>{ transformButton });
-			transformButton->textWidget.String_Set("SpriteRenderer2D");
-			transformButton->type = Gui::Button::Type::Toggle;
-			Scene* scene = this->ctxImpl->scene;
-			Gui::StackLayout* componentWidgetListLayout = this->componentWidgetListLayout;
-			transformButton->activatePfn = [id, scene, componentWidgetListLayout](
-				Gui::Button& btn,
-				Gui::Context& ctx,
-				Gui::WindowID windowId,
-				Gui::Rect widgetRect,
-				Gui::Rect visibleRect)
-			{
-				if (btn.GetToggled())
-				{
-					// Add the transform component widget.
-					scene->textureIDs.push_back(Std::Pair<Entity, Gfx::TextureID>{ id, Gfx::TextureID() });
-
-					TextureIdWidget* transformWidget = new TextureIdWidget(id, scene);
-					componentWidgetListLayout->AddLayout2(Std::Box<Gui::Layout>{ transformWidget });
-				}
-				else
-				{
-					// Remove the transform component widget.
-					// Find the transform button, remove the component after it.
-					componentWidgetListLayout->RemoveItem(componentWidgetListLayout->ChildCount() - 1);
-					for (uSize i = 0; i < scene->textureIDs.size(); i++)
-					{
-						if (scene->textureIDs[i].a == id)
-						{
-							scene->textureIDs.erase(scene->textureIDs.begin() + i);
-							break;
-						}
-					}
-					
-				}
-			};
-
-			// We check if the entity already has a Transform
-			// If it does, we set the transform button to toggled state
-			// And add the Transform component widget.
-			auto componentIt = std::find_if(
-				ctxImpl->scene->textureIDs.begin(),
-				ctxImpl->scene->textureIDs.end(),
-				[id](decltype(ctxImpl->scene->textureIDs)::value_type const& item) -> bool { return item.a == id; });
-			
-			if (componentIt != ctxImpl->scene->textureIDs.end())
-			{
-				transformButton->SetToggled(true);
-
-				TextureIdWidget* transformWidget = new TextureIdWidget(id, scene);
-				componentWidgetListLayout->AddLayout2(Std::Box<Gui::Layout>{ transformWidget });
-			}
-		}
-	public:
 		void EntitySelected(Entity id)
 		{
-			Clear();
+			this->ClearChildren();
+			
+			moveWidget = new MoveWidget(ctxImpl->scene, id);
+			this->AddLayout2(Std::Box<Gui::Layout>{ moveWidget });
 
-			HandleTransformComponent(id);
+			transformWidget = new TransformWidget(ctxImpl->scene, id);
+			this->AddLayout2(Std::Box<Gui::Layout>{ transformWidget });
 
-			HandleTextureIdComponent(id);
+			spriteRendererWidget = new SpriteRenderer2DWidget(ctxImpl->scene, id);
+			this->AddLayout2(Std::Box<Gui::Layout>{ spriteRendererWidget });
+
+			rbWidget = new Rigidbody2DWidget(ctxImpl->scene, id);
+			this->AddLayout2(Std::Box<Gui::Layout>{ rbWidget });
+
+			circleColliderWidget = new CircleCollider2DWidget(ctxImpl->scene, id);
+			this->AddLayout2(Std::Box<Gui::Layout>{ circleColliderWidget });
+
+			boxColliderWidget = new BoxCollider2DWidget(ctxImpl->scene, id);
+			this->AddLayout2(Std::Box<Gui::Layout>{ boxColliderWidget });
 		}
 
-		void Clear()
+		void Tick(Scene& scene, Entity id)
 		{
-			componentWidgetListLayout->ClearChildren();
+			transformWidget->Tick(scene, id);
+			rbWidget->Tick(scene, id);
 		}
 	};
 }
@@ -449,7 +241,7 @@ using namespace DEngine;
 namespace DEngine::Editor
 {
 	static Std::Box<Gui::Layout> CreateNavigationBar(
-		ContextImpl& implData)
+		EditorImpl& implData)
 	{
 		// Menu button
 		Gui::MenuBar* menuBarA = new Gui::MenuBar(Gui::MenuBar::Direction::Horizontal);
@@ -537,9 +329,34 @@ namespace DEngine::Editor
 
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;
+		menuBarA->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ deltaText });
 		implData.test_fpsText = deltaText;
 		deltaText->String_Set("Child text");
-		menuBarA->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ deltaText });
+		
+
+		Gui::Button* playButton = new Gui::Button;
+		menuBarA->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ playButton });
+		playButton->textWidget.String_Set("Play");
+		playButton->type = Gui::Button::Type::Toggle;
+		Scene& scene = *implData.scene;
+		playButton->activatePfn = [&scene](
+			Gui::Button& btn,
+			Gui::Context& ctx,
+			Gui::WindowID windowId,
+			Gui::Rect widgetRect,
+			Gui::Rect visibleRect)
+		{
+			if (btn.GetToggled())
+			{
+				DENGINE_DETAIL_ASSERT(!scene.play);
+				scene.play = true;
+			}
+			else
+			{
+				DENGINE_DETAIL_ASSERT(scene.play);
+				scene.play = false;
+			}
+		};
 
 		return Std::Box<Gui::Layout>{ menuBarA };
 	}
@@ -552,8 +369,8 @@ Editor::Context Editor::Context::Create(
 {
 	Context newCtx;
 
-	newCtx.implData = new ContextImpl;
-	ContextImpl& implData = *static_cast<ContextImpl*>(newCtx.implData);
+	newCtx.implData = new EditorImpl;
+	EditorImpl& implData = *newCtx.implData;
 	implData.guiCtx = Std::Box{ new DEngine::Gui::Context(DEngine::Gui::Context::Create(implData, gfxCtx)) };
 	implData.gfxCtx = gfxCtx;
 	implData.scene = scene;
@@ -610,8 +427,13 @@ Editor::Context Editor::Context::Create(
 			auto& newWindow = topNode->windows.back();
 			newWindow.title = "Components";
 			newWindow.titleBarColor = { 0.f, 0.5f, 0.5f, 1.f };
+
+			Gui::ScrollArea* scrollArea = new Gui::ScrollArea;
+			newWindow.layout = Std::Box<Gui::Layout>{ scrollArea };
+
 			ComponentList* componentList = new ComponentList(&implData);
-			newWindow.layout = Std::Box<Gui::Layout>{ componentList };
+			scrollArea->childType = Gui::ScrollArea::ChildType::Layout;
+			scrollArea->layout = Std::Box<Gui::Layout>{ componentList };
 
 			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
 		}
@@ -622,7 +444,7 @@ Editor::Context Editor::Context::Create(
 
 void Editor::Context::ProcessEvents()
 {
-	ContextImpl& implData = *static_cast<ContextImpl*>(this->implData);
+	EditorImpl& implData = this->ImplData();
 
 	if (App::TickCount() % 60 == 0)
 		implData.test_fpsText->String_Set(std::to_string(Time::Delta()).c_str());
@@ -650,6 +472,12 @@ void Editor::Context::ProcessEvents()
 	{
 		viewportPtr->TickTest(Time::Delta());
 	}
+	if (App::TickCount() % 10 == 0)
+	{
+		if (implData.componentList && implData.selectedEntity.HasValue())
+			implData.componentList->Tick(*implData.scene, implData.selectedEntity.Value());
+	}
+
 
 	//implData.guiCtx->Tick();
 	implData.guiCtx->Render();
@@ -665,7 +493,7 @@ Editor::Context::~Context()
 {
 	if (this->implData)
 	{
-		ContextImpl& implData = *static_cast<ContextImpl*>(this->implData);
+		EditorImpl& implData = this->ImplData();
 		App::RemoveEventInterface(implData);
 		delete &implData;
 	}
@@ -673,7 +501,7 @@ Editor::Context::~Context()
 
 Editor::DrawInfo Editor::Context::GetDrawInfo() const
 {
-	ContextImpl& implData = *static_cast<ContextImpl*>(this->implData);
+	EditorImpl& implData = this->ImplData();
 
 	DrawInfo returnVal;
 	
@@ -727,7 +555,7 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 	return returnVal;
 }
 
-void Editor::ContextImpl::SelectEntity(Entity id)
+void Editor::EditorImpl::SelectEntity(Entity id)
 {
 	if (selectedEntity.HasValue() && selectedEntity.Value() == id)
 		return;
@@ -743,7 +571,7 @@ void Editor::ContextImpl::SelectEntity(Entity id)
 	selectedEntity = id;
 }
 
-void Editor::ContextImpl::UnselectEntity()
+void Editor::EditorImpl::UnselectEntity()
 {
 	// Update the entity list
 	if (selectedEntity.HasValue() && entityIdList)
@@ -751,12 +579,12 @@ void Editor::ContextImpl::UnselectEntity()
 
 	// Clear the component list
 	if (componentList)
-		componentList->Clear();
+		componentList->ClearChildren();
 
 	selectedEntity = Std::nullOpt;
 }
 
-void Editor::ContextImpl::ButtonEvent(
+void Editor::EditorImpl::ButtonEvent(
 	App::Button button,
 	bool state)
 {
@@ -773,7 +601,7 @@ void Editor::ContextImpl::ButtonEvent(
 	}
 }
 
-void DEngine::Editor::ContextImpl::CharEnterEvent()
+void DEngine::Editor::EditorImpl::CharEnterEvent()
 {
 	impl::GuiEvent event{};
 	event.type = impl::GuiEvent::Type::CharEnterEvent;
@@ -781,7 +609,7 @@ void DEngine::Editor::ContextImpl::CharEnterEvent()
 	queuedGuiEvents.push_back(event);
 }
 
-void Editor::ContextImpl::CharEvent(
+void Editor::EditorImpl::CharEvent(
 	u32 value)
 {
 	impl::GuiEvent event{};
@@ -790,7 +618,7 @@ void Editor::ContextImpl::CharEvent(
 	queuedGuiEvents.push_back(event);
 }
 
-void Editor::ContextImpl::CharRemoveEvent()
+void Editor::EditorImpl::CharRemoveEvent()
 {
 	impl::GuiEvent event{};
 	event.type = impl::GuiEvent::Type::CharRemoveEvent;
@@ -798,7 +626,7 @@ void Editor::ContextImpl::CharRemoveEvent()
 	queuedGuiEvents.push_back(event);
 }
 
-void Editor::ContextImpl::CursorMove(
+void Editor::EditorImpl::CursorMove(
 	Math::Vec2Int position,
 	Math::Vec2Int positionDelta)
 {
@@ -809,7 +637,7 @@ void Editor::ContextImpl::CursorMove(
 	queuedGuiEvents.push_back(event);
 }
 
-void Editor::ContextImpl::TouchEvent(
+void Editor::EditorImpl::TouchEvent(
 	u8 id,
 	App::TouchEventType type,
 	Math::Vec2 position)
@@ -827,7 +655,7 @@ void Editor::ContextImpl::TouchEvent(
 	queuedGuiEvents.push_back(event);
 }
 
-void Editor::ContextImpl::WindowClose(App::WindowID windowId)
+void Editor::EditorImpl::WindowClose(App::WindowID windowId)
 {
 	impl::GuiEvent event{};
 	event.type = impl::GuiEvent::Type::WindowCloseEvent;
@@ -835,7 +663,7 @@ void Editor::ContextImpl::WindowClose(App::WindowID windowId)
 	queuedGuiEvents.push_back(event);
 }
 
-void Editor::ContextImpl::WindowCursorEnter(
+void Editor::EditorImpl::WindowCursorEnter(
 	App::WindowID window,
 	bool entered)
 {
@@ -846,7 +674,7 @@ void Editor::ContextImpl::WindowCursorEnter(
 	queuedGuiEvents.push_back(event);
 }
 
-void Editor::ContextImpl::WindowMinimize(
+void Editor::EditorImpl::WindowMinimize(
 	App::WindowID window,
 	bool wasMinimized)
 {
@@ -857,7 +685,7 @@ void Editor::ContextImpl::WindowMinimize(
 	queuedGuiEvents.push_back(event);
 }
 
-void Editor::ContextImpl::WindowMove(
+void Editor::EditorImpl::WindowMove(
 	App::WindowID window,
 	Math::Vec2Int position)
 {
@@ -868,7 +696,7 @@ void Editor::ContextImpl::WindowMove(
 	queuedGuiEvents.push_back(event);
 }
 
-void Editor::ContextImpl::WindowResize(
+void Editor::EditorImpl::WindowResize(
 	App::WindowID window,
 	App::Extent newExtent,
 	Math::Vec2Int visiblePos,
@@ -882,12 +710,12 @@ void Editor::ContextImpl::WindowResize(
 	queuedGuiEvents.push_back(event);
 }
 
-void Editor::ContextImpl::CloseWindow(Gui::WindowID id)
+void Editor::EditorImpl::CloseWindow(Gui::WindowID id)
 {
 	App::DestroyWindow((App::WindowID)id);
 }
 
-void Editor::ContextImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursorType)
+void Editor::EditorImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursorType)
 {
 	App::CursorType appCursorType{};
 	switch (cursorType)
@@ -907,12 +735,12 @@ void Editor::ContextImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursor
 	App::SetCursor((App::WindowID)id, appCursorType);
 }
 
-void Editor::ContextImpl::HideSoftInput()
+void Editor::EditorImpl::HideSoftInput()
 {
 	App::HideSoftInput();
 }
 
-void Editor::ContextImpl::OpenSoftInput(
+void Editor::EditorImpl::OpenSoftInput(
 	std::string_view currentText, 
 	Gui::SoftInputFilter inputFilter)
 {

@@ -5,6 +5,7 @@
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
+#include <DEngine/Std/Utility.hpp>
 // For file IO
 #include <DEngine/Application.hpp>
 
@@ -50,7 +51,7 @@ void Vk::APIData::DeleteViewport(ViewportID id)
 	//vk::Result vkResult{};
 	APIData& apiData = *this;
 
-	ViewportManager::NewViewport(
+	ViewportManager::DeleteViewport(
 		apiData.viewportManager,
 		id);
 }
@@ -78,11 +79,36 @@ Vk::GlobUtils::GlobUtils()
 {
 }
 
+namespace DEngine::Gfx::Vk
+{
+	[[noreturn]] void Test(APIData* inApiData)
+	{
+		Std::NameThisThread("RenderingThread");
+
+		APIData& apiData = *inApiData;
+
+		while (true)
+		{
+			std::unique_lock lock{ apiData.drawParamsLock };
+			apiData.drawParamsCondVarWorker.wait(lock, [&apiData]() -> bool { return apiData.drawParamsReady; });
+
+			apiData.InternalDraw(apiData.drawParams);
+
+			apiData.drawParamsReady = false;
+			lock.unlock();
+			apiData.drawParamsCondVarProducer.notify_one();
+		}
+	}
+}
+
 bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& apiDataBuffer)
 {
 	apiDataBuffer = new APIData;
 	APIData& apiData = *static_cast<APIData*>(apiDataBuffer);
 	GlobUtils& globUtils = apiData.globUtils;
+
+	apiData.renderingThread = std::thread(&Test, &apiData);
+
 
 	//vk::Result vkResult{};
 	bool boolResult = false;

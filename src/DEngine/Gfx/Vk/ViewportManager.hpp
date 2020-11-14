@@ -48,9 +48,7 @@ namespace DEngine::Gfx::Vk
 	// This variable should basically not be accessed anywhere except from APIData.
 	struct ViewportManager
 	{
-		// Controls the entire structure.
-		std::mutex mutexLock{};
-
+		std::mutex createQueue_Lock;
 		struct CreateJob
 		{
 			ViewportID id = ViewportID::Invalid;
@@ -58,6 +56,7 @@ namespace DEngine::Gfx::Vk
 		uSize viewportIDTracker = 0;
 		std::vector<CreateJob> createQueue{};
 
+		std::mutex deleteQueue_Lock;
 		std::vector<ViewportID> deleteQueue{};
 
 		// Unsorted vector holding viewport-data and their ID.

@@ -198,12 +198,45 @@ namespace DEngine::Gfx::Vk
 		return viewport;
 	}
 
-	// Assumes the viewportManager.viewportDatas is already locked.
+	void HandleViewportDeleteJobs(
+		ViewportManager& viewportManager,
+		GlobUtils const& globUtils)
+	{
+		std::lock_guard lock{ viewportManager.deleteQueue_Lock };
+
+		// Execute pending deletions
+		for (ViewportID id : viewportManager.deleteQueue)
+		{
+			auto const viewportDataNodeIt = std::find_if(
+				viewportManager.viewportNodes.begin(),
+				viewportManager.viewportNodes.end(),
+				[id](decltype(viewportManager.viewportNodes[0]) const& val) -> bool { return id == val.id; });
+			DENGINE_DETAIL_GFX_ASSERT(viewportDataNodeIt != viewportManager.viewportNodes.end());
+			auto& viewportNode = *viewportDataNodeIt;
+			ViewportData& viewportData = viewportDataNodeIt->viewport;
+
+			// Delete all the resources
+			globUtils.deletionQueue.Destroy(viewportData.cameraDescrPool);
+			globUtils.deletionQueue.Destroy(viewportData.camVmaAllocation, viewportData.camDataBuffer);
+			globUtils.deletionQueue.Destroy(viewportData.cmdPool);
+			globUtils.deletionQueue.Destroy(viewportData.renderTarget.framebuffer);
+			globUtils.deletionQueue.Destroy(viewportData.renderTarget.imgView);
+			globUtils.deletionQueue.Destroy(viewportData.renderTarget.vmaAllocation, viewportData.renderTarget.img);
+
+			// Swap with back, remove the element.
+			std::swap(viewportNode, viewportManager.viewportNodes.back());
+			viewportManager.viewportNodes.pop_back();
+		}
+		viewportManager.deleteQueue.clear();
+	}
+
 	void HandleViewportCreationJobs(
 		ViewportManager& viewportManager,
 		GlobUtils const& globUtils)
 	{
 		vk::Result vkResult{};
+
+		std::lock_guard lock{ viewportManager.createQueue_Lock };
 
 		for (ViewportManager::CreateJob const& createJob : viewportManager.createQueue)
 		{
@@ -261,7 +294,7 @@ void Vk::ViewportManager::NewViewport(
 {
 	ViewportManager::CreateJob createJob{};
 
-	std::lock_guard _{ viewportManager.mutexLock };
+	std::lock_guard lock{ viewportManager.createQueue_Lock };
 	createJob.id = (ViewportID)viewportManager.viewportIDTracker;
 	viewportID = createJob.id;
 
@@ -273,7 +306,7 @@ void Vk::ViewportManager::DeleteViewport(
 	ViewportManager& viewportManager,
 	ViewportID viewportId)
 {
-	std::lock_guard _{ viewportManager.mutexLock };
+	std::lock_guard lock{ viewportManager.deleteQueue_Lock };
 	viewportManager.deleteQueue.push_back(viewportId);
 }
 
@@ -285,41 +318,18 @@ void Vk::ViewportManager::HandleEvents(
 {
 	vk::Result vkResult{};
 
-	// Execute pending deletions
-	for (ViewportID id : viewportManager.deleteQueue)
-	{
-		auto& viewportDataNode = *std::find_if(
-			viewportManager.viewportNodes.begin(),
-			viewportManager.viewportNodes.end(),
-			[id](decltype(viewportManager.viewportNodes)::value_type const& val) -> bool {
-				return id == val.id; });
-		ViewportData& viewportData = viewportDataNode.viewport;
-
-		// Delete all the resources
-		globUtils.deletionQueue.Destroy(viewportData.cameraDescrPool);
-		globUtils.deletionQueue.Destroy(viewportData.camVmaAllocation, viewportData.camDataBuffer);
-		globUtils.deletionQueue.Destroy(viewportData.cmdPool);
-		globUtils.deletionQueue.Destroy(viewportData.renderTarget.framebuffer);
-		globUtils.deletionQueue.Destroy(viewportData.renderTarget.imgView);
-		globUtils.deletionQueue.Destroy(viewportData.renderTarget.vmaAllocation, viewportData.renderTarget.img);
-
-		// Swap with back, remove the element.
-		std::swap(viewportDataNode, viewportManager.viewportNodes.back());
-		viewportManager.viewportNodes.pop_back();
-	}
-	viewportManager.deleteQueue.clear();
-
+	HandleViewportDeleteJobs(viewportManager, globUtils);
 	HandleViewportCreationJobs(viewportManager, globUtils);
 
 	// First we handle any viewportManager that need to be initialized, not resized.
 	for (Gfx::ViewportUpdate const& updateData : viewportUpdates)
 	{
-		auto& viewportDataNode = *std::find_if(
+		auto const viewportDataNodeIt = Std::FindIf(
 			viewportManager.viewportNodes.begin(),
 			viewportManager.viewportNodes.end(),
-			[&updateData](decltype(viewportManager.viewportNodes)::value_type const& val) -> bool {
-				return updateData.id == val.id; });
-		ViewportData& viewportData = viewportDataNode.viewport;
+			[&updateData](decltype(viewportManager.viewportNodes[0]) const& val) -> bool {return updateData.id == val.id; });
+		DENGINE_DETAIL_GFX_ASSERT(viewportDataNodeIt != viewportManager.viewportNodes.end());
+		ViewportData& viewportData = viewportDataNodeIt->viewport;
 		if (viewportData.renderTarget.img == vk::Image())
 		{
 			// This image is not initalized.
@@ -378,7 +388,6 @@ void Vk::ViewportManager::UpdateCameras(
 	Std::Span<ViewportUpdate const> viewportUpdates,
 	u8 inFlightIndex)
 {
-	std::lock_guard lock{ viewportManager.mutexLock };
 	for (auto const& viewportUpdate : viewportUpdates)
 	{
 		auto nodeIt = Std::FindIf(

@@ -9,6 +9,17 @@ using namespace DEngine::Gui;
 
 Gui::LineEdit::~LineEdit()
 {
+	if (this->inputConnectionCtx)
+	{
+		DENGINE_IMPL_GUI_ASSERT(this->selected);
+		this->inputConnectionCtx->ClearInputConnection(*this);
+		this->inputConnectionCtx = nullptr;
+	}
+}
+
+bool LineEdit::CurrentlyBeingEdited() const
+{
+	return selected;
 }
 
 void LineEdit::Render(
@@ -42,6 +53,7 @@ void LineEdit::CharEnterEvent(Context& ctx)
 	if (selected)
 	{
 		selected = false;
+		inputConnectionCtx = nullptr;
 		ctx.ClearInputConnection(*this);
 		if (StringView().empty())
 		{
@@ -129,10 +141,10 @@ void LineEdit::CharRemoveEvent(Context& ctx)
 
 void LineEdit::InputConnectionLost(Context& ctx)
 {
-	if (selected)
-	{
-		selected = false;
-	}
+	DENGINE_IMPL_GUI_ASSERT(this->selected);
+	DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx);
+	this->selected = false;
+	this->inputConnectionCtx = nullptr;
 }
 
 void LineEdit::CursorClick(
@@ -162,11 +174,12 @@ void LineEdit::CursorClick(
 				*this,
 				filter,
 				StringView());
-
+			this->inputConnectionCtx = &ctx;
 		}
 		else if (!cursorIsInside && event.clicked && selected)
 		{
 			selected = false;
+			this->inputConnectionCtx = nullptr;
 			ctx.ClearInputConnection(*this);
 			if (StringView().empty())
 			{
@@ -189,8 +202,6 @@ void LineEdit::TouchEvent(
 
 	if (event.id == 0 && event.type == TouchEventType::Down && cursorIsInside && !selected)
 	{
-		selected = true;
-
 		SoftInputFilter filter{};
 		if (this->type == Type::Float)
 			filter = SoftInputFilter::Float;
@@ -202,11 +213,12 @@ void LineEdit::TouchEvent(
 			*this,
 			filter,
 			StringView());
+		selected = true;
+		this->inputConnectionCtx = &ctx;
 	}
 
 	if (event.id == 0 && event.type == TouchEventType::Down && !cursorIsInside && selected)
 	{
-		
 		if (StringView().empty())
 		{
 			String_Set("0");
@@ -214,6 +226,7 @@ void LineEdit::TouchEvent(
 				textChangedPfn(*this);
 		}
 		selected = false;
+		this->inputConnectionCtx = nullptr;
 		ctx.ClearInputConnection(*this);
 	}
 }

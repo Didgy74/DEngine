@@ -4,7 +4,6 @@
 
 #include <DEngine/Std/Utility.hpp>
 
-
 namespace DEngine::Physics
 {
 	void Resolve_Circle_Circle(
@@ -61,7 +60,7 @@ void DEngine::Physics::Resolve_Circle_Circle(
 		CircleCollider2D const& leftCollider = circleColliders[leftIndex].b;
 
 		// First check if this entity has a transform
-		auto leftTransIt = Std::FindIf(
+		auto const leftTransIt = Std::FindIf(
 			transforms.AsRange(),
 			[leftEntity](decltype(transforms)::ValueType const& val) -> bool {
 				return val.a == leftEntity; });
@@ -70,11 +69,11 @@ void DEngine::Physics::Resolve_Circle_Circle(
 		auto& leftTransform = leftTransIt->b;
 
 		// Check if this entity has a rigidbody
-		auto leftRbIt = Std::FindIf(
+		auto const leftRbIt = Std::FindIf(
 			rigidbodies.AsRange(),
 			[leftEntity](decltype(rigidbodies)::ValueType const& val) -> bool {
 				return val.a == leftEntity; });
-		Rigidbody2D* leftRb = leftRbIt ? &leftRbIt->b : nullptr;
+		Rigidbody2D* leftRb = leftRbIt != rigidbodies.end() ? &leftRbIt->b : nullptr;
 
 		for (uSize rightIndex = leftIndex + 1; rightIndex < circleColliders.Size(); rightIndex += 1)
 		{
@@ -82,7 +81,7 @@ void DEngine::Physics::Resolve_Circle_Circle(
 			CircleCollider2D const& rightCollider = circleColliders[rightIndex].b;
 
 			// First check if this entity has a position
-			auto rightTransIt = Std::FindIf(
+			auto const rightTransIt = Std::FindIf(
 				transforms.AsRange(),
 				[rightEntity](decltype(transforms)::ValueType const& val) -> bool {
 					return val.a == rightEntity; });
@@ -91,7 +90,7 @@ void DEngine::Physics::Resolve_Circle_Circle(
 			auto& rightTransform = rightTransIt->b;
 
 			// Check if this entity has a rigidbody
-			auto rightRbIt = Std::FindIf(
+			auto const rightRbIt = Std::FindIf(
 				rigidbodies.AsRange(),
 				[rightEntity](decltype(rigidbodies)::ValueType const& val) -> bool {
 					return val.a == rightEntity; });
@@ -100,7 +99,7 @@ void DEngine::Physics::Resolve_Circle_Circle(
 			if (leftRb == nullptr && rightRb == nullptr)
 				continue;
 
-			Math::Vec2 relativePosVec = (rightTransform.position - leftTransform.position).AsVec2();
+			Math::Vec2 relativePosVec = rightTransform.position.AsVec2() - leftTransform.position.AsVec2();
 
 			f32 distSqrd = relativePosVec.MagnitudeSqrd();
 			f32 sumRadiusSqrd = Math::Sqrd(rightCollider.radius + leftCollider.radius);

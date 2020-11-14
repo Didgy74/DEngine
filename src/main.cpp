@@ -107,6 +107,8 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
 
+	DEngine::Std::NameThisThread("MainThread");
+
 	Time::Initialize();
 	App::detail::Initialize();
 
@@ -150,16 +152,18 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 		editorCtx.ProcessEvents();
 
-		Physics::Update(myScene, Time::Delta());
+		if (myScene.play)
+		{
+			Physics::Update(myScene, Time::Delta());
 
-		for (auto item : myScene.moves)
-			item.b.Update(item.a, myScene, Time::Delta());
+			for (auto item : myScene.moves)
+				item.b.Update(item.a, myScene, Time::Delta());
+		}
 
 		detail::SubmitRendering(
 			gfxCtx, 
 			editorCtx, 
 			myScene);
-			
 	}
 
 	return 0;

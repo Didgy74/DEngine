@@ -5,7 +5,7 @@ namespace DEngine::Std
 	template<typename T, typename U>
 	struct Pair
 	{
-		T a{};
-		U b{};
+		T a;
+		U b;
 	};
 }

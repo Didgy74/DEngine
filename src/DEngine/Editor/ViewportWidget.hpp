@@ -5,7 +5,7 @@
 #include <DEngine/Gui/Button.hpp>
 #include <DEngine/Gui/MenuBar.hpp>
 
-#include "ContextImpl.hpp"
+#include "EditorImpl.hpp"
 
 #include <DEngine/Gfx/Gfx.hpp>
 
@@ -19,7 +19,7 @@ namespace DEngine::Editor
 	public:
 		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
 		Gfx::Context* gfxCtx = nullptr;
-		ContextImpl* implData = nullptr;
+		EditorImpl* implData = nullptr;
 
 		mutable bool isVisible = false;
 
@@ -51,7 +51,7 @@ namespace DEngine::Editor
 		};
 		Camera cam{};
 
-		InternalViewportWidget(ContextImpl& implData, Gfx::Context& gfxCtxIn) :
+		InternalViewportWidget(EditorImpl& implData, Gfx::Context& gfxCtxIn) :
 			gfxCtx(&gfxCtxIn),
 			implData(&implData)
 		{
@@ -464,7 +464,7 @@ namespace DEngine::Editor
 	class ViewportWidget : public Gui::StackLayout 
 	{
 	public:
-		ViewportWidget(ContextImpl& implData, Gfx::Context& ctx) :
+		ViewportWidget(EditorImpl& implData, Gfx::Context& ctx) :
 			Gui::StackLayout(Gui::StackLayout::Direction::Vertical)
 		{
 			// Generate top navigation bar

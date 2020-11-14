@@ -4,8 +4,15 @@
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Trait.hpp>
 
+#include <string_view>
+
 namespace DEngine::Std
 {
+	void NameThisThread(std::string const& name);
+	
+	template<typename T>
+	[[nodiscard]] constexpr Trait::RemoveRef<T>&& Move(T&& in) noexcept;
+
 	template<typename T = f32>
 	T Rand() = delete;
 	// Returns a value 0-1
@@ -19,8 +26,7 @@ namespace DEngine::Std
 	template<>
 	f32 RandRange<f32>(f32 a, f32 b);
 
-	template<typename T>
-	[[nodiscard]] constexpr Trait::RemoveRef<T>&& Move(T&& in) noexcept;
+
 
 	template<typename T>
 	constexpr void Swap(T& a, T& b) noexcept;
