@@ -19,10 +19,9 @@ namespace DEngine::Gfx
 	struct InitInfo;
 	class ViewportRef;
 	struct DrawParams;
-	enum class TextureID : u32 {};
-	constexpr TextureID noTextureID = TextureID(-1);
-	enum class ViewportID : u32 { Invalid = u32(-1) };
-	enum class NativeWindowID : u32 { Invalid = u32(-1) };
+	enum class TextureID : u64 { Invalid = u64(-1) };
+	enum class ViewportID : u64 { Invalid = u64(-1) };
+	enum class NativeWindowID : u64 { Invalid = u64(-1) };
 	enum class NativeWindowEvent : u32;
 
 	class Context

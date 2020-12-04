@@ -75,41 +75,36 @@ namespace DEngine::Gui
 			HoldingTab,
 		};
 		Behavior behavior = Behavior::Normal;
+
+		struct Internal_Behavior_Normal
+		{
+		};
+		struct Internal_Behavior_Moving
+		{
+			Math::Vec2Int windowMovedRelativePos;
+			Node const* showLayoutNodePtr;
+			bool useHighlightGizmo;
+			impl::DockArea_LayoutGizmo highlightGizmo;
+		};
+		struct Internal_Behavior_Resizing
+		{
+			ResizeSide resizeSide;
+			bool resizingSplit;
+			Node const* resizeSplitNode;
+			bool resizingSplitIsFrontNode;
+		};
+		struct Internal_Behavior_HoldingTab
+		{
+			bool holdingFrontWindow;
+			Node const* holdingTab;
+			Math::Vec2Int cursorPosRelative;
+		};	
 		union BehaviorData
 		{
-			template<Behavior>
-			struct Internal;
-			template<>
-			struct Internal<Behavior::Normal>
-			{
-			};
-			template<>
-			struct Internal<Behavior::Moving>
-			{
-				Math::Vec2Int windowMovedRelativePos;
-				Node const* showLayoutNodePtr;
-				bool useHighlightGizmo;
-				impl::DockArea_LayoutGizmo highlightGizmo;
-			};
-			template<>
-			struct Internal<Behavior::Resizing>
-			{
-				ResizeSide resizeSide;
-				bool resizingSplit;
-				Node const* resizeSplitNode;
-				bool resizingSplitIsFrontNode;
-			};
-			template<>
-			struct Internal<Behavior::HoldingTab>
-			{
-				bool holdingFrontWindow;
-				Node const* holdingTab;
-				Math::Vec2Int cursorPosRelative;
-			};
-			Internal<Behavior::Normal> normal;
-			Internal<Behavior::Moving> moving;
-			Internal<Behavior::Resizing> resizing;
-			Internal<Behavior::HoldingTab> holdingTab;
+			Internal_Behavior_Normal normal;
+			Internal_Behavior_Moving moving;
+			Internal_Behavior_Resizing resizing;
+			Internal_Behavior_HoldingTab holdingTab;
 		};
 		BehaviorData behaviorData{};
 

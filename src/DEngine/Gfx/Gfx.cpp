@@ -45,7 +45,7 @@ Std::Opt<Gfx::Context> Gfx::Initialize(InitInfo const& initInfo)
 
 void Gfx::Context::Draw(DrawParams const& params)
 {
-	static_cast<APIDataBase*>(this->apiDataBuffer)->Draw(*this, params);
+	static_cast<APIDataBase*>(this->apiDataBuffer)->Draw(params);
 }
 
 Gfx::NativeWindowID Gfx::Context::NewNativeWindow(WsiInterface& wsiConnection)

@@ -3,7 +3,6 @@ project(dengine)
 
 set(CMAKE_CXX_STANDARD 17)
 
-
 set(DENGINE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 include(Common.cmake)
 
@@ -17,6 +16,8 @@ include(Common.cmake)
 	target_include_directories(dengine PRIVATE ${DENGINE_INCLUDE_DIRS})
 	target_compile_definitions(dengine PRIVATE ${DENGINE_DEFINES})
 	target_link_libraries(dengine PRIVATE ${CMAKE_DL_LIBS})
+	find_package(Threads REQUIRED)
+	target_link_libraries(dengine PRIVATE Threads::Threads)
 	if(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
 		target_compile_options(dengine PRIVATE -Og)
 	endif()
@@ -61,6 +62,7 @@ target_link_libraries(dengine PRIVATE freetype)
 # -----------------------
 # START
 	add_library(dengine_application STATIC ${DENGINE_ROOT_DIR}/src/DEngine/Application/Application_Desktop.cpp)
+	set_target_properties(dengine_application PROPERTIES CXX_STANDARD 17)
 	target_link_libraries(dengine PRIVATE dengine_application)
 	target_include_directories(dengine_application PRIVATE ${DENGINE_INCLUDE_DIRS})
 	target_compile_definitions(dengine_application PRIVATE ${DENGINE_DEFINES})

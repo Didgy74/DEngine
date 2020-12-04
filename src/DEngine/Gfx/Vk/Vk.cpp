@@ -5,6 +5,7 @@
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
+#include <DEngine/Std/Utility.hpp>
 // For file IO
 #include <DEngine/Application.hpp>
 
@@ -50,7 +51,7 @@ void Vk::APIData::DeleteViewport(ViewportID id)
 	//vk::Result vkResult{};
 	APIData& apiData = *this;
 
-	ViewportManager::NewViewport(
+	ViewportManager::DeleteViewport(
 		apiData.viewportManager,
 		id);
 }
@@ -78,11 +79,36 @@ Vk::GlobUtils::GlobUtils()
 {
 }
 
+namespace DEngine::Gfx::Vk
+{
+	[[noreturn]] void Test(APIData* inApiData)
+	{
+		Std::NameThisThread("RenderingThread");
+
+		APIData& apiData = *inApiData;
+
+		while (true)
+		{
+			std::unique_lock lock{ apiData.drawParamsLock };
+			apiData.drawParamsCondVarWorker.wait(lock, [&apiData]() -> bool { return apiData.drawParamsReady; });
+
+			apiData.InternalDraw(apiData.drawParams);
+
+			apiData.drawParamsReady = false;
+			lock.unlock();
+			apiData.drawParamsCondVarProducer.notify_one();
+		}
+	}
+}
+
 bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& apiDataBuffer)
 {
 	apiDataBuffer = new APIData;
 	APIData& apiData = *static_cast<APIData*>(apiDataBuffer);
 	GlobUtils& globUtils = apiData.globUtils;
+
+	apiData.renderingThread = std::thread(&Test, &apiData);
+
 
 	//vk::Result vkResult{};
 	bool boolResult = false;
@@ -348,7 +374,17 @@ void Vk::Init::Test(APIData& apiData)
 	multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
 
 	vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
-	colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+	colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eR;
+	colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eG;
+	colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eB;
+	colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eA;
+	colorBlendAttachment.blendEnable = true;
+	colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd;
+	colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
+	colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+	colorBlendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+	colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+	colorBlendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
 
 	vk::PipelineColorBlendStateCreateInfo colorBlending{};
 	colorBlending.attachmentCount = 1;

@@ -11,57 +11,6 @@ Button::Button()
 	textWidget.String_Set("Button");
 }
 
-void Button::Render(
-	Context const& ctx,
-	Extent framebufferExtent,
-	Rect widgetRect,
-	Rect visibleRect,
-	DrawInfo& drawInfo) const
-{
-	Math::Vec4 currentColor{};
-	Math::Vec4 currentTextColor{};
-	switch (state)
-	{
-	case State::Hovered:
-		currentColor = hoverColor;
-		currentTextColor = hoverTextColor;
-		break;
-	case State::Normal:
-		currentColor = normalColor;
-		currentTextColor = normalTextColor;
-		break;
-	case State::Pressed:
-		currentColor = pressedColor;
-		currentTextColor = pressedTextColor;
-		break;
-	case State::Toggled:
-		currentColor = toggledColor;
-		currentTextColor = toggledTextColor;
-		break;
-	default:
-		break;
-	}
-
-	Gfx::GuiDrawCmd cmd{};
-	cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-	cmd.filledMesh.color = currentColor;
-	cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
-	cmd.rectPosition.x = (f32)widgetRect.position.x / framebufferExtent.width;
-	cmd.rectPosition.y = (f32)widgetRect.position.y / framebufferExtent.height;
-	cmd.rectExtent.x = (f32)widgetRect.extent.width / framebufferExtent.width;
-	cmd.rectExtent.y = (f32)widgetRect.extent.height / framebufferExtent.height;
-	drawInfo.drawCmds.push_back(cmd);
-
-
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-	impl::TextManager::RenderText(
-		implData.textManager,
-		textWidget.StringView(),
-		currentTextColor,
-		widgetRect,
-		drawInfo);
-}
-
 void Button::SetState(State newState)
 {
 	if (newState == state)
@@ -110,6 +59,7 @@ void Button::SetToggled(bool toggled)
 {
 	if (toggled)
 	{
+		SetState(State::Toggled);
 		textWidget.color = toggledTextColor;
 	}
 	else
@@ -123,6 +73,104 @@ void Button::SetToggled(bool toggled)
 bool Button::GetToggled() const
 {
 	return toggled;
+}
+
+SizeHint Button::GetSizeHint(
+	Context const& ctx) const
+{
+	return textWidget.GetSizeHint(ctx);
+}
+
+void Button::Render(
+	Context const& ctx,
+	Extent framebufferExtent,
+	Rect widgetRect,
+	Rect visibleRect,
+	DrawInfo& drawInfo) const
+{
+	Math::Vec4 currentColor{};
+	Math::Vec4 currentTextColor{};
+	if (state == State::Normal && toggled)
+	{
+		currentColor = toggledColor;
+		currentTextColor = toggledTextColor;
+	}
+	else
+	{
+		switch (state)
+		{
+			case State::Hovered:
+				currentColor = hoverColor;
+				currentTextColor = hoverTextColor;
+				break;
+			case State::Normal:
+				currentColor = normalColor;
+				currentTextColor = normalTextColor;
+				break;
+			case State::Pressed:
+				currentColor = pressedColor;
+				currentTextColor = pressedTextColor;
+				break;
+			case State::Toggled:
+				currentColor = toggledColor;
+				currentTextColor = toggledTextColor;
+				break;
+			default:
+				break;
+		}
+	}
+
+
+	Gfx::GuiDrawCmd cmd{};
+	cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
+	cmd.filledMesh.color = currentColor;
+	cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
+	cmd.rectPosition.x = (f32)widgetRect.position.x / framebufferExtent.width;
+	cmd.rectPosition.y = (f32)widgetRect.position.y / framebufferExtent.height;
+	cmd.rectExtent.x = (f32)widgetRect.extent.width / framebufferExtent.width;
+	cmd.rectExtent.y = (f32)widgetRect.extent.height / framebufferExtent.height;
+	drawInfo.drawCmds.push_back(cmd);
+
+
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+	impl::TextManager::RenderText(
+		implData.textManager,
+		textWidget.StringView(),
+		currentTextColor,
+		widgetRect,
+		drawInfo);
+}
+
+void Button::CursorClick(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Math::Vec2Int cursorPos,
+	CursorClickEvent event)
+{
+	if (event.button == CursorButton::Left)
+	{
+		bool temp = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
+
+		if (temp)
+		{
+			if (event.clicked)
+				SetState(State::Pressed);
+			else
+			{
+				if (state == State::Pressed)
+				{
+					Activate(
+						ctx,
+						windowId,
+						widgetRect,
+						visibleRect);
+				}
+				SetState(State::Hovered);
+			}
+		}
+	}
 }
 
 void Button::CursorMove(
@@ -144,38 +192,6 @@ void Button::CursorMove(
 			SetState(State::Toggled);
 		else
 			SetState(State::Normal);
-	}
-}
-
-void Button::CursorClick(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Math::Vec2Int cursorPos,
-	CursorClickEvent event)
-{
-	if (event.button == CursorButton::Left)
-	{
-		bool temp = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
-			
-		if (temp)
-		{
-			if (event.clicked)
-				SetState(State::Pressed);
-			else
-			{
-				if (state == State::Pressed)
-				{
-					Activate(
-						ctx,
-						windowId,
-						widgetRect,
-						visibleRect);
-				}
-				SetState(State::Hovered);
-			}
-		}
 	}
 }
 
@@ -209,10 +225,4 @@ void Button::TouchEvent(
 			SetState(State::Normal);
 		}
 	}
-}
-
-SizeHint Button::GetSizeHint(
-	Context const& ctx) const
-{
-	return textWidget.GetSizeHint(ctx);
 }

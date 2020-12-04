@@ -24,7 +24,11 @@ namespace DEngine::Gui
 		void* pUserData = nullptr;
 		std::function<void(LineEdit& widget)> textChangedPfn = nullptr;
 
+		Context* inputConnectionCtx = nullptr;
+
 		virtual ~LineEdit();
+
+		[[nodiscard]] bool CurrentlyBeingEdited() const;
 
 		virtual void Render(
 			Context const& ctx,

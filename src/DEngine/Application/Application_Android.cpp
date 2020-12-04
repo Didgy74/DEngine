@@ -228,12 +228,6 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeInit(
 	};
 
 	backendData.gameThread = std::thread(lambda);
-	auto threadName = "MainGameThread";
-	int result = pthread_setname_np(backendData.gameThread.native_handle(), threadName);
-	if (result != 0)
-	{
-
-	}
 }
 
 extern "C"

@@ -37,23 +37,29 @@ namespace DEngine::Gui::impl
 			// Call SizeHint on child.
 			if (child.type == StackLayout::LayoutItem::Type::Layout)
 				childSizeHint = child.layout->GetSizeHint(ctx);
-			else
+			else if (child.type == StackLayout::LayoutItem::Type::Widget)
 				childSizeHint = child.widget->GetSizeHint(ctx);
+			else
+				DENGINE_DETAIL_UNREACHABLE();
 
 			// Add to the sum size.
-			if (!childSizeHint.expandX)
+			bool shouldAdd = layout.direction == StackLayout::Direction::Horizontal && !childSizeHint.expandX;
+			shouldAdd |= layout.direction == StackLayout::Direction::Vertical && !childSizeHint.expandY;
+			if (shouldAdd)
 			{
-				u32& directionLength = layout.direction == StackLayout::Direction::Horizontal ? 
-					sumChildPreferredSize.width : 
+				u32& directionLength = layout.direction == StackLayout::Direction::Horizontal ?
+					sumChildPreferredSize.width :
 					sumChildPreferredSize.height;
-				u32 const& childDirectionLength = layout.direction == StackLayout::Direction::Horizontal ? 
-					childSizeHint.preferred.width : 
+				u32 const& childDirectionLength = layout.direction == StackLayout::Direction::Horizontal ?
+					childSizeHint.preferred.width :
 					childSizeHint.preferred.height;
 				directionLength += childDirectionLength;
 
-				u32& nonDirectionLength = layout.direction == StackLayout::Direction::Vertical ? sumChildPreferredSize.width : sumChildPreferredSize.height;
-				u32 const& childNonDirectionLength = layout.direction == StackLayout::Direction::Vertical ? 
-					childSizeHint.preferred.width : 
+				u32& nonDirectionLength = layout.direction == StackLayout::Direction::Vertical ?
+					sumChildPreferredSize.width :
+					sumChildPreferredSize.height;
+				u32 const& childNonDirectionLength = layout.direction == StackLayout::Direction::Vertical ?
+					childSizeHint.preferred.width :
 					childSizeHint.preferred.height;
 				nonDirectionLength = Math::Max(nonDirectionLength, childNonDirectionLength);
 			}
@@ -78,26 +84,27 @@ namespace DEngine::Gui::impl
 		for (uSize i = 0; i < childCount; i++)
 		{
 			SizeHint const childSizeHint = childSizeHints[i];
-			if (childSizeHint.expandX)
+			if (layout.direction == StackLayout::Direction::Horizontal)
 			{
-				if (layout.direction == StackLayout::Direction::Horizontal)
+				if (childSizeHint.expandX)
 					childRect.extent.width = remainingDirectionSpace;
 				else
-					childRect.extent.height = remainingDirectionSpace;
+					childRect.extent.width = childSizeHint.preferred.width;
 			}
 			else
 			{
-				if (layout.direction == StackLayout::Direction::Horizontal)
-					childRect.extent.width = childSizeHint.preferred.width;
+				if (childSizeHint.expandY)
+					childRect.extent.height = remainingDirectionSpace;
 				else
 					childRect.extent.height = childSizeHint.preferred.height;
 			}
+				
 
 			// Translate the i in the SizeHint array back to the Children array's corresponding element.
 			// Note! This code is likely bugged in some cases still. Prepare to fix.
 			uSize modifiedIndex = i;
 			bool childExists = true;
-			for (StackLayout::InsertRemoveJob job : layout.insertionJobs)
+			for (StackLayout::InsertRemoveJob const& job : layout.insertionJobs)
 			{
 				switch (job.type)
 				{
@@ -303,10 +310,14 @@ SizeHint StackLayout::GetSizeHint(
 		}
 	}
 
-	if (test_expand)
+	if (this->expandNonDirection)
 	{
-		returnVal.expandX = true;
-		returnVal.expandY = true;
+		if (this->direction == Direction::Horizontal)
+			returnVal.expandY = true;
+		else if (this->direction == Direction::Vertical)
+			returnVal.expandX = true;
+		else
+			DENGINE_DETAIL_UNREACHABLE();
 	}
 		
 	// Add padding

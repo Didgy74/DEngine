@@ -1,7 +1,7 @@
 #pragma once
 
-#include "DEngine/Gfx/Gfx.hpp"
-#include "DEngine/FixedWidthTypes.hpp"
+#include <DEngine/Gfx/Gfx.hpp>
+#include <DEngine/FixedWidthTypes.hpp>
 
 namespace DEngine::Gfx
 {
@@ -16,7 +16,7 @@ namespace DEngine::Gfx
 		APIDataBase& operator=(APIDataBase const&) = delete;
 		APIDataBase& operator=(APIDataBase&&) = delete;
 
-		virtual void Draw(Context& gfxData, DrawParams const& drawParams) = 0;
+		virtual void Draw(DrawParams const& drawParams) = 0;
 
 		// Needs to be thread-safe
 		virtual NativeWindowID NewNativeWindow(WsiInterface& wsiConnection) = 0;

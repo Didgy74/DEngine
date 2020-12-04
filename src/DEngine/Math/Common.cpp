@@ -9,17 +9,17 @@ using namespace DEngine;
 
 f32 Math::Ceil(f32 input)
 {
-	return std::ceilf(input);
+	return ceilf(input);
 }
 
 f64 Math::Ceil(f64 input)
 {
-	return std::ceill(input);
+	return ceill(input);
 }
 
 f32 Math::Round(f32 input)
 {
-	return std::roundf(input);
+	return roundf(input);
 }
 
 f32 Math::Sqrt(f32 input)

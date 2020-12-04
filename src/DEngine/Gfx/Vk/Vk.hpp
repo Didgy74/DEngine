@@ -15,13 +15,16 @@
 #include "VMAIncluder.hpp"
 #include "VulkanIncluder.hpp"
 
-#include "DEngine/Gfx/Gfx.hpp"
+#include <DEngine/Gfx/Gfx.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
 #include <DEngine/Std/Containers/Pair.hpp>
 
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 #include <vector>
 
 namespace DEngine::Gfx::Vk
@@ -53,7 +56,8 @@ namespace DEngine::Gfx::Vk
 	{
 		APIData();
 		virtual ~APIData() override;
-		virtual void Draw(Context& gfxData, DrawParams const& drawParams) override;
+		virtual void Draw(DrawParams const& drawParams) override;
+		void InternalDraw(DrawParams const& drawParams);
 
 		// Thread safe
 		virtual NativeWindowID NewNativeWindow(WsiInterface& wsiConnection) override;
@@ -93,5 +97,13 @@ namespace DEngine::Gfx::Vk
 
 		vk::PipelineLayout testPipelineLayout{};
 		vk::Pipeline testPipeline{};
+
+		std::thread renderingThread;
+
+		DrawParams drawParams;
+		bool drawParamsReady = false;
+		std::mutex drawParamsLock;
+		std::condition_variable drawParamsCondVarWorker;
+		std::condition_variable drawParamsCondVarProducer;
 	};
 }

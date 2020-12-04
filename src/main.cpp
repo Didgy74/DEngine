@@ -35,8 +35,10 @@ class GfxTexAssetInterfacer : public DEngine::Gfx::TextureAssetInterface
 	{
 		if ((DEngine::u64)id == 0)
 			return "data/01.ktx";
-		else
+		else if ((DEngine::u64)id == 1)
 			return "data/2.png";
+		else
+			return "data/Circle.png";
 	}
 };
 
@@ -54,7 +56,7 @@ void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 
 	Math::Vec2 addAcceleration{};
 
-	f32 amount = 1.f * deltaTime;
+	f32 amount = 2.f * deltaTime;
 
 	if (App::ButtonValue(App::Button::Up))
 		addAcceleration.y += amount;
@@ -107,6 +109,8 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
 
+	DEngine::Std::NameThisThread("MainThread");
+
 	Time::Initialize();
 	App::detail::Initialize();
 
@@ -136,6 +140,128 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	Scene myScene;
 
+	{
+		Entity a = myScene.NewEntity();
+
+		Transform transform{};
+		transform.position.x = 0.f;
+		transform.position.y = 0.f;
+		transform.rotation = 0.707f;
+		transform.scale = { 1.f, 1.f };
+		myScene.transforms.push_back({ a, transform });
+
+		Physics::Rigidbody2D rb{};
+		myScene.rigidbodies.push_back({ a, rb });
+
+		Gfx::TextureID textureId{ 0 };
+		myScene.textureIDs.push_back({ a, textureId });
+
+		Physics::BoxCollider2D collider{};
+		myScene.boxColliders.push_back({ a, collider });
+	}
+
+	{
+		Entity a = myScene.NewEntity();
+
+		Transform transform{};
+		transform.position.x = 2.f;
+		transform.position.y = 0.f;
+		transform.scale = { 1.f, 1.f };
+		myScene.transforms.push_back({ a, transform });
+
+		//Physics::Rigidbody2D rb{};
+		//myScene.rigidbodies.push_back({ a, rb });
+
+		Gfx::TextureID textureId{ 2 };
+		myScene.textureIDs.push_back({ a, textureId });
+
+		//Physics::CircleCollider2D collider{};
+		//myScene.circleColliders.push_back({ a, collider });
+	}
+
+	{
+		Entity a = myScene.NewEntity();
+
+		Transform transform{};
+		transform.position.x = 0.f;
+		transform.position.y = -5.f;
+		transform.scale = { 25.f, 1.f };
+		myScene.transforms.push_back({ a, transform });
+
+		//Physics::Rigidbody2D rb{};
+		//myScene.rigidbodies.push_back({ a, rb });
+
+		Gfx::TextureID textureId{ 0 };
+		myScene.textureIDs.push_back({ a, textureId });
+
+		//Physics::BoxCollider2D collider{};
+		//myScene.boxColliders.push_back({ a, collider });
+	}
+
+	{
+		Entity a = myScene.NewEntity();
+
+		Transform transform{};
+		transform.position.x = -2.f;
+		transform.position.y = 0.f;
+		transform.scale = { 1.f, 25.f };
+		myScene.transforms.push_back({ a, transform });
+
+		Physics::Rigidbody2D rb{};
+		rb.inverseMass = 1 / 100.f;
+		myScene.rigidbodies.push_back({ a, rb });
+
+		Gfx::TextureID textureId{ 0 };
+		myScene.textureIDs.push_back({ a, textureId });
+
+		Physics::BoxCollider2D collider{};
+		myScene.boxColliders.push_back({ a, collider });
+	}
+
+	/*
+	uSize yo = 10;
+	for (uSize i = 0; i < yo; i += 1)
+	{
+		for (uSize j = 0; j < yo; j += 1)
+		{
+			Entity a = myScene.NewEntity();
+
+			f32 spacing = 3.f;
+
+			Transform transform{};
+			transform.position.x -= (spacing * yo) / 2.f;
+			transform.position.x += spacing * i;
+			transform.position.y -= (spacing * yo) / 2.f;
+			transform.position.y += spacing * j;
+			myScene.transforms.push_back({ a, transform });
+
+			Physics::Rigidbody2D rb{};
+			myScene.rigidbodies.push_back({ a, rb });
+
+			if ((i + j) % 2)
+			{
+				Gfx::TextureID textureId{ 2 };
+				myScene.textureIDs.push_back({ a, textureId });
+
+				Physics::CircleCollider2D collider{};
+				myScene.circleColliders.push_back({ a, collider });
+			}
+			else
+			{
+				Gfx::TextureID textureId{ 0 };
+				myScene.textureIDs.push_back({ a, textureId });
+
+				Physics::BoxCollider2D collider{};
+				myScene.boxColliders.push_back({ a, collider });
+			}
+		}
+	}
+	*/
+
+	Move move{};
+	myScene.moves.push_back({ Entity(), move });
+	
+
 	Editor::Context editorCtx = Editor::Context::Create(
 		mainWindow,
 		&myScene,
@@ -150,16 +276,18 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 		editorCtx.ProcessEvents();
 
-		Physics::Update(myScene, Time::Delta());
+		if (myScene.play)
+		{
+			Physics::Update(myScene, Time::Delta());
 
-		for (auto item : myScene.moves)
-			item.b.Update(item.a, myScene, Time::Delta());
+			for (auto item : myScene.moves)
+				item.b.Update(item.a, myScene, Time::Delta());
+		}
 
 		detail::SubmitRendering(
 			gfxCtx, 
 			editorCtx, 
 			myScene);
-			
 	}
 
 	return 0;
@@ -180,13 +308,17 @@ void DEngine::detail::SubmitRendering(
 		auto posIt = Std::FindIf(
 			scene.transforms.begin(),
 			scene.transforms.end(),
-			[&entity](decltype(scene.transforms)::value_type const& val) -> bool { return val.a == entity; });
+			[&entity](decltype(scene.transforms[0]) const& val) -> bool { return val.a == entity; });
 		if (posIt == scene.transforms.end())
 			continue;
 		auto& transform = posIt->b;
 
 		params.textureIDs.push_back(item.b);
-		params.transforms.push_back(Math::LinTran3D::Translate(transform.position));
+
+		Math::Mat4 transformMat = Math::LinTran3D::Translate(transform.position) * 
+			Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation) * 
+			Math::LinTran3D::Scale_Homo(transform.scale.AsVec3());
+		params.transforms.push_back(transformMat);
 	}
 
 	auto editorDrawData = editorCtx.GetDrawInfo();

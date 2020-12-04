@@ -41,7 +41,7 @@ namespace DEngine::Gui
 		i32 padding = 0;
 		i32 spacing = 0;
 
-		bool test_expand = false;
+		bool expandNonDirection = false;
 
 		uSize ChildCount() const;
 		struct Child
@@ -94,13 +94,6 @@ namespace DEngine::Gui
 		virtual void CharRemoveEvent(
 			Context& ctx) override;
 
-		virtual void CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event) override;
-
 		virtual void CursorClick(
 			Context& ctx,
 			WindowID windowId,
@@ -108,6 +101,13 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
+
+		virtual void CursorMove(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			CursorMoveEvent event) override;
 
 		virtual void TouchEvent(
 			Context& ctx,

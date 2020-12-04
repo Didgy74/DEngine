@@ -345,8 +345,22 @@ namespace DEngine::Gfx::Vk
 }
 
 void Vk::APIData::Draw(
-	Context& gfxData,
 	DrawParams const& drawParams)
+{
+	APIData& apiData = *this;
+
+	std::unique_lock lock{ apiData.drawParamsLock };
+	
+	apiData.drawParamsCondVarProducer.wait(lock, [&apiData]() -> bool { return !apiData.drawParamsReady; });
+
+	apiData.drawParams = drawParams;
+	apiData.drawParamsReady = true;
+
+	lock.unlock();
+	apiData.drawParamsCondVarWorker.notify_one();
+}
+
+void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 {
 	vk::Result vkResult{};
 	APIData& apiData = *this;
@@ -373,13 +387,12 @@ void Vk::APIData::Draw(
 		drawParams,
 		*apiData.test_textureAssetInterface);
 
-
 	u8 currentInFlightIndex = apiData.currInFlightIndex;
 
 	// Wait for fences, so we know the resources are available.
 	vkResult = globUtils.device.waitForFences(
-		apiData.mainFences[currentInFlightIndex], 
-		true, 
+		apiData.mainFences[currentInFlightIndex],
+		true,
 		5000000000); // Added a 5s timeout for testing purposes
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("Vulkan: Failed to wait for cmd buffer fence.");
@@ -426,7 +439,7 @@ void Vk::APIData::Draw(
 			currentInFlightIndex,
 			apiData);
 	}
-	
+
 	// Record all the GUI shit.
 	std::vector<NativeWindowData const*> windowsToPresent;
 	for (auto& windowUpdate : drawParams.nativeWindowUpdates)
@@ -449,7 +462,7 @@ void Vk::APIData::Draw(
 			DENGINE_DETAIL_GFX_ASSERT(windowUpdate.drawCmdOffset + windowUpdate.drawCmdCount <= drawParams.guiDrawCmds.size());
 			drawCmds = { &drawParams.guiDrawCmds[windowUpdate.drawCmdOffset], windowUpdate.drawCmdCount };
 		}
-			
+
 
 		RecordGUICmdBuffer(
 			globUtils,
@@ -516,7 +529,7 @@ void Vk::APIData::Draw(
 	}
 
 	DeletionQueue::ExecuteCurrentTick(
-		apiData.globUtils.deletionQueue, 
+		apiData.globUtils.deletionQueue,
 		globUtils,
 		currentInFlightIndex);
 	apiData.currInFlightIndex = (apiData.currInFlightIndex + 1) % apiData.globUtils.inFlightCount;
