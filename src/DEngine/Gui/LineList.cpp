@@ -100,7 +100,7 @@ void LineList::CursorClick(
 			lineRect.position.y += static_cast<u32>(i * lineRect.extent.height);
 			if (lineRect.PointIsInside(cursorPos))
 			{
-				selectedLine = Std::Opt{ i };
+				selectedLine = Std::Opt<uSize>{ i };
 
 				if (selectedLineChangedCallback)
 					selectedLineChangedCallback(*this);
@@ -137,7 +137,7 @@ void LineList::TouchEvent(
 				lineRect.position.y += static_cast<u32>(i * lineRect.extent.height);
 				if (lineRect.PointIsInside(event.position))
 				{
-					selectedLine = Std::Opt{ i };
+					selectedLine = Std::Opt<uSize>{ i };
 
 					if (selectedLineChangedCallback)
 						selectedLineChangedCallback(*this);

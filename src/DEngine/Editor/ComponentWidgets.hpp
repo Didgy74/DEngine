@@ -85,6 +85,7 @@ namespace DEngine::Editor
 		Gui::LineEdit* positionInputX = nullptr;
 		Gui::LineEdit* positionInputY = nullptr;
 		Gui::LineEdit* positionInputZ = nullptr;
+		Gui::LineEdit* rotationInput = nullptr;
 
 		TransformWidget(Scene* scene, Entity id) :
 			Gui::StackLayout(Gui::StackLayout::Direction::Vertical)
@@ -202,6 +203,28 @@ namespace DEngine::Editor
 				Transform& component = componentIt->b;
 				component.position.z = std::stof(widget.StringView().data());
 			};
+
+
+			Gui::StackLayout* rotationLayout = new StackLayout(StackLayout::Direction::Horizontal);
+			this->AddLayout2(Std::Box<Layout>{ rotationLayout });
+			rotationLayout->spacing = 10;
+
+			Gui::Text* rotationText = new Gui::Text();
+			rotationLayout->AddWidget2(Std::Box<Gui::Widget>{ rotationText });
+			rotationText->String_Set("Rotation: ");
+
+			rotationInput = new Gui::LineEdit;
+			rotationLayout->AddWidget2(Std::Box<Gui::Widget>{ rotationInput });
+			rotationInput->textChangedPfn = [id, &scene](Gui::LineEdit& widget)
+			{
+				auto const componentIt = Std::FindIf(
+					scene.transforms.begin(),
+					scene.transforms.end(),
+					[id](decltype(scene.transforms[0]) const& value) -> bool { return id == value.a; });
+				DENGINE_DETAIL_ASSERT(componentIt != scene.transforms.end());
+				Transform& component = componentIt->b;
+				component.rotation = std::stof(widget.StringView().data());
+			};
 		}
 
 		void Update(Transform const& component)
@@ -211,7 +234,9 @@ namespace DEngine::Editor
 			if (!positionInputY->CurrentlyBeingEdited())
 				positionInputY->String_Set(std::to_string(component.position.y).c_str());
 			if (!positionInputZ->CurrentlyBeingEdited())
-				positionInputZ->String_Set(std::to_string(component.position.z).data());
+				positionInputZ->String_Set(std::to_string(component.position.z).c_str());
+			if (!rotationInput->CurrentlyBeingEdited())
+				rotationInput->String_Set(std::to_string(component.rotation).c_str());
 		}
 
 		void Tick(Scene& scene, Entity id)
@@ -328,6 +353,7 @@ namespace DEngine::Editor
 	{
 	public:
 		Gui::Text* velocityText = nullptr;
+		Gui::LineEdit* angularVelocityInput = nullptr;
 
 		Rigidbody2DWidget(Scene* scene, Entity id) :
 			Gui::StackLayout(Gui::StackLayout::Direction::Vertical)
@@ -356,7 +382,7 @@ namespace DEngine::Editor
 					scene->rigidbodies.push_back(Std::Pair<Entity, Physics::Rigidbody2D>{ id, {} });
 					Physics::Rigidbody2D& component = scene->rigidbodies.back().b;
 
-					Expand(component);
+					Expand(*scene, id, component);
 					Update(component);
 				}
 				else
@@ -387,16 +413,36 @@ namespace DEngine::Editor
 
 				Physics::Rigidbody2D& component = componentIt->b;
 
-				Expand(component);
+				Expand(*scene, id, component);
 				Update(component);
 			}
 		}
 
-		void Expand(Physics::Rigidbody2D const& component)
+		void Expand(Scene& scene, Entity id, Physics::Rigidbody2D const& component)
 		{
 			velocityText = new Gui::Text;
 			this->AddWidget2(Std::Box<Gui::Widget>{ velocityText });
-			Update(component);
+
+			Gui::StackLayout* angularVelocityLayout = new StackLayout(StackLayout::Direction::Horizontal);
+			this->AddLayout2(Std::Box<Gui::Layout>{ angularVelocityLayout });
+			angularVelocityLayout->spacing = 10;
+			
+			Gui::Text* angularVelocityText = new Gui::Text;
+			angularVelocityLayout->AddWidget2(Std::Box<Gui::Widget>{ angularVelocityText });
+			angularVelocityText->String_Set("Angular velocity: ");
+
+			angularVelocityInput = new Gui::LineEdit;
+			angularVelocityLayout->AddWidget2(Std::Box<Gui::Widget>{ angularVelocityInput });
+			angularVelocityInput->textChangedPfn = [id, &scene](Gui::LineEdit& widget)
+			{
+				auto const componentIt = Std::FindIf(
+					scene.rigidbodies.begin(),
+					scene.rigidbodies.end(),
+					[id](decltype(scene.rigidbodies[0]) const& value) -> bool { return id == value.a; });
+				DENGINE_DETAIL_ASSERT(componentIt != scene.rigidbodies.end());
+				Physics::Rigidbody2D& component = componentIt->b;
+				component.angularVelocity = std::stof(widget.StringView().data());
+			};
 		}
 
 		void Update(Physics::Rigidbody2D const& component)
@@ -405,6 +451,9 @@ namespace DEngine::Editor
 			velocityString += std::to_string(component.velocity.x) + " ";
 			velocityString += std::to_string(component.velocity.y);
 			velocityText->String_Set(velocityString.c_str());
+
+			if (!angularVelocityInput->CurrentlyBeingEdited())
+				angularVelocityInput->String_Set(std::to_string(component.angularVelocity).c_str());
 		}
 
 		void Tick(Scene& scene, Entity id)

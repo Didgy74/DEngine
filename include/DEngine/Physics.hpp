@@ -12,10 +12,12 @@ namespace DEngine::Physics
 {
 	struct Rigidbody2D
 	{
-		static constexpr f32 defaultLinearDamp = 0.995f;
+		static constexpr f32 defaultLinearDamp = 0.95f;
 
 		Math::Vec2 velocity{};
 		Math::Vec2 acceleration{};
+		f32 angularVelocity = 0;
+		f32 torque = 0;
 
 		f32 inverseMass = 1.f;
 
@@ -35,6 +37,11 @@ namespace DEngine::Physics
 	struct BoxCollider2D
 	{
 		Math::Vec2 size{ 1.f, 1.f };
+	};
+
+	struct Instance
+	{
+		
 	};
 
 	void Update(Scene& scene, f32 deltaTime);

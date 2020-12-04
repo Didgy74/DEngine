@@ -24,7 +24,9 @@ namespace DEngine
 	class Transform
 	{
 	public:
-		Math::Vector<3, f32> position{};
+		Math::Vec3 position{};
+		f32 rotation = 0;
+		Math::Vec2 scale = { 1.f, 1.f };
 	};
 
 	class Scene

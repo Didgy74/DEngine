@@ -663,7 +663,7 @@ namespace DEngine::Gui::impl
 					[topLevelRect, &resizeRectHit, cursorPos](impl::DockArea_ResizeRect side, Rect rect)
 					{
 						if (!resizeRectHit.HasValue() && rect.PointIsInside(cursorPos))
-							resizeRectHit = Std::Opt{ side };
+							resizeRectHit = Std::Opt<impl::DockArea_ResizeRect>{ side };
 					});
 				if (resizeRectHit.HasValue())
 				{
@@ -1042,7 +1042,7 @@ namespace DEngine::Gui::impl
 						[topLevelRect, event, &resizeRectHit](DockArea_ResizeRect side, Rect rect)
 					{
 						if (!resizeRectHit.HasValue() && rect.PointIsInside(event.position))
-							resizeRectHit = Std::Opt{ side };
+							resizeRectHit = Std::Opt<DockArea_ResizeRect>{ side };
 					});
 				}
 
@@ -1493,7 +1493,7 @@ namespace DEngine::Gui::impl
 							[topLevelRect, &resizeRectHit, event](impl::DockArea_ResizeRect side, Rect rect)
 							{
 								if (!resizeRectHit.HasValue() && rect.PointIsInside(event.position))
-									resizeRectHit = Std::Opt{side};
+									resizeRectHit = Std::Opt<impl::DockArea_ResizeRect>{ side };
 							});
 						if (resizeRectHit.HasValue())
 						{

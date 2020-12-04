@@ -1,11 +1,11 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Std/Trait.hpp"
+#include <DEngine/detail/Assert.hpp>
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/Trait.hpp>
 
-#include "DEngine/Math/detail/MatrixBase.hpp"
-#include "DEngine/Math/detail/MatrixBaseSquare.hpp"
-
+#include <DEngine/Math/detail/MatrixBase.hpp>
+#include <DEngine/Math/detail/MatrixBaseSquare.hpp>
 
 namespace DEngine::Math
 {
@@ -51,12 +51,16 @@ namespace DEngine::Math
 	template<uSize width, uSize height, typename T>
 	constexpr T& Matrix<width, height, T>::At(uSize x, uSize y)
 	{
+		DENGINE_DETAIL_ASSERT(x < width);
+		DENGINE_DETAIL_ASSERT(y < height);
 		return this->data[x * height + y];
 	}
 
 	template<uSize width, uSize height, typename T>
 	constexpr T Matrix<width, height, T>::At(uSize x, uSize y) const
 	{
+		DENGINE_DETAIL_ASSERT(x < width);
+		DENGINE_DETAIL_ASSERT(y < height);
 		return this->data[x * height + y];
 	}
 

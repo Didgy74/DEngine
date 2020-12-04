@@ -10,11 +10,11 @@
 namespace DEngine::Gfx::Vk::Constants
 {
 	constexpr u32 maxInFlightCount = 4;
-	constexpr u32 preferredInFlightCount = 2;
+	constexpr u32 preferredInFlightCount = 4;
 
-	constexpr vk::PresentModeKHR preferredPresentMode = vk::PresentModeKHR::eImmediate;
+	constexpr vk::PresentModeKHR preferredPresentMode = vk::PresentModeKHR::eFifo;
 	constexpr u32 maxSwapchainLength = 4;
-	constexpr u32 preferredSwapchainLength = 2;
+	constexpr u32 preferredSwapchainLength = 4;
 
 	constexpr char const* khronosLayerName
 	{

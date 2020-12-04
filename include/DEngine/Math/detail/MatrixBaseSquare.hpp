@@ -67,7 +67,7 @@ namespace DEngine::Math
 				{
 					for (size_t i = 0; i < width * width; i += 1)
 						adjugate.data[i] /= determinant;
-					return Std::Opt{ adjugate };
+					return Std::Opt<Math::Matrix<width, width, T>>{ adjugate };
 				}
 				else
 					return {};

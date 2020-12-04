@@ -18,7 +18,7 @@ namespace DEngine::Gfx::Vk
 	{
 		// Contains minimum capacity of amount of elements.
 		// Not measured in bytes.
-		static constexpr uSize minCapacity = 4;
+		static constexpr uSize minCapacity = 256;
 		// Measured in bytes.
 		static constexpr uSize minElementSize = 64;
 		VmaAllocation vmaAlloc{};

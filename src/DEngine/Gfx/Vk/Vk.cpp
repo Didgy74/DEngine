@@ -374,7 +374,17 @@ void Vk::Init::Test(APIData& apiData)
 	multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
 
 	vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
-	colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+	colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eR;
+	colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eG;
+	colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eB;
+	colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eA;
+	colorBlendAttachment.blendEnable = true;
+	colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd;
+	colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
+	colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+	colorBlendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+	colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+	colorBlendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
 
 	vk::PipelineColorBlendStateCreateInfo colorBlending{};
 	colorBlending.attachmentCount = 1;

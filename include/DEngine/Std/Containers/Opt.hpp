@@ -12,21 +12,22 @@ namespace DEngine::Std
 
 	template<typename T>
 	class Opt
-	{	
+	{
 	public:
 		using ValueType = T;
 
-		constexpr Opt(NullOpt_T = nullOpt) noexcept;
-		constexpr Opt(Opt const&);
-		constexpr Opt(Opt&&) noexcept;
-		explicit constexpr Opt(T const&);
-		explicit constexpr Opt(T&&) noexcept;
+		Opt(NullOpt_T = nullOpt);
+		Opt(Opt const&);
+		Opt(Opt&&);
+		Opt(T const&);
+		//Opt(T&) = delete;
+		Opt(T&&);
 		~Opt();
 
 		Opt& operator=(Opt const&);
-		Opt& operator=(Opt&&) noexcept;
+		Opt& operator=(Opt&&);
 		Opt& operator=(T const&);
-		Opt& operator=(T&&) noexcept;
+		Opt& operator=(T&&);
 
 		[[nodiscard]] bool HasValue() const;
 
@@ -46,10 +47,10 @@ namespace DEngine::Std
 	};
 
 	template<typename T>
-	constexpr Opt<T>::Opt(NullOpt_T) noexcept {}
+	Opt<T>::Opt(NullOpt_T) {}
 
 	template<typename T>
-	constexpr Opt<T>::Opt(Opt const& other)
+	Opt<T>::Opt(Opt const& other)
 	{
 		if (other.hasValue)
 		{
@@ -59,7 +60,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	constexpr Opt<T>::Opt(Opt&& other) noexcept
+	Opt<T>::Opt(Opt&& other)
 	{
 		if (other.hasValue)
 		{
@@ -72,14 +73,14 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	constexpr Opt<T>::Opt(T const& other) :
+	Opt<T>::Opt(T const& other) :
 		hasValue(true)
 	{
 		new(&value) T(other);
 	}
 
 	template<typename T>
-	constexpr Opt<T>::Opt(T&& other) noexcept :
+	Opt<T>::Opt(T&& other) :
 		hasValue(true)
 	{
 		new(&value) T(static_cast<T&&>(other));
@@ -111,7 +112,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	Opt<T>& Opt<T>::operator=(Opt&& other) noexcept
+	Opt<T>& Opt<T>::operator=(Opt&& other)
 	{
 		if (this == &other)
 			return *this;
@@ -148,7 +149,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	Opt<T>& Opt<T>::operator=(T&& right) noexcept
+	Opt<T>& Opt<T>::operator=(T&& right)
 	{
 		if (hasValue)
 			value = static_cast<T&&>(right);

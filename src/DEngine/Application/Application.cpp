@@ -520,7 +520,7 @@ void Application::detail::UpdateTouchInput(TouchEventType type, u8 id, f32 x, f3
 Std::Opt<Application::GamepadState> Application::GetGamepad()
 {
 	if (detail::pAppData->gamepadConnected)
-		return Std::Opt{ detail::pAppData->gamepadState };
+		return Std::Opt<Application::GamepadState>{ detail::pAppData->gamepadState };
 	else
 		return {};
 }
