@@ -45,17 +45,14 @@ include(Common.cmake)
 # Link Texas
 # ----------
 # START
-	add_subdirectory(external/Texas Texas EXCLUDE_FROM_ALL)
+	add_subdirectory(external/Texas Texas)
 	target_link_libraries(dengine PRIVATE Texas)
 #
 # END
 #
 
-add_subdirectory(external/freetype2 freetype2 EXCLUDE_FROM_ALL)
+add_subdirectory(external/freetype2 freetype2)
 target_link_libraries(dengine PRIVATE freetype)
-
-#add_subdirectory(external/harfbuzz harfbuzz EXCLUDE_FROM_ALL)
-#target_link_libraries(dengine PRIVATE harfbuzz)
 
 # -----------------------
 # Link external libraries
@@ -79,11 +76,25 @@ target_link_libraries(dengine PRIVATE freetype)
 		add_subdirectory(${GLFW3_DIR} glfw EXCLUDE_FROM_ALL)
 		if(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
 			target_compile_options(glfw PRIVATE -Wno-everything)
-	endif()
+		endif()
 	endif()
 
-	
 	target_link_libraries(dengine_application PRIVATE glfw)
+
+#
+# END
+#
+
+
+# ----------
+# Link Box2D
+# ----------
+# START
+
+	set(BOX2D_BUILD_UNIT_TESTS OFF)
+	set(BOX2D_BUILD_TESTBED OFF)
+	add_subdirectory(external/Box2D Box2D)
+	target_link_libraries(dengine PRIVATE box2d)
 
 #
 # END

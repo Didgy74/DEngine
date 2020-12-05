@@ -6,10 +6,13 @@
 
 #include "DEngine/Gfx/Gfx.hpp"
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Utility.hpp>
 #include <DEngine/Math/Vector.hpp>
 #include <DEngine/Math/UnitQuaternion.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
+
+#include <box2d/box2d.h>
 
 #include <iostream>
 #include <vector>
@@ -44,34 +47,50 @@ class GfxTexAssetInterfacer : public DEngine::Gfx::TextureAssetInterface
 
 void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 {
-	auto rbIt = Std::FindIf(
-		scene.rigidbodies.begin(),
-		scene.rigidbodies.end(),
-		[entity](Std::Pair<Entity, Physics::Rigidbody2D> const& val) -> bool { return entity == val.a; });
-
-	if (rbIt == scene.rigidbodies.end())
-		return;
-
-	Physics::Rigidbody2D& rb = rbIt->b;
-
 	Math::Vec2 addAcceleration{};
 
-	f32 amount = 2.f * deltaTime;
+	f32 amount = 300.f * deltaTime;
 
 	if (App::ButtonValue(App::Button::Up))
-		addAcceleration.y += amount;
+		addAcceleration.y += 1.f;
 	if (App::ButtonValue(App::Button::Down))
-		addAcceleration.y -= amount;
+		addAcceleration.y -= 1.f;
 	if (App::ButtonValue(App::Button::Right))
-		addAcceleration.x += amount;
+		addAcceleration.x += 1.f;
 	if (App::ButtonValue(App::Button::Left))
-		addAcceleration.x -= amount;
+		addAcceleration.x -= 1.f;
 
 	if (addAcceleration.MagnitudeSqrd() != 0)
 	{
 		addAcceleration.Normalize();
+		addAcceleration *= amount;
+	}
 
-		rb.acceleration += addAcceleration;
+	if (App::ButtonEvent(App::Button::Space) == App::KeyEventType::Pressed)
+		addAcceleration.y += 400.f;
+
+	if (addAcceleration.MagnitudeSqrd() != 0)
+	{
+		auto rbIt = Std::FindIf(
+			scene.rigidbodies.begin(),
+			scene.rigidbodies.end(),
+			[entity](Std::Pair<Entity, Physics::Rigidbody2D> const& val) -> bool { return entity == val.a; });
+
+		if (rbIt != scene.rigidbodies.end())
+		{
+			Physics::Rigidbody2D& rb = rbIt->b;
+			rb.acceleration += addAcceleration;
+		}
+
+		auto physicsBodyIt = Std::FindIf(
+			scene.b2Bodies.begin(),
+			scene.b2Bodies.end(),
+			[entity](decltype(scene.b2Bodies[0]) const& val) -> bool { return entity == val.a; });
+		if (physicsBodyIt != scene.b2Bodies.end())
+		{
+			auto& physicsBody = *physicsBodyIt;
+			physicsBody.b.ptr->ApplyForceToCenter({ addAcceleration.x, addAcceleration.y }, true);
+		}
 	}
 }
 
@@ -140,13 +159,15 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	Scene myScene;
 
+	Std::Box<b2World> physicsWorld{ new b2World({ 0.f, -10.f }) };
+
 	{
 		Entity a = myScene.NewEntity();
 
 		Transform transform{};
 		transform.position.x = 0.f;
 		transform.position.y = 0.f;
-		transform.rotation = 0.707f;
+		//transform.rotation = 0.707f;
 		transform.scale = { 1.f, 1.f };
 		myScene.transforms.push_back({ a, transform });
 
@@ -158,6 +179,21 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 		Physics::BoxCollider2D collider{};
 		myScene.boxColliders.push_back({ a, collider });
+
+		b2BodyDef bodyDef{};
+		bodyDef.type = b2BodyType::b2_dynamicBody;
+		bodyDef.fixedRotation = true;
+		b2Body* physicsBody = physicsWorld->CreateBody(&bodyDef);
+		DEngine::Box2DBody body{};
+		body.ptr = physicsBody;
+		myScene.b2Bodies.push_back({ a, body });
+		b2MassData massData{};
+		massData.mass = 1.f;
+		physicsBody->SetMassData(&massData);
+		b2PolygonShape boxShape{};
+		boxShape.SetAsBox(0.5f, 0.5f);
+		f32 density = 1.;
+		physicsBody->CreateFixture(&boxShape, density);
 	}
 
 	{
@@ -196,6 +232,20 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 		//Physics::BoxCollider2D collider{};
 		//myScene.boxColliders.push_back({ a, collider });
+
+		b2BodyDef bodyDef{};
+		bodyDef.type = b2BodyType::b2_staticBody;
+		b2Body* physicsBody = physicsWorld->CreateBody(&bodyDef);
+		DEngine::Box2DBody body{};
+		body.ptr = physicsBody;
+		myScene.b2Bodies.push_back({ a, body });
+		b2MassData massData{};
+		massData.mass = 1.f;
+		physicsBody->SetMassData(&massData);
+		b2PolygonShape boxShape{};
+		boxShape.SetAsBox(12.5f, 0.5f);
+		f32 density = 1.;
+		physicsBody->CreateFixture(&boxShape, density);
 	}
 
 	{
@@ -204,7 +254,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		Transform transform{};
 		transform.position.x = -2.f;
 		transform.position.y = 0.f;
-		transform.scale = { 1.f, 25.f };
+		transform.scale = { 1.f, 1.f };
 		myScene.transforms.push_back({ a, transform });
 
 		Physics::Rigidbody2D rb{};
@@ -216,6 +266,20 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 		Physics::BoxCollider2D collider{};
 		myScene.boxColliders.push_back({ a, collider });
+
+		b2BodyDef bodyDef{};
+		bodyDef.type = b2BodyType::b2_dynamicBody;
+		b2Body* physicsBody = physicsWorld->CreateBody(&bodyDef);
+		DEngine::Box2DBody body{};
+		body.ptr = physicsBody;
+		myScene.b2Bodies.push_back({ a, body });
+		b2MassData massData{};
+		massData.mass = 1.f;
+		physicsBody->SetMassData(&massData);
+		b2PolygonShape boxShape{};
+		boxShape.SetAsBox(0.5f, 0.5f);
+		f32 density = 1.;
+		physicsBody->CreateFixture(&boxShape, density);
 	}
 
 	/*
@@ -278,10 +342,34 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 		if (myScene.play)
 		{
-			Physics::Update(myScene, Time::Delta());
+			//Physics::Update(myScene, Time::Delta());
 
 			for (auto item : myScene.moves)
 				item.b.Update(item.a, myScene, Time::Delta());
+
+			// First copy our positions into every physics body
+			for (auto const& physicsBodyPair : myScene.b2Bodies)
+			{
+				Entity a = physicsBodyPair.a;
+				auto const& transform = Std::FindIf(
+					myScene.transforms.begin(),
+					myScene.transforms.end(),
+					[a](decltype(myScene.transforms[0]) const& val) -> bool { return val.a == a; })->b;
+				physicsBodyPair.b.ptr->SetTransform({ transform.position.x, transform.position.y }, transform.rotation);
+			}
+			physicsWorld->Step(Time::Delta(), 8, 8);
+			// Then copy the stuff back
+			for (auto const& physicsBodyPair : myScene.b2Bodies)
+			{
+				Entity a = physicsBodyPair.a;
+				auto& transform = Std::FindIf(
+					myScene.transforms.begin(),
+					myScene.transforms.end(),
+					[a](decltype(myScene.transforms[0]) const& val) -> bool { return val.a == a; })->b;
+				auto physicsBodyTransform = physicsBodyPair.b.ptr->GetTransform();
+				transform.position = { physicsBodyTransform.p.x, physicsBodyTransform.p.y };
+				transform.rotation = physicsBodyTransform.q.GetAngle();
+			}
 		}
 
 		detail::SubmitRendering(

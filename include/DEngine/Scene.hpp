@@ -9,9 +9,15 @@
 #include <DEngine/Math/UnitQuaternion.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
 #include <DEngine/Physics.hpp>
+#include <box2d/box2d.h>
 
 namespace DEngine
 {
+	struct Box2DBody
+	{
+		b2Body* ptr = nullptr;
+	};
+
 	enum class Entity : u64 { Invalid = u64(-1) };
 
 	class Scene;
@@ -47,6 +53,7 @@ namespace DEngine
 		std::vector<Std::Pair<Entity, Physics::CircleCollider2D>> circleColliders;
 		std::vector<Std::Pair<Entity, Physics::BoxCollider2D>> boxColliders;
 		std::vector<Std::Pair<Entity, Move>> moves;
+		std::vector<Std::Pair<Entity, Box2DBody>> b2Bodies;
 
 		inline Entity NewEntity()
 		{
