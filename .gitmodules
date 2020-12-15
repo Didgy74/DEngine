@@ -3,9 +3,9 @@
 	path = external/Texas
 	url = https://github.com/Didgy74/Texas.git
 	branch = development
+[submodule "external/box2d"]
+	path = external/box2d
+	url = git@github.com:Didgy74/box2d.git
 [submodule "external/anton_gizmo"]
 	path = external/anton_gizmo
-	url = https://github.com/kociap/anton_gizmo.git
-[submodule "external/Box2D"]
-	path = external/Box2D
-	url = https://github.com/erincatto/box2d.git
+	url = https://github.com/Didgy74/anton_gizmo.git

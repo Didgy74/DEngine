@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.15)
 project(dengine)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -94,9 +94,7 @@ target_link_libraries(dengine PRIVATE anton_gizmo)
 # ----------
 # START
 
-	set(BOX2D_BUILD_UNIT_TESTS OFF)
-	set(BOX2D_BUILD_TESTBED OFF)
-	add_subdirectory(external/Box2D Box2D)
+	add_subdirectory(external/box2d box2d)
 	target_link_libraries(dengine PRIVATE box2d)
 
 #
