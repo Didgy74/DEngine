@@ -16,26 +16,25 @@ namespace DEngine::Std
 	public:
 		using ValueType = T;
 
-		Opt(NullOpt_T = nullOpt);
+		Opt(NullOpt_T = nullOpt) noexcept;
 		Opt(Opt const&);
-		Opt(Opt&&);
+		Opt(Opt&&) noexcept;
 		Opt(T const&);
-		//Opt(T&) = delete;
 		Opt(T&&);
 		~Opt();
 
 		Opt& operator=(Opt const&);
-		Opt& operator=(Opt&&);
+		Opt& operator=(Opt&&) noexcept;
 		Opt& operator=(T const&);
 		Opt& operator=(T&&);
 
-		[[nodiscard]] bool HasValue() const;
+		[[nodiscard]] bool HasValue() const noexcept;
 
-		[[nodiscard]] T const& Value() const;
-		[[nodiscard]] T& Value();
+		[[nodiscard]] T const& Value() const noexcept;
+		[[nodiscard]] T& Value() noexcept;
 
-		[[nodiscard]] T const* ToPtr() const;
-		[[nodiscard]] T* ToPtr();
+		[[nodiscard]] T const* ToPtr() const noexcept;
+		[[nodiscard]] T* ToPtr() noexcept;
 
 	private:
 		bool hasValue = false;
@@ -47,7 +46,7 @@ namespace DEngine::Std
 	};
 
 	template<typename T>
-	Opt<T>::Opt(NullOpt_T) {}
+	Opt<T>::Opt(NullOpt_T) noexcept {}
 
 	template<typename T>
 	Opt<T>::Opt(Opt const& other)
@@ -60,7 +59,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	Opt<T>::Opt(Opt&& other)
+	Opt<T>::Opt(Opt&& other) noexcept
 	{
 		if (other.hasValue)
 		{
@@ -109,10 +108,12 @@ namespace DEngine::Std
 		}
 		else
 			hasValue = false;
+
+		return *this;
 	}
 
 	template<typename T>
-	Opt<T>& Opt<T>::operator=(Opt&& other)
+	Opt<T>& Opt<T>::operator=(Opt&& other) noexcept
 	{
 		if (this == &other)
 			return *this;
@@ -162,13 +163,13 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	bool Opt<T>::HasValue() const
+	bool Opt<T>::HasValue() const noexcept
 	{
 		return hasValue;
 	}
 
 	template<typename T>
-	T const& Opt<T>::Value() const
+	T const& Opt<T>::Value() const noexcept
 	{
 		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
 			hasValue,
@@ -177,7 +178,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	T& Opt<T>::Value()
+	T& Opt<T>::Value() noexcept
 	{
 		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
 			hasValue,
@@ -186,7 +187,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	T const* Opt<T>::ToPtr() const
+	T const* Opt<T>::ToPtr() const noexcept
 	{
 		if (hasValue)
 			return &value;
@@ -195,7 +196,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	T* Opt<T>::ToPtr()
+	T* Opt<T>::ToPtr() noexcept
 	{
 		if (hasValue)
 			return &value;

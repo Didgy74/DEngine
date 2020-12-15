@@ -211,9 +211,9 @@ vk::DebugUtilsMessengerEXT DEngine::Gfx::Vk::Init::CreateLayerMessenger(
 	vk::DebugUtilsMessengerCreateInfoEXT debugMessengerInfo{};
 	debugMessengerInfo.messageSeverity =
 		vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
-		vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+		vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
 		//vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
-		vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
+		//vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose;
 	debugMessengerInfo.messageType =
 		vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
 		vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |

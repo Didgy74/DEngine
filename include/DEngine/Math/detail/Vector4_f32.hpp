@@ -35,6 +35,11 @@ namespace DEngine::Math
 
 		void Normalize();
 
+		[[nodiscard]] constexpr f32* begin() noexcept;
+		[[nodiscard]] constexpr f32 const* begin() const noexcept;
+		[[nodiscard]] constexpr f32* end() noexcept;
+		[[nodiscard]] constexpr f32 const* end() const noexcept;
+
 		[[nodiscard]] static constexpr Vector<4, f32> SingleValue(f32 input) noexcept;
 		[[nodiscard]] static constexpr Vector<4, f32> Zero() noexcept;
 		[[nodiscard]] static constexpr Vector<4, f32> One() noexcept;

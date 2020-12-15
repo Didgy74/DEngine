@@ -567,6 +567,20 @@ void Vk::DeviceDispatch::cmdBindVertexBuffers(
 		offsets.data());
 }
 
+void Vk::DeviceDispatch::cmdCopyBuffer(
+	vk::CommandBuffer commandBuffer,
+	vk::Buffer srcBuffer, 
+	vk::Buffer dstBuffer, 
+	vk::ArrayProxy<vk::BufferCopy const> regions) const
+{
+	raw.vkCmdCopyBuffer(
+		static_cast<VkCommandBuffer>(commandBuffer),
+		static_cast<VkBuffer>(srcBuffer),
+		static_cast<VkBuffer>(dstBuffer),
+		regions.size(),
+		reinterpret_cast<VkBufferCopy const*>(regions.data()));
+}
+
 void Vk::DeviceDispatch::cmdCopyBufferToImage(
 	vk::CommandBuffer cmdBuffer,
 	vk::Buffer srcBuffer,

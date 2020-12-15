@@ -58,7 +58,7 @@ namespace DEngine::Gfx
 
 		void* apiDataBuffer = nullptr;
 
-		friend Std::Opt<Context> Initialize(const InitInfo& initInfo);
+		friend Std::Opt<Context> Initialize(InitInfo const& initInfo);
 	};
 
 	struct TextureAssetInterface
@@ -75,6 +75,14 @@ namespace DEngine::Gfx
 		u32 width;
 		u32 height;
 		Math::Mat4 transform;
+
+		struct Gizmo
+		{
+			// In world space
+			Math::Vec3 position{};
+			f32 scale{};
+		};
+		Std::Opt<Gizmo> gizmo;
 	};
 
 	struct GuiVertex

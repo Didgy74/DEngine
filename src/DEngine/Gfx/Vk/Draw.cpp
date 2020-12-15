@@ -1,6 +1,7 @@
 #include "Vk.hpp"
 #include <DEngine/Gfx/detail/Assert.hpp>
 
+#include <DEngine/Math/LinearTransform3D.hpp>
 #include <DEngine/Std/Utility.hpp>
 
 #include "Init.hpp"
@@ -249,12 +250,13 @@ namespace DEngine::Gfx::Vk
 		GlobUtils const& globUtils, 
 		ObjectDataManager const& objectDataManager,
 		TextureManager const& textureManager,
-		ViewportData const& viewportInfo,
+		ViewportData const& viewportData,
+		ViewportUpdate const& viewportUpdate,
 		DrawParams const& drawParams,
 		u8 inFlightIndex,
-		APIData& apiData)
+		APIData& test_apiData)
 	{
-		vk::CommandBuffer cmdBuffer = viewportInfo.cmdBuffers[inFlightIndex];
+		vk::CommandBuffer cmdBuffer = viewportData.cmdBuffers[inFlightIndex];
 
 		// We need to rename the command buffer every time we record it
 		if (globUtils.UsingDebugUtils())
@@ -262,12 +264,10 @@ namespace DEngine::Gfx::Vk
 			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
 			nameInfo.objectHandle = (u64)(VkCommandBuffer)cmdBuffer;
 			nameInfo.objectType = cmdBuffer.objectType;
-			/*
-			std::string name = std::string("Graphics viewport #") + std::to_string((u64)viewportInfo.id) + 
-				std::string(" - CmdBuffer #") + std::to_string(resourceSetIndex);
+			std::string name = std::string("Graphics viewport #") + std::to_string((u64)viewportUpdate.id) + 
+				std::string(" - CmdBuffer #") + std::to_string(inFlightIndex);
 			nameInfo.pObjectName = name.data();
 			globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
-			*/
 		}
 
 		vk::CommandBufferBeginInfo beginInfo{};
@@ -275,27 +275,27 @@ namespace DEngine::Gfx::Vk
 		globUtils.device.beginCommandBuffer(cmdBuffer, beginInfo);
 
 		vk::RenderPassBeginInfo rpBegin{};
-		rpBegin.framebuffer = viewportInfo.renderTarget.framebuffer;
+		rpBegin.framebuffer = viewportData.renderTarget.framebuffer;
 		rpBegin.renderPass = globUtils.gfxRenderPass;
-		rpBegin.renderArea.extent = viewportInfo.renderTarget.extent;
+		rpBegin.renderArea.extent = viewportData.renderTarget.extent;
 		rpBegin.clearValueCount = 1;
 		vk::ClearColorValue clearVal{};
 		clearVal.setFloat32({ 0.f, 0.f, 0.5f, 1.f });
-		vk::ClearValue test = clearVal;
-		rpBegin.pClearValues = &test;
+		vk::ClearValue clear = clearVal;
+		rpBegin.pClearValues = &clear;
 		globUtils.device.cmdBeginRenderPass(cmdBuffer, rpBegin, vk::SubpassContents::eInline);
 
 		vk::Viewport viewport{};
-		viewport.width = static_cast<float>(viewportInfo.renderTarget.extent.width);
-		viewport.height = static_cast<float>(viewportInfo.renderTarget.extent.height);
+		viewport.width = static_cast<f32>(viewportData.renderTarget.extent.width);
+		viewport.height = static_cast<f32>(viewportData.renderTarget.extent.height);
 		globUtils.device.cmdSetViewport(cmdBuffer, 0, viewport);
 
-		globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, apiData.testPipeline);
+		globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, test_apiData.testPipeline);
 
 		for (uSize drawIndex = 0; drawIndex < drawParams.textureIDs.size(); drawIndex += 1)
 		{
 			Std::Array<vk::DescriptorSet, 3> descrSets = {
-				viewportInfo.camDataDescrSets[inFlightIndex],
+				viewportData.camDataDescrSets[inFlightIndex],
 				objectDataManager.descrSet,
 				textureManager.database.at(drawParams.textureIDs[drawIndex]).descrSet };
 
@@ -306,12 +306,90 @@ namespace DEngine::Gfx::Vk
 			globUtils.device.cmdBindDescriptorSets(
 				cmdBuffer,
 				vk::PipelineBindPoint::eGraphics,
-				apiData.testPipelineLayout,
+				test_apiData.testPipelineLayout,
 				0,
 				{ (u32)descrSets.Size(), descrSets.Data() },
 				(u32)objectDataBufferOffset);
 			globUtils.device.cmdDraw(cmdBuffer, 4, 1, 0, 0);
 		}
+
+		// Draw the gizmo for this viewport
+		if (viewportUpdate.gizmo.HasValue())
+		{
+			ViewportUpdate::Gizmo gizmo = viewportUpdate.gizmo.Value();
+		
+			globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, test_apiData.gizmoManager.pipeline);
+
+			globUtils.device.cmdBindVertexBuffers(cmdBuffer, 0, { test_apiData.gizmoManager.vtxBuffer }, { 0 });
+			Std::Array<vk::DescriptorSet, 1> descrSets = {
+				viewportData.camDataDescrSets[inFlightIndex] };
+			globUtils.device.cmdBindDescriptorSets(
+				cmdBuffer,
+				vk::PipelineBindPoint::eGraphics,
+				test_apiData.gizmoManager.pipelineLayout,
+				0,
+				{ (u32)descrSets.Size(), descrSets.Data() },
+				nullptr);
+
+			// Draw X arrow
+			{
+				Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
+				gizmoMatrix = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Y, -Math::pi / 2) * gizmoMatrix;
+				Math::LinTran3D::SetTranslation(gizmoMatrix, gizmo.position);
+				globUtils.device.cmdPushConstants(
+					cmdBuffer,
+					test_apiData.gizmoManager.pipelineLayout,
+					vk::ShaderStageFlagBits::eVertex,
+					0,
+					sizeof(gizmoMatrix),
+					&gizmoMatrix);
+				Math::Vec4 color = { 1.f, 0.f, 0.f, 1.f };
+				globUtils.device.cmdPushConstants(
+					cmdBuffer,
+					test_apiData.gizmoManager.pipelineLayout,
+					vk::ShaderStageFlagBits::eFragment,
+					sizeof(gizmoMatrix),
+					sizeof(color),
+					&color);
+
+				globUtils.device.cmdDraw(
+					cmdBuffer,
+					test_apiData.gizmoManager.vertexCount,
+					1,
+					0,
+					0);
+			}
+
+			// Draw Y arrow
+			{
+				Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
+				gizmoMatrix = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::X, Math::pi / 2) * gizmoMatrix;
+				Math::LinTran3D::SetTranslation(gizmoMatrix, gizmo.position);
+				globUtils.device.cmdPushConstants(
+					cmdBuffer,
+					test_apiData.gizmoManager.pipelineLayout,
+					vk::ShaderStageFlagBits::eVertex,
+					0,
+					sizeof(gizmoMatrix),
+					&gizmoMatrix);
+				Math::Vec4 color = { 0.f, 1.f, 0.f, 1.f };
+				globUtils.device.cmdPushConstants(
+					cmdBuffer,
+					test_apiData.gizmoManager.pipelineLayout,
+					vk::ShaderStageFlagBits::eFragment,
+					sizeof(gizmoMatrix),
+					sizeof(color),
+					&color);
+
+				globUtils.device.cmdDraw(
+					cmdBuffer,
+					test_apiData.gizmoManager.vertexCount,
+					1,
+					0,
+					0);
+			}
+		}
+		
 
 		globUtils.device.cmdEndRenderPass(cmdBuffer);
 
@@ -319,7 +397,7 @@ namespace DEngine::Gfx::Vk
 		if (globUtils.editorMode)
 		{
 			vk::ImageMemoryBarrier imgBarrier{};
-			imgBarrier.image = viewportInfo.renderTarget.img;
+			imgBarrier.image = viewportData.renderTarget.img;
 			imgBarrier.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 			imgBarrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 			imgBarrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
@@ -417,8 +495,6 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		{ drawParams.viewportUpdates.data(), drawParams.viewportUpdates.size() },
 		currentInFlightIndex);
 
-
-
 	std::vector<vk::CommandBuffer> graphicsCmdBuffers{};
 	for (auto const& viewportUpdate : drawParams.viewportUpdates)
 	{
@@ -430,11 +506,13 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		ViewportData const& viewport = viewportDataIt->viewport;
 		vk::CommandBuffer cmdBuffer = viewport.cmdBuffers[currentInFlightIndex];
 		graphicsCmdBuffers.push_back(cmdBuffer);
+		
 		RecordGraphicsCmdBuffer(
 			globUtils,
 			apiData.objectDataManager,
 			apiData.textureManager,
 			viewport,
+			viewportUpdate,
 			drawParams,
 			currentInFlightIndex,
 			apiData);
@@ -462,7 +540,6 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 			DENGINE_DETAIL_GFX_ASSERT(windowUpdate.drawCmdOffset + windowUpdate.drawCmdCount <= drawParams.guiDrawCmds.size());
 			drawCmds = { &drawParams.guiDrawCmds[windowUpdate.drawCmdOffset], windowUpdate.drawCmdCount };
 		}
-
 
 		RecordGUICmdBuffer(
 			globUtils,
@@ -524,8 +601,8 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		presentInfo.pSwapchains = swapchains.data();
 		presentInfo.swapchainCount = (u32)swapchains.size();
 		vkResult = globUtils.queues.graphics.presentKHR(presentInfo);
-		//if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eSuboptimalKHR)
-			//throw std::runtime_error("DEngine - Vulkan: Presentation submission did not return success result.");
+		if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eSuboptimalKHR)
+			throw std::runtime_error("DEngine - Vulkan: Presentation submission did not return success result.");
 	}
 
 	DeletionQueue::ExecuteCurrentTick(

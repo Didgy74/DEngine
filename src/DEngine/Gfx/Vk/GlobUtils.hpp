@@ -51,6 +51,6 @@ namespace DEngine::Gfx::Vk
 
 	private:
 		GlobUtils();
-		friend struct APIData;
+		friend class APIData;
 	};
 }

@@ -14,6 +14,8 @@
 
 #include <box2d/box2d.h>
 
+#include <anton/gizmo/gizmo.hpp>
+
 #include <iostream>
 #include <vector>
 #include <string>
@@ -135,7 +137,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	App::WindowID mainWindow = App::CreateWindow(
 		"Main window",
-		{ 750, 750 });
+		{ 1000, 750 });
 
 	auto gfxWsiConnection = new detail::GfxWsiConnection;
 	gfxWsiConnection->appWindowID = mainWindow;
@@ -324,7 +326,6 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	Move move{};
 	myScene.moves.push_back({ Entity(), move });
-	
 
 	Editor::Context editorCtx = Editor::Context::Create(
 		mainWindow,

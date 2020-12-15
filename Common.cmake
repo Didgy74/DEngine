@@ -45,6 +45,7 @@
 		${DENGINE_ROOT_DIR}/src/main.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Assert.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Editor/Editor.cpp
+		${DENGINE_ROOT_DIR}/src/DEngine/Editor/ViewportWidget.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/FrameAllocator.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/Button.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/Context.cpp

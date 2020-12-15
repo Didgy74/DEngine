@@ -41,18 +41,6 @@ include(Common.cmake)
 	set(VULKAN_INCLUDE_DIRS ${DENGINE_ROOT_DIR}/external/Vulkan-Headers/include)
 	target_include_directories(dengine PRIVATE ${VULKAN_INCLUDE_DIRS})
 
-# ----------
-# Link Texas
-# ----------
-# START
-	add_subdirectory(external/Texas Texas)
-	target_link_libraries(dengine PRIVATE Texas)
-#
-# END
-#
-
-add_subdirectory(external/freetype2 freetype2)
-target_link_libraries(dengine PRIVATE freetype)
 
 # -----------------------
 # Link external libraries
@@ -85,6 +73,21 @@ target_link_libraries(dengine PRIVATE freetype)
 # END
 #
 
+# ----------
+# Link Texas
+# ----------
+# START
+	add_subdirectory(external/Texas Texas)
+	target_link_libraries(dengine PRIVATE Texas)
+#
+# END
+#
+
+add_subdirectory(external/freetype2 freetype2)
+target_link_libraries(dengine PRIVATE freetype)
+
+add_subdirectory(external/anton_gizmo anton_gizmo)
+target_link_libraries(dengine PRIVATE anton_gizmo)
 
 # ----------
 # Link Box2D

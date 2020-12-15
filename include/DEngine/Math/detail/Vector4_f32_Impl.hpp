@@ -66,6 +66,26 @@ namespace DEngine::Math
 		return (x * x) + (y * y) + (z * z) + (w * w);
 	}
 
+	[[nodiscard]] constexpr f32* Vector<4, f32>::begin() noexcept
+	{
+		return &x;
+	}
+
+	[[nodiscard]] constexpr f32 const* Vector<4, f32>::begin() const noexcept
+	{
+		return &x;
+	}
+
+	[[nodiscard]] constexpr f32* Vector<4, f32>::end() noexcept
+	{
+		return &x + 4;
+	}
+
+	[[nodiscard]] constexpr f32 const* Vector<4, f32>::end() const noexcept
+	{
+		return &x + 4;
+	}
+
 	constexpr Vector<4, f32> Vector<4, f32>::SingleValue(f32 input) noexcept
 	{
 		return { input, input, input, input };

@@ -1,3 +1,5 @@
+#include <anton/gizmo/gizmo.hpp>
+
 #include "ViewportWidget.hpp"
 
 #include "Editor.hpp"
@@ -513,9 +515,10 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 
 	for (auto viewportWidgetPtr : implData.viewportWidgets)
 	{
-		if (viewportWidgetPtr && viewportWidgetPtr->isVisible)
+		DENGINE_DETAIL_ASSERT(viewportWidgetPtr);
+		auto& viewportWidget = *viewportWidgetPtr;
+		if (viewportWidgetPtr->isVisible)
 		{
-			auto& viewportWidget = *viewportWidgetPtr;
 			DENGINE_DETAIL_ASSERT(viewportWidget.currentExtent.width > 0 && viewportWidget.currentExtent.height > 0);
 			DENGINE_DETAIL_ASSERT(viewportWidget.newExtent.width > 0 && viewportWidget.newExtent.height > 0);
 
@@ -524,30 +527,46 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 			update.width = viewportWidget.currentExtent.width;
 			update.height = viewportWidget.currentExtent.height;
 
-			Math::Mat4 test = Math::Mat4::Identity();
-			test.At(0, 0) = -1;
-			//test.At(1, 1) = -1;
-			test.At(2, 2) = -1;
+			f32 aspectRatio = (f32)update.width / (f32)update.height;
+			Math::Mat4 projMat = viewportWidget.GetProjectionMatrix(aspectRatio);
 
-			Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(viewportWidget.cam.rotation) * test;
-			Math::LinTran3D::SetTranslation(camMat, viewportWidget.cam.position);
+			update.transform = projMat;
 
-			Math::Mat4 test2 = Math::Mat4::Identity();
-			//test2.At(0, 0) = -1;
-			//test2.At(1, 1) = -1;
-			//test2.At(2, 2) = -1;
-			camMat = test2 * camMat;
+			if (implData.selectedEntity.HasValue())
+			{
+				Entity selected = implData.selectedEntity.Value();
+				// Find Transform component of this entity
+				auto const transformIt = Std::FindIf(
+					implData.scene->transforms.begin(),
+					implData.scene->transforms.end(),
+					[selected](decltype(implData.scene->transforms[0]) const& val) -> bool { return val.a == selected; });
+				if (transformIt != implData.scene->transforms.end())
+				{
+					Transform const& transform = transformIt->b;
 
+					update.gizmo = Gfx::ViewportUpdate::Gizmo{};
+					Gfx::ViewportUpdate::Gizmo gizmo = update.gizmo.Value();
 
-			camMat = camMat.GetInverse().Value();
-			f32 aspectRatio = (f32)viewportWidget.newExtent.width / viewportWidget.newExtent.height;
+					gizmo.position = transform.position;
 
-			camMat = Math::LinTran3D::Perspective_RH_ZO(viewportWidget.cam.verticalFov * Math::degToRad, aspectRatio, 0.1f, 100.f) * camMat;
+					//Math::Mat4 worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation);
+					Math::Mat4 worldTransform = Math::Mat4::Identity();
+					Math::LinTran3D::SetTranslation(worldTransform, { transform.position.x, transform.position.y, 0.f });
+					//Math::Mat4 worldTransformTransposed = worldTransform.Transposed();
+					anton::math::Mat4 anton_worldTransform{ worldTransform.Data() };
+					//Math::Mat4 projMatTransposed = projMat.Transposed();
+					anton::math::Mat4 anton_projMatrix{ projMat.Data() };
+					u32 smallestViewportExtent = Math::Min(viewportWidget.currentExtent.width, viewportWidget.currentExtent.height);
+					f32 scale = anton::gizmo::compute_scale(
+						anton_worldTransform,
+						smallestViewportExtent / 4,
+						anton_projMatrix, 
+						{ (f32)viewportWidget.currentExtent.width, (f32)viewportWidget.currentExtent.height  });
+					gizmo.scale = scale;
 
-			//camMat = test * camMat;
-
-			update.transform = camMat;
-
+					update.gizmo = gizmo;
+				}
+			}
 			returnVal.viewportUpdates.push_back(update);
 		}
 	}

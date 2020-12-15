@@ -905,7 +905,7 @@ void Vk::GuiResourceManager::NewFontTexture(
 	}
 	else
 	{
-		auto insertResult = manager.glyphDatas.insert({ utfValue, newGlyphData });
+		auto insertResult = manager.glyphDatas.insert(std::pair{ utfValue, newGlyphData });
 		if (!insertResult.second)
 			throw std::runtime_error("DEngine - Vulkan: Unable to insert new glyph.");
 	}

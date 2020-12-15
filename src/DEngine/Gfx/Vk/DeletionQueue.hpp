@@ -51,12 +51,14 @@ namespace DEngine::Gfx::Vk
 			GlobUtils const& globUtils,
 			u8 currentInFlightIndex);
 
+		// Custom data is mem-copied.
 		void Destroy(
 			CallbackPFN callback, 
 			Std::Span<u8 const> customData) const;
 
 		// Waits for a fence to be signalled and then executes
 		// the job, and afterwards destroys the Fence.
+		// Custom data is mem-copied.
 		void Destroy(
 			vk::Fence fence,
 			CallbackPFN callback,
@@ -159,6 +161,7 @@ namespace DEngine::Gfx::Vk
 		tempData.customData = customData;
 		CallbackPFN wrapperFunc = [](GlobUtils const& globUtils, Std::Span<u8> customData)
 		{
+			DENGINE_DETAIL_GFX_ASSERT(reinterpret_cast<uSize>(customData.Data()) % alignof(TempData) == 0);
 			DENGINE_DETAIL_GFX_ASSERT(sizeof(TempData) == customData.Size());
 			TempData& tempData = *reinterpret_cast<TempData*>(customData.Data());
 			tempData.callback(globUtils, tempData.customData);

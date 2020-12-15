@@ -366,6 +366,12 @@ namespace DEngine::Gfx::Vk
 			vk::ArrayProxy<vk::Buffer const> buffers,
 			vk::ArrayProxy<vk::DeviceSize const> offsets) const;
 
+		void cmdCopyBuffer(
+			vk::CommandBuffer commandBuffer,
+			vk::Buffer srcBuffer,
+			vk::Buffer dstBuffer,
+			vk::ArrayProxy<vk::BufferCopy const> regions) const;
+		
 		void cmdCopyBufferToImage(
 			vk::CommandBuffer commandBuffer,
 			vk::Buffer srcBuffer,

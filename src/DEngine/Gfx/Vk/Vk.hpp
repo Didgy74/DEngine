@@ -5,6 +5,7 @@
 #include "Constants.hpp"
 #include "DeletionQueue.hpp"
 #include "DynamicDispatch.hpp"
+#include "GizmoManager.hpp"
 #include "GlobUtils.hpp"
 #include "GuiResourceManager.hpp"
 #include "NativeWindowManager.hpp"
@@ -52,8 +53,9 @@ namespace DEngine::Gfx::Vk
 		u64 vma_idTracker = 0;
 	};
 
-	struct APIData final : public APIDataBase
+	class APIData final : public APIDataBase
 	{
+	public:
 		APIData();
 		virtual ~APIData() override;
 		virtual void Draw(DrawParams const& drawParams) override;
@@ -89,6 +91,7 @@ namespace DEngine::Gfx::Vk
 
 		GlobUtils globUtils{};
 
+		GizmoManager gizmoManager{};
 		GuiResourceManager guiResourceManager{};
 		NativeWindowManager nativeWindowManager{};
 		ObjectDataManager objectDataManager{};

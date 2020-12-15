@@ -1,3 +1,4 @@
+project(DEngine)
 cmake_minimum_required(VERSION 3.4.1)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -16,14 +17,29 @@ target_link_libraries(dengine PRIVATE ${CMAKE_DL_LIBS})
 # Link Texas
 # ----------
 # START
-	add_subdirectory(${DENGINE_ROOT_DIR}/external/Texas Texas EXCLUDE_FROM_ALL)
+	add_subdirectory(${DENGINE_ROOT_DIR}/external/Texas Texas)
 	target_link_libraries(dengine PRIVATE Texas)
 #
 # END
 #
 
-add_subdirectory(${DENGINE_ROOT_DIR}/external/freetype2 freetype EXCLUDE_FROM_ALL)
+add_subdirectory(${DENGINE_ROOT_DIR}/external/freetype2 freetype)
 target_link_libraries(dengine PRIVATE freetype)
+
+add_subdirectory(${DENGINE_ROOT_DIR}/external/anton_gizmo anton_gizmo)
+target_link_libraries(dengine PRIVATE anton_gizmo)
+
+# ----------
+# Link Box2D
+# ----------
+# START
+set(BOX2D_BUILD_UNIT_TESTS OFF)
+set(BOX2D_BUILD_TESTBED OFF)
+add_subdirectory(${DENGINE_ROOT_DIR}/external/Box2D Box2D)
+target_link_libraries(dengine PRIVATE box2d)
+#
+# END
+#
 
 # Vulkan
 	set(VULKAN_INCLUDE_DIRS ${DENGINE_ROOT_DIR}/external/Vulkan-Headers/include)
