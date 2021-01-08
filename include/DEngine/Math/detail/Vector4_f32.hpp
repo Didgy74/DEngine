@@ -19,7 +19,9 @@ namespace DEngine::Math
 		f32 w;
 
 		[[nodiscard]] constexpr Vector<2, f32> AsVec2() const noexcept;
+		[[nodiscard]] explicit constexpr operator Vector<2, f32>() const noexcept;
 		[[nodiscard]] constexpr Vector<3, f32> AsVec3() const noexcept;
+		[[nodiscard]] explicit constexpr operator Vector<3, f32>() const noexcept;
 
 		[[nodiscard]] constexpr f32& At(uSize index) noexcept;
 		[[nodiscard]] constexpr f32 At(uSize index) const noexcept;

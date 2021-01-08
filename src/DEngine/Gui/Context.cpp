@@ -108,7 +108,7 @@ void Context::Test_AddMenu(
 	auto const windowNodeIt = Std::FindIf(
 		implData.windows.begin(),
 		implData.windows.end(),
-		[windowId](decltype(implData.windows.front()) const& val) -> bool { return windowId == val.id; });
+		[windowId](decltype(implData.windows)::value_type const& val) -> bool { return windowId == val.id; });
 	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != implData.windows.end());
 	auto& windowNode = *windowNodeIt;
 
@@ -132,14 +132,14 @@ void Context::Test_DestroyMenu(WindowID windowId, Layout* layout)
 	auto const windowNodeIt = Std::FindIf(
 		implData.windows.begin(),
 		implData.windows.end(),
-		[windowId](decltype(implData.windows.front()) const& val) -> bool { return windowId == val.id; });
+		[windowId](decltype(implData.windows)::value_type const& val) -> bool { return windowId == val.id; });
 	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != implData.windows.end());
 	auto& windowNode = *windowNodeIt;
 
 	auto const menuIt = Std::FindIf(
 		windowNode.test_Menus.begin(),
 		windowNode.test_Menus.end(),
-		[layout](decltype(windowNode.test_Menus.front()) const& val) -> bool { return val.topLayout.Get() == layout; });
+		[layout](decltype(windowNode.test_Menus)::value_type const& val) -> bool { return val.topLayout.Get() == layout; });
 	DENGINE_IMPL_GUI_ASSERT(menuIt != windowNode.test_Menus.end());
 
 	if (windowNode.currentlyIterating)

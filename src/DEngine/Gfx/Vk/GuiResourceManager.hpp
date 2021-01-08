@@ -25,13 +25,13 @@ namespace DEngine::Gfx::Vk
 	class GuiResourceManager
 	{
 	public:
-		static constexpr uSize minVtxCapacity = 4096;
+		static constexpr uSize minVtxCapacity = 2048;
 		vk::Buffer vtxBuffer{};
 		VmaAllocation vtxVmaAlloc{};
 		Std::Span<u8> vtxMappedMem;
 		uSize vtxInFlightCapacity = 0;
 
-		static constexpr uSize minIndexCapacity = 4096;
+		static constexpr uSize minIndexCapacity = 2048;
 		vk::Buffer indexBuffer{};
 		VmaAllocation indexVmaAlloc{};
 		Std::Span<u8> indexMappedMem;

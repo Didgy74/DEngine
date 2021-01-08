@@ -132,8 +132,6 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 				}
 			}
 
-
-			// First check if the Khronos validation layer is present
 			u32 availableLayerCount = 0;
 			vkResult = baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, nullptr);
 			if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
@@ -141,24 +139,38 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 			std::vector<vk::LayerProperties> availableLayers;
 			availableLayers.resize(availableLayerCount);
 			vkResult = baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data());
-			bool layerIsAvailable = false;
-			for (const auto& availableLayer : availableLayers)
-			{
-				char const* wantedLayerName = Constants::khronosLayerName;
-				char const* availableLayerName = availableLayer.layerName;
-				if (std::strcmp(wantedLayerName, availableLayerName) == 0)
-				{
-					layerIsAvailable = true;
-					// If the layer is available, we know it implements debug utils.
-					debugUtilsIsAvailable = true;
-					break;
-				}
-			}
-			if (debugUtilsIsAvailable && layerIsAvailable)
-			{
-				totalRequiredExtensions.push_back(Constants::debugUtilsExtensionName);
-				layersToUse.PushBack(Constants::khronosLayerName);
 
+			if (!debugUtilsIsAvailable)
+            {
+			    // Debug utils is not confirmed to be available yet,
+			    // We look if we find the KHRONOS layer is available,
+			    // it guarantees debug-utils to be availab.
+                for (const auto& availableLayer : availableLayers)
+                {
+                    char const* khronosLayerName = Constants::khronosLayerName;
+                    char const* availableLayerName = availableLayer.layerName;
+                    if (std::strcmp(khronosLayerName, availableLayerName) == 0)
+                    {
+                        // If the layer is available, we know it implements debug utils.
+                        debugUtilsIsAvailable = true;
+                        break;
+                    }
+                }
+            }
+
+			if (debugUtilsIsAvailable)
+			{
+			    // Add all preferred layers that are also available.
+			    for (auto const& availableLayer : availableLayers)
+                {
+			        for (auto const& preferredLayerName : Constants::preferredLayerNames)
+                    {
+			            if (std::strcmp(availableLayer.layerName, preferredLayerName) == 0)
+			                layersToUse.PushBack(preferredLayerName);
+                    }
+                }
+
+				totalRequiredExtensions.push_back(Constants::debugUtilsExtensionName);
 				returnValue.debugUtilsEnabled = true;
 			}
 		}

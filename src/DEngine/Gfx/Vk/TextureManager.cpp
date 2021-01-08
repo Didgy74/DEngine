@@ -321,7 +321,7 @@ void DEngine::Gfx::Vk::TextureManager::Init(
 	samplerInfo.addressModeV = vk::SamplerAddressMode::eRepeat;
 	samplerInfo.addressModeW = vk::SamplerAddressMode::eRepeat;
 	samplerInfo.magFilter = vk::Filter::eLinear;
-	samplerInfo.maxLod = 64.f;
+	samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
 	samplerInfo.minFilter = vk::Filter::eLinear;
 	samplerInfo.mipmapMode = vk::SamplerMipmapMode::eLinear;
 	manager.sampler = device.createSampler(samplerInfo);

@@ -282,12 +282,14 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 
 	GizmoManager::Initialize(
 		apiData.gizmoManager,
+		globUtils.inFlightCount,
 		globUtils.device,
 		globUtils.queues,
 		globUtils.vma,
 		globUtils.deletionQueue,
 		globUtils.DebugUtilsPtr(),
-		apiData);
+		apiData,
+		{ initInfo.gizmoArrowMesh.data(), initInfo.gizmoArrowMesh.size() });
 
 	return true;
 }
@@ -314,7 +316,6 @@ void Vk::Init::Test(APIData& apiData)
 		nameInfo.pObjectName = name.data();
 		apiData.globUtils.debugUtils.setDebugUtilsObjectNameEXT(apiData.globUtils.device.handle, nameInfo);
 	}
-
 
 	App::FileInputStream vertFile{ "data/vert.spv" };
 	if (!vertFile.IsOpen())
@@ -417,6 +418,7 @@ void Vk::Init::Test(APIData& apiData)
 	dynamicState.pDynamicStates = &temp;
 
 	vk::GraphicsPipelineCreateInfo pipelineInfo{};
+	pipelineInfo.pDepthStencilState = &depthStencilInfo;
 	pipelineInfo.layout = apiData.testPipelineLayout;
 	pipelineInfo.renderPass = apiData.globUtils.gfxRenderPass;
 	pipelineInfo.pDynamicState = &dynamicState;
@@ -448,42 +450,27 @@ void Vk::Init::Test(APIData& apiData)
 
 	apiData.globUtils.device.destroy(vertModule);
 	apiData.globUtils.device.destroy(fragModule);
-	
 }
 
-
-#include <anton/gizmo/gizmo.hpp>
-void Vk::GizmoManager::Initialize(
-	GizmoManager& manager,
-	DeviceDispatch const& device,
-	QueueData const& queues,
-	VmaAllocator const& vma,
-	DeletionQueue const& deletionQueue,
-	DebugUtilsDispatch const* debugUtils,
-	APIData const& apiData)
+namespace DEngine::Gfx::Vk
 {
-	vk::Result vkResult{};
-
+	void GizmoManager_InitializeArrowMesh(
+		GizmoManager& manager,
+		DeviceDispatch const& device,
+		QueueData const& queues,
+		VmaAllocator vma,
+		DeletionQueue const& deletionQueue,
+		DebugUtilsDispatch const* debugUtils,
+		Std::Span<Math::Vec3 const> arrowMesh)
 	{
-		anton::gizmo::Arrow_3D arrow{};
-		arrow.cap_length = 0.33f;
-		arrow.cap_size = 0.2f;
-		arrow.draw_style = anton::gizmo::Arrow_3D_Style::cone;
-		arrow.shaft_diameter = 0.1f;
-		arrow.shaft_length = 0.66f;
-		auto antonGeometry = anton::gizmo::generate_arrow_3d_geometry(arrow, 16);
-
-		std::vector<Math::Vec3> geometry;
-		geometry.reserve(antonGeometry.size());
-		for (auto const& item : antonGeometry)
-			geometry.push_back({ item.x, item.y, item.z });
-
-		manager.vertexCount = (u32)geometry.size();
+		vk::Result vkResult{};
+		
+		manager.arrowVtxCount = (u32)arrowMesh.Size();
 
 		// First we create the staging buffer
 		vk::BufferCreateInfo vtxBufferInfo_Staging{};
 		vtxBufferInfo_Staging.sharingMode = vk::SharingMode::eExclusive;
-		vtxBufferInfo_Staging.size = geometry.size() * sizeof(Math::Vec3);
+		vtxBufferInfo_Staging.size = arrowMesh.Size() * sizeof(Math::Vec3);
 		vtxBufferInfo_Staging.usage = vk::BufferUsageFlagBits::eTransferSrc;
 		VmaAllocationCreateInfo vtxVmaAllocInfo_Staging{};
 		vtxVmaAllocInfo_Staging.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_MAPPED_BIT;
@@ -502,11 +489,11 @@ void Vk::GizmoManager::Initialize(
 			throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate staging memory for gizmo vertices.");
 
 		// Copy vertices over to staging buffer
-		std::memcpy(vtxVmaAllocResultInfo_Staging.pMappedData, geometry.data(), vtxBufferInfo_Staging.size);
+		std::memcpy(vtxVmaAllocResultInfo_Staging.pMappedData, arrowMesh.Data(), vtxBufferInfo_Staging.size);
 
 		vk::BufferCreateInfo vtxBufferInfo{};
 		vtxBufferInfo.sharingMode = vk::SharingMode::eExclusive;
-		vtxBufferInfo.size = geometry.size() * sizeof(Math::Vec3);
+		vtxBufferInfo.size = vtxBufferInfo_Staging.size;
 		vtxBufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst;
 		VmaAllocationCreateInfo vtxVmaAllocInfo{};
 		vtxVmaAllocInfo.usage = VmaMemoryUsage::VMA_MEMORY_USAGE_GPU_ONLY;
@@ -514,16 +501,16 @@ void Vk::GizmoManager::Initialize(
 			vma,
 			(VkBufferCreateInfo*)&vtxBufferInfo,
 			&vtxVmaAllocInfo,
-			(VkBuffer*)&manager.vtxBuffer,
-			&manager.vtxVmaAlloc,
+			(VkBuffer*)&manager.arrowVtxBuffer,
+			&manager.arrowVtxVmaAlloc,
 			nullptr);
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate memory for gizmo vertices.");
 		if (debugUtils)
 		{
 			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkBuffer)manager.vtxBuffer;
-			nameInfo.objectType = manager.vtxBuffer.objectType;
+			nameInfo.objectHandle = (u64)(VkBuffer)manager.arrowVtxBuffer;
+			nameInfo.objectType = manager.arrowVtxBuffer.objectType;
 			std::string name = "GizmoManager - VertexBuffer";
 			nameInfo.pObjectName = name.c_str();
 			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
@@ -550,11 +537,11 @@ void Vk::GizmoManager::Initialize(
 		device.cmdCopyBuffer(
 			cmdBuffer,
 			vtxBuffer_Staging,
-			manager.vtxBuffer,
+			manager.arrowVtxBuffer,
 			{ copyRegion });
 
 		vk::BufferMemoryBarrier buffBarrier{};
-		buffBarrier.buffer = manager.vtxBuffer;
+		buffBarrier.buffer = manager.arrowVtxBuffer;
 		buffBarrier.size = vtxBufferInfo.size;
 		buffBarrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
 		buffBarrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead;
@@ -593,10 +580,16 @@ void Vk::GizmoManager::Initialize(
 			globUtils.device.destroy(destroyData.cmdPool);
 		};
 		deletionQueue.DestroyTest(fence, destroyCallback, destroyData);
-
 	}
 
+	void GizmoManager_InitializeArrowShader(
+		GizmoManager& manager,
+		DeviceDispatch const& device,
+		DebugUtilsDispatch const* debugUtils,
+		APIData const& apiData)
 	{
+		vk::Result vkResult{};
+
 		Std::Array<vk::DescriptorSetLayout, 1> layouts{
 			apiData.viewportManager.cameraDescrLayout };
 
@@ -618,7 +611,7 @@ void Vk::GizmoManager::Initialize(
 		pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.Data();
 		manager.pipelineLayout = apiData.globUtils.device.createPipelineLayout(pipelineLayoutInfo);
 
-		App::FileInputStream vertFile{ "data/Gizmo/vert.spv" };
+		App::FileInputStream vertFile{ "data/Gizmo/Arrow/vert.spv" };
 		if (!vertFile.IsOpen())
 			throw std::runtime_error("Could not open vertex shader file");
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
@@ -636,7 +629,7 @@ void Vk::GizmoManager::Initialize(
 		vertStageInfo.module = vertModule;
 		vertStageInfo.pName = "main";
 
-		App::FileInputStream fragFile{ "data/Gizmo/frag.spv" };
+		App::FileInputStream fragFile{ "data/Gizmo/Arrow/frag.spv" };
 		if (!fragFile.IsOpen())
 			throw std::runtime_error("Could not open fragment shader file");
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
@@ -647,7 +640,7 @@ void Vk::GizmoManager::Initialize(
 
 		vk::ShaderModuleCreateInfo fragModInfo{};
 		fragModInfo.codeSize = fragCode.size();
-		fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.data());
+		fragModInfo.pCode = reinterpret_cast<u32 const*>(fragCode.data());
 		vk::ShaderModule fragModule = apiData.globUtils.device.createShaderModule(fragModInfo);
 		vk::PipelineShaderStageCreateInfo fragStageInfo{};
 		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
@@ -670,7 +663,6 @@ void Vk::GizmoManager::Initialize(
 		vertexInputInfo.pVertexAttributeDescriptions = &position;
 		vertexInputInfo.vertexBindingDescriptionCount = 1;
 		vertexInputInfo.pVertexBindingDescriptions = &binding;
-
 
 		vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
 		inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
@@ -735,6 +727,7 @@ void Vk::GizmoManager::Initialize(
 		vk::GraphicsPipelineCreateInfo pipelineInfo{};
 		pipelineInfo.layout = manager.pipelineLayout;
 		pipelineInfo.renderPass = apiData.globUtils.gfxRenderPass;
+		pipelineInfo.pDepthStencilState = &depthStencilInfo;
 		pipelineInfo.pDynamicState = &dynamicState;
 		pipelineInfo.pInputAssemblyState = &inputAssembly;
 		pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -749,11 +742,386 @@ void Vk::GizmoManager::Initialize(
 			vk::PipelineCache(),
 			{ 1, &pipelineInfo },
 			nullptr,
-			&manager.pipeline);
+			&manager.arrowPipeline);
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to make graphics pipeline.");
 
 		apiData.globUtils.device.destroy(vertModule);
 		apiData.globUtils.device.destroy(fragModule);
 	}
+
+	void GizmoManager_InitializeQuadShader(
+		GizmoManager& manager,
+		DeviceDispatch const& device,
+		DebugUtilsDispatch const* debugUtils,
+		APIData const& apiData)
+	{
+		vk::Result vkResult{};
+
+		App::FileInputStream vertFile{ "data/Gizmo/Quad/vert.spv" };
+		if (!vertFile.IsOpen())
+			throw std::runtime_error("Could not open vertex shader file");
+		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
+		u64 vertFileLength = vertFile.Tell().Value();
+		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
+		std::vector<char> vertCode((uSize)vertFileLength);
+		vertFile.Read(vertCode.data(), vertFileLength);
+
+		vk::ShaderModuleCreateInfo vertModCreateInfo{};
+		vertModCreateInfo.codeSize = vertCode.size();
+		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
+		vk::ShaderModule vertModule = apiData.globUtils.device.createShaderModule(vertModCreateInfo);
+		vk::PipelineShaderStageCreateInfo vertStageInfo{};
+		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
+		vertStageInfo.module = vertModule;
+		vertStageInfo.pName = "main";
+
+		App::FileInputStream fragFile{ "data/Gizmo/Quad/frag.spv" };
+		if (!fragFile.IsOpen())
+			throw std::runtime_error("Could not open fragment shader file");
+		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
+		u64 fragFileLength = fragFile.Tell().Value();
+		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
+		std::vector<char> fragCode((uSize)fragFileLength);
+		fragFile.Read(fragCode.data(), fragFileLength);
+
+		vk::ShaderModuleCreateInfo fragModInfo{};
+		fragModInfo.codeSize = fragCode.size();
+		fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.data());
+		vk::ShaderModule fragModule = apiData.globUtils.device.createShaderModule(fragModInfo);
+		vk::PipelineShaderStageCreateInfo fragStageInfo{};
+		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
+		fragStageInfo.module = fragModule;
+		fragStageInfo.pName = "main";
+
+		Std::Array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = { vertStageInfo, fragStageInfo };
+
+		vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+
+		vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
+		inputAssembly.topology = vk::PrimitiveTopology::eTriangleStrip;
+
+		vk::Viewport viewport{};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = (f32)0.f;
+		viewport.height = (f32)0.f;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		vk::Rect2D scissor{};
+		scissor.offset = vk::Offset2D{ 0, 0 };
+		scissor.extent = vk::Extent2D{ 8192, 8192 };
+		vk::PipelineViewportStateCreateInfo viewportState{};
+		viewportState.viewportCount = 1;
+		viewportState.pViewports = &viewport;
+		viewportState.scissorCount = 1;
+		viewportState.pScissors = &scissor;
+
+		vk::PipelineRasterizationStateCreateInfo rasterizer{};
+		rasterizer.lineWidth = 1.f;
+		rasterizer.polygonMode = vk::PolygonMode::eFill;
+		rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
+		rasterizer.rasterizerDiscardEnable = 0;
+		rasterizer.cullMode = vk::CullModeFlagBits::eNone;
+
+		vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
+		depthStencilInfo.depthTestEnable = 0;
+		depthStencilInfo.depthCompareOp = vk::CompareOp::eLess;
+		depthStencilInfo.stencilTestEnable = 0;
+		depthStencilInfo.depthWriteEnable = 0;
+		depthStencilInfo.minDepthBounds = 0.f;
+		depthStencilInfo.maxDepthBounds = 1.f;
+
+		vk::PipelineMultisampleStateCreateInfo multisampling{};
+		multisampling.sampleShadingEnable = 0;
+		multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
+
+		vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
+		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eR;
+		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eG;
+		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eB;
+		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eA;
+		colorBlendAttachment.blendEnable = true;
+		colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd;
+		colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
+		colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+		colorBlendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+		colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+		colorBlendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+
+		vk::PipelineColorBlendStateCreateInfo colorBlending{};
+		colorBlending.attachmentCount = 1;
+		colorBlending.pAttachments = &colorBlendAttachment;
+
+		vk::DynamicState temp = vk::DynamicState::eViewport;
+		vk::PipelineDynamicStateCreateInfo dynamicState{};
+		dynamicState.dynamicStateCount = 1;
+		dynamicState.pDynamicStates = &temp;
+
+		vk::GraphicsPipelineCreateInfo pipelineInfo{};
+		pipelineInfo.layout = manager.pipelineLayout;
+		pipelineInfo.renderPass = apiData.globUtils.gfxRenderPass;
+		pipelineInfo.pDepthStencilState = &depthStencilInfo;
+		pipelineInfo.pDynamicState = &dynamicState;
+		pipelineInfo.pInputAssemblyState = &inputAssembly;
+		pipelineInfo.pVertexInputState = &vertexInputInfo;
+		pipelineInfo.pViewportState = &viewportState;
+		pipelineInfo.pMultisampleState = &multisampling;
+		pipelineInfo.pRasterizationState = &rasterizer;
+		pipelineInfo.pColorBlendState = &colorBlending;
+		pipelineInfo.stageCount = (u32)shaderStages.Size();
+		pipelineInfo.pStages = shaderStages.Data();
+
+		vkResult = apiData.globUtils.device.createGraphicsPipelines(
+			vk::PipelineCache(),
+			{ 1, &pipelineInfo },
+			nullptr,
+			&manager.quadPipeline);
+		if (vkResult != vk::Result::eSuccess)
+			throw std::runtime_error("Unable to make graphics pipeline.");
+
+		apiData.globUtils.device.destroy(vertModule);
+		apiData.globUtils.device.destroy(fragModule);
+	}
+
+	void GizmoManager_InitializeLineShader(
+		GizmoManager& manager,
+		DeviceDispatch const& device,
+		DebugUtilsDispatch const* debugUtils,
+		APIData const& apiData)
+	{
+		vk::Result vkResult{};
+
+		App::FileInputStream vertFile{ "data/Gizmo/Line/vert.spv" };
+		if (!vertFile.IsOpen())
+			throw std::runtime_error("Could not open vertex shader file");
+		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
+		u64 vertFileLength = vertFile.Tell().Value();
+		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
+		std::vector<char> vertCode((uSize)vertFileLength);
+		vertFile.Read(vertCode.data(), vertFileLength);
+
+		vk::ShaderModuleCreateInfo vertModCreateInfo{};
+		vertModCreateInfo.codeSize = vertCode.size();
+		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
+		vk::ShaderModule vertModule = apiData.globUtils.device.createShaderModule(vertModCreateInfo);
+		vk::PipelineShaderStageCreateInfo vertStageInfo{};
+		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
+		vertStageInfo.module = vertModule;
+		vertStageInfo.pName = "main";
+
+		App::FileInputStream fragFile{ "data/Gizmo/Line/frag.spv" };
+		if (!fragFile.IsOpen())
+			throw std::runtime_error("Could not open fragment shader file");
+		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
+		u64 fragFileLength = fragFile.Tell().Value();
+		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
+		std::vector<char> fragCode((uSize)fragFileLength);
+		fragFile.Read(fragCode.data(), fragFileLength);
+
+		vk::ShaderModuleCreateInfo fragModInfo{};
+		fragModInfo.codeSize = fragCode.size();
+		fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.data());
+		vk::ShaderModule fragModule = apiData.globUtils.device.createShaderModule(fragModInfo);
+		vk::PipelineShaderStageCreateInfo fragStageInfo{};
+		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
+		fragStageInfo.module = fragModule;
+		fragStageInfo.pName = "main";
+
+		Std::Array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = { vertStageInfo, fragStageInfo };
+
+		vk::VertexInputAttributeDescription position{};
+		position.binding = 0;
+		position.format = vk::Format::eR32G32B32Sfloat;
+		position.location = 0;
+		position.offset = 0;
+		vk::VertexInputBindingDescription binding{};
+		binding.binding = 0;
+		binding.inputRate = vk::VertexInputRate::eVertex;
+		binding.stride = 12;
+		vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+		vertexInputInfo.vertexAttributeDescriptionCount = 1;
+		vertexInputInfo.pVertexAttributeDescriptions = &position;
+		vertexInputInfo.vertexBindingDescriptionCount = 1;
+		vertexInputInfo.pVertexBindingDescriptions = &binding;
+
+		vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
+		inputAssembly.topology = vk::PrimitiveTopology::eLineStrip;
+
+		vk::Viewport viewport{};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = (f32)0.f;
+		viewport.height = (f32)0.f;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		vk::Rect2D scissor{};
+		scissor.offset = vk::Offset2D{ 0, 0 };
+		scissor.extent = vk::Extent2D{ 8192, 8192 };
+		vk::PipelineViewportStateCreateInfo viewportState{};
+		viewportState.viewportCount = 1;
+		viewportState.pViewports = &viewport;
+		viewportState.scissorCount = 1;
+		viewportState.pScissors = &scissor;
+
+		vk::PipelineRasterizationStateCreateInfo rasterizer{};
+		rasterizer.lineWidth = 1.f;
+		rasterizer.polygonMode = vk::PolygonMode::eFill;
+		rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
+		rasterizer.rasterizerDiscardEnable = 0;
+		rasterizer.cullMode = vk::CullModeFlagBits::eNone;
+
+		vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
+
+		vk::PipelineMultisampleStateCreateInfo multisampling{};
+
+		vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
+		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eR;
+		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eG;
+		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eB;
+		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eA;
+		colorBlendAttachment.blendEnable = true;
+		colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd;
+		colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
+		colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+		colorBlendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+		colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+		colorBlendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+
+		vk::PipelineColorBlendStateCreateInfo colorBlending{};
+		colorBlending.attachmentCount = 1;
+		colorBlending.pAttachments = &colorBlendAttachment;
+
+		vk::DynamicState temp = vk::DynamicState::eViewport;
+		vk::PipelineDynamicStateCreateInfo dynamicState{};
+		dynamicState.dynamicStateCount = 1;
+		dynamicState.pDynamicStates = &temp;
+
+		vk::GraphicsPipelineCreateInfo pipelineInfo{};
+		pipelineInfo.layout = manager.pipelineLayout;
+		pipelineInfo.renderPass = apiData.globUtils.gfxRenderPass;
+		pipelineInfo.pDepthStencilState = &depthStencilInfo;
+		pipelineInfo.pDynamicState = &dynamicState;
+		pipelineInfo.pInputAssemblyState = &inputAssembly;
+		pipelineInfo.pVertexInputState = &vertexInputInfo;
+		pipelineInfo.pViewportState = &viewportState;
+		pipelineInfo.pMultisampleState = &multisampling;
+		pipelineInfo.pRasterizationState = &rasterizer;
+		pipelineInfo.pColorBlendState = &colorBlending;
+		pipelineInfo.stageCount = (u32)shaderStages.Size();
+		pipelineInfo.pStages = shaderStages.Data();
+
+		vkResult = apiData.globUtils.device.createGraphicsPipelines(
+			vk::PipelineCache(),
+			{ 1, &pipelineInfo },
+			nullptr,
+			&manager.linePipeline);
+		if (vkResult != vk::Result::eSuccess)
+			throw std::runtime_error("Unable to make graphics pipeline.");
+
+		apiData.globUtils.device.destroy(vertModule);
+		apiData.globUtils.device.destroy(fragModule);
+	}
+
+	void GizmoManager_InitializeLineVtxBuffer(
+		GizmoManager& manager,
+		u8 inFlightCount,
+		DeviceDispatch const& device,
+		VmaAllocator const& vma,
+		DebugUtilsDispatch const* debugUtils)
+	{
+		vk::Result vkResult{};
+
+		vk::BufferCreateInfo vtxBufferInfo{};
+		vtxBufferInfo.sharingMode = vk::SharingMode::eExclusive;
+		vtxBufferInfo.size = manager.lineVtxElementSize * manager.lineVtxMinCapacity * inFlightCount;
+		vtxBufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer;
+		VmaAllocationCreateInfo vtxVmaAllocInfo{};
+		vtxVmaAllocInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		vtxVmaAllocInfo.usage = VmaMemoryUsage::VMA_MEMORY_USAGE_CPU_TO_GPU;
+		VmaAllocationInfo vmaAllocInfo{};
+		vkResult = (vk::Result)vmaCreateBuffer(
+			vma,
+			(VkBufferCreateInfo*)&vtxBufferInfo,
+			&vtxVmaAllocInfo,
+			(VkBuffer*)&manager.lineVtxBuffer,
+			&manager.lineVtxVmaAlloc,
+			&vmaAllocInfo);
+		if (vkResult != vk::Result::eSuccess)
+			throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate memory for gizmo line vertices.");
+		if (debugUtils)
+		{
+			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+			nameInfo.objectHandle = (u64)(VkBuffer)manager.lineVtxBuffer;
+			nameInfo.objectType = manager.lineVtxBuffer.objectType;
+			std::string name = "GizmoManager - LineVtxBuffer";
+			nameInfo.pObjectName = name.c_str();
+			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		}
+
+		manager.lineVtxBufferCapacity = manager.lineVtxMinCapacity;
+		manager.lineVtxBufferMappedMem = { (u8*)vmaAllocInfo.pMappedData, (uSize)vtxBufferInfo.size };
+	}
+}
+
+void Vk::GizmoManager::Initialize(
+	GizmoManager& manager,
+	u8 inFlightCount,
+	DeviceDispatch const& device,
+	QueueData const& queues,
+	VmaAllocator const& vma,
+	DeletionQueue const& deletionQueue,
+	DebugUtilsDispatch const* debugUtils,
+	APIData const& apiData,
+	Std::Span<Math::Vec3 const> arrowMesh)
+{
+	vk::Result vkResult{};
+
+	GizmoManager_InitializeArrowMesh(
+		manager,
+		device,
+		queues,
+		vma,
+		deletionQueue,
+		debugUtils,
+		arrowMesh);
+
+	GizmoManager_InitializeArrowShader(
+		manager,
+		device,
+		debugUtils,
+		apiData);
+
+	GizmoManager_InitializeQuadShader(
+		manager,
+		device,
+		debugUtils,
+		apiData);
+
+	GizmoManager_InitializeLineShader(
+		manager,
+		device,
+		debugUtils,
+		apiData);
+
+	GizmoManager_InitializeLineVtxBuffer(
+		manager,
+		inFlightCount,
+		device,
+		vma,
+		debugUtils);
+}
+
+void Vk::GizmoManager::UpdateLineVtxBuffer(
+	GizmoManager& manager,
+	GlobUtils const& globUtils,
+	u8 inFlightIndex,
+	Std::Span<Math::Vec3 const> vertices)
+{
+	uSize const ptrOffset = manager.lineVtxBufferCapacity * manager.lineVtxElementSize * inFlightIndex;
+	DENGINE_DETAIL_GFX_ASSERT(ptrOffset + manager.lineVtxElementSize * vertices.Size() < manager.lineVtxBufferMappedMem.Size());
+
+	u8* ptr = manager.lineVtxBufferMappedMem.Data() + ptrOffset;
+
+	std::memcpy(ptr, vertices.Data(), manager.lineVtxElementSize * vertices.Size());
 }

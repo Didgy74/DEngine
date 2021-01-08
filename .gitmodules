@@ -6,6 +6,3 @@
 [submodule "external/box2d"]
 	path = external/box2d
 	url = git@github.com:Didgy74/box2d.git
-[submodule "external/anton_gizmo"]
-	path = external/anton_gizmo
-	url = https://github.com/Didgy74/anton_gizmo.git

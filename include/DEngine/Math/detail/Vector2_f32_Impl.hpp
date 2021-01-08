@@ -1,12 +1,18 @@
 #pragma once
 
 #include <DEngine/detail/Assert.hpp>
+#include "Vector2_f32.hpp"
 
 namespace DEngine::Math
 {
 	constexpr Vector<3, f32> Vector<2, f32>::AsVec3(f32 zValue) const noexcept
 	{
 		return Vector<3, f32>{ x, y, zValue };
+	}
+
+	constexpr Vector<2, f32>::operator Vector<3, f32>() const noexcept
+	{
+		return Vector<3, f32>{ x, y, 0.f };
 	}
 
 	constexpr Vector<4, f32> Vector<2, f32>::AsVec4(f32 zValue, f32 wValue) const noexcept

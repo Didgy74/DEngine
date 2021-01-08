@@ -26,9 +26,6 @@ target_link_libraries(dengine PRIVATE ${CMAKE_DL_LIBS})
 add_subdirectory(${DENGINE_ROOT_DIR}/external/freetype2 freetype)
 target_link_libraries(dengine PRIVATE freetype)
 
-add_subdirectory(${DENGINE_ROOT_DIR}/external/anton_gizmo anton_gizmo)
-target_link_libraries(dengine PRIVATE anton_gizmo)
-
 # ----------
 # Link Box2D
 # ----------

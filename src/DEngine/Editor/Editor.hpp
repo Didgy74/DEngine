@@ -18,6 +18,8 @@ namespace DEngine::Editor
 		std::vector<Gfx::GuiDrawCmd> drawCmds;
 		std::vector<Gfx::NativeWindowUpdate> windowUpdates;
 		std::vector<Gfx::ViewportUpdate> viewportUpdates;
+		std::vector<Math::Vec3> lineVertices;
+		std::vector<Gfx::LineDrawCmd> lineDrawCmds;
 	};
 
 	class EditorImpl;
@@ -48,4 +50,6 @@ namespace DEngine::Editor
 
 		EditorImpl* implData = nullptr;
 	};
+
+	std::vector<Math::Vec3> BuildGizmoArrowMesh();
 }

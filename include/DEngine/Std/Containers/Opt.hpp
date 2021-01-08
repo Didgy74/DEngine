@@ -26,7 +26,7 @@ namespace DEngine::Std
 		Opt& operator=(Opt const&);
 		Opt& operator=(Opt&&) noexcept;
 		Opt& operator=(T const&);
-		Opt& operator=(T&&);
+		Opt& operator=(T&&) noexcept;
 
 		[[nodiscard]] bool HasValue() const noexcept;
 
@@ -40,9 +40,11 @@ namespace DEngine::Std
 		bool hasValue = false;
 		union
 		{
-			unsigned char unusedChar = 0;
+			alignas(T) unsigned char unusedChar[sizeof(T)] = {};
 			T value;
 		};
+
+		void Clear() noexcept;
 	};
 
 	template<typename T>
@@ -61,13 +63,13 @@ namespace DEngine::Std
 	template<typename T>
 	Opt<T>::Opt(Opt&& other) noexcept
 	{
+		Clear();
 		if (other.hasValue)
 		{
 			new(&value) T(static_cast<T&&>(other.Value()));
 			hasValue = true;
 
-			other.value.~T();
-			other.hasValue = false;
+			other.Clear();
 		}
 	}
 
@@ -88,8 +90,7 @@ namespace DEngine::Std
 	template<typename T>
 	Opt<T>::~Opt()
 	{
-		if (hasValue)
-			value.~T();
+		Clear();
 	}
 
 	template<typename T>
@@ -98,17 +99,18 @@ namespace DEngine::Std
 		if (this == &other)
 			return *this;
 
-		if (hasValue)
-			value.~T();
-
 		if (other.hasValue)
 		{
-			value = other.value;
-			hasValue = true;
+			if (hasValue)
+				value = other.value;
+			else
+				new(&value) T(other.value);
 		}
 		else
-			hasValue = false;
+			Clear();
 
+		hasValue = other.hasValue;
+			
 		return *this;
 	}
 
@@ -120,16 +122,13 @@ namespace DEngine::Std
 
 		if (other.hasValue)
 		{
-			if (!hasValue)
-				new(&value) T(static_cast<T&&>(other.value));
-			else
+			if (hasValue)
 				value = static_cast<T&&>(other.value);
+			else
+				new(&value) T(static_cast<T&&>(other.value));
 		}
 		else
-		{
-			if (hasValue)
-				value.~T();
-		}
+			Clear();
 
 		hasValue = other.hasValue;
 
@@ -150,7 +149,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	Opt<T>& Opt<T>::operator=(T&& right)
+	Opt<T>& Opt<T>::operator=(T&& right) noexcept
 	{
 		if (hasValue)
 			value = static_cast<T&&>(right);
@@ -202,5 +201,15 @@ namespace DEngine::Std
 			return &value;
 		else
 			return nullptr;
+	}
+
+	template<typename T>
+	void Opt<T>::Clear() noexcept
+	{
+		if (hasValue)
+		{
+			value.~T();
+			hasValue = false;
+		}
 	}
 }

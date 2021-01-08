@@ -33,4 +33,5 @@ Requires
  - GLFW 3
  - Texas
  - FreeType2
+ - Vulkan Memory Allocator
 

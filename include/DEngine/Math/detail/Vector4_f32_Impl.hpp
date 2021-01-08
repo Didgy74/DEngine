@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DEngine/detail/Assert.hpp>
+#include "Vector4_f32.hpp"
 
 namespace DEngine::Math
 {
@@ -8,9 +9,20 @@ namespace DEngine::Math
 	{
 		return Vector<2, f32>{ x, y };
 	}
+
+	inline constexpr Vector<4, f32>::operator Vector<2, f32>() const noexcept
+	{
+		return AsVec2();
+	}
+
 	constexpr Vector<3, f32> Vector<4, f32>::AsVec3() const noexcept
 	{
 		return Vector<3, f32>{ x, y, z };
+	}
+
+	inline constexpr Vector<4, f32>::operator Vector<3, f32>() const noexcept
+	{
+		return AsVec3();
 	}
 
 	constexpr f32& Vector<4, f32>::At(uSize index) noexcept

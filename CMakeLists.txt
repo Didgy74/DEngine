@@ -10,7 +10,6 @@ include(Common.cmake)
 # Make the main executable
 # ------------------------
 # START
-
 	add_executable(dengine ${DENGINE_SRC_FILES})
 	set_target_properties(dengine PROPERTIES CXX_STANDARD 17)
 	target_include_directories(dengine PRIVATE ${DENGINE_INCLUDE_DIRS})
@@ -85,9 +84,6 @@ include(Common.cmake)
 
 add_subdirectory(external/freetype2 freetype2)
 target_link_libraries(dengine PRIVATE freetype)
-
-add_subdirectory(external/anton_gizmo anton_gizmo)
-target_link_libraries(dengine PRIVATE anton_gizmo)
 
 # ----------
 # Link Box2D

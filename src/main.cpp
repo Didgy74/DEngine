@@ -14,11 +14,12 @@
 
 #include <box2d/box2d.h>
 
-#include <anton/gizmo/gizmo.hpp>
-
 #include <iostream>
 #include <vector>
 #include <string>
+
+#include <DEngine/Std/Trait.hpp>
+#include <DEngine/Std/Containers/Variant.hpp>
 
 class GfxLogger : public DEngine::Gfx::LogInterface
 {
@@ -76,7 +77,7 @@ void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 		auto rbIt = Std::FindIf(
 			scene.rigidbodies.begin(),
 			scene.rigidbodies.end(),
-			[entity](Std::Pair<Entity, Physics::Rigidbody2D> const& val) -> bool { return entity == val.a; });
+			[entity](auto const& val) -> bool { return entity == val.a; });
 
 		if (rbIt != scene.rigidbodies.end())
 		{
@@ -87,7 +88,7 @@ void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 		auto physicsBodyIt = Std::FindIf(
 			scene.b2Bodies.begin(),
 			scene.b2Bodies.end(),
-			[entity](decltype(scene.b2Bodies[0]) const& val) -> bool { return entity == val.a; });
+			[entity](auto const& val) -> bool { return entity == val.a; });
 		if (physicsBodyIt != scene.b2Bodies.end())
 		{
 			auto& physicsBody = *physicsBodyIt;
@@ -151,6 +152,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	rendererInitInfo.texAssetInterface = &gfxTexAssetInterfacer;
 	rendererInitInfo.optional_logger = &gfxLogger;
 	rendererInitInfo.requiredVkInstanceExtensions = requiredInstanceExtensions.ToSpan();
+	rendererInitInfo.gizmoArrowMesh = Editor::BuildGizmoArrowMesh();
 	Std::Opt<Gfx::Context> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
 	if (!rendererDataOpt.HasValue())
 	{
@@ -355,7 +357,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 				auto const& transform = Std::FindIf(
 					myScene.transforms.begin(),
 					myScene.transforms.end(),
-					[a](decltype(myScene.transforms[0]) const& val) -> bool { return val.a == a; })->b;
+					[a](auto const& val) -> bool { return val.a == a; })->b;
 				physicsBodyPair.b.ptr->SetTransform({ transform.position.x, transform.position.y }, transform.rotation);
 			}
 			physicsWorld->Step(Time::Delta(), 8, 8);
@@ -366,7 +368,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 				auto& transform = Std::FindIf(
 					myScene.transforms.begin(),
 					myScene.transforms.end(),
-					[a](decltype(myScene.transforms[0]) const& val) -> bool { return val.a == a; })->b;
+					[a](auto const& val) -> bool { return val.a == a; })->b;
 				auto physicsBodyTransform = physicsBodyPair.b.ptr->GetTransform();
 				transform.position = { physicsBodyTransform.p.x, physicsBodyTransform.p.y };
 				transform.rotation = physicsBodyTransform.q.GetAngle();
@@ -397,7 +399,7 @@ void DEngine::detail::SubmitRendering(
 		auto posIt = Std::FindIf(
 			scene.transforms.begin(),
 			scene.transforms.end(),
-			[&entity](decltype(scene.transforms[0]) const& val) -> bool { return val.a == entity; });
+			[&entity](auto const& val) -> bool { return val.a == entity; });
 		if (posIt == scene.transforms.end())
 			continue;
 		auto& transform = posIt->b;
@@ -411,11 +413,15 @@ void DEngine::detail::SubmitRendering(
 	}
 
 	auto editorDrawData = editorCtx.GetDrawInfo();
-	params.guiVerts = editorDrawData.vertices;
+	params.guiVertices = editorDrawData.vertices;
 	params.guiIndices = editorDrawData.indices;
 	params.guiDrawCmds = editorDrawData.drawCmds;
 	params.nativeWindowUpdates = editorDrawData.windowUpdates;
 	params.viewportUpdates = editorDrawData.viewportUpdates;
+	params.lineVertices = editorDrawData.lineVertices;
+	params.lineDrawCmds = editorDrawData.lineDrawCmds;
+
+
 
 	gfxData.Draw(params);
 }

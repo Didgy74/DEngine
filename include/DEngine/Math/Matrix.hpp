@@ -23,8 +23,8 @@ namespace DEngine::Math
 	struct Matrix : public Std::Trait::Cond<width == height, detail::MatrixBaseSquare<width, T>, detail::MatrixBase<width, height, T>>
 	{
 	public:
-		[[nodiscard]] constexpr T& At(uSize x, uSize y);
-		[[nodiscard]] constexpr T At(uSize x, uSize y) const;
+		[[nodiscard]] constexpr T& At(uSize x, uSize y) noexcept;
+		[[nodiscard]] constexpr T At(uSize x, uSize y) const noexcept;
 
 		[[nodiscard]] constexpr T* Data();
 		[[nodiscard]] constexpr T const* Data() const;
@@ -42,14 +42,14 @@ namespace DEngine::Math
 		[[nodiscard]] constexpr Matrix<width, height, T> operator-() const;
 		template<uSize widthB>
 		[[nodiscard]] constexpr Matrix<widthB, height, T> operator*(Matrix<widthB, width, T> const& right) const;
-		[[nodiscard]] constexpr Vector<height, T> operator*(Vector<width, T> const& right) const;
+		[[nodiscard]] Vector<height, T> operator*(Vector<width, T> const& right) const;
 		constexpr Matrix<width, height, T>& operator*=(T const& right);
 		[[nodiscard]] constexpr bool operator==(Matrix<width, height, T> const& right) const;
 		[[nodiscard]] constexpr bool operator!=(Matrix<width, height, T> const& right) const;
 	};
 
 	template<uSize width, uSize height, typename T>
-	constexpr T& Matrix<width, height, T>::At(uSize x, uSize y)
+	constexpr T& Matrix<width, height, T>::At(uSize x, uSize y) noexcept
 	{
 		DENGINE_DETAIL_ASSERT(x < width);
 		DENGINE_DETAIL_ASSERT(y < height);
@@ -57,7 +57,7 @@ namespace DEngine::Math
 	}
 
 	template<uSize width, uSize height, typename T>
-	constexpr T Matrix<width, height, T>::At(uSize x, uSize y) const
+	constexpr T Matrix<width, height, T>::At(uSize x, uSize y) const noexcept
 	{
 		DENGINE_DETAIL_ASSERT(x < width);
 		DENGINE_DETAIL_ASSERT(y < height);
@@ -174,9 +174,9 @@ namespace DEngine::Math
 	}
 
 	template<uSize width, uSize height, typename T>
-	constexpr Vector<height, T> Matrix<width, height, T>::operator*(Vector<width, T> const& right) const
+	Vector<height, T> Matrix<width, height, T>::operator*(Vector<width, T> const& right) const
 	{
-		Vector<height, T> newVector{};
+		Vector<height, T> newVector;
 		for (uSize y = 0; y < height; y += 1)
 		{
 			T dot{};

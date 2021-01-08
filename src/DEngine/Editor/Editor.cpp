@@ -1,5 +1,3 @@
-#include <anton/gizmo/gizmo.hpp>
-
 #include "ViewportWidget.hpp"
 
 #include "Editor.hpp"
@@ -527,7 +525,7 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 			update.width = viewportWidget.currentExtent.width;
 			update.height = viewportWidget.currentExtent.height;
 
-			f32 aspectRatio = (f32)update.width / (f32)update.height;
+			f32 aspectRatio = (f32)viewportWidget.newExtent.width / (f32)viewportWidget.newExtent.height;
 			Math::Mat4 projMat = viewportWidget.GetProjectionMatrix(aspectRatio);
 
 			update.transform = projMat;
@@ -539,35 +537,76 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 				auto const transformIt = Std::FindIf(
 					implData.scene->transforms.begin(),
 					implData.scene->transforms.end(),
-					[selected](decltype(implData.scene->transforms[0]) const& val) -> bool { return val.a == selected; });
+					[selected](auto const& val) -> bool { return val.a == selected; });
 				if (transformIt != implData.scene->transforms.end())
 				{
 					Transform const& transform = transformIt->b;
 
 					update.gizmo = Gfx::ViewportUpdate::Gizmo{};
-					Gfx::ViewportUpdate::Gizmo gizmo = update.gizmo.Value();
+					Gfx::ViewportUpdate::Gizmo& gizmo = update.gizmo.Value();
 
 					gizmo.position = transform.position;
 
-					//Math::Mat4 worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation);
 					Math::Mat4 worldTransform = Math::Mat4::Identity();
 					Math::LinTran3D::SetTranslation(worldTransform, { transform.position.x, transform.position.y, 0.f });
-					//Math::Mat4 worldTransformTransposed = worldTransform.Transposed();
-					anton::math::Mat4 anton_worldTransform{ worldTransform.Data() };
-					//Math::Mat4 projMatTransposed = projMat.Transposed();
-					anton::math::Mat4 anton_projMatrix{ projMat.Data() };
-					u32 smallestViewportExtent = Math::Min(viewportWidget.currentExtent.width, viewportWidget.currentExtent.height);
-					f32 scale = anton::gizmo::compute_scale(
-						anton_worldTransform,
-						smallestViewportExtent / 4,
-						anton_projMatrix, 
-						{ (f32)viewportWidget.currentExtent.width, (f32)viewportWidget.currentExtent.height  });
+					u32 smallestViewportExtent = Math::Min(viewportWidget.newExtent.width, viewportWidget.newExtent.height);
+					f32 scale = Gizmo::ComputeScale(
+						worldTransform,
+						smallestViewportExtent * Gizmo::defaultGizmoSizeRelative,
+						projMat,
+						viewportWidget.newExtent);
 					gizmo.scale = scale;
 
-					update.gizmo = gizmo;
+					gizmo.quadScale = gizmo.scale * Gizmo::defaultPlaneScaleRelative;
+					gizmo.quadOffset = gizmo.scale * Gizmo::defaultPlaneOffsetRelative;
 				}
 			}
 			returnVal.viewportUpdates.push_back(update);
+		}
+	}
+
+	// Add the debug lines for the collider
+	if (implData.selectedEntity.HasValue())
+	{
+		Entity const entity = implData.selectedEntity.Value();
+		auto const boxColliderIt = Std::FindIf(
+			implData.scene->boxColliders.begin(),
+			implData.scene->boxColliders.end(),
+			[entity](auto const& val) -> bool { return entity == val.a; });
+		if (boxColliderIt != implData.scene->boxColliders.end())
+		{
+			Physics::BoxCollider2D const& boxCollider = boxColliderIt->b;
+
+			auto const transformIt = Std::FindIf(
+				implData.scene->transforms.begin(),
+				implData.scene->transforms.end(),
+				[entity](auto const& val) -> bool { return entity == val.a; });
+			if (transformIt != implData.scene->transforms.end())
+			{
+				Transform const& transform = transformIt->b;
+
+				Math::Vec3 vertices[4] = {
+					{ -0.5f, 0.5f, 0.f },
+					{ 0.5f, 0.5f, 0.f },
+					{ 0.5f, -0.5f, 0.f },
+					{ -0.5f, -0.5f, 0.f } };
+
+				// Transform the vertices
+				Math::Mat4 worldTransform = Math::LinTran3D::Scale_Homo(boxCollider.size.x / 2.f, boxCollider.size.y / 2.f, 1.f);
+				worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation) * worldTransform;
+				Math::LinTran3D::SetTranslation(worldTransform, transform.position);
+				for (uSize i = 0; i < 4; i += 1)
+				{
+					vertices[i] = (worldTransform * vertices[i].AsVec4(1.f)).AsVec3();
+					returnVal.lineVertices.push_back(vertices[i]);
+				}
+				// And then push the first vertex again, so we close the shape
+				returnVal.lineVertices.push_back(vertices[0]);
+				Gfx::LineDrawCmd lineDrawCmd{};
+				lineDrawCmd.color = { 0.1f, 0.8f, 0.1f, 1.f };
+				lineDrawCmd.vertCount = 5;
+				returnVal.lineDrawCmds.push_back(lineDrawCmd);
+			}
 		}
 	}
 
@@ -777,4 +816,89 @@ void Editor::EditorImpl::OpenSoftInput(
 		break;
 	}
 	App::OpenSoftInput(currentText, filter);
+}
+
+std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh()
+{
+	Gizmo::Arrow arrow = Editor::Gizmo::defaultArrow;
+
+	f32 arrowShaftRadius = arrow.shaftDiameter / 2.f;
+	f32 arrowCapRadius = arrow.capSize / 2.f;
+
+	u32 subdivisions = 4;
+	// We need atleast 2 subdivisons so we can atleast get a diamond
+	DENGINE_DETAIL_ASSERT(subdivisions > 1);
+	u32 baseCircleTriangleCount = (subdivisions * 2);
+
+	std::vector<Math::Vec3> vertices;
+	for (u32 i = 0; i < baseCircleTriangleCount; i++)
+	{
+		f32 currentRadiansA = 2 * Math::pi / baseCircleTriangleCount * i;
+		f32 currentRadiansB = 2 * Math::pi / baseCircleTriangleCount * ((i + 1) % baseCircleTriangleCount);
+		
+		{
+			Math::Vec3 shaftBaseVertA{};
+			shaftBaseVertA.x = Math::Sin(currentRadiansA);
+			shaftBaseVertA.x *= arrowShaftRadius;
+			shaftBaseVertA.y = Math::Cos(currentRadiansA);
+			shaftBaseVertA.y *= arrowShaftRadius;
+
+			Math::Vec3 shaftBaseVertB{};
+			shaftBaseVertB.x = Math::Sin(currentRadiansB);
+			shaftBaseVertB.x *= arrowShaftRadius;
+			shaftBaseVertB.y = Math::Cos(currentRadiansB);
+			shaftBaseVertB.y *= arrowShaftRadius;
+
+			// Build the base circle triangle.
+			// We use different winding on this base circle,
+			// because this face faces away from the direction of the arrow.
+			vertices.push_back(shaftBaseVertB);
+			vertices.push_back({});
+			vertices.push_back(shaftBaseVertA);
+			
+			// Build a wall from this base triangle
+			Math::Vec3 shaftTopVertA = { shaftBaseVertA.x, shaftBaseVertA.y, shaftBaseVertA.z + arrow.shaftLength };
+			Math::Vec3 shaftTopVertB = { shaftBaseVertB.x, shaftBaseVertB.y, shaftBaseVertB.z + arrow.shaftLength };
+			vertices.push_back(shaftBaseVertA);
+			vertices.push_back(shaftTopVertA);
+			vertices.push_back(shaftBaseVertB);
+
+			vertices.push_back(shaftBaseVertB);
+			vertices.push_back(shaftTopVertA);
+			vertices.push_back(shaftTopVertB);
+
+			// Append walls to build base of cap
+			Math::Vec3 capBaseVertA{};
+			capBaseVertA.x = Math::Sin(currentRadiansA);
+			capBaseVertA.x *= arrowCapRadius;
+			capBaseVertA.y = Math::Cos(currentRadiansA);
+			capBaseVertA.y *= arrowCapRadius;
+			capBaseVertA.z = arrow.shaftLength;
+
+			Math::Vec3 capBaseVertB{};
+			capBaseVertB.x = Math::Sin(currentRadiansB);
+			capBaseVertB.x *= arrowCapRadius;
+			capBaseVertB.y = Math::Cos(currentRadiansB);
+			capBaseVertB.y *= arrowCapRadius;
+			capBaseVertB.z = arrow.shaftLength;
+
+			vertices.push_back(shaftTopVertA);
+			vertices.push_back(capBaseVertA);
+			vertices.push_back(shaftTopVertB);
+
+			vertices.push_back(shaftTopVertB);
+			vertices.push_back(capBaseVertA);
+			vertices.push_back(capBaseVertB);
+
+			// Connect cap base to arrow head
+			Math::Vec3 arrowHeadMidVert{};
+			arrowHeadMidVert.z = arrow.shaftLength + arrow.capLength;
+
+			vertices.push_back(capBaseVertA);
+			vertices.push_back(arrowHeadMidVert);
+			vertices.push_back(capBaseVertB);
+		}
+	}
+
+	return vertices;
 }

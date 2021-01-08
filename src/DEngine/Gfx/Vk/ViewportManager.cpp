@@ -210,7 +210,7 @@ namespace DEngine::Gfx::Vk
 			auto const viewportDataNodeIt = std::find_if(
 				viewportManager.viewportNodes.begin(),
 				viewportManager.viewportNodes.end(),
-				[id](decltype(viewportManager.viewportNodes[0]) const& val) -> bool { return id == val.id; });
+				[id](Std::Trait::RemoveCVRef<decltype(viewportManager.viewportNodes[0])> const& val) -> bool { return id == val.id; });
 			DENGINE_DETAIL_GFX_ASSERT(viewportDataNodeIt != viewportManager.viewportNodes.end());
 			auto& viewportNode = *viewportDataNodeIt;
 			ViewportData& viewportData = viewportDataNodeIt->viewport;
@@ -327,7 +327,7 @@ void Vk::ViewportManager::HandleEvents(
 		auto const viewportDataNodeIt = Std::FindIf(
 			viewportManager.viewportNodes.begin(),
 			viewportManager.viewportNodes.end(),
-			[&updateData](decltype(viewportManager.viewportNodes[0]) const& val) -> bool {return updateData.id == val.id; });
+			[&updateData](Std::Trait::RemoveCVRef<decltype(viewportManager.viewportNodes[0])> const& val) -> bool {return updateData.id == val.id; });
 		DENGINE_DETAIL_GFX_ASSERT(viewportDataNodeIt != viewportManager.viewportNodes.end());
 		ViewportData& viewportData = viewportDataNodeIt->viewport;
 		if (viewportData.renderTarget.img == vk::Image())
@@ -393,7 +393,7 @@ void Vk::ViewportManager::UpdateCameras(
 		auto nodeIt = Std::FindIf(
 			viewportManager.viewportNodes.begin(),
 			viewportManager.viewportNodes.end(),
-			[&viewportUpdate](decltype(viewportManager.viewportNodes.front()) const& val) -> bool {
+			[&viewportUpdate](Std::Trait::RemoveCVRef<decltype(viewportManager.viewportNodes[0])> const& val) -> bool {
 				return viewportUpdate.id == val.id; });
 		DENGINE_DETAIL_GFX_ASSERT(nodeIt != viewportManager.viewportNodes.end());
 		auto& node = *nodeIt;
@@ -433,7 +433,7 @@ Vk::GfxRenderTarget Vk::InitializeGfxViewportRenderTarget(
 	}
 
 	VmaAllocationCreateInfo vmaAllocInfo{};
-	vmaAllocInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+	//vmaAllocInfo.flags = VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 	vmaAllocInfo.memoryTypeBits = 0;
 	vmaAllocInfo.pool = 0;
 	vmaAllocInfo.preferredFlags = 0;

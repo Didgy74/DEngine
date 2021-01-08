@@ -245,6 +245,116 @@ namespace DEngine::Gfx::Vk
 		}
 	}
 
+	void RecordGizmoDrawCalls(
+		GlobUtils const& globUtils,
+		GizmoManager const& gizmoManager,
+		ViewportData const& viewportData,
+		ViewportUpdate::Gizmo gizmo,
+		vk::CommandBuffer cmdBuffer,
+		u8 inFlightIndex)
+	{
+		globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, gizmoManager.arrowPipeline);
+
+		globUtils.device.cmdBindVertexBuffers(cmdBuffer, 0, { gizmoManager.arrowVtxBuffer }, { 0 });
+		Std::Array<vk::DescriptorSet, 1> descrSets = {
+			viewportData.camDataDescrSets[inFlightIndex] };
+		globUtils.device.cmdBindDescriptorSets(
+			cmdBuffer,
+			vk::PipelineBindPoint::eGraphics,
+			gizmoManager.pipelineLayout,
+			0,
+			{ (u32)descrSets.Size(), descrSets.Data() },
+			nullptr);
+
+		// Draw X arrow
+		{
+			Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
+			gizmoMatrix = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Y, Math::pi / 2) * gizmoMatrix;
+			Math::LinTran3D::SetTranslation(gizmoMatrix, gizmo.position);
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				gizmoManager.pipelineLayout,
+				vk::ShaderStageFlagBits::eVertex,
+				0,
+				sizeof(gizmoMatrix),
+				&gizmoMatrix);
+			Math::Vec4 color = { 1.f, 0.f, 0.f, 1.f };
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				gizmoManager.pipelineLayout,
+				vk::ShaderStageFlagBits::eFragment,
+				sizeof(gizmoMatrix),
+				sizeof(color),
+				&color);
+
+			globUtils.device.cmdDraw(
+				cmdBuffer,
+				gizmoManager.arrowVtxCount,
+				1,
+				0,
+				0);
+		}
+		// Draw Y arrow
+		{
+			Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
+			gizmoMatrix = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::X, -Math::pi / 2) * gizmoMatrix;
+			Math::LinTran3D::SetTranslation(gizmoMatrix, gizmo.position);
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				gizmoManager.pipelineLayout,
+				vk::ShaderStageFlagBits::eVertex,
+				0,
+				sizeof(gizmoMatrix),
+				&gizmoMatrix);
+			Math::Vec4 color = { 0.f, 1.f, 0.f, 1.f };
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				gizmoManager.pipelineLayout,
+				vk::ShaderStageFlagBits::eFragment,
+				sizeof(gizmoMatrix),
+				sizeof(color),
+				&color);
+			globUtils.device.cmdDraw(
+				cmdBuffer,
+				gizmoManager.arrowVtxCount,
+				1,
+				0,
+				0);
+		}
+
+		// Draw the floating quad thing
+		{
+			globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, gizmoManager.quadPipeline);
+
+			Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.quadScale, gizmo.quadScale, gizmo.quadScale);
+			Math::Vec3 translation = gizmo.position;
+			translation += Math::Vec3{ 1.f, 1.f, 0.f } * gizmo.quadOffset;
+
+			Math::LinTran3D::SetTranslation(gizmoMatrix, translation);
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				gizmoManager.pipelineLayout,
+				vk::ShaderStageFlagBits::eVertex,
+				0,
+				sizeof(gizmoMatrix),
+				&gizmoMatrix);
+			Math::Vec4 color = { 1.f, 1.f, 0.f, 0.75f };
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				gizmoManager.pipelineLayout,
+				vk::ShaderStageFlagBits::eFragment,
+				sizeof(gizmoMatrix),
+				sizeof(color),
+				&color);
+			globUtils.device.cmdDraw(
+				cmdBuffer,
+				4,
+				1,
+				0,
+				0);
+		}
+	}
+	
 	// Assumes the resource set is available
 	void RecordGraphicsCmdBuffer(
 		GlobUtils const& globUtils, 
@@ -313,14 +423,14 @@ namespace DEngine::Gfx::Vk
 			globUtils.device.cmdDraw(cmdBuffer, 4, 1, 0, 0);
 		}
 
-		// Draw the gizmo for this viewport
-		if (viewportUpdate.gizmo.HasValue())
+		// Draw our lines
+		if (!drawParams.lineDrawCmds.empty())
 		{
-			ViewportUpdate::Gizmo gizmo = viewportUpdate.gizmo.Value();
-		
-			globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, test_apiData.gizmoManager.pipeline);
+			globUtils.device.cmdBindPipeline(
+				cmdBuffer,
+				vk::PipelineBindPoint::eGraphics,
+				test_apiData.gizmoManager.linePipeline);
 
-			globUtils.device.cmdBindVertexBuffers(cmdBuffer, 0, { test_apiData.gizmoManager.vtxBuffer }, { 0 });
 			Std::Array<vk::DescriptorSet, 1> descrSets = {
 				viewportData.camDataDescrSets[inFlightIndex] };
 			globUtils.device.cmdBindDescriptorSets(
@@ -331,63 +441,71 @@ namespace DEngine::Gfx::Vk
 				{ (u32)descrSets.Size(), descrSets.Data() },
 				nullptr);
 
-			// Draw X arrow
+			Math::Mat4 gizmoMatrix = Math::Mat4::Identity();
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				test_apiData.gizmoManager.pipelineLayout,
+				vk::ShaderStageFlagBits::eVertex,
+				0,
+				sizeof(gizmoMatrix),
+				&gizmoMatrix);
+
+			uSize vertexOffset = 0;
+			for (auto const& drawCmd : drawParams.lineDrawCmds)
 			{
-				Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
-				gizmoMatrix = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Y, -Math::pi / 2) * gizmoMatrix;
-				Math::LinTran3D::SetTranslation(gizmoMatrix, gizmo.position);
-				globUtils.device.cmdPushConstants(
-					cmdBuffer,
-					test_apiData.gizmoManager.pipelineLayout,
-					vk::ShaderStageFlagBits::eVertex,
-					0,
-					sizeof(gizmoMatrix),
-					&gizmoMatrix);
-				Math::Vec4 color = { 1.f, 0.f, 0.f, 1.f };
+				// Push the color to the push-constant
 				globUtils.device.cmdPushConstants(
 					cmdBuffer,
 					test_apiData.gizmoManager.pipelineLayout,
 					vk::ShaderStageFlagBits::eFragment,
 					sizeof(gizmoMatrix),
-					sizeof(color),
-					&color);
+					sizeof(drawCmd.color),
+					&drawCmd.color);
+
+				// Bind the vertex-array
+				vk::Buffer vertexBuffer = test_apiData.gizmoManager.lineVtxBuffer;
+				uSize vertexBufferOffset = 0;
+				// Offset into the right in-flight part of the buffer
+				vertexBufferOffset += test_apiData.gizmoManager.lineVtxBufferCapacity * test_apiData.gizmoManager.lineVtxElementSize * inFlightIndex;
+				// Index into the correct vertex
+				vertexBufferOffset += test_apiData.gizmoManager.lineVtxElementSize * vertexOffset;
+				globUtils.device.cmdBindVertexBuffers(
+					cmdBuffer,
+					0,
+					vertexBuffer,
+					vertexBufferOffset);
 
 				globUtils.device.cmdDraw(
 					cmdBuffer,
-					test_apiData.gizmoManager.vertexCount,
+					drawCmd.vertCount,
 					1,
 					0,
 					0);
-			}
 
-			// Draw Y arrow
-			{
-				Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
-				gizmoMatrix = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::X, Math::pi / 2) * gizmoMatrix;
-				Math::LinTran3D::SetTranslation(gizmoMatrix, gizmo.position);
-				globUtils.device.cmdPushConstants(
-					cmdBuffer,
-					test_apiData.gizmoManager.pipelineLayout,
-					vk::ShaderStageFlagBits::eVertex,
-					0,
-					sizeof(gizmoMatrix),
-					&gizmoMatrix);
-				Math::Vec4 color = { 0.f, 1.f, 0.f, 1.f };
-				globUtils.device.cmdPushConstants(
-					cmdBuffer,
-					test_apiData.gizmoManager.pipelineLayout,
-					vk::ShaderStageFlagBits::eFragment,
-					sizeof(gizmoMatrix),
-					sizeof(color),
-					&color);
-
-				globUtils.device.cmdDraw(
-					cmdBuffer,
-					test_apiData.gizmoManager.vertexCount,
-					1,
-					0,
-					0);
+				vertexOffset += drawCmd.vertCount;
 			}
+		}
+
+
+
+
+
+
+
+
+
+		// Draw the gizmo for this viewport
+		if (viewportUpdate.gizmo.HasValue())
+		{
+			ViewportUpdate::Gizmo gizmo = viewportUpdate.gizmo.Value();
+
+			RecordGizmoDrawCalls(
+				globUtils,
+				test_apiData.gizmoManager,
+				viewportData,
+				gizmo,
+				cmdBuffer,
+				inFlightIndex);
 		}
 		
 
@@ -465,7 +583,7 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		drawParams,
 		*apiData.test_textureAssetInterface);
 
-	u8 currentInFlightIndex = apiData.currInFlightIndex;
+	u8 const currentInFlightIndex = apiData.currInFlightIndex;
 
 	// Wait for fences, so we know the resources are available.
 	vkResult = globUtils.device.waitForFences(
@@ -476,7 +594,6 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		throw std::runtime_error("Vulkan: Failed to wait for cmd buffer fence.");
 	device.resetFences(apiData.mainFences[currentInFlightIndex]);
 
-
 	// Update object-data
 	ObjectDataManager::Update(
 		apiData.objectDataManager,
@@ -486,7 +603,7 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	GuiResourceManager::Update(
 		apiData.guiResourceManager,
 		globUtils,
-		{ drawParams.guiVerts.data(), drawParams.guiVerts.size() },
+		{ drawParams.guiVertices.data(), drawParams.guiVertices.size() },
 		{ drawParams.guiIndices.data(), drawParams.guiIndices.size() },
 		currentInFlightIndex);
 	ViewportManager::UpdateCameras(
@@ -494,6 +611,11 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		apiData.globUtils,
 		{ drawParams.viewportUpdates.data(), drawParams.viewportUpdates.size() },
 		currentInFlightIndex);
+	GizmoManager::UpdateLineVtxBuffer(
+		apiData.gizmoManager,
+		globUtils,
+		currentInFlightIndex,
+		{ drawParams.lineVertices.data(), drawParams.lineVertices.size() });
 
 	std::vector<vk::CommandBuffer> graphicsCmdBuffers{};
 	for (auto const& viewportUpdate : drawParams.viewportUpdates)

@@ -18,6 +18,7 @@ namespace DEngine::Math
 		f32 y;
 
 		[[nodiscard]] constexpr Vector<3, f32> AsVec3(f32 zValue = 0.f) const noexcept;
+		[[nodiscard]] constexpr explicit operator Vector<3, f32>() const noexcept;
 		[[nodiscard]] constexpr Vector<4, f32> AsVec4(f32 zValue = 0.f, f32 wValue = 0.f) const noexcept;
 
 		[[nodiscard]] f32 Magnitude() const;

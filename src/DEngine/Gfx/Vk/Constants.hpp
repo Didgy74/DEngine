@@ -16,9 +16,13 @@ namespace DEngine::Gfx::Vk::Constants
 	constexpr u32 maxSwapchainLength = 4;
 	constexpr u32 preferredSwapchainLength = 2;
 
-	constexpr char const* khronosLayerName
+	constexpr char const* khronosLayerName { "VK_LAYER_KHRONOS_validation" };
+	constexpr char const* armMaliPerfLayerName { "VK_LAYER_ARM_mali_perf_doc" };
+
+	constexpr std::array preferredLayerNames
 	{
-		"VK_LAYER_KHRONOS_validation"
+			khronosLayerName,
+			//armMaliPerfLayerName
 	};
 
 	constexpr std::array<const char*, 1> requiredInstanceExtensions

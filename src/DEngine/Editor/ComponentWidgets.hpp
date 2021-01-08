@@ -35,7 +35,7 @@ namespace DEngine::Editor
 					DENGINE_DETAIL_ASSERT(Std::FindIf(
 						scene->moves.begin(),
 						scene->moves.end(),
-						[id](decltype(scene->moves[0]) const& val) -> bool { return val.a == id; }) == scene->moves.end());
+						[id](auto const& val) -> bool { return val.a == id; }) == scene->moves.end());
 
 					scene->moves.push_back(Std::Pair<Entity, Move>{ id, {} });
 					Move& component = scene->moves.back().b;
@@ -53,7 +53,7 @@ namespace DEngine::Editor
 					auto const componentIt = Std::FindIf(
 						scene->moves.begin(),
 						scene->moves.end(),
-						[id](decltype(scene->moves[0]) const& val) -> bool { return val.a == id; });
+						[id](auto const& val) -> bool { return val.a == id; });
 					DENGINE_DETAIL_ASSERT(componentIt != scene->moves.end());
 					scene->moves.erase(componentIt);
 				}
@@ -63,7 +63,7 @@ namespace DEngine::Editor
 			auto const componentIt = Std::FindIf(
 				scene->moves.begin(),
 				scene->moves.end(),
-				[id](decltype(scene->moves[0]) const& val) -> bool { return val.a == id; });
+				[id](decltype(scene->moves)::value_type const& val) -> bool { return val.a == id; });
 			if (componentIt != scene->moves.end())
 			{
 				button->SetToggled(true);
@@ -109,7 +109,7 @@ namespace DEngine::Editor
 					DENGINE_DETAIL_ASSERT(Std::FindIf(
 						scene->transforms.begin(),
 						scene->transforms.end(),
-						[id](decltype(scene->transforms[0]) const& val) -> bool { return val.a == id; }) == scene->transforms.end());
+						[id](auto const& val) -> bool { return val.a == id; }) == scene->transforms.end());
 
 					scene->transforms.push_back(Std::Pair<Entity, Transform>{ id, {} });
 					Transform& component = scene->transforms.back().b;
@@ -128,7 +128,7 @@ namespace DEngine::Editor
 					auto const componentIt = Std::FindIf(
 						scene->transforms.begin(),
 						scene->transforms.end(),
-						[id](decltype(scene->transforms[0]) const& val) -> bool { return val.a == id; });
+						[id](auto const& val) -> bool { return val.a == id; });
 					DENGINE_DETAIL_ASSERT(componentIt != scene->transforms.end());
 					scene->transforms.erase(componentIt);
 				}
@@ -138,7 +138,7 @@ namespace DEngine::Editor
 			auto const componentIt = Std::FindIf(
 				scene->transforms.begin(),
 				scene->transforms.end(),
-				[id](decltype(scene->transforms[0]) const& val) -> bool { return val.a == id; });
+				[id](auto const& val) -> bool { return val.a == id; });
 			if (componentIt != scene->transforms.end())
 			{
 				button->SetToggled(true);
@@ -171,7 +171,7 @@ namespace DEngine::Editor
 				auto const componentIt = Std::FindIf(
 					scene.transforms.begin(),
 					scene.transforms.end(),
-					[id](decltype(scene.transforms[0]) const& value) -> bool { return id == value.a; });
+					[id](auto const& value) -> bool { return id == value.a; });
 				DENGINE_DETAIL_ASSERT(componentIt != scene.transforms.end());
 				Transform& component = componentIt->b;
 				component.position.x = std::stof(widget.StringView().data());
@@ -185,7 +185,7 @@ namespace DEngine::Editor
 				auto const componentIt = Std::FindIf(
 					scene.transforms.begin(),
 					scene.transforms.end(),
-					[id](decltype(scene.transforms[0]) const& value) -> bool { return id == value.a; });
+					[id](auto const& value) -> bool { return id == value.a; });
 				DENGINE_DETAIL_ASSERT(componentIt != scene.transforms.end());
 				Transform& component = componentIt->b;
 				component.position.y = std::stof(widget.StringView().data());
@@ -198,7 +198,7 @@ namespace DEngine::Editor
 				auto const componentIt = Std::FindIf(
 					scene.transforms.begin(),
 					scene.transforms.end(),
-					[id](decltype(scene.transforms[0]) const& value) -> bool { return id == value.a; });
+					[id](auto const& value) -> bool { return id == value.a; });
 				DENGINE_DETAIL_ASSERT(componentIt != scene.transforms.end());
 				Transform& component = componentIt->b;
 				component.position.z = std::stof(widget.StringView().data());
@@ -220,7 +220,7 @@ namespace DEngine::Editor
 				auto const componentIt = Std::FindIf(
 					scene.transforms.begin(),
 					scene.transforms.end(),
-					[id](decltype(scene.transforms[0]) const& value) -> bool { return id == value.a; });
+					[id](auto const& value) -> bool { return id == value.a; });
 				DENGINE_DETAIL_ASSERT(componentIt != scene.transforms.end());
 				Transform& component = componentIt->b;
 				component.rotation = std::stof(widget.StringView().data());
@@ -244,7 +244,7 @@ namespace DEngine::Editor
 			auto const componentIt = Std::FindIf(
 				scene.transforms.begin(),
 				scene.transforms.end(),
-				[id](decltype(scene.transforms[0]) const& value) -> bool { return id == value.a; });
+				[id](auto const& value) -> bool { return id == value.a; });
 			if (componentIt != scene.transforms.end())
 			{
 				Transform& component = componentIt->b;
@@ -278,7 +278,7 @@ namespace DEngine::Editor
 					DENGINE_DETAIL_ASSERT(Std::FindIf(
 						scene->textureIDs.begin(),
 						scene->textureIDs.end(),
-						[id](decltype(scene->textureIDs[0]) const& val) -> bool { return val.a == id; }) == scene->textureIDs.end());
+						[id](auto const& val) -> bool { return val.a == id; }) == scene->textureIDs.end());
 
 					scene->textureIDs.push_back(Std::Pair<Entity, Gfx::TextureID>{ id, {} });
 					Gfx::TextureID& component = scene->textureIDs.back().b;
@@ -296,7 +296,7 @@ namespace DEngine::Editor
 					auto const componentIt = Std::FindIf(
 						scene->textureIDs.begin(),
 						scene->textureIDs.end(),
-						[id](decltype(scene->textureIDs[0]) const& val) -> bool { return val.a == id; });
+						[id](auto const& val) -> bool { return val.a == id; });
 					DENGINE_DETAIL_ASSERT(componentIt != scene->textureIDs.end());
 					scene->textureIDs.erase(componentIt);
 				}
@@ -306,7 +306,7 @@ namespace DEngine::Editor
 			auto const componentIt = Std::FindIf(
 				scene->textureIDs.begin(),
 				scene->textureIDs.end(),
-				[id](decltype(scene->textureIDs[0]) const& val) -> bool { return val.a == id; });
+				[id](auto const& val) -> bool { return val.a == id; });
 			if (componentIt != scene->textureIDs.end())
 			{
 				button->SetToggled(true);
@@ -377,7 +377,7 @@ namespace DEngine::Editor
 					DENGINE_DETAIL_ASSERT(Std::FindIf(
 						scene->rigidbodies.begin(),
 						scene->rigidbodies.end(),
-						[id](decltype(scene->rigidbodies[0]) const& val) -> bool { return val.a == id; }) == scene->rigidbodies.end());
+						[id](auto const& val) -> bool { return val.a == id; }) == scene->rigidbodies.end());
 
 					scene->rigidbodies.push_back(Std::Pair<Entity, Physics::Rigidbody2D>{ id, {} });
 					Physics::Rigidbody2D& component = scene->rigidbodies.back().b;
@@ -396,7 +396,7 @@ namespace DEngine::Editor
 					auto const componentIt = Std::FindIf(
 						scene->rigidbodies.begin(),
 						scene->rigidbodies.end(),
-						[id](decltype(scene->rigidbodies[0]) const& val) -> bool { return val.a == id; });
+						[id](auto const& val) -> bool { return val.a == id; });
 					DENGINE_DETAIL_ASSERT(componentIt != scene->rigidbodies.end());
 					scene->rigidbodies.erase(componentIt);
 				}
@@ -406,7 +406,7 @@ namespace DEngine::Editor
 			auto const componentIt = Std::FindIf(
 				scene->rigidbodies.begin(),
 				scene->rigidbodies.end(),
-				[id](decltype(scene->rigidbodies[0]) const& val) -> bool { return val.a == id; });
+				[id](auto const& val) -> bool { return val.a == id; });
 			if (componentIt != scene->rigidbodies.end())
 			{
 				button->SetToggled(true);
@@ -438,7 +438,7 @@ namespace DEngine::Editor
 				auto const componentIt = Std::FindIf(
 					scene.rigidbodies.begin(),
 					scene.rigidbodies.end(),
-					[id](decltype(scene.rigidbodies[0]) const& value) -> bool { return id == value.a; });
+					[id](auto const& value) -> bool { return id == value.a; });
 				DENGINE_DETAIL_ASSERT(componentIt != scene.rigidbodies.end());
 				Physics::Rigidbody2D& component = componentIt->b;
 				component.angularVelocity = std::stof(widget.StringView().data());
@@ -461,7 +461,7 @@ namespace DEngine::Editor
 			auto const componentIt = Std::FindIf(
 				scene.rigidbodies.begin(),
 				scene.rigidbodies.end(),
-				[id](decltype(scene.rigidbodies[0]) const& value) -> bool { return id == value.a; });
+				[id](auto const& value) -> bool { return id == value.a; });
 			if (componentIt != scene.rigidbodies.end())
 			{
 				Physics::Rigidbody2D& component = componentIt->b;
@@ -495,13 +495,13 @@ namespace DEngine::Editor
 					DENGINE_DETAIL_ASSERT(Std::FindIf(
 						scene->boxColliders.begin(),
 						scene->boxColliders.end(),
-						[id](decltype(scene->boxColliders[0]) const& val) -> bool { return val.a == id; }) == scene->boxColliders.end());
+						[id](auto const& val) -> bool { return val.a == id; }) == scene->boxColliders.end());
 					
 					// Crash if we have an existing circlecollider on this entity
 					DENGINE_DETAIL_ASSERT(Std::FindIf(
 						scene->circleColliders.begin(),
 						scene->circleColliders.end(),
-						[id](decltype(scene->circleColliders[0]) const& val) -> bool { return val.a == id; }) == scene->circleColliders.end());
+						[id](auto const& val) -> bool { return val.a == id; }) == scene->circleColliders.end());
 
 					scene->circleColliders.push_back(Std::Pair<Entity, Physics::CircleCollider2D>{ id, {} });
 					Physics::CircleCollider2D& component = scene->circleColliders.back().b;
@@ -519,7 +519,7 @@ namespace DEngine::Editor
 					auto const componentIt = Std::FindIf(
 						scene->circleColliders.begin(),
 						scene->circleColliders.end(),
-						[id](decltype(scene->circleColliders[0]) const& val) -> bool { return val.a == id; });
+						[id](auto const& val) -> bool { return val.a == id; });
 					DENGINE_DETAIL_ASSERT(componentIt != scene->circleColliders.end());
 					scene->circleColliders.erase(componentIt);
 				}
@@ -529,7 +529,7 @@ namespace DEngine::Editor
 			auto const componentIt = Std::FindIf(
 				scene->circleColliders.begin(),
 				scene->circleColliders.end(),
-				[id](decltype(scene->circleColliders[0]) const& val) -> bool { return val.a == id; });
+				[id](auto const& val) -> bool { return val.a == id; });
 			if (componentIt != scene->circleColliders.end())
 			{
 				button->SetToggled(true);
@@ -572,13 +572,13 @@ namespace DEngine::Editor
 					DENGINE_DETAIL_ASSERT(Std::FindIf(
 						scene->circleColliders.begin(),
 						scene->circleColliders.end(),
-						[id](decltype(scene->circleColliders[0]) const& val) -> bool { return val.a == id; }) == scene->circleColliders.end());
+						[id](auto const& val) -> bool { return val.a == id; }) == scene->circleColliders.end());
 
 					// Crash if we have an existing boxcollider on this entity
 					DENGINE_DETAIL_ASSERT(Std::FindIf(
 						scene->boxColliders.begin(),
 						scene->boxColliders.end(),
-						[id](decltype(scene->boxColliders[0]) const& val) -> bool { return val.a == id; }) == scene->boxColliders.end());
+						[id](auto const& val) -> bool { return val.a == id; }) == scene->boxColliders.end());
 
 					scene->boxColliders.push_back(Std::Pair<Entity, Physics::BoxCollider2D>{ id, {} });
 					Physics::BoxCollider2D& component = scene->boxColliders.back().b;
@@ -596,7 +596,7 @@ namespace DEngine::Editor
 					auto const componentIt = Std::FindIf(
 						scene->boxColliders.begin(),
 						scene->boxColliders.end(),
-						[id](decltype(scene->boxColliders[0]) const& val) -> bool { return val.a == id; });
+						[id](auto const& val) -> bool { return val.a == id; });
 					DENGINE_DETAIL_ASSERT(componentIt != scene->boxColliders.end());
 					scene->boxColliders.erase(componentIt);
 				}
@@ -606,7 +606,7 @@ namespace DEngine::Editor
 			auto const componentIt = Std::FindIf(
 				scene->boxColliders.begin(),
 				scene->boxColliders.end(),
-				[id](decltype(scene->boxColliders[0]) const& val) -> bool { return val.a == id; });
+				[id](auto const& val) -> bool { return val.a == id; });
 			if (componentIt != scene->boxColliders.end())
 			{
 				button->SetToggled(true);

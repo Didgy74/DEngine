@@ -81,6 +81,8 @@ namespace DEngine::Gfx
 			// In world space
 			Math::Vec3 position{};
 			f32 scale{};
+			f32 quadOffset{};
+			f32 quadScale{};
 		};
 		Std::Opt<Gizmo> gizmo;
 	};
@@ -142,13 +144,22 @@ namespace DEngine::Gfx
 		u32 drawCmdCount;
 	};
 
+	struct LineDrawCmd
+	{
+		Math::Vec4 color;
+		uSize vertCount;
+	};
+
 	struct DrawParams
 	{
 		// Scene specific stuff
 		std::vector<TextureID> textureIDs;
 		std::vector<Math::Mat4> transforms;
 
-		std::vector<GuiVertex> guiVerts;
+		std::vector<LineDrawCmd> lineDrawCmds;
+		std::vector<Math::Vec3> lineVertices;
+
+		std::vector<GuiVertex> guiVertices;
 		std::vector<u32> guiIndices;
 		std::vector<GuiDrawCmd> guiDrawCmds;
 		std::vector<ViewportUpdate> viewportUpdates;
@@ -163,6 +174,8 @@ namespace DEngine::Gfx
 		
 		TextureAssetInterface const* texAssetInterface = nullptr;
 		Std::Span<char const*> requiredVkInstanceExtensions{};
+
+		std::vector<Math::Vec3> gizmoArrowMesh;
 	};
 
 	class LogInterface

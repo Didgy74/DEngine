@@ -159,9 +159,18 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 
 		Std::Array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = { vertStageInfo, fragStageInfo };
 
+        vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
+        depthStencilInfo.depthTestEnable = 0;
+        depthStencilInfo.depthCompareOp = vk::CompareOp::eLess;
+        depthStencilInfo.stencilTestEnable = 0;
+        depthStencilInfo.depthWriteEnable = 0;
+        depthStencilInfo.minDepthBounds = 0.f;
+        depthStencilInfo.maxDepthBounds = 1.f;
+
 		vk::GraphicsPipelineCreateInfo pipelineInfo{};
 		pipelineInfo.layout = manager.filledMeshPipelineLayout;
 		pipelineInfo.pColorBlendState = &colorBlendState;
+		pipelineInfo.pDepthStencilState = &depthStencilInfo;
 		pipelineInfo.pDynamicState = &dynamicState;
 		pipelineInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineInfo.pMultisampleState = &multiSampleState;
@@ -333,9 +342,18 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 
 		Std::Array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = { vertStageInfo, fragStageInfo };
 
+        vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
+        depthStencilInfo.depthTestEnable = 0;
+        depthStencilInfo.depthCompareOp = vk::CompareOp::eLess;
+        depthStencilInfo.stencilTestEnable = 0;
+        depthStencilInfo.depthWriteEnable = 0;
+        depthStencilInfo.minDepthBounds = 0.f;
+        depthStencilInfo.maxDepthBounds = 1.f;
+
 		vk::GraphicsPipelineCreateInfo pipelineInfo{};
 		pipelineInfo.layout = manager.viewportPipelineLayout;
 		pipelineInfo.pColorBlendState = &colorBlendState;
+		pipelineInfo.pDepthStencilState = &depthStencilInfo;
 		pipelineInfo.pDynamicState = &dynamicState;
 		pipelineInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineInfo.pMultisampleState = &multiSampleState;
@@ -415,7 +433,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		samplerInfo.addressModeV = vk::SamplerAddressMode::eClampToEdge;
 		samplerInfo.addressModeW = vk::SamplerAddressMode::eClampToEdge;
 		samplerInfo.magFilter = vk::Filter::eNearest;
-		samplerInfo.maxLod = 64.f;
+		samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
 		samplerInfo.minFilter = vk::Filter::eNearest;
 		samplerInfo.mipmapMode = vk::SamplerMipmapMode::eNearest;
 		manager.font_sampler = device.createSampler(samplerInfo);
@@ -537,9 +555,18 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 
 		Std::Array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = { vertStageInfo, fragStageInfo };
 
+        vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
+        depthStencilInfo.depthTestEnable = 0;
+        depthStencilInfo.depthCompareOp = vk::CompareOp::eLess;
+        depthStencilInfo.stencilTestEnable = 0;
+        depthStencilInfo.depthWriteEnable = 0;
+        depthStencilInfo.minDepthBounds = 0.f;
+        depthStencilInfo.maxDepthBounds = 1.f;
+
 		vk::GraphicsPipelineCreateInfo pipelineInfo{};
 		pipelineInfo.layout = manager.font_pipelineLayout;
 		pipelineInfo.pColorBlendState = &colorBlendState;
+		pipelineInfo.pDepthStencilState = &depthStencilInfo;
 		pipelineInfo.pDynamicState = &dynamicState;
 		pipelineInfo.pInputAssemblyState = &inputAssemblyState;
 		pipelineInfo.pMultisampleState = &multiSampleState;

@@ -12,8 +12,6 @@
 #include "VMAIncluder.hpp"
 #include "VulkanIncluder.hpp"
 
-#include <mutex>
-
 namespace DEngine::Gfx::Vk
 {
 	// Everything here is thread-safe to use and access!!

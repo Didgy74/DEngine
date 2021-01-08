@@ -1,5 +1,7 @@
 #include "ViewportWidget.hpp"
 
+#include <DEngine/Std/Trait.hpp>
+
 #include <iostream> // For testing
 
 using namespace DEngine;
@@ -182,8 +184,8 @@ namespace DEngine::Editor
 {
 	struct GizmoHitTestReturnType
 	{
-		u8 axis;
-		anton::math::Ray ray;
+		Gizmo::GizmoPart part{};
+		Gizmo::Test_Ray ray{};
 	};
 
 	static Std::Opt<GizmoHitTestReturnType> GizmoHitTest(
@@ -191,6 +193,12 @@ namespace DEngine::Editor
 		Gui::Rect widgetRect,
 		Math::Vec2Int cursorPos,
 		Transform const& transform);
+
+	static void TranslateAlongGizmoAxis(
+		InternalViewportWidget const& widget,
+		Gui::Rect widgetRect,
+		Math::Vec2Int cursorPos,
+		Transform& transform);
 }
 static Std::Opt<GizmoHitTestReturnType> Editor::GizmoHitTest(
 	InternalViewportWidget const& widget, 
@@ -200,85 +208,138 @@ static Std::Opt<GizmoHitTestReturnType> Editor::GizmoHitTest(
 {
 	Math::Mat4 worldTransform = Math::Mat4::Identity();
 	Math::LinTran3D::SetTranslation(worldTransform, { transform.position.x, transform.position.y, 0.f });
-	anton::math::Mat4 anton_worldTransform{ worldTransform.Data() };
 
 	f32 aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
 	Math::Mat4 projMat = widget.GetProjectionMatrix(aspectRatio);
-	anton::math::Mat4 anton_projMatrix{ projMat.Data() };
 
 	u32 smallestViewportExtent = Math::Min(widgetRect.extent.width, widgetRect.extent.height);
-	f32 scale = anton::gizmo::compute_scale(
-		anton_worldTransform,
-		smallestViewportExtent / 4,
-		anton_projMatrix,
-		{ (f32)widgetRect.extent.width, (f32)widgetRect.extent.height });
+	f32 scale = Gizmo::ComputeScale(
+		worldTransform,
+		smallestViewportExtent * Gizmo::defaultGizmoSizeRelative,
+		projMat,
+		widgetRect.extent);
 
-	// Anton gizmo cannot include scale in the world transform, so we modify the arrow struct
+	// Gizmo cannot include scale in the world transform, so we modify the arrow struct
 	// to account for the scaling
-	anton::gizmo::Arrow_3D arrow{};
-	arrow.cap_length = 0.33f;
-	arrow.cap_size = 0.2f;
-	arrow.draw_style = anton::gizmo::Arrow_3D_Style::cone;
-	arrow.shaft_diameter = 0.1f;
-	arrow.shaft_length = 0.66f;
-	arrow.cap_length *= scale;
-	arrow.cap_size *= scale;
-	arrow.shaft_diameter *= scale;
-	arrow.shaft_length *= scale;
+	Gizmo::Arrow arrow = Gizmo::defaultArrow;
+	arrow.capLength *= scale;
+	arrow.capSize *= scale;
+	arrow.shaftDiameter *= scale;
+	arrow.shaftLength *= scale;
 
-	anton::math::Ray ray{};
-	ray.origin = { widget.cam.position.x, widget.cam.position.y, widget.cam.position.z };
-	Math::Vec2 cursorNormalizedPos = InternalViewportWidget::GetNormalizedViewportPosition(cursorPos, widgetRect);
-	Math::Vec4 vector = Math::Vec4{
-		cursorNormalizedPos.x,
-		cursorNormalizedPos.y,
-		1.f,
-		1.f };
-	vector = projMat.GetInverse().Value() * vector;
-	for (auto& item : vector)
-		item /= vector.w;
-	Math::Vec3 vec2 = (vector.AsVec3() - widget.cam.position).Normalized();
-	ray.direction = { vec2.x, vec2.y, vec2.z };
+	Gizmo::Test_Ray ray{};
+	ray.origin = widget.cam.position;
+	Math::Vec3 vector = Gizmo::DeprojectScreenspacePoint(InternalViewportWidget::GetNormalizedViewportPosition(cursorPos, widgetRect), projMat);
+	ray.direction = (vector - widget.cam.position).Normalized();
 	
-	bool axisWasHit = false;
+	Std::Opt<GizmoHitTestReturnType> returnVal{};
+	
+	bool gizmoPartHit = false;
 	f32 closestDistance = 0.f;
-	u8 axisIndex = 0;
+	Gizmo::GizmoPart gizmoPart{};
 	{
 		// Next we handle the X arrow
-		Math::Mat4 worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Y, -Math::pi / 2);
-		Math::LinTran3D::SetTranslation(worldTransform, { transform.position.x, transform.position.y, 0.f });
-		anton::math::Mat4 anton_worldTransform = anton::math::Mat4{ worldTransform.Data() };
-		anton::Optional<anton::f32> hit = anton::gizmo::intersect_arrow_3d(ray, arrow, anton_worldTransform);
-		if (hit.holds_value() && (!axisWasHit || hit.value() < closestDistance))
+		Math::Mat4 worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Y, Math::pi / 2);
+		Math::LinTran3D::SetTranslation(worldTransform, Math::Vec3{ transform.position.x, transform.position.y, 0.f });
+
+		Std::Opt<f32> hit = Gizmo::IntersectArrow(ray, arrow, worldTransform);
+		if (hit.HasValue() && (!gizmoPartHit || hit.Value() < closestDistance))
 		{
-			closestDistance = hit.value();
-			axisWasHit = true;
-			axisIndex = 0;
+			closestDistance = hit.Value();
+			gizmoPartHit = true;
+			gizmoPart = Gizmo::GizmoPart::ArrowX;
 		}
 	}
 	{
 		// Next we handle the Y arrow
-		Math::Mat4 worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::X, Math::pi / 2);
-		Math::LinTran3D::SetTranslation(worldTransform, { transform.position.x, transform.position.y, 0.f });
-		anton::math::Mat4 anton_worldTransform = anton::math::Mat4{ worldTransform.Data() };
-		anton::Optional<anton::f32> hit = anton::gizmo::intersect_arrow_3d(ray, arrow, anton_worldTransform);
-		if (hit.holds_value() && (!axisWasHit || hit.value() < closestDistance))
+		Math::Mat4 worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::X, -Math::pi / 2);
+		Math::LinTran3D::SetTranslation(worldTransform, Math::Vec3{ transform.position.x, transform.position.y, 0.f });
+
+		Std::Opt<f32> hit = Gizmo::IntersectArrow(ray, arrow, worldTransform);
+		if (hit.HasValue() && (!gizmoPartHit || hit.Value() < closestDistance))
 		{
-			closestDistance = hit.value();
-			axisWasHit = true;
-			axisIndex = 1;
+			closestDistance = hit.Value();
+			gizmoPartHit = true;
+			gizmoPart = Gizmo::GizmoPart::ArrowY;
 		}
 	}
 
-	if (axisWasHit)
+	// Then we check the XY quad
+	{
+		Std::Opt<f32> hit = Gizmo::IntersectRayPlane(ray, Math::Vec3{ 0.f, 0.f, 1.f }, transform.position);
+		if (hit.HasValue())
+		{
+			f32 planeScale = scale * Gizmo::defaultPlaneScaleRelative;
+			f32 planeOffset = scale * Gizmo::defaultPlaneOffsetRelative;
+
+			Math::Vec3 quadPosition = transform.position + Math::Vec3{ 1.f, 1.f, 0.f } * planeOffset;
+
+			Math::Vec3 point = ray.origin + ray.direction * hit.Value();
+			Math::Vec3 pointRelative = point - quadPosition;
+			f32 dotA = Math::Vec3::Dot(pointRelative, Math::Vec3{ 1.f, 0.f, 0.f });
+			f32 dotB = Math::Vec3::Dot(pointRelative, Math::Vec3{ 0.f, 1.f, 0.f });
+			if (dotA >= -planeScale / 2.f && dotA <= planeScale / 2.f && dotB >= -planeScale / 2.f && dotB <= planeScale / 2.f)
+			{
+				if (!gizmoPartHit || hit.Value() < closestDistance)
+				{
+					closestDistance = hit.Value();
+					gizmoPartHit = true;
+					gizmoPart = Gizmo::GizmoPart::PlaneXY;
+				}
+			}
+		}
+	}
+	
+	if (gizmoPartHit)
 	{
 		GizmoHitTestReturnType returnVal;
-		returnVal.axis = axisIndex;
+		returnVal.part = gizmoPart;
 		returnVal.ray = ray;
-		return Std::Opt{ returnVal };
+		return Std::Opt<GizmoHitTestReturnType>{ returnVal };
 	}
 	else
 		return Std::nullOpt;
+}
+
+static void DEngine::Editor::TranslateAlongGizmoAxis(
+	InternalViewportWidget const& widget,
+	Gui::Rect widgetRect,
+	Math::Vec2Int cursorPos,
+	Transform& transform)
+{
+	Math::Vec2 cursorNormalizedPos = InternalViewportWidget::GetNormalizedViewportPosition(cursorPos, widgetRect);
+	Math::Mat4 projMat = widget.GetProjectionMatrix((f32)widgetRect.extent.width / (f32)widgetRect.extent.height);
+	Math::Vec3 rayDir = (Gizmo::DeprojectScreenspacePoint(cursorNormalizedPos, projMat) - widget.cam.position).Normalized();
+
+	Gizmo::Test_Ray ray{};
+	ray.direction = rayDir;
+	ray.origin = widget.cam.position;
+
+	Math::Vec3 newPos = Gizmo::TranslateAlongPlane(ray, Math::Vec3::Forward(), widget.gizmo_initialPos, widget.gizmo_initialRay);
+	if (widget.gizmo_holdingPart == Gizmo::GizmoPart::ArrowX || widget.gizmo_holdingPart == Gizmo::GizmoPart::ArrowY)
+	{
+		Math::Vec3 movementAxis;
+		switch (widget.gizmo_holdingPart)
+		{
+		case Gizmo::GizmoPart::ArrowX:
+			movementAxis = { 1.f, 0.f, 0.f };
+			break;
+		case Gizmo::GizmoPart::ArrowY:
+			movementAxis = { 0.f, 1.f, 0.f };
+			break;
+		default:
+			DENGINE_DETAIL_UNREACHABLE();
+		}
+		newPos = widget.gizmo_initialPos + movementAxis * Math::Vec3::Dot(movementAxis, newPos - widget.gizmo_initialPos);
+	}
+	else
+	{
+
+	}
+
+	
+
+	transform.position = newPos;
 }
 
 void InternalViewportWidget::CursorClick(
@@ -304,7 +365,7 @@ void InternalViewportWidget::CursorClick(
 		auto const transformIt = Std::FindIf(
 			implData->scene->transforms.begin(),
 			implData->scene->transforms.end(),
-			[entity](decltype(implData->scene->transforms[0]) const& val) -> bool { return val.a == entity; });
+			[entity](auto const& val) -> bool { return val.a == entity; });
 		if (transformIt != implData->scene->transforms.end())
 		{
 			Transform const& transform = transformIt->b;
@@ -321,7 +382,7 @@ void InternalViewportWidget::CursorClick(
 				this->isCurrentlyHoldingGizmo = true;
 				this->gizmo_initialRay = hit.ray;
 				this->gizmo_initialPos = transform.position;
-				this->gizmo_holdingAxis = hit.axis;
+				this->gizmo_holdingPart = hit.part;
 			}
 		}
 	}
@@ -373,44 +434,25 @@ void InternalViewportWidget::CursorMove(
 
 	if (isCurrentlyHoldingGizmo)
 	{
-		Math::Vec2 cursorNormalizedPos = GetNormalizedViewportPosition(event.position, widgetRect);
-		Math::Vec4 vector = Math::Vec4{
-			cursorNormalizedPos.x,
-			cursorNormalizedPos.y,
-			1.f,
-			1.f };
-		f32 aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
-		Math::Mat4 projMat = GetProjectionMatrix(aspectRatio);
-		vector = projMat.GetInverse().Value() * vector;
-		for (auto& item : vector)
-			item /= vector.w;
-		Math::Vec3 vec2 = (vector.AsVec3() - cam.position).Normalized();
-
-		anton::math::Ray ray{};
-		ray.direction = { vec2.x, vec2.y, vec2.z };
-		ray.origin = { cam.position.x, cam.position.y, cam.position.z };
-		anton::math::Vec3 anton_initialPos = { this->gizmo_initialPos.x, this->gizmo_initialPos.y, this->gizmo_initialPos.z };
-		anton::math::Vec3 anton_axis;
-		switch (this->gizmo_holdingAxis)
+		if (this->implData->selectedEntity.HasValue())
 		{
-		case 0:
-			anton_axis = { 1.f, 0.f, 0.f };
-			break;
-		case 1:
-			anton_axis = { 0.f, 1.f, 0.f };
-			break;
-		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			Entity entity = implData->selectedEntity.Value();
+			// First check if we have a transform
+			auto const transformIt = Std::FindIf(
+				implData->scene->transforms.begin(),
+				implData->scene->transforms.end(),
+				[entity](auto const& val) -> bool { return val.a == entity; });
+			if (transformIt != implData->scene->transforms.end())
+			{
+				Transform& transform = transformIt->b;
+
+				TranslateAlongGizmoAxis(
+					*this,
+					widgetRect,
+					event.position,
+					transform);
+			}
 		}
-		auto anton_newPos = anton::gizmo::translate_along_line(ray, anton_axis, anton_initialPos, this->gizmo_initialRay);
-		// Find the transform component
-		Entity selectedEntity = this->implData->selectedEntity.Value();
-		auto const transformIt = Std::FindIf(
-			this->implData->scene->transforms.begin(),
-			this->implData->scene->transforms.end(),
-			[selectedEntity](decltype(this->implData->scene->transforms[0]) const& val) -> bool { return val.a == selectedEntity; });
-		Transform& transform = transformIt->b;
-		transform.position = { anton_newPos.x, anton_newPos.y, anton_newPos.z };
 	}
 
 
@@ -471,14 +513,14 @@ void InternalViewportWidget::TouchEvent(
 		}
 
 		// We didn't hit any of the joysticks, check if we hit any of the gizmo arrows.
-		if (!hitSomething && isCurrentlyHoldingGizmo && this->implData->selectedEntity.HasValue())
+		if (!hitSomething && !isCurrentlyHoldingGizmo && this->implData->selectedEntity.HasValue())
 		{
 			Entity entity = implData->selectedEntity.Value();
 			// First check if we have a transform
 			auto const transformIt = Std::FindIf(
 				implData->scene->transforms.begin(),
 				implData->scene->transforms.end(),
-				[entity](decltype(implData->scene->transforms[0]) const& val) -> bool { return val.a == entity; });
+				[entity](auto const& val) -> bool { return val.a == entity; });
 			if (transformIt != implData->scene->transforms.end())
 			{
 				Transform const& transform = transformIt->b;
@@ -493,9 +535,10 @@ void InternalViewportWidget::TouchEvent(
 				{
 					auto const& hit = hitResult.Value();
 					this->isCurrentlyHoldingGizmo = true;
+					this->gizmo_touchID = { touch.id };
 					this->gizmo_initialRay = hit.ray;
 					this->gizmo_initialPos = transform.position;
-					this->gizmo_holdingAxis = hit.axis;
+					this->gizmo_holdingPart = hit.part;
 				}
 			}
 		}
@@ -503,6 +546,29 @@ void InternalViewportWidget::TouchEvent(
 
 	if (touch.type == Gui::TouchEventType::Moved)
 	{
+	    if (this->isCurrentlyHoldingGizmo && this->gizmo_touchID.HasValue() && this->gizmo_touchID.Value() == touch.id)
+	    {
+				if (this->implData->selectedEntity.HasValue())
+				{
+					Entity entity = implData->selectedEntity.Value();
+					// First check if we have a transform
+					auto const transformIt = Std::FindIf(
+						implData->scene->transforms.begin(),
+						implData->scene->transforms.end(),
+						[entity](auto const &val) -> bool { return val.a == entity; });
+					if (transformIt != implData->scene->transforms.end())
+					{
+						Transform& transform = transformIt->b;
+
+						TranslateAlongGizmoAxis(
+							*this,
+							widgetRect,
+							{ (i32)touch.position.x, (i32)touch.position.y },
+							transform);
+					}
+				}
+			}
+
 		for (auto& joystick : joysticks)
 		{
 			if (joystick.touchID.HasValue() && joystick.touchID.Value() == touch.id)
@@ -521,6 +587,12 @@ void InternalViewportWidget::TouchEvent(
 	}
 	else if (touch.type == Gui::TouchEventType::Up)
 	{
+		if (this->isCurrentlyHoldingGizmo && this->gizmo_touchID.HasValue() && this->gizmo_touchID.Value() == touch.id)
+		{
+			this->isCurrentlyHoldingGizmo = false;
+			this->gizmo_touchID = Std::nullOpt;
+		}
+
 		for (auto& joystick : joysticks)
 		{
 			if (joystick.touchID.HasValue() && joystick.touchID.Value() == touch.id)
