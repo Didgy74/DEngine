@@ -24,7 +24,7 @@ namespace DEngine::Editor
 			Math::Vec3 direction{};
 		};
 
-		enum GizmoPart
+		enum class GizmoPart
 		{
 			ArrowX,
 			ArrowY,
@@ -416,7 +416,7 @@ namespace DEngine::Editor
 		{
 			// Generate top navigation bar
 			Gui::MenuBar* menuBar = new Gui::MenuBar(Gui::MenuBar::Direction::Horizontal);
-			AddLayout2(Std::Box<Gui::Layout>{ menuBar });
+			AddWidget(Std::Box<Gui::Widget>{ menuBar });
 			
 			menuBar->AddSubmenuButton(
 				"Camera",
@@ -432,7 +432,7 @@ namespace DEngine::Editor
 				});
 
 			InternalViewportWidget* viewport = new InternalViewportWidget(implData, ctx);
-			AddWidget2(Std::Box<Gui::Widget>{ viewport });
+			AddWidget(Std::Box<Gui::Widget>{ viewport });
 		}
 	};
 }

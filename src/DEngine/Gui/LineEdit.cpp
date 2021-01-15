@@ -1,6 +1,7 @@
 #include <DEngine/Gui/LineEdit.hpp>
 
 #include <DEngine/Gui/Context.hpp>
+#include "ImplData.hpp"
 
 #include <DEngine/Std/Utility.hpp>
 
@@ -11,7 +12,6 @@ Gui::LineEdit::~LineEdit()
 {
 	if (this->inputConnectionCtx)
 	{
-		DENGINE_IMPL_GUI_ASSERT(this->selected);
 		this->inputConnectionCtx->ClearInputConnection(*this);
 		this->inputConnectionCtx = nullptr;
 	}
@@ -19,7 +19,15 @@ Gui::LineEdit::~LineEdit()
 
 bool LineEdit::CurrentlyBeingEdited() const
 {
-	return selected;
+	return this->inputConnectionCtx;
+}
+
+SizeHint DEngine::Gui::LineEdit::GetSizeHint(Context const& ctx) const
+{
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+	return impl::TextManager::GetSizeHint(
+		implData.textManager,
+		text);
 }
 
 void LineEdit::Render(
@@ -31,7 +39,7 @@ void LineEdit::Render(
 {
 	Gfx::GuiDrawCmd cmd{};
 	cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-	cmd.filledMesh.color = { 0.25f, 0.25f, 0.25f, 1.f };
+	cmd.filledMesh.color = { 0.0f, 0.0f, 0.0f, 0.3f };
 	cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
 	cmd.rectPosition.x = (f32)widgetRect.position.x / framebufferExtent.width;
 	cmd.rectPosition.y = (f32)widgetRect.position.y / framebufferExtent.height;
@@ -40,24 +48,24 @@ void LineEdit::Render(
 
 	drawInfo.drawCmds.push_back(cmd);
 
-	Text::Render(
-		ctx,
-		framebufferExtent,
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+	impl::TextManager::RenderText(
+		implData.textManager,
+		this->text,
+		{ 1.f, 1.f, 1.f, 1.f },
 		widgetRect,
-		visibleRect,
 		drawInfo);
 }
 
 void LineEdit::CharEnterEvent(Context& ctx)
 {
-	if (selected)
+	if (inputConnectionCtx)
 	{
-		selected = false;
 		inputConnectionCtx = nullptr;
 		ctx.ClearInputConnection(*this);
-		if (StringView().empty())
+		if (text.empty())
 		{
-			String_Set("0");
+			text = "0";
 			if (textChangedPfn)
 				textChangedPfn(*this);
 		}
@@ -66,7 +74,7 @@ void LineEdit::CharEnterEvent(Context& ctx)
 
 void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 {
-	if (selected)
+	if (inputConnectionCtx)
 	{
 		bool validChar = false;
 		switch (this->type)
@@ -77,14 +85,14 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 				validChar = true;
 				break;
 			}
-			if (charEvent == '-' && StringView().length() == 0)
+			if (charEvent == '-' && text.length() == 0)
 			{
 				validChar = true;
 				break;
 			}
 			if (charEvent == '.') // Check if we already have dot
 			{
-				bool alreadyHasDot = StringView().find('.') != std::string_view::npos;
+				bool alreadyHasDot = text.find('.') != std::string_view::npos;
 				if (!alreadyHasDot)
 				{
 					validChar = true;
@@ -98,7 +106,7 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 				validChar = true;
 				break;
 			}
-			if (charEvent == '-' && StringView().length() == 0)
+			if (charEvent == '-' && text.length() == 0)
 			{
 				validChar = true;
 				break;
@@ -114,8 +122,8 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 		}
 		if (validChar)
 		{
-			String_PushBack((u8)charEvent);
-			auto const& string = StringView();
+			text.push_back((u8)charEvent);
+			auto const& string = text;
 			if (string != "" && string != "-" && string != "." && string != "-.")
 			{
 				if (textChangedPfn)
@@ -127,10 +135,10 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 
 void LineEdit::CharRemoveEvent(Context& ctx)
 {
-	if (selected && !StringView().empty())
+	if (inputConnectionCtx && !text.empty())
 	{
-		String_PopBack();
-		auto const& string = StringView();
+		text.pop_back();
+		auto const& string = text;
 		if (string != "" && string != "-" && string != "." && string != "-.")
 		{
 			if (textChangedPfn)
@@ -141,10 +149,11 @@ void LineEdit::CharRemoveEvent(Context& ctx)
 
 void LineEdit::InputConnectionLost(Context& ctx)
 {
-	DENGINE_IMPL_GUI_ASSERT(this->selected);
-	DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx);
-	this->selected = false;
-	this->inputConnectionCtx = nullptr;
+	if (this->inputConnectionCtx)
+	{
+		this->inputConnectionCtx->ClearInputConnection(*this);
+		this->inputConnectionCtx = nullptr;
+	}
 }
 
 void LineEdit::CursorClick(
@@ -159,10 +168,8 @@ void LineEdit::CursorClick(
 	{
 		bool cursorIsInside = widgetRect.PointIsInside(cursorPos);
 
-		if (cursorIsInside && event.clicked && !selected)
+		if (cursorIsInside && event.clicked && inputConnectionCtx == nullptr)
 		{
-			selected = true;
-
 			SoftInputFilter filter{};
 			if (this->type == Type::Float)
 				filter = SoftInputFilter::Float;
@@ -173,17 +180,17 @@ void LineEdit::CursorClick(
 			ctx.TakeInputConnection(
 				*this,
 				filter,
-				StringView());
+				text);
 			this->inputConnectionCtx = &ctx;
 		}
-		else if (!cursorIsInside && event.clicked && selected)
+		else if (!cursorIsInside && event.clicked && inputConnectionCtx)
 		{
-			selected = false;
+			DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx == &ctx);
 			this->inputConnectionCtx = nullptr;
 			ctx.ClearInputConnection(*this);
-			if (StringView().empty())
+			if (text.empty())
 			{
-				String_Set("0");
+				text = "0";
 				if (textChangedPfn)
 					textChangedPfn(*this);
 			}
@@ -200,7 +207,7 @@ void LineEdit::TouchEvent(
 {
 	bool cursorIsInside = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
 
-	if (event.id == 0 && event.type == TouchEventType::Down && cursorIsInside && !selected)
+	if (event.id == 0 && event.type == TouchEventType::Down && cursorIsInside && !inputConnectionCtx)
 	{
 		SoftInputFilter filter{};
 		if (this->type == Type::Float)
@@ -212,20 +219,18 @@ void LineEdit::TouchEvent(
 		ctx.TakeInputConnection(
 			*this,
 			filter,
-			StringView());
-		selected = true;
+			text);
 		this->inputConnectionCtx = &ctx;
 	}
 
-	if (event.id == 0 && event.type == TouchEventType::Down && !cursorIsInside && selected)
+	if (event.id == 0 && event.type == TouchEventType::Down && !cursorIsInside && inputConnectionCtx)
 	{
-		if (StringView().empty())
+		if (text.empty())
 		{
-			String_Set("0");
+			text = "0";
 			if (textChangedPfn)
 				textChangedPfn(*this);
 		}
-		selected = false;
 		this->inputConnectionCtx = nullptr;
 		ctx.ClearInputConnection(*this);
 	}

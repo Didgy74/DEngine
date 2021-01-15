@@ -13,7 +13,6 @@ namespace DEngine::Gui
 	class StackLayout; // TEMPORARY
 
 	class Widget;
-	class Layout;
 
 	class Context
 	{
@@ -51,8 +50,8 @@ namespace DEngine::Gui
 
 		WindowHandler& GetWindowHandler() const;
 
-		void Test_AddMenu(WindowID windowId, Std::Box<Layout> layout, Rect rect);
-		void Test_DestroyMenu(WindowID windowId, Layout* layout);
+		void Test_AddMenu(WindowID windowId, Std::Box<Widget>&& widget, Rect rect);
+		void Test_DestroyMenu(WindowID windowId, Widget* widget);
 		
 		// TEMPORARY FIELDS
 		StackLayout* outerLayout = nullptr;

@@ -31,9 +31,11 @@ namespace DEngine::Std
 		[[nodiscard]] bool operator==(Box const&) const noexcept;
 		[[nodiscard]] bool operator==(T const*) const noexcept;
 
-		void Release() noexcept;
+		// Returns the pointer and releases ownership over it.
+		[[nodiscard]] T* Release() noexcept;
 
 	private:
+		void Clear() noexcept;
 		T* data = nullptr;
 	};
 
@@ -59,7 +61,7 @@ namespace DEngine::Std
 	template<typename T>
 	inline Box<T>::~Box()
 	{
-		Release();
+		Clear();
 	}
 
 	template<typename T>
@@ -68,7 +70,7 @@ namespace DEngine::Std
 		if (this == &right)
 			return *this;
 		
-		Release();
+		Clear();
 		data = right.data;
 		right.data = nullptr;
 		return *this;
@@ -129,7 +131,15 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	inline void Box<T>::Release() noexcept
+	inline T* Box<T>::Release() noexcept
+	{
+		T* returnVal = data;
+		data = nullptr;
+		return returnVal;
+	}
+
+	template<typename T>
+	inline void Box<T>::Clear() noexcept
 	{
 		if (data)
 		{

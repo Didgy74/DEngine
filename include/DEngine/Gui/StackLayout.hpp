@@ -1,7 +1,6 @@
 #pragma once
 
-#include "DEngine/Gui/Layout.hpp"
-#include "DEngine/Gui/Widget.hpp"
+#include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Math/Vector.hpp>
@@ -18,10 +17,10 @@ namespace DEngine::Gui::impl
 
 namespace DEngine::Gui
 {
-	class StackLayout : public Layout
+	class StackLayout : public Widget
 	{
 	public:
-		using ParentType = Layout;
+		using ParentType = Widget;
 
 		enum class Direction
 		{
@@ -44,33 +43,11 @@ namespace DEngine::Gui
 		bool expandNonDirection = false;
 
 		uSize ChildCount() const;
-		struct Child
-		{
-			enum class Type
-			{
-				Widget,
-				Layout
-			};
-			Type type;
-			Widget* widget = nullptr;
-			Layout* layout = nullptr;
-		};
-		Child At(uSize index);
-		struct ConstChild
-		{
-			enum class Type
-			{
-				Widget,
-				Layout
-			};
-			Type type;
-			Widget const* widget = nullptr;
-			Layout const* layout = nullptr;
-		};
-		ConstChild At(uSize index) const;
-		void AddWidget2(Std::Box<Widget>&& in);
-		void AddLayout2(Std::Box<Layout>&& in);
-		void InsertLayout(uSize index, Std::Box<Layout>&& in);
+		Widget& At(uSize index);
+		Widget const& At(uSize index) const;
+		void AddWidget(Std::Box<Widget>&& in);
+		Std::Box<Widget> ExtractChild(uSize index);
+		void InsertWidget(uSize index, Std::Box<Widget>&& in);
 		void RemoveItem(uSize index);
 		void ClearChildren();
 
@@ -92,6 +69,9 @@ namespace DEngine::Gui
 			u32 utfValue) override;
 
 		virtual void CharRemoveEvent(
+			Context& ctx) override;
+
+		virtual void InputConnectionLost(
 			Context& ctx) override;
 
 		virtual void CursorClick(
@@ -117,18 +97,7 @@ namespace DEngine::Gui
 			Gui::TouchEvent event) override;
 
 	protected:
-		struct LayoutItem
-		{
-			enum class Type
-			{
-				Widget,
-				Layout
-			};
-			Type type;
-			Std::Box<Widget> widget;
-			Std::Box<Layout> layout;
-		};
-		std::vector<LayoutItem> children;
+		std::vector<Std::Box<Widget>> children;
 
 		struct InsertRemoveJob
 		{

@@ -65,16 +65,8 @@ SizeHint ScrollArea::GetSizeHint(
   returnVal.expandX = true;
   returnVal.expandY = true;
 
-  if (childType == ChildType::Layout)
-  {
-    Gui::SizeHint childSizeHint = layout->GetSizeHint(ctx);
-    returnVal.preferred.width = childSizeHint.preferred.width;
-  }
-  else if (childType == ChildType::Widget)
-  {
-    Gui::SizeHint childSizeHint = widget->GetSizeHint(ctx);
-    returnVal.preferred.width = childSizeHint.preferred.width;
-  }
+  Gui::SizeHint childSizeHint = widget->GetSizeHint(ctx);
+  returnVal.preferred.width = childSizeHint.preferred.width;
 
   returnVal.preferred.width += scrollBarThickness;
 
@@ -88,11 +80,7 @@ void ScrollArea::Render(
   Rect visibleRect,
   DrawInfo& drawInfo) const
 {
-  SizeHint childSizeHint{};
-  if (layout)
-    childSizeHint = layout->GetSizeHint(ctx);
-  else
-    childSizeHint = widget->GetSizeHint(ctx);
+  SizeHint childSizeHint = widget->GetSizeHint(ctx);
 
   Rect childRect = impl::GetChildRect(
     widgetRect,
@@ -106,28 +94,16 @@ void ScrollArea::Render(
 
   Rect childVisibleRect = Rect::Intersection(childRect, visibleRect);
 
-  if ((layout || widget) && !childVisibleRect.IsNothing())
+  if (widget && !childVisibleRect.IsNothing())
   {
     drawInfo.PushScissor(childVisibleRect);
 
-    if (childType == ChildType::Layout)
-    {
-      layout->Render(
-        ctx,
-        framebufferExtent,
-        childRect,
-        childVisibleRect,
-        drawInfo);
-    }
-    else if (childType == ChildType::Widget)
-    {
-      widget->Render(
-        ctx,
-        framebufferExtent,
-        childRect,
-        childVisibleRect,
-        drawInfo);
-    }
+    widget->Render(
+      ctx,
+      framebufferExtent,
+      childRect,
+      childVisibleRect,
+      drawInfo);
 
     // Add scissor remove drawcmd
     drawInfo.PopScissor();
@@ -158,13 +134,9 @@ void ScrollArea::CursorMove(
   Rect visibleRect,
   CursorMoveEvent event)
 {
-  if (childType == ChildType::Layout || childType == ChildType::Widget)
+  if (widget)
   {
-    SizeHint childSizeHint{};
-    if (childType == ChildType::Layout)
-      childSizeHint = layout->GetSizeHint(ctx);
-    else
-      childSizeHint = widget->GetSizeHint(ctx);
+    SizeHint childSizeHint = widget->GetSizeHint(ctx);
 
     Rect childRect = impl::GetChildRect(
       widgetRect,
@@ -200,20 +172,12 @@ void ScrollArea::CursorMove(
         scrollBarState = ScrollBarState::Normal;
     }
 
-    if (childType == ChildType::Layout)
-      layout->CursorMove(
-        ctx,
-        windowId,
-        childRect,
-        Rect::Intersection(childRect, visibleRect),
-        event);
-    else if (childType == ChildType::Widget)
-      widget->CursorMove(
-        ctx,
-        windowId,
-        childRect,
-        Rect::Intersection(childRect, visibleRect),
-        event);
+    widget->CursorMove(
+      ctx,
+      windowId,
+      childRect,
+      Rect::Intersection(childRect, visibleRect),
+      event);      
   }
 }
 
@@ -225,13 +189,9 @@ void ScrollArea::CursorClick(
   Math::Vec2Int cursorPos, 
   CursorClickEvent event)
 {
-  if (childType == ChildType::Layout || childType == ChildType::Widget)
+  if (widget)
   {
-    SizeHint childSizeHint{};
-    if (childType == ChildType::Layout)
-      childSizeHint = layout->GetSizeHint(ctx);
-    else
-      childSizeHint = widget->GetSizeHint(ctx);
+    SizeHint childSizeHint = widget->GetSizeHint(ctx);
 
     Rect childRect = impl::GetChildRect(
       widgetRect,
@@ -260,22 +220,13 @@ void ScrollArea::CursorClick(
         scrollBarState = ScrollBarState::Normal;
     }
 
-    if (childType == ChildType::Layout)
-      layout->CursorClick(
-        ctx,
-        windowId,
-        childRect,
-        Rect::Intersection(childRect, visibleRect),
-        cursorPos,
-        event);
-    else if (childType == ChildType::Widget)
-      widget->CursorClick(
-        ctx,
-        windowId,
-        childRect,
-        Rect::Intersection(childRect, visibleRect),
-        cursorPos,
-        event);
+    widget->CursorClick(
+      ctx,
+      windowId,
+      childRect,
+      Rect::Intersection(childRect, visibleRect),
+      cursorPos,
+      event);
   }
 }
 
@@ -293,13 +244,9 @@ void ScrollArea::TouchEvent(
     visibleRect,
     event);
 
-  if (childType == ChildType::Layout || childType == ChildType::Widget)
+  if (widget)
   {
-    SizeHint childSizeHint{};
-    if (childType == ChildType::Layout)
-      childSizeHint = layout->GetSizeHint(ctx);
-    else
-      childSizeHint = widget->GetSizeHint(ctx);
+    SizeHint childSizeHint = widget->GetSizeHint(ctx);
 
     Rect childRect = impl::GetChildRect(
       widgetRect,
@@ -340,43 +287,31 @@ void ScrollArea::TouchEvent(
       }
     }
 
-    if (childType == ChildType::Layout)
-      layout->TouchEvent(
-        ctx,
-        windowId,
-        childRect,
-        Rect::Intersection(childRect, visibleRect),
-        event);
-    else if (childType == ChildType::Widget)
-      widget->TouchEvent(
-        ctx,
-        windowId,
-        childRect,
-        Rect::Intersection(childRect, visibleRect),
-        event);
+    widget->TouchEvent(
+      ctx,
+      windowId,
+      childRect,
+      Rect::Intersection(childRect, visibleRect),
+      event);
   }
+}
+
+void DEngine::Gui::ScrollArea::InputConnectionLost(Context& ctx)
+{
+  widget->InputConnectionLost(ctx);
 }
 
 void ScrollArea::CharEnterEvent(Context& ctx)
 {
-  if (childType == ChildType::Layout)
-    layout->CharEnterEvent(ctx);
-  else if (childType == ChildType::Widget)
-    widget->CharEnterEvent(ctx);
+  widget->CharEnterEvent(ctx);
 }
 
 void ScrollArea::CharEvent(Context& ctx, u32 utfValue)
 {
-  if (childType == ChildType::Layout)
-    layout->CharEvent(ctx, utfValue);
-  else if (childType == ChildType::Widget)
-    widget->CharEvent(ctx, utfValue);
+  widget->CharEvent(ctx, utfValue);
 }
 
 void ScrollArea::CharRemoveEvent(Context& ctx)
 {
-  if (childType == ChildType::Layout)
-    layout->CharRemoveEvent(ctx);
-  else if (childType == ChildType::Widget)
-    widget->CharRemoveEvent(ctx);
+  widget->CharRemoveEvent(ctx);
 }

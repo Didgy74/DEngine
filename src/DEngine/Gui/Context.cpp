@@ -44,7 +44,7 @@ Context Context::Create(
 		newNode.data.clearColor = { 0.1f, 0.1f, 0.1f, 1.f };
 
 		StackLayout* outmostLayout = new StackLayout(StackLayout::Direction::Vertical);
-		newNode.data.topLayout = Std::Box<Layout>{ outmostLayout };
+		newNode.data.topLayout = Std::Box<Widget>{ outmostLayout };
 		implData.windows.emplace_back(Std::Move(newNode));
 
 		newCtx.outerLayout = outmostLayout;
@@ -100,7 +100,7 @@ WindowHandler& Context::GetWindowHandler() const
 
 void Context::Test_AddMenu(
 	WindowID windowId, 
-	Std::Box<Layout> layout, 
+	Std::Box<Widget>&& layout, 
 	Rect rect)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
@@ -121,11 +121,11 @@ void Context::Test_AddMenu(
 	}
 	impl::Test_Menu yo{};
 	yo.rect = rect;
-	yo.topLayout = static_cast<Std::Box<Layout>&&>(layout);
+	yo.topLayout = static_cast<Std::Box<Widget>&&>(layout);
 	windowNode.test_Menus.emplace(windowNode.test_Menus.begin(), Std::Move(yo));
 }
 
-void Context::Test_DestroyMenu(WindowID windowId, Layout* layout)
+void Context::Test_DestroyMenu(WindowID windowId, Widget* widget)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 
@@ -139,7 +139,7 @@ void Context::Test_DestroyMenu(WindowID windowId, Layout* layout)
 	auto const menuIt = Std::FindIf(
 		windowNode.test_Menus.begin(),
 		windowNode.test_Menus.end(),
-		[layout](decltype(windowNode.test_Menus)::value_type const& val) -> bool { return val.topLayout.Get() == layout; });
+		[widget](decltype(windowNode.test_Menus)::value_type const& val) -> bool { return val.topLayout.Get() == widget; });
 	DENGINE_IMPL_GUI_ASSERT(menuIt != windowNode.test_Menus.end());
 
 	if (windowNode.currentlyIterating)

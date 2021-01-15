@@ -12,7 +12,9 @@ namespace DEngine::Gui::impl
 		Rect widgetRect,
 		Callable const& callable)
 	{
-		static_assert(Std::Trait::IsSame<decltype(layout), StackLayout&> || Std::Trait::IsSame<decltype(layout), StackLayout const&>);
+		static_assert(
+			Std::Trait::isSame<decltype(layout), StackLayout&> || Std::Trait::isSame<decltype(layout), StackLayout const&>,
+			"When iterating over a Gui::StackLayout, the must be StackLayout& or StackLayout const&");
 		
 		uSize childCount = (uSize)layout.children.size();
 		if (childCount == 0)
@@ -34,13 +36,7 @@ namespace DEngine::Gui::impl
 		{
 			auto& child = layout.children[i];
 			auto& childSizeHint = childSizeHints[i];
-			// Call SizeHint on child.
-			if (child.type == StackLayout::LayoutItem::Type::Layout)
-				childSizeHint = child.layout->GetSizeHint(ctx);
-			else if (child.type == StackLayout::LayoutItem::Type::Widget)
-				childSizeHint = child.widget->GetSizeHint(ctx);
-			else
-				DENGINE_DETAIL_UNREACHABLE();
+			childSizeHint = child->GetSizeHint(ctx);
 
 			// Add to the sum size.
 			bool shouldAdd = layout.direction == StackLayout::Direction::Horizontal && !childSizeHint.expandX;
@@ -123,8 +119,8 @@ namespace DEngine::Gui::impl
 			if (childExists)
 			{
 				auto& child = layout.children[modifiedIndex];
-				if (child.widget || child.layout)
-					callable(child, childRect);
+				if (child)
+					callable(*child, childRect);
 			}
 
 
@@ -152,102 +148,74 @@ uSize StackLayout::ChildCount() const
 	return (uSize)children.size();
 }
 
-StackLayout::Child StackLayout::At(uSize index)
+Widget& StackLayout::At(uSize index)
 {
 	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
 	auto& child = children[index];
 	
-	DENGINE_IMPL_GUI_ASSERT(child.layout || child.widget);
+	DENGINE_IMPL_GUI_ASSERT(child);
 
-	Child returnVal{};
-	if (child.type == LayoutItem::Type::Layout)
-	{
-		returnVal.type = Child::Type::Layout;
-		returnVal.layout = child.layout.Get();
-	}
-	else
-	{
-		returnVal.type = Child::Type::Widget;
-		returnVal.widget = child.widget.Get();
-	}
-
-	return returnVal;
+	return *child;
 }
 
-StackLayout::ConstChild StackLayout::At(uSize index) const
+Widget const& StackLayout::At(uSize index) const
 {
 	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
-
 	auto& child = children[index];
 
-	DENGINE_IMPL_GUI_ASSERT(child.layout || child.widget);
+	DENGINE_IMPL_GUI_ASSERT(child);
 
-	ConstChild returnVal{};
-	if (child.type == LayoutItem::Type::Layout)
+	return *child;
+}
+
+void StackLayout::AddWidget(Std::Box<Widget>&& in)
+{
+	DENGINE_IMPL_GUI_ASSERT(in);
+
+	children.emplace_back(static_cast<Std::Box<Widget>&&>(in));
+
+	if (currentlyIterating)
 	{
-		returnVal.type = ConstChild::Type::Layout;
-		returnVal.layout = child.layout.Get();
+		InsertRemoveJob newJob{};
+		newJob.type = InsertRemoveJob::Type::Insert;
+		newJob.insert.index = InsertRemoveJob::Insert::pushBackIndex;
+		insertionJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
 	}
-	else
+}
+
+Std::Box<Widget> DEngine::Gui::StackLayout::ExtractChild(uSize index)
+{
+	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
+
+	auto& item = children[index];
+	Std::Box<Widget> returnVal = static_cast<Std::Box<Widget>&&>(item);
+
+	children.erase(children.begin() + index);
+
+	if (currentlyIterating)
 	{
-		returnVal.type = ConstChild::Type::Widget;
-		returnVal.widget = child.widget.Get();
+		InsertRemoveJob newJob{};
+		newJob.type = InsertRemoveJob::Type::Remove;
+		newJob.remove.index = index;
+		insertionJobs.emplace_back(newJob);
 	}
+
 	return returnVal;
 }
 
-void StackLayout::AddWidget2(Std::Box<Widget>&& in)
-{
-	DENGINE_IMPL_GUI_ASSERT(in);
-
-	LayoutItem newItem{};
-	newItem.type = LayoutItem::Type::Widget;
-	newItem.widget = static_cast<Std::Box<Widget>&&>(in);
-	children.emplace_back(static_cast<LayoutItem&&>(newItem));
-
-	if (currentlyIterating)
-	{
-		InsertRemoveJob newJob{};
-		newJob.type = InsertRemoveJob::Type::Insert;
-		newJob.insert.index = InsertRemoveJob::Insert::pushBackIndex;
-		insertionJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
-	}
-}
-
-void StackLayout::AddLayout2(Std::Box<Layout>&& in)
-{
-	DENGINE_IMPL_GUI_ASSERT(in);
-
-	LayoutItem newItem{};
-	newItem.type = LayoutItem::Type::Layout;
-	newItem.layout = static_cast<Std::Box<Layout>&&>(in);
-	children.emplace_back(static_cast<LayoutItem&&>(newItem));
-
-	if (currentlyIterating)
-	{
-		InsertRemoveJob newJob{};
-		newJob.type = InsertRemoveJob::Type::Insert;
-		newJob.insert.index = InsertRemoveJob::Insert::pushBackIndex;
-		insertionJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
-	}
-}
-
-void StackLayout::InsertLayout(uSize index, Std::Box<Layout>&& in)
+void StackLayout::InsertWidget(uSize index, Std::Box<Widget>&& in)
 {
 	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
 	DENGINE_IMPL_GUI_ASSERT(in);
 
-	LayoutItem newItem{};
-	newItem.type = LayoutItem::Type::Layout;
-	newItem.layout = static_cast<Std::Box<Layout>&&>(in);
-	children.insert(children.begin() + index, static_cast<LayoutItem&&>(newItem));
+	children.insert(children.begin() + index, static_cast<Std::Box<Widget>&&>(in));
 
 	if (currentlyIterating)
 	{
 		InsertRemoveJob newJob{};
 		newJob.type = InsertRemoveJob::Type::Insert;
 		newJob.insert.index = index;
-		insertionJobs.emplace_back(static_cast<InsertRemoveJob&&>(newJob));
+		insertionJobs.emplace_back(newJob);
 	}
 }
 
@@ -278,23 +246,19 @@ SizeHint StackLayout::GetSizeHint(
 	u32 childCount = 0;
 	for (auto const& child : children)
 	{
-		if (!child.widget && !child.layout)
+		if (!child)
 			continue;
 
 		childCount += 1;
 
-		SizeHint childSizeHint{};
-		if (child.type == LayoutItem::Type::Layout)
-			childSizeHint = child.layout->GetSizeHint(ctx);
-		else
-			childSizeHint = child.widget->GetSizeHint(ctx);
+		SizeHint const childSizeHint = child->GetSizeHint(ctx);
 
 		u32& directionLength = direction == Direction::Horizontal ? returnVal.preferred.width : returnVal.preferred.height;
-		u32& childDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.width : childSizeHint.preferred.height;
+		u32 const& childDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.width : childSizeHint.preferred.height;
 		directionLength += childDirectionLength;
 
 		u32& nonDirectionLength = direction == Direction::Horizontal ? returnVal.preferred.height : returnVal.preferred.width;
-		u32& childNonDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.height : childSizeHint.preferred.width;
+		u32 const& childNonDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.height : childSizeHint.preferred.width;
 		nonDirectionLength = Math::Max(nonDirectionLength, childNonDirectionLength);
 	}
 	// Add spacing
@@ -359,26 +323,18 @@ void StackLayout::Render(
 		ctx,
 		*this,
 		widgetRect,
-		[&ctx, framebufferExtent, &drawInfo, visibleRect](LayoutItem const& child, Rect childRect)
+		[&ctx, framebufferExtent, &drawInfo, visibleRect](Widget const& child, Rect childRect)
 		{
 			Rect childVisibleRect = Rect::Intersection(childRect, visibleRect);
 			if (childVisibleRect.IsNothing())
 				return;
 
-			if (child.type == LayoutItem::Type::Layout)
-				child.layout->Render(
-					ctx,
-					framebufferExtent,
-					childRect,
-					childVisibleRect,
-					drawInfo);
-			else
-				child.widget->Render(
-					ctx,
-					framebufferExtent,
-					childRect,
-					childVisibleRect,
-					drawInfo);
+			child.Render(
+				ctx,
+				framebufferExtent,
+				childRect,
+				childVisibleRect,
+				drawInfo);
 		});
 }
 
@@ -388,14 +344,7 @@ void StackLayout::CharEnterEvent(Context& ctx)
 
 	for (auto& child : children)
 	{
-		if (child.type == LayoutItem::Type::Layout)
-		{
-			child.layout->CharEnterEvent(ctx);
-		}
-		else
-		{
-			child.widget->CharEnterEvent(ctx);
-		}
+		child->CharEnterEvent(ctx);
 	}
 }
 
@@ -409,14 +358,7 @@ void StackLayout::CharEvent(
 
 	for (auto& child : children)
 	{
-		if (child.type == LayoutItem::Type::Layout)
-		{
-			child.layout->CharEvent(ctx, utfValue);
-		}
-		else
-		{
-			child.widget->CharEvent(ctx, utfValue);
-		}
+		child->CharEvent(ctx, utfValue);
 	}
 }
 
@@ -426,14 +368,17 @@ void StackLayout::CharRemoveEvent(Context& ctx)
 
 	for (auto& child : children)
 	{
-		if (child.type == LayoutItem::Type::Layout)
-		{
-			child.layout->CharRemoveEvent(ctx);
-		}
-		else
-		{
-			child.widget->CharRemoveEvent(ctx);
-		}
+		child->CharRemoveEvent(ctx);
+	}
+}
+
+void StackLayout::InputConnectionLost(Context& ctx)
+{
+	ParentType::InputConnectionLost(ctx);
+
+	for (auto& child : children)
+	{
+		child->InputConnectionLost(ctx);
 	}
 }
 
@@ -455,22 +400,14 @@ void StackLayout::CursorMove(
 		ctx,
 		*this,
 		widgetRect,
-		[&ctx, windowId, visibleRect, event](LayoutItem& child, Rect childRect)
+		[&ctx, windowId, visibleRect, event](Widget& child, Rect childRect)
 		{
-			if (child.type == LayoutItem::Type::Layout)
-				child.layout->CursorMove(
-					ctx,
-					windowId,
-					childRect,
-					Rect::Intersection(childRect, visibleRect),
-					event);
-			else
-				child.widget->CursorMove(
-					ctx,
-					windowId,
-					childRect,
-					Rect::Intersection(childRect, visibleRect),
-					event);
+			child.CursorMove(
+				ctx,
+				windowId,
+				childRect,
+				Rect::Intersection(childRect, visibleRect),
+				event);
 		});
 }
 
@@ -494,24 +431,15 @@ void StackLayout::CursorClick(
 		ctx,
 		*this,
 		widgetRect,
-		[&ctx, windowId, visibleRect, cursorPos, event](LayoutItem& child, Rect childRect)
+		[&ctx, windowId, visibleRect, cursorPos, event](Widget& child, Rect childRect)
 		{
-			if (child.type == LayoutItem::Type::Layout)
-				child.layout->CursorClick(
-					ctx,
-					windowId,
-					childRect,
-					Rect::Intersection(childRect, visibleRect),
-					cursorPos,
-					event);
-			else
-				child.widget->CursorClick(
-					ctx,
-					windowId,
-					childRect,
-					Rect::Intersection(childRect, visibleRect),
-					cursorPos,
-					event);
+			child.CursorClick(
+				ctx,
+				windowId,
+				childRect,
+				Rect::Intersection(childRect, visibleRect),
+				cursorPos,
+				event);
 		});
 }
 
@@ -533,21 +461,13 @@ void StackLayout::TouchEvent(
 		ctx,
 		*this,
 		widgetRect,
-		[&ctx, windowId, visibleRect, event](LayoutItem& child, Rect childRect)
+		[&ctx, windowId, visibleRect, event](Widget& child, Rect childRect)
 		{
-			if (child.type == LayoutItem::Type::Layout)
-				child.layout->TouchEvent(
-					ctx,
-					windowId,
-					childRect,
-					Rect::Intersection(childRect, visibleRect),
-					event);
-			else
-				child.widget->TouchEvent(
-					ctx,
-					windowId,
-					childRect,
-					Rect::Intersection(childRect, visibleRect),
-					event);
+			child.TouchEvent(
+				ctx,
+				windowId,
+				childRect,
+				Rect::Intersection(childRect, visibleRect),
+				event);
 		});
 }

@@ -24,10 +24,8 @@ namespace DEngine::Gui
 		using Callback = std::function<void(LineList&)>;
 		Callback selectedLineChangedCallback = nullptr;
 
-
-		[[nodiscard]] virtual Gui::SizeHint GetSizeHint(Context const& ctx) const override;
+		[[nodiscard]] virtual SizeHint GetSizeHint(Context const& ctx) const override;
 	
-
 		virtual void Render(
 			Context const& ctx,
 			Extent framebufferExtent,

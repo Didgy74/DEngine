@@ -8,38 +8,11 @@ using namespace DEngine::Gui;
 
 Button::Button()
 {
-	textWidget.String_Set("Button");
-}
-
-void Button::SetState(State newState)
-{
-	if (newState == state)
-		return;
-
-	switch (newState)
-	{
-	case State::Normal:
-		textWidget.color = normalTextColor;
-		break;
-	case State::Hovered:
-		textWidget.color = hoverTextColor;
-		break;
-	case State::Pressed:
-		textWidget.color = pressedTextColor;
-		break;
-	case State::Toggled:
-		textWidget.color = toggledTextColor;
-		break;
-	}
-
-	state = newState;
+	text = "Button";
 }
 
 void Button::Activate(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect)
+	Context& ctx)
 {
 	if (type == Type::Toggle)
 	{
@@ -49,22 +22,14 @@ void Button::Activate(
 	if (activatePfn)
 		activatePfn(
 			*this,
-			ctx,
-			windowId,
-			widgetRect,
-			visibleRect);
+			&ctx);
 }
 
 void Button::SetToggled(bool toggled)
 {
 	if (toggled)
 	{
-		SetState(State::Toggled);
-		textWidget.color = toggledTextColor;
-	}
-	else
-	{
-		textWidget.color = normalTextColor;
+		state = State::Toggled;
 	}
 
 	this->toggled = toggled;
@@ -78,7 +43,10 @@ bool Button::GetToggled() const
 SizeHint Button::GetSizeHint(
 	Context const& ctx) const
 {
-	return textWidget.GetSizeHint(ctx);
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+	return impl::TextManager::GetSizeHint(
+		implData.textManager,
+		text);
 }
 
 void Button::Render(
@@ -135,7 +103,7 @@ void Button::Render(
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	impl::TextManager::RenderText(
 		implData.textManager,
-		textWidget.StringView(),
+		text,
 		currentTextColor,
 		widgetRect,
 		drawInfo);
@@ -156,18 +124,15 @@ void Button::CursorClick(
 		if (temp)
 		{
 			if (event.clicked)
-				SetState(State::Pressed);
+				state = State::Pressed;
 			else
 			{
 				if (state == State::Pressed)
 				{
 					Activate(
-						ctx,
-						windowId,
-						widgetRect,
-						visibleRect);
+						ctx);
 				}
-				SetState(State::Hovered);
+				state = State::Hovered;
 			}
 		}
 	}
@@ -184,14 +149,14 @@ void Button::CursorMove(
 	if (temp)
 	{
 		if (state != State::Pressed)
-			SetState(State::Hovered);
+			state = State::Hovered;
 	}
 	else
 	{
 		if (toggled)
-			SetState(State::Toggled);
+			state = State::Toggled;
 		else
-			SetState(State::Normal);
+			state = State::Normal;
 	}
 }
 
@@ -208,21 +173,18 @@ void Button::TouchEvent(
 		if (temp)
 		{
 			if (event.type == TouchEventType::Down)
-				SetState(State::Pressed);
+				state = State::Pressed;
 			else if (event.type == TouchEventType::Up)
 			{
 				if (state == State::Pressed)
 					Activate(
-						ctx,
-						(WindowID)0,
-						widgetRect,
-						visibleRect);
-				SetState(State::Normal);
+						ctx);
+				state = State::Normal;
 			}
 		}
 		else
 		{
-			SetState(State::Normal);
+			state = State::Normal;
 		}
 	}
 }

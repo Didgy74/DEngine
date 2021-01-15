@@ -119,9 +119,9 @@ namespace DEngine::Gui::impl
 		DockArea_IterateNode_SplitCallableOrder splitCallableOrder,
 		Callable const& callable)
 	{
-		static_assert(Std::Trait::IsSame<
-			Std::Trait::RemoveConst<T>, 
-			DockArea::Node>);
+		static_assert(
+			Std::Trait::isSame<Std::Trait::RemoveConst<T>,	DockArea::Node>,
+			"Template type error.");
 		
 		DENGINE_IMPL_GUI_ASSERT(continueIterating);
 		DockArea_IterateNode_Internal(
@@ -153,9 +153,9 @@ namespace DEngine::Gui::impl
 		bool& continueIterating,
 		Callable callable)
 	{
-		static_assert(Std::Trait::IsSame<
-			Std::Trait::RemoveConst<TopLevelNodeContainerType>,
-			decltype(DockArea::topLevelNodes)>);
+		static_assert(
+			Std::Trait::isSame<Std::Trait::RemoveConst<TopLevelNodeContainerType>, decltype(DockArea::topLevelNodes)>,
+			"Wrong topLevelNodeContainerType passed into DockArea_IterateTopLevelNodes");
 
 		uSize topLevelNodesLength = topLevelNodes.size();
 		
@@ -443,27 +443,15 @@ namespace DEngine::Gui::impl
 							}
 
 							// Draw the window content
-							if (window.widget || window.layout)
+							if (window.widget)
 							{
 								drawInfo.PushScissor(contentRect);
-								if (window.widget)
-								{
-									window.widget->Render(
-										ctx,
-										drawInfo.GetFramebufferExtent(),
-										contentRect,
-										contentRect,
-										drawInfo);
-								}
-								else
-								{
-									window.layout->Render(
-										ctx,
-										drawInfo.GetFramebufferExtent(),
-										contentRect,
-										contentRect,
-										drawInfo);
-								}
+								window.widget->Render(
+									ctx,
+									drawInfo.GetFramebufferExtent(),
+									contentRect,
+									contentRect,
+									drawInfo);
 								drawInfo.PopScissor();
 							}
 						}
@@ -777,16 +765,6 @@ namespace DEngine::Gui::impl
 								if (window.widget)
 								{
 									window.widget->CursorClick(
-										ctx,
-										windowId,
-										contentRect,
-										contentRect,
-										cursorPos,
-										event);
-								}
-								else if (window.layout)
-								{
-									window.layout->CursorClick(
 										ctx,
 										windowId,
 										contentRect,
@@ -1108,15 +1086,6 @@ namespace DEngine::Gui::impl
 									if (window.widget)
 									{
 										window.widget->CursorMove(
-											ctx,
-											windowId,
-											contentRect,
-											contentRect,
-											event);
-									}
-									else if (window.layout)
-									{
-										window.layout->CursorMove(
 											ctx,
 											windowId,
 											contentRect,
@@ -1638,15 +1607,6 @@ namespace DEngine::Gui::impl
 														contentRect,
 														event);
 												}
-												else if (window.layout)
-												{
-													window.layout->TouchEvent(
-														ctx,
-														windowId,
-														contentRect,
-														contentRect,
-														event);
-												}
 											}
 										}
 									}
@@ -2111,6 +2071,41 @@ void DockArea::TouchEvent(
 	}
 }
 
+void DEngine::Gui::DockArea::InputConnectionLost(Context& ctx)
+{
+	bool continueIterating = true;
+	impl::DockArea_IterateTopLevelNodes(
+		impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
+		topLevelNodes,
+		Rect{},
+		continueIterating,
+		[&ctx](
+			DockArea::TopLevelNode& topLevelNode,
+			Rect topLevelRect,
+			uSize topLevelIndex,
+			bool& continueIterating)
+		{
+			impl::DockArea_IterateNode(
+				*topLevelNode.node,
+				topLevelRect,
+				continueIterating,
+				impl::DockArea_IterateNode_SplitCallableOrder::First,
+				[&ctx](
+					DockArea::Node& node,
+					Rect rect,
+					DockArea::Node* parentNode,
+					bool& continueIterating)
+				{
+					if (node.type == Node::Type::Window)
+					{
+						auto& window = node.windows[node.selectedWindow];
+						if (window.widget)
+							window.widget->InputConnectionLost(ctx);
+					}
+				});
+		});
+}
+
 void DEngine::Gui::DockArea::CharEnterEvent(Context& ctx)
 {
 	// Only send events to the window in focus?
@@ -2143,8 +2138,6 @@ void DEngine::Gui::DockArea::CharEnterEvent(Context& ctx)
 						auto& window = node.windows[node.selectedWindow];
 						if (window.widget)
 							window.widget->CharEnterEvent(ctx);
-						else if (window.layout)
-							window.layout->CharEnterEvent(ctx);
 					}
 				});
 		});
@@ -2186,10 +2179,6 @@ void DockArea::CharEvent(
 							window.widget->CharEvent(
 								ctx,
 								utfValue);
-						else if (window.layout)
-							window.layout->CharEvent(
-								ctx,
-								utfValue);
 					}
 				});
 		});
@@ -2226,9 +2215,6 @@ void DockArea::CharRemoveEvent(
 						auto& window = node.windows[node.selectedWindow];
 						if (window.widget)
 							window.widget->CharRemoveEvent(
-								ctx);
-						else if (window.layout)
-							window.layout->CharRemoveEvent(
 								ctx);
 					}
 				});

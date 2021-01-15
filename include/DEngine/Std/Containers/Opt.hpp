@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DEngine/Std/Containers/detail/Assert.hpp>
+#include <DEngine/Std/Trait.hpp>
 
 #include <new>
 

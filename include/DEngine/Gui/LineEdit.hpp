@@ -1,15 +1,15 @@
 #pragma once
 
-#include <DEngine/Gui/Text.hpp>
+#include <DEngine/Gui/Widget.hpp>
 
 #include <functional>
+#include <string>
 
 namespace DEngine::Gui
 {
-	class LineEdit : public Text
+	class LineEdit : public Widget
 	{
 	public:
-
 		enum class Type
 		{
 			Float,
@@ -19,16 +19,18 @@ namespace DEngine::Gui
 		Type type = Type::Float;
 
 		Math::Vec4 backgroundColor = { 0.25f, 0.25f, 0.25f, 1.f };
-		bool selected = false;
 
-		void* pUserData = nullptr;
 		std::function<void(LineEdit& widget)> textChangedPfn = nullptr;
 
-		Context* inputConnectionCtx = nullptr;
+		
+
+		std::string text;
 
 		virtual ~LineEdit();
 
 		[[nodiscard]] bool CurrentlyBeingEdited() const;
+
+		[[nodiscard]] virtual SizeHint GetSizeHint(Context const& ctx) const override;
 
 		virtual void Render(
 			Context const& ctx,
@@ -64,5 +66,8 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchEvent touch) override;
+
+	private:
+		Context* inputConnectionCtx = nullptr;
 	};
 }

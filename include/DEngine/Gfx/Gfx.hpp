@@ -188,7 +188,7 @@ namespace DEngine::Gfx
 			Info,
 			Fatal
 		};
-		virtual void log(Level level, char const* msg) = 0;
+		virtual void Log(Level level, char const* msg) = 0;
 	};
 
 	class WsiInterface

@@ -1,65 +1,129 @@
 #pragma once
 
-#include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Trait.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 
-namespace DEngine::Std::impl
-{
-	template <uSize a, uSize... others>
-	struct Max;
-
-	template <uSize arg>
-	struct Max<arg>
-	{
-		static constexpr uSize value = arg;
-	};
-
-	template <uSize a, uSize b, uSize... others>
-	struct Max<a, b, others...>
-	{
-		static constexpr uSize value = a > b ? Max<a, others...>::value : Max<b, others...>::value;
-	};
-
-	template<uSize... sizes>
-	constexpr uSize max = Max<sizes...>::value;
-
-	template<typename T, typename... Us>
-	struct Find
-	{
-		template<uSize i>
-		struct At
-		{
-			template<uSize counter>
-			using Type = Trait::Conditional<
-				i != counter, 
-				T, 
-				void
-			>;
-		};
-	};
-}
+#include <new>
 
 namespace DEngine::Std
 {
+	enum class NullVariantT : char;
+	constexpr NullVariantT nullVariant = NullVariantT();
+
 	template<typename... Ts>
 	class Variant
 	{
 	public:
-		[[nodiscard]] Opt<uSize> GetIndex() const noexcept;
+		inline ~Variant() noexcept;
+
+		[[nodiscard]] Opt<unsigned int> GetIndex() const noexcept;
+
+		void Set(NullVariantT) noexcept
+		{
+			if (tracker != noValue)
+				Clear();
+			tracker = noValue;
+		}
+
+		template<typename T>
+		void Set(T const& in) noexcept
+		{
+			constexpr unsigned int newTypeIndex = Trait::indexOf<T, Ts...>;
+			if (tracker != noValue)
+				Clear();
+			if (newTypeIndex != tracker)
+			{
+				new(data) T(in);
+			}
+			else
+			{
+				*reinterpret_cast<T*> = in;
+			}
+
+			tracker = newTypeIndex;
+		}
+
+		template<unsigned int i>
+		[[nodiscard]] auto Get() noexcept -> decltype(auto)
+		{
+			static_assert(i < sizeof...(Ts), "Tried to Get a Variant with an index out of bounds of the types.");
+			DENGINE_DETAIL_CONTAINERS_ASSERT(i == tracker);
+			return *reinterpret_cast<Trait::At<i, Ts...>*>(data);
+		}
 
 	private:
-		static constexpr uSize noValue = static_cast<uSize>(-1);
-		uSize tracker = noValue;
-		alignas(impl::max<alignof(Ts)...>) unsigned char data[impl::max<sizeof(Ts)...>];
+		static constexpr unsigned int noValue = static_cast<unsigned int>(-1);
+		unsigned int tracker = noValue;
+		alignas(Trait::max<alignof(Ts)...>) unsigned char data[Trait::max<sizeof(Ts)...>] = {};
+
+		inline void Clear() noexcept;
 	};
 }
 
 template<typename... Ts>
-DEngine::Std::Opt<DEngine::uSize> DEngine::Std::Variant<Ts...>::GetIndex() const noexcept
+inline DEngine::Std::Variant<Ts...>::~Variant() noexcept
+{
+	Clear();
+}
+
+template<typename... Ts>
+inline DEngine::Std::Opt<unsigned int> DEngine::Std::Variant<Ts...>::GetIndex() const noexcept
 {
 	if (tracker == noValue)
 		return Std::nullOpt;
 	else
 		return tracker;
+}
+
+template<typename... Ts>
+void DEngine::Std::Variant<Ts...>::Clear() noexcept
+{
+	static_assert(sizeof...(Ts) < 6, "Variant::Clear does not support more than 6 types.");
+
+	if (tracker == noValue)
+		return;
+
+	using TriviallyDesctructibleT = char;
+	switch (tracker)
+	{
+	case 0:
+	{
+		using T = Trait::AtOr<0, TriviallyDesctructibleT, Ts...>;
+		reinterpret_cast<T*>(data)->~T();
+	}
+	break;
+	case 1:
+	{
+		using T = Trait::AtOr<1, TriviallyDesctructibleT, Ts...>;
+		reinterpret_cast<T*>(data)->~T();
+	}
+	break;
+	case 2:
+	{
+		using T = Trait::AtOr<2, TriviallyDesctructibleT, Ts...>;
+		reinterpret_cast<T*>(data)->~T();
+	}
+	break;
+	case 3:
+	{
+		using T = Trait::AtOr<3, TriviallyDesctructibleT, Ts...>;
+		reinterpret_cast<T*>(data)->~T();
+	}
+	break;
+	case 4:
+	{
+		using T = Trait::AtOr<4, TriviallyDesctructibleT, Ts...>;
+		reinterpret_cast<T*>(data)->~T();
+	}
+	break;
+	case 5:
+	{
+		using T = Trait::AtOr<5, TriviallyDesctructibleT, Ts...>;
+		reinterpret_cast<T*>(data)->~T();
+	}
+	break;
+	default:
+		DENGINE_DETAIL_UNREACHABLE();
+		break;
+	}
 }

@@ -51,7 +51,7 @@ namespace DEngine::Gfx::Vk
 
 			msg += pCallbackData->pMessage;
 
-			logger->log(LogInterface::Level::Fatal, msg.data());
+			logger->Log(LogInterface::Level::Fatal, msg.data());
 		}
 
 
@@ -141,34 +141,34 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 			vkResult = baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data());
 
 			if (!debugUtilsIsAvailable)
-            {
-			    // Debug utils is not confirmed to be available yet,
-			    // We look if we find the KHRONOS layer is available,
-			    // it guarantees debug-utils to be availab.
-                for (const auto& availableLayer : availableLayers)
-                {
-                    char const* khronosLayerName = Constants::khronosLayerName;
-                    char const* availableLayerName = availableLayer.layerName;
-                    if (std::strcmp(khronosLayerName, availableLayerName) == 0)
-                    {
-                        // If the layer is available, we know it implements debug utils.
-                        debugUtilsIsAvailable = true;
-                        break;
-                    }
-                }
-            }
+						{
+					// Debug utils is not confirmed to be available yet,
+					// We look if we find the KHRONOS layer is available,
+					// it guarantees debug-utils to be availab.
+								for (const auto& availableLayer : availableLayers)
+								{
+										char const* khronosLayerName = Constants::khronosLayerName;
+										char const* availableLayerName = availableLayer.layerName;
+										if (std::strcmp(khronosLayerName, availableLayerName) == 0)
+										{
+												// If the layer is available, we know it implements debug utils.
+												debugUtilsIsAvailable = true;
+												break;
+										}
+								}
+						}
 
 			if (debugUtilsIsAvailable)
 			{
-			    // Add all preferred layers that are also available.
-			    for (auto const& availableLayer : availableLayers)
-                {
-			        for (auto const& preferredLayerName : Constants::preferredLayerNames)
-                    {
-			            if (std::strcmp(availableLayer.layerName, preferredLayerName) == 0)
-			                layersToUse.PushBack(preferredLayerName);
-                    }
-                }
+					// Add all preferred layers that are also available.
+					for (auto const& availableLayer : availableLayers)
+								{
+							for (auto const& preferredLayerName : Constants::preferredLayerNames)
+										{
+									if (std::strcmp(availableLayer.layerName, preferredLayerName) == 0)
+											layersToUse.PushBack(preferredLayerName);
+										}
+								}
 
 				totalRequiredExtensions.push_back(Constants::debugUtilsExtensionName);
 				returnValue.debugUtilsEnabled = true;

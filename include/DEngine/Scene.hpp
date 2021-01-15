@@ -1,7 +1,9 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Pair.hpp>
+#include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 
 // Temp
@@ -32,7 +34,6 @@ namespace DEngine
 	public:
 		Math::Vec3 position{};
 		f32 rotation = 0;
-		Math::Vec2 scale = { 1.f, 1.f };
 	};
 
 	class Scene
@@ -46,16 +47,27 @@ namespace DEngine
 
 		bool play = false;
 
-		std::vector<Entity> entities;
-		std::vector<Std::Pair<Entity, Transform>> transforms;
-		std::vector<Std::Pair<Entity, Gfx::TextureID>> textureIDs;
-		std::vector<Std::Pair<Entity, Physics::Rigidbody2D>> rigidbodies;
-		std::vector<Std::Pair<Entity, Physics::CircleCollider2D>> circleColliders;
-		std::vector<Std::Pair<Entity, Physics::BoxCollider2D>> boxColliders;
-		std::vector<Std::Pair<Entity, Move>> moves;
-		std::vector<Std::Pair<Entity, Box2DBody>> b2Bodies;
+		// We need this to be a pointer to heap because the struct is so huge.
+		Std::Box<b2World> physicsWorld{ new b2World{{ 0.f, -10.f }} };
 
-		inline Entity NewEntity()
+		Std::Span<Entity const> GetEntities() const { return { entities.data(), entities.size() }; }
+
+		template<typename T>
+		using ComponentVector = std::vector<Std::Pair<Entity, T>>;
+		template<typename T>
+		ComponentVector<T>& GetComponentVector() = delete;
+		template<>
+		ComponentVector<Transform>& GetComponentVector<Transform>() { return transforms; }
+		template<>
+		ComponentVector<Gfx::TextureID>& GetComponentVector<Gfx::TextureID>() { return textureIDs; }
+		template<>
+		ComponentVector<Move>& GetComponentVector<Move>() { return moves; }
+		template<>
+		ComponentVector<Box2DBody>& GetComponentVector<Box2DBody>() { return b2Bodies; }
+
+
+
+		Entity NewEntity()
 		{
 			entities.push_back((Entity)entityIdIncrementor);
 			entityIdIncrementor += 1;
@@ -63,65 +75,90 @@ namespace DEngine
 			return entities[entities.size() - 1];
 		}
 
-		inline void DeleteEntity(Entity ent)
+		void DeleteEntity(Entity ent)
 		{
+			DENGINE_DETAIL_ASSERT(ValidateEntity(ent));
+			DeleteComponent_CanFail<Transform>(ent);
+			DeleteComponent_CanFail<Gfx::TextureID>(ent);
+			DeleteComponent_CanFail<Move>(ent);
+
 			for (uSize i = 0; i < entities.size(); i += 1)
 			{
-				if (entities[i] == ent)
+				if (ent == entities[i])
 				{
 					entities.erase(entities.begin() + i);
 					break;
 				}
 			}
+		}
 
-			for (uSize i = 0; i < transforms.size(); i += 1)
+		// Confirm that this entity exists.
+		[[nodiscard]] bool ValidateEntity(Entity entity) const noexcept
+		{
+			for (auto const& item : entities)
 			{
-				if (transforms[i].a == ent)
-				{
-					transforms.erase(transforms.begin() + i);
-					break;
-				}
+				if (item == entity)
+					return true;
 			}
+			return false;
+		}
 
-			for (uSize i = 0; i < textureIDs.size(); i += 1)
-			{
-				if (textureIDs[i].a == ent)
-				{
-					textureIDs.erase(textureIDs.begin() + i);
-					break;
-				}
-			}
+		template<typename T>
+		void AddComponent(Entity entity, T const& component)
+		{
+			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
 
-			for (uSize i = 0; i < rigidbodies.size(); i += 1)
-			{
-				if (rigidbodies[i].a == ent)
-				{
-					rigidbodies.erase(rigidbodies.begin() + 1);
-					break;
-				}
-			}
+			auto& componentVector = GetComponentVector<T>();
+			// Crash if we already got this component
+			DENGINE_DETAIL_ASSERT(GetComponent<T>(entity) == nullptr);
 
-			for (uSize i = 0; i < circleColliders.size(); i += 1)
-			{
-				if (circleColliders[i].a == ent)
-				{
-					circleColliders.erase(circleColliders.begin() + i);
-					break;
-				}
-			}
-
-			for (uSize i = 0; i < moves.size(); i += 1)
-			{
-				if (moves[i].a == ent)
-				{
-					moves.erase(moves.begin() + i);
-					break;
-				}
-			}
+			componentVector.push_back({ entity, component });
+		}
+		template<typename T>
+		void DeleteComponent(Entity entity)
+		{
+			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
+			auto& componentVector = GetComponentVector<T>();
+			auto const componentIt = Std::FindIf(
+				componentVector.begin(),
+				componentVector.end(),
+				[entity](auto const& val) -> bool { return entity == val.a; });
+			DENGINE_DETAIL_ASSERT(componentIt != componentVector.end());
+			componentVector.erase(componentIt);
+		}
+		template<typename T>
+		void DeleteComponent_CanFail(Entity entity)
+		{
+			auto& componentVector = GetComponentVector<T>();
+			auto const componentIt = Std::FindIf(
+				componentVector.begin(),
+				componentVector.end(),
+				[entity](auto const& val) -> bool { return entity == val.a; });
+			if (componentIt != componentVector.end())
+				componentVector.erase(componentIt);
+		}
+		template<typename T>
+		[[nodiscard]] T* GetComponent(Entity entity)
+		{
+			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
+			auto& componentVector = GetComponentVector<T>();
+			auto const componentIt = Std::FindIf(
+				componentVector.begin(),
+				componentVector.end(),
+				[entity](auto const& val) -> bool { return entity == val.a; });
+			if (componentIt != componentVector.end())
+				return &componentIt->b;
+			else
+				return nullptr;
 		}
 
 	private:
 		u64 entityIdIncrementor = 0;
+		std::vector<Std::Pair<Entity, Transform>> transforms;
+		std::vector<Std::Pair<Entity, Gfx::TextureID>> textureIDs;
+		std::vector<Std::Pair<Entity, Move>> moves;
+		std::vector<Std::Pair<Entity, Box2DBody>> b2Bodies;
+		std::vector<Entity> entities;
 	};
 }
 

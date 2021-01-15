@@ -1,6 +1,6 @@
 #pragma once
 
-#include <DEngine/Gui/Layout.hpp>
+#include <DEngine/Gui/Widget.hpp>
 #include <DEngine/Gui/StackLayout.hpp>
 
 #include <DEngine/Std/Containers/Opt.hpp>
@@ -11,7 +11,7 @@
 
 namespace DEngine::Gui
 {
-	class MenuBar : public Layout
+	class MenuBar : public Widget
 	{
 	public:
 		using SubmenuActivateCallback = void(
@@ -27,7 +27,7 @@ namespace DEngine::Gui
 			std::string title;
 			bool active = false;
 			std::function<SubmenuActivateCallback> activateCallback;
-			Layout* menuPtr = nullptr;
+			Widget* menuPtr = nullptr;
 
 			Button(
 				MenuBar* parentMenuBar,

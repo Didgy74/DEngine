@@ -48,7 +48,7 @@ void MenuBar::AddSubmenuButton(
 	std::function<SubmenuActivateCallback> callback)
 {
 	MenuBar::Button* newButton = new MenuBar::Button(this, title, callback);
-	stackLayout.AddWidget2(Std::Box<Widget>{ newButton });
+	stackLayout.AddWidget(Std::Box<Widget>{ newButton });
 }
 
 void MenuBar::AddMenuButton(
@@ -56,7 +56,7 @@ void MenuBar::AddMenuButton(
 	std::function<ButtonActivateCallback> callback)
 {
 	MenuBar::ActivatableButton* newButton = new MenuBar::ActivatableButton(this, title, callback);
-	stackLayout.AddWidget2(Std::Box<Widget>{ newButton });
+	stackLayout.AddWidget(Std::Box<Widget>{ newButton });
 }
 
 void MenuBar::AddToggleMenuButton(
@@ -70,7 +70,7 @@ void MenuBar::AddToggleMenuButton(
 		toggled,
 		callback);
 
-	stackLayout.AddWidget2(Std::Box<Widget>{ newButton });
+	stackLayout.AddWidget(Std::Box<Widget>{ newButton });
 }
 
 MenuBar::Direction MenuBar::GetDirection() const
@@ -297,7 +297,7 @@ void MenuBar::Button::CursorClick(
 		}
 		ctx.Test_AddMenu(
 			windowId,
-			Std::Box<Layout>{ newMenuBar },
+			Std::Box<Widget>{ newMenuBar },
 			{ menuPos, {} });
 
 		activateCallback(
@@ -348,7 +348,7 @@ void MenuBar::Button::TouchEvent(
 			}
 			ctx.Test_AddMenu(
 				windowId,
-				Std::Box<Layout>{ newMenuBar },
+				Std::Box<Widget>{ newMenuBar },
 				{ menuPos, {} });
 			activateCallback(
 				*newMenuBar);

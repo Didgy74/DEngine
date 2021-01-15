@@ -1,16 +1,15 @@
 #pragma once
 
-#include <DEngine/Gui/Layout.hpp>
 #include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
 
 namespace DEngine::Gui
 {
-	class ScrollArea : public Layout
+	class ScrollArea : public Widget
 	{
 	public:
-		using ParentType = Layout;
+		using ParentType = Widget;
 
 		u32 scrollBarCursorRelativePosY = 0;
 		mutable u32 scrollBarPos = 0;
@@ -24,14 +23,6 @@ namespace DEngine::Gui
 		ScrollBarState scrollBarState = ScrollBarState::Normal;
 		Std::Opt<u8> scrollBarTouchIndex;
 
-		enum class ChildType
-		{
-			None,
-			Layout,
-			Widget,
-		};
-		ChildType childType = ChildType::None;
-		Std::Box<Layout> layout;
 		Std::Box<Widget> widget;
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
@@ -65,6 +56,9 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchEvent event) override;
+
+		virtual void InputConnectionLost(
+			Context& ctx) override;
 
 		virtual void CharEnterEvent(
 			Context& ctx) override;

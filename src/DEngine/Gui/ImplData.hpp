@@ -1,7 +1,6 @@
 #pragma once
 
 #include <DEngine/Gui/Events.hpp>
-#include <DEngine/Gui/Layout.hpp>
 #include <DEngine/Gui/SizeHint.hpp>
 #include <DEngine/Gui/WindowHandler.hpp>
 
@@ -76,13 +75,13 @@ namespace DEngine::Gui::impl
 		Math::Vec4 clearColor{ 0, 0, 0, 1 };
 		u32 drawCmdOffset{};
 		u32 drawCmdCount{};
-		Std::Box<Layout> topLayout{};
+		Std::Box<Widget> topLayout{};
 	};
 
 	struct Test_Menu
 	{
 		Rect rect{};
-		Std::Box<Layout> topLayout{};
+		Std::Box<Widget> topLayout{};
 	};
 
 	struct WindowNode

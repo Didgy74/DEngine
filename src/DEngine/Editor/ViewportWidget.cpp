@@ -362,13 +362,10 @@ void InternalViewportWidget::CursorClick(
 	{
 		Entity entity = implData->selectedEntity.Value();
 		// First check if we have a transform
-		auto const transformIt = Std::FindIf(
-			implData->scene->transforms.begin(),
-			implData->scene->transforms.end(),
-			[entity](auto const& val) -> bool { return val.a == entity; });
-		if (transformIt != implData->scene->transforms.end())
+		Transform const* transformPtr = implData->scene->GetComponent<Transform>(entity);
+		if (transformPtr != nullptr)
 		{
-			Transform const& transform = transformIt->b;
+			Transform const& transform = *transformPtr;
 
 			auto hitResult = GizmoHitTest(
 				*this,
@@ -438,13 +435,10 @@ void InternalViewportWidget::CursorMove(
 		{
 			Entity entity = implData->selectedEntity.Value();
 			// First check if we have a transform
-			auto const transformIt = Std::FindIf(
-				implData->scene->transforms.begin(),
-				implData->scene->transforms.end(),
-				[entity](auto const& val) -> bool { return val.a == entity; });
-			if (transformIt != implData->scene->transforms.end())
+			Transform* transformPtr = implData->scene->GetComponent<Transform>(entity);
+			if (transformPtr != nullptr)
 			{
-				Transform& transform = transformIt->b;
+				Transform& transform = *transformPtr;
 
 				TranslateAlongGizmoAxis(
 					*this,
@@ -490,7 +484,6 @@ void InternalViewportWidget::TouchEvent(
 {
 	UpdateJoystickOrigin(widgetRect);
 
-
 	if (touch.type == Gui::TouchEventType::Down)
 	{
 		bool hitSomething = false;
@@ -517,13 +510,10 @@ void InternalViewportWidget::TouchEvent(
 		{
 			Entity entity = implData->selectedEntity.Value();
 			// First check if we have a transform
-			auto const transformIt = Std::FindIf(
-				implData->scene->transforms.begin(),
-				implData->scene->transforms.end(),
-				[entity](auto const& val) -> bool { return val.a == entity; });
-			if (transformIt != implData->scene->transforms.end())
+			Transform* transformPtr = implData->scene->GetComponent<Transform>(entity);
+			if (transformPtr != nullptr)
 			{
-				Transform const& transform = transformIt->b;
+				Transform const& transform = *transformPtr;
 
 				auto hitResult = GizmoHitTest(
 					*this,
@@ -552,14 +542,10 @@ void InternalViewportWidget::TouchEvent(
 				{
 					Entity entity = implData->selectedEntity.Value();
 					// First check if we have a transform
-					auto const transformIt = Std::FindIf(
-						implData->scene->transforms.begin(),
-						implData->scene->transforms.end(),
-						[entity](auto const &val) -> bool { return val.a == entity; });
-					if (transformIt != implData->scene->transforms.end())
+					Transform* transformPtr = implData->scene->GetComponent<Transform>(entity);
+					if (transformPtr != nullptr)
 					{
-						Transform& transform = transformIt->b;
-
+						Transform& transform = *transformPtr;
 						TranslateAlongGizmoAxis(
 							*this,
 							widgetRect,

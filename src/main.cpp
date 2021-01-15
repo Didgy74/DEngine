@@ -12,41 +12,9 @@
 #include <DEngine/Math/UnitQuaternion.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
 
-#include <box2d/box2d.h>
-
 #include <iostream>
 #include <vector>
 #include <string>
-
-#include <DEngine/Std/Trait.hpp>
-#include <DEngine/Std/Containers/Variant.hpp>
-
-class GfxLogger : public DEngine::Gfx::LogInterface
-{
-public:
-	virtual void log(DEngine::Gfx::LogInterface::Level level, const char* msg) override 
-	{
-		DEngine::App::Log(msg);
-	}
-
-	virtual ~GfxLogger() override
-	{
-
-	}
-};
-
-class GfxTexAssetInterfacer : public DEngine::Gfx::TextureAssetInterface
-{
-	virtual char const* get(DEngine::Gfx::TextureID id) const override
-	{
-		if ((DEngine::u64)id == 0)
-			return "data/01.ktx";
-		else if ((DEngine::u64)id == 1)
-			return "data/2.png";
-		else
-			return "data/Circle.png";
-	}
-};
 
 void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 {
@@ -74,31 +42,43 @@ void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 
 	if (addAcceleration.MagnitudeSqrd() != 0)
 	{
-		auto rbIt = Std::FindIf(
-			scene.rigidbodies.begin(),
-			scene.rigidbodies.end(),
-			[entity](auto const& val) -> bool { return entity == val.a; });
-
-		if (rbIt != scene.rigidbodies.end())
+		Box2DBody* body = scene.GetComponent<Box2DBody>(entity);
+		if (body != nullptr)
 		{
-			Physics::Rigidbody2D& rb = rbIt->b;
-			rb.acceleration += addAcceleration;
-		}
-
-		auto physicsBodyIt = Std::FindIf(
-			scene.b2Bodies.begin(),
-			scene.b2Bodies.end(),
-			[entity](auto const& val) -> bool { return entity == val.a; });
-		if (physicsBodyIt != scene.b2Bodies.end())
-		{
-			auto& physicsBody = *physicsBodyIt;
-			physicsBody.b.ptr->ApplyForceToCenter({ addAcceleration.x, addAcceleration.y }, true);
+			body->ptr->ApplyForceToCenter({ addAcceleration.x, addAcceleration.y }, true);
 		}
 	}
 }
 
-namespace DEngine::detail
+namespace DEngine::impl
 {
+	class GfxLogger : public Gfx::LogInterface
+	{
+	public:
+		virtual void Log(Gfx::LogInterface::Level level, const char* msg) override
+		{
+			App::Log(msg);
+		}
+
+		virtual ~GfxLogger() override
+		{
+
+		}
+	};
+
+	class GfxTexAssetInterfacer : public Gfx::TextureAssetInterface
+	{
+		virtual char const* get(Gfx::TextureID id) const override
+		{
+			if ((u64)id == 0)
+				return "data/01.ktx";
+			else if ((u64)id == 1)
+				return "data/2.png";
+			else
+				return "data/Circle.png";
+		}
+	};
+
 	struct GfxWsiConnection : public Gfx::WsiInterface
 	{
 		App::WindowID appWindowID{};
@@ -121,17 +101,43 @@ namespace DEngine::detail
 		}
 	};
 
+	Gfx::Context CreateGfxContext(
+		Gfx::WsiInterface& wsiConnection,
+		Gfx::TextureAssetInterface const& textureAssetConnection,
+		Gfx::LogInterface& logger,
+		Std::Span<char const*> requiredVkInstanceExtensions)
+	{
+		Gfx::InitInfo rendererInitInfo{};
+		rendererInitInfo.initialWindowConnection = &wsiConnection;
+		rendererInitInfo.texAssetInterface = &textureAssetConnection;
+		rendererInitInfo.optional_logger = &logger;
+		rendererInitInfo.requiredVkInstanceExtensions = requiredVkInstanceExtensions;
+		rendererInitInfo.gizmoArrowMesh = Editor::BuildGizmoArrowMesh();
+		Std::Opt<Gfx::Context> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
+		if (!rendererDataOpt.HasValue())
+		{
+			std::cout << "Could not initialize renderer." << std::endl;
+			std::abort();
+		}
+		return static_cast<Gfx::Context&&>(rendererDataOpt.Value());
+	}
+
+	void RunPhysicsStep(
+		Scene& scene);
+	
 	void SubmitRendering(
 		Gfx::Context& gfxData,
 		Editor::Context& editorData,
 		Scene& scene);
 }
 
+#include <DEngine/Std/Containers/Variant.hpp>
+
 int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
 
-	DEngine::Std::NameThisThread("MainThread");
+	Std::NameThisThread("MainThread");
 
 	Time::Initialize();
 	App::detail::Initialize();
@@ -140,30 +146,20 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		"Main window",
 		{ 1000, 750 });
 
-	auto gfxWsiConnection = new detail::GfxWsiConnection;
+	auto gfxWsiConnection = new impl::GfxWsiConnection;
 	gfxWsiConnection->appWindowID = mainWindow;
 
 	// Initialize the renderer
 	auto requiredInstanceExtensions = App::RequiredVulkanInstanceExtensions();
-	GfxLogger gfxLogger{};
-	GfxTexAssetInterfacer gfxTexAssetInterfacer{};
-	Gfx::InitInfo rendererInitInfo{};
-	rendererInitInfo.initialWindowConnection = gfxWsiConnection;
-	rendererInitInfo.texAssetInterface = &gfxTexAssetInterfacer;
-	rendererInitInfo.optional_logger = &gfxLogger;
-	rendererInitInfo.requiredVkInstanceExtensions = requiredInstanceExtensions.ToSpan();
-	rendererInitInfo.gizmoArrowMesh = Editor::BuildGizmoArrowMesh();
-	Std::Opt<Gfx::Context> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
-	if (!rendererDataOpt.HasValue())
-	{
-		std::cout << "Could not initialize renderer." << std::endl;
-		std::abort();
-	}
-	Gfx::Context gfxCtx = Std::Move(rendererDataOpt.Value());
+	impl::GfxLogger gfxLogger{};
+	impl::GfxTexAssetInterfacer gfxTexAssetInterfacer{};
+	Gfx::Context gfxCtx = impl::CreateGfxContext(
+		*gfxWsiConnection,
+		gfxTexAssetInterfacer,
+		gfxLogger,
+		requiredInstanceExtensions);
 
 	Scene myScene;
-
-	Std::Box<b2World> physicsWorld{ new b2World({ 0.f, -10.f }) };
 
 	{
 		Entity a = myScene.NewEntity();
@@ -172,25 +168,19 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		transform.position.x = 0.f;
 		transform.position.y = 0.f;
 		//transform.rotation = 0.707f;
-		transform.scale = { 1.f, 1.f };
-		myScene.transforms.push_back({ a, transform });
-
-		Physics::Rigidbody2D rb{};
-		myScene.rigidbodies.push_back({ a, rb });
+		//transform.scale = { 1.f, 1.f };
+		myScene.AddComponent(a, transform);
 
 		Gfx::TextureID textureId{ 0 };
-		myScene.textureIDs.push_back({ a, textureId });
-
-		Physics::BoxCollider2D collider{};
-		myScene.boxColliders.push_back({ a, collider });
+		myScene.AddComponent(a, textureId);
 
 		b2BodyDef bodyDef{};
 		bodyDef.type = b2BodyType::b2_dynamicBody;
 		bodyDef.fixedRotation = true;
-		b2Body* physicsBody = physicsWorld->CreateBody(&bodyDef);
+		b2Body* physicsBody = myScene.physicsWorld->CreateBody(&bodyDef);
 		DEngine::Box2DBody body{};
 		body.ptr = physicsBody;
-		myScene.b2Bodies.push_back({ a, body });
+		myScene.AddComponent(a, body);
 		b2MassData massData{};
 		massData.mass = 1.f;
 		physicsBody->SetMassData(&massData);
@@ -206,17 +196,11 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		Transform transform{};
 		transform.position.x = 2.f;
 		transform.position.y = 0.f;
-		transform.scale = { 1.f, 1.f };
-		myScene.transforms.push_back({ a, transform });
-
-		//Physics::Rigidbody2D rb{};
-		//myScene.rigidbodies.push_back({ a, rb });
+		//transform.scale = { 1.f, 1.f };
+		myScene.AddComponent(a, transform);
 
 		Gfx::TextureID textureId{ 2 };
-		myScene.textureIDs.push_back({ a, textureId });
-
-		//Physics::CircleCollider2D collider{};
-		//myScene.circleColliders.push_back({ a, collider });
+		myScene.AddComponent(a, textureId);
 	}
 
 	{
@@ -225,24 +209,18 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		Transform transform{};
 		transform.position.x = 0.f;
 		transform.position.y = -5.f;
-		transform.scale = { 25.f, 1.f };
-		myScene.transforms.push_back({ a, transform });
-
-		//Physics::Rigidbody2D rb{};
-		//myScene.rigidbodies.push_back({ a, rb });
+		//transform.scale = { 25.f, 1.f };
+		myScene.AddComponent(a, transform);
 
 		Gfx::TextureID textureId{ 0 };
-		myScene.textureIDs.push_back({ a, textureId });
-
-		//Physics::BoxCollider2D collider{};
-		//myScene.boxColliders.push_back({ a, collider });
+		myScene.AddComponent(a, textureId);
 
 		b2BodyDef bodyDef{};
 		bodyDef.type = b2BodyType::b2_staticBody;
-		b2Body* physicsBody = physicsWorld->CreateBody(&bodyDef);
+		b2Body* physicsBody = myScene.physicsWorld->CreateBody(&bodyDef);
 		DEngine::Box2DBody body{};
 		body.ptr = physicsBody;
-		myScene.b2Bodies.push_back({ a, body });
+		myScene.AddComponent(a, body);
 		b2MassData massData{};
 		massData.mass = 1.f;
 		physicsBody->SetMassData(&massData);
@@ -258,25 +236,18 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		Transform transform{};
 		transform.position.x = -2.f;
 		transform.position.y = 0.f;
-		transform.scale = { 1.f, 1.f };
-		myScene.transforms.push_back({ a, transform });
-
-		Physics::Rigidbody2D rb{};
-		rb.inverseMass = 1 / 100.f;
-		myScene.rigidbodies.push_back({ a, rb });
+		//transform.scale = { 1.f, 1.f };
+		myScene.AddComponent(a, transform);
 
 		Gfx::TextureID textureId{ 0 };
-		myScene.textureIDs.push_back({ a, textureId });
-
-		Physics::BoxCollider2D collider{};
-		myScene.boxColliders.push_back({ a, collider });
+		myScene.AddComponent(a, textureId);
 
 		b2BodyDef bodyDef{};
 		bodyDef.type = b2BodyType::b2_dynamicBody;
-		b2Body* physicsBody = physicsWorld->CreateBody(&bodyDef);
+		b2Body* physicsBody = myScene.physicsWorld->CreateBody(&bodyDef);
 		DEngine::Box2DBody body{};
 		body.ptr = physicsBody;
-		myScene.b2Bodies.push_back({ a, body });
+		myScene.AddComponent(a, body);
 		b2MassData massData{};
 		massData.mass = 1.f;
 		physicsBody->SetMassData(&massData);
@@ -286,48 +257,8 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		physicsBody->CreateFixture(&boxShape, density);
 	}
 
-	/*
-	uSize yo = 10;
-	for (uSize i = 0; i < yo; i += 1)
-	{
-		for (uSize j = 0; j < yo; j += 1)
-		{
-			Entity a = myScene.NewEntity();
-
-			f32 spacing = 3.f;
-
-			Transform transform{};
-			transform.position.x -= (spacing * yo) / 2.f;
-			transform.position.x += spacing * i;
-			transform.position.y -= (spacing * yo) / 2.f;
-			transform.position.y += spacing * j;
-			myScene.transforms.push_back({ a, transform });
-
-			Physics::Rigidbody2D rb{};
-			myScene.rigidbodies.push_back({ a, rb });
-
-			if ((i + j) % 2)
-			{
-				Gfx::TextureID textureId{ 2 };
-				myScene.textureIDs.push_back({ a, textureId });
-
-				Physics::CircleCollider2D collider{};
-				myScene.circleColliders.push_back({ a, collider });
-			}
-			else
-			{
-				Gfx::TextureID textureId{ 0 };
-				myScene.textureIDs.push_back({ a, textureId });
-
-				Physics::BoxCollider2D collider{};
-				myScene.boxColliders.push_back({ a, collider });
-			}
-		}
-	}
-	*/
-
 	Move move{};
-	myScene.moves.push_back({ Entity(), move });
+	myScene.AddComponent( Entity(), move);
 
 	Editor::Context editorCtx = Editor::Context::Create(
 		mainWindow,
@@ -347,35 +278,13 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		{
 			//Physics::Update(myScene, Time::Delta());
 
-			for (auto item : myScene.moves)
-				item.b.Update(item.a, myScene, Time::Delta());
+			for (auto const& [entity, moveComponent] : myScene.GetComponentVector<Move>())
+				moveComponent.Update(entity, myScene, Time::Delta());
 
-			// First copy our positions into every physics body
-			for (auto const& physicsBodyPair : myScene.b2Bodies)
-			{
-				Entity a = physicsBodyPair.a;
-				auto const& transform = Std::FindIf(
-					myScene.transforms.begin(),
-					myScene.transforms.end(),
-					[a](auto const& val) -> bool { return val.a == a; })->b;
-				physicsBodyPair.b.ptr->SetTransform({ transform.position.x, transform.position.y }, transform.rotation);
-			}
-			physicsWorld->Step(Time::Delta(), 8, 8);
-			// Then copy the stuff back
-			for (auto const& physicsBodyPair : myScene.b2Bodies)
-			{
-				Entity a = physicsBodyPair.a;
-				auto& transform = Std::FindIf(
-					myScene.transforms.begin(),
-					myScene.transforms.end(),
-					[a](auto const& val) -> bool { return val.a == a; })->b;
-				auto physicsBodyTransform = physicsBodyPair.b.ptr->GetTransform();
-				transform.position = { physicsBodyTransform.p.x, physicsBodyTransform.p.y };
-				transform.rotation = physicsBodyTransform.q.GetAngle();
-			}
+			impl::RunPhysicsStep(myScene);
 		}
 
-		detail::SubmitRendering(
+		impl::SubmitRendering(
 			gfxCtx, 
 			editorCtx, 
 			myScene);
@@ -384,31 +293,54 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	return 0;
 }
 
-void DEngine::detail::SubmitRendering(
+void DEngine::impl::RunPhysicsStep(
+	Scene& scene)
+{
+	// First copy our positions into every physics body
+	for (auto const& physicsBodyPair : scene.GetComponentVector<Box2DBody>())
+	{
+		Entity a = physicsBodyPair.a;
+
+		Transform const* transformPtr = scene.GetComponent<Transform>(a);
+		DENGINE_DETAIL_ASSERT(transformPtr != nullptr);
+		Transform const& transform = *transformPtr;
+		physicsBodyPair.b.ptr->SetTransform({ transform.position.x, transform.position.y }, transform.rotation);
+	}
+	scene.physicsWorld->Step(Time::Delta(), 8, 8);
+	// Then copy the stuff back
+	for (auto const& physicsBodyPair : scene.GetComponentVector<Box2DBody>())
+	{
+		Entity a = physicsBodyPair.a;
+		Transform* transformPtr = scene.GetComponent<Transform>(a);
+		DENGINE_DETAIL_ASSERT(transformPtr != nullptr);
+		Transform& transform = *transformPtr;
+		auto physicsBodyTransform = physicsBodyPair.b.ptr->GetTransform();
+		transform.position = { physicsBodyTransform.p.x, physicsBodyTransform.p.y };
+		transform.rotation = physicsBodyTransform.q.GetAngle();
+	}
+}
+
+void DEngine::impl::SubmitRendering(
 	Gfx::Context& gfxData,
 	Editor::Context& editorCtx,
 	Scene& scene)
 {
 	Gfx::DrawParams params{};
 
-	for (auto item : scene.textureIDs)
+	for (auto const& item : scene.GetComponentVector<Gfx::TextureID>())
 	{
 		auto& entity = item.a;
 
 		// First check if this entity has a position
-		auto posIt = Std::FindIf(
-			scene.transforms.begin(),
-			scene.transforms.end(),
-			[&entity](auto const& val) -> bool { return val.a == entity; });
-		if (posIt == scene.transforms.end())
+		Transform* transformPtr = scene.GetComponent<Transform>(entity);
+		if (transformPtr == nullptr)
 			continue;
-		auto& transform = posIt->b;
+		Transform& transform = *transformPtr;
 
 		params.textureIDs.push_back(item.b);
 
-		Math::Mat4 transformMat = Math::LinTran3D::Translate(transform.position) * 
-			Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation) * 
-			Math::LinTran3D::Scale_Homo(transform.scale.AsVec3());
+		Math::Mat4 transformMat = Math::LinTran3D::Translate(transform.position) *
+			Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation);
 		params.transforms.push_back(transformMat);
 	}
 

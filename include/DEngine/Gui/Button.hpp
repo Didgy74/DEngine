@@ -4,9 +4,12 @@
 #include <DEngine/Gui/Text.hpp>
 
 #include <functional>
+#include <string>
 
 namespace DEngine::Gui
 {
+	class Context;
+
 	class Button : public Widget
 	{
 	public:
@@ -15,6 +18,8 @@ namespace DEngine::Gui
 		Button();
 		virtual ~Button() {}
 
+		std::string text;
+		
 		enum class Type
 		{
 			Push,
@@ -29,7 +34,7 @@ namespace DEngine::Gui
 			Pressed,
 			Toggled,
 		};
-		State state = State::Normal;
+		
 		Math::Vec4 normalColor{ 0.25f, 0.25f, 0.25f, 1.f };
 		Math::Vec4 normalTextColor = Math::Vec4::One();
 		Math::Vec4 toggledColor{ 0.4f, 0.4f, 0.4f, 1.f };
@@ -38,9 +43,8 @@ namespace DEngine::Gui
 		Math::Vec4 hoverTextColor = Math::Vec4::One();
 		Math::Vec4 pressedColor{ 1.f, 1.f, 1.f, 1.f };
 		Math::Vec4 pressedTextColor = Math::Vec4::Zero();
-		Text textWidget{};
 
-		using ActivateCallback = void(Button&, Context&, WindowID, Rect, Rect);
+		using ActivateCallback = void(Button& btn, Context*);
 		std::function<ActivateCallback> activatePfn = nullptr;
 
 		void SetToggled(bool toggled);
@@ -78,16 +82,11 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			Gui::TouchEvent event) override;
 
-
-
 	private:
 		bool toggled = false;
+		State state = State::Normal;
 		
-		void SetState(State newState);
 		void Activate(
-			Context& ctx,
-			WindowID windowId, 
-			Rect widgetRect, 
-			Rect visibleRect);
+			Context& ctx);
 	};
 }

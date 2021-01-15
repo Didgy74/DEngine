@@ -1,5 +1,6 @@
 #pragma once
 
+/*
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
 
@@ -46,3 +47,4 @@ namespace DEngine::Physics
 
 	void Update(Scene& scene, f32 deltaTime);
 }
+*/

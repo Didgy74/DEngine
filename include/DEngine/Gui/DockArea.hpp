@@ -1,6 +1,5 @@
 #pragma once
 
-#include <DEngine/Gui/Layout.hpp>
 #include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
@@ -19,7 +18,8 @@ namespace DEngine::Gui
 		enum class DockArea_LayoutGizmo { Top, Bottom, Left, Right, Center };
 	}
 
-	class DockArea : public Layout
+	// TODO: Rename toplevelnode to "layer".
+	class DockArea : public Widget
 	{
 	public:
 		DockArea();
@@ -30,7 +30,6 @@ namespace DEngine::Gui
 			std::string title{};
 			Math::Vec4 titleBarColor{ 0.5f, 0.5f, 0.5f, 1.f };
 			Std::Box<Widget> widget;
-			Std::Box<Layout> layout;
 		};
 		struct Split
 		{
@@ -123,6 +122,8 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
+
+
 		virtual void CursorMove(
 			Context& ctx,
 			WindowID windowId,
@@ -144,6 +145,9 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchEvent event) override;
+
+		virtual void InputConnectionLost(
+			Context& ctx) override;
 
 		virtual void CharEnterEvent(
 			Context& ctx) override;

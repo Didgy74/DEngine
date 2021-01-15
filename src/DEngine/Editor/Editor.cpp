@@ -48,31 +48,25 @@ namespace DEngine::Editor
 			this->direction = Direction::Vertical;
 
 			Gui::StackLayout* topElementLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-			this->AddLayout2(Std::Box<Gui::Layout>{ topElementLayout });
+			this->AddWidget(Std::Box<Gui::Widget>{ topElementLayout });
 
 			Gui::Button* newEntityButton = new Gui::Button;
-			topElementLayout->AddWidget2(Std::Box<Gui::Widget>{ newEntityButton });
-			newEntityButton->textWidget.String_Set("New");
+			topElementLayout->AddWidget(Std::Box<Gui::Widget>{ newEntityButton });
+			newEntityButton->text = "New";
 			newEntityButton->activatePfn = [this](
 				Gui::Button& btn,
-				Gui::Context& ctx,
-				Gui::WindowID windowId,
-				Gui::Rect widgetRect,
-				Gui::Rect visibleRect)
+				Gui::Context* guiCtx)
 			{
 				Entity newId = this->ctxImpl->scene->NewEntity();
 				AddEntityToList(newId);
 			};
 
 			Gui::Button* entityDeleteButton = new Gui::Button;
-			topElementLayout->AddWidget2(Std::Box<Gui::Widget>{ entityDeleteButton });
-			entityDeleteButton->textWidget.String_Set("Delete");
+			topElementLayout->AddWidget(Std::Box<Gui::Widget>{ entityDeleteButton });
+			entityDeleteButton->text = "Delete";
 			entityDeleteButton->activatePfn = [this](
 				Gui::Button& btn,
-				Gui::Context& ctx,
-				Gui::WindowID windowId,
-				Gui::Rect widgetRect,
-				Gui::Rect visibleRect)
+				Gui::Context* guiCtx)
 			{
 				if (!this->ctxImpl->selectedEntity.HasValue())
 					return;
@@ -87,7 +81,7 @@ namespace DEngine::Editor
 			};
 			
 			Gui::ScrollArea* entityListScrollArea = new Gui::ScrollArea();
-			this->AddLayout2(Std::Box<Gui::Layout>{ entityListScrollArea });
+			this->AddWidget(Std::Box<Gui::Widget>{ entityListScrollArea });
 
 			entitiesList = new Gui::LineList();
 			entitiesList->SetCanSelect(true);
@@ -101,13 +95,10 @@ namespace DEngine::Editor
 					this->ctxImpl->SelectEntity((Entity)std::atoi(lineText.data()));
 				}
 			};
-			entityListScrollArea->childType = Gui::ScrollArea::ChildType::Widget;
 			entityListScrollArea->widget = Std::Box<Gui::Widget>{ entitiesList};
 
-			for (uSize i = 0; i < ctxImpl->scene->entities.size(); i++)
+			for (Entity entityId : ctxImpl->scene->GetEntities())
 			{
-				Entity entityId = ctxImpl->scene->entities[i];
-
 				AddEntityToList(entityId);
 			}
 		}
@@ -153,10 +144,8 @@ namespace DEngine::Editor
 
 		MoveWidget* moveWidget = nullptr;
 		TransformWidget* transformWidget = nullptr;
+		TransformWidget2* transformWidget2 = nullptr;
 		SpriteRenderer2DWidget* spriteRendererWidget = nullptr;
-		Rigidbody2DWidget* rbWidget = nullptr;
-		CircleCollider2DWidget* circleColliderWidget = nullptr;
-		BoxCollider2DWidget* boxColliderWidget = nullptr;
 
 		ComponentList(EditorImpl* ctxImpl) :
 			ctxImpl(ctxImpl)
@@ -185,28 +174,24 @@ namespace DEngine::Editor
 			this->ClearChildren();
 			
 			moveWidget = new MoveWidget(ctxImpl->scene, id);
-			this->AddLayout2(Std::Box<Gui::Layout>{ moveWidget });
+			this->AddWidget(Std::Box<Gui::Widget>{ moveWidget });
 
 			transformWidget = new TransformWidget(ctxImpl->scene, id);
-			this->AddLayout2(Std::Box<Gui::Layout>{ transformWidget });
+			this->AddWidget(Std::Box<Gui::Widget>{ transformWidget });
+
+			transformWidget2 = new TransformWidget2(*ctxImpl);
+			this->AddWidget(Std::Box<Gui::Widget>{ transformWidget2 });
 
 			spriteRendererWidget = new SpriteRenderer2DWidget(ctxImpl->scene, id);
-			this->AddLayout2(Std::Box<Gui::Layout>{ spriteRendererWidget });
-
-			rbWidget = new Rigidbody2DWidget(ctxImpl->scene, id);
-			this->AddLayout2(Std::Box<Gui::Layout>{ rbWidget });
-
-			circleColliderWidget = new CircleCollider2DWidget(ctxImpl->scene, id);
-			this->AddLayout2(Std::Box<Gui::Layout>{ circleColliderWidget });
-
-			boxColliderWidget = new BoxCollider2DWidget(ctxImpl->scene, id);
-			this->AddLayout2(Std::Box<Gui::Layout>{ boxColliderWidget });
+			this->AddWidget(Std::Box<Gui::Widget>{ spriteRendererWidget });
 		}
 
 		void Tick(Scene& scene, Entity id)
 		{
 			transformWidget->Tick(scene, id);
-			rbWidget->Tick(scene, id);
+			
+			if (auto ptr = scene.GetComponent<Transform>(id))
+				transformWidget2->Update(*ptr);
 		}
 	};
 }
@@ -240,7 +225,7 @@ using namespace DEngine;
 
 namespace DEngine::Editor
 {
-	static Std::Box<Gui::Layout> CreateNavigationBar(
+	static Std::Box<Gui::Widget> CreateNavigationBar(
 		EditorImpl& implData)
 	{
 		// Menu button
@@ -276,7 +261,7 @@ namespace DEngine::Editor
 							newWindow.title = "Entities";
 							newWindow.titleBarColor = { 0.5f, 0.5f, 0.f, 1.f };
 							EntityIdList* entityIdList = new EntityIdList(&implData);
-							newWindow.layout = Std::Box<Gui::Layout>{ entityIdList };
+							newWindow.widget = Std::Box<Gui::Widget>{ entityIdList };
 
 							implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
 						}
@@ -300,7 +285,7 @@ namespace DEngine::Editor
 							newWindow.title = "Components";
 							newWindow.titleBarColor = { 0.f, 0.5f, 0.5f, 1.f };
 							ComponentList* componentList = new ComponentList(&implData);
-							newWindow.layout = Std::Box<Gui::Layout>{ componentList };
+							newWindow.widget = Std::Box<Gui::Widget>{ componentList };
 
 							implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
 						}
@@ -321,7 +306,7 @@ namespace DEngine::Editor
 						newWindow.title = "Viewport";
 						newWindow.titleBarColor = { 0.5f, 0.f, 0.5f, 1.f };
 						ViewportWidget* viewport = new ViewportWidget(implData, *implData.gfxCtx);
-						newWindow.layout = Std::Box<Gui::Layout>{ viewport };
+						newWindow.widget = Std::Box<Gui::Widget>{ viewport };
 
 						implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
 					});
@@ -329,22 +314,19 @@ namespace DEngine::Editor
 
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;
-		menuBarA->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ deltaText });
+		menuBarA->stackLayout.AddWidget(Std::Box<Gui::Widget>{ deltaText });
 		implData.test_fpsText = deltaText;
 		deltaText->String_Set("Child text");
 		
 
 		Gui::Button* playButton = new Gui::Button;
-		menuBarA->stackLayout.AddWidget2(Std::Box<Gui::Widget>{ playButton });
-		playButton->textWidget.String_Set("Play");
+		menuBarA->stackLayout.AddWidget(Std::Box<Gui::Widget>{ playButton });
+		playButton->text = "Play";
 		playButton->type = Gui::Button::Type::Toggle;
 		Scene& scene = *implData.scene;
 		playButton->activatePfn = [&scene](
 			Gui::Button& btn,
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect)
+			Gui::Context* guiCtx)
 		{
 			if (btn.GetToggled())
 			{
@@ -358,7 +340,7 @@ namespace DEngine::Editor
 			}
 		};
 
-		return Std::Box<Gui::Layout>{ menuBarA };
+		return Std::Box<Gui::Widget>{ menuBarA };
 	}
 }
 
@@ -379,11 +361,11 @@ Editor::Context Editor::Context::Create(
 	{
 		Gui::StackLayout* outmostLayout = implData.guiCtx->outerLayout;
 
-		outmostLayout->AddLayout2(CreateNavigationBar(implData));
+		outmostLayout->AddWidget(CreateNavigationBar(implData));
 
 		Gui::DockArea* dockArea = new Gui::DockArea;
 		implData.dockArea = dockArea;
-		outmostLayout->AddLayout2(Std::Box<Gui::Layout>{ dockArea });
+		outmostLayout->AddWidget(Std::Box<Gui::Widget>{ dockArea });
 
 		{
 			Gui::DockArea::TopLevelNode newTop{};
@@ -396,7 +378,7 @@ Editor::Context Editor::Context::Create(
 			newWindow.title = "Entities";
 			newWindow.titleBarColor = { 0.5f, 0.5f, 0.f, 1.f };
 			EntityIdList* entityIdList = new EntityIdList(&implData);
-			newWindow.layout = Std::Box<Gui::Layout>{ entityIdList };
+			newWindow.widget = Std::Box<Gui::Widget>{ entityIdList };
 
 			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
 		}
@@ -412,7 +394,7 @@ Editor::Context Editor::Context::Create(
 			newWindow.title = "Viewport";
 			newWindow.titleBarColor = { 0.5f, 0.f, 0.5f, 1.f };
 			ViewportWidget* viewport = new ViewportWidget(implData, *gfxCtx);
-			newWindow.layout = Std::Box<Gui::Layout>{ viewport };
+			newWindow.widget = Std::Box<Gui::Widget>{ viewport };
 
 			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
 		}
@@ -429,11 +411,10 @@ Editor::Context Editor::Context::Create(
 			newWindow.titleBarColor = { 0.f, 0.5f, 0.5f, 1.f };
 
 			Gui::ScrollArea* scrollArea = new Gui::ScrollArea;
-			newWindow.layout = Std::Box<Gui::Layout>{ scrollArea };
+			newWindow.widget = Std::Box<Gui::Widget>{ scrollArea };
 
 			ComponentList* componentList = new ComponentList(&implData);
-			scrollArea->childType = Gui::ScrollArea::ChildType::Layout;
-			scrollArea->layout = Std::Box<Gui::Layout>{ componentList };
+			scrollArea->widget = Std::Box<Gui::Widget>{ componentList };
 
 			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
 		}
@@ -534,13 +515,10 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 			{
 				Entity selected = implData.selectedEntity.Value();
 				// Find Transform component of this entity
-				auto const transformIt = Std::FindIf(
-					implData.scene->transforms.begin(),
-					implData.scene->transforms.end(),
-					[selected](auto const& val) -> bool { return val.a == selected; });
-				if (transformIt != implData.scene->transforms.end())
+				Transform const* transformPtr = implData.scene->GetComponent<Transform>(selected);
+				if (transformPtr != nullptr)
 				{
-					Transform const& transform = transformIt->b;
+					Transform const& transform = *transformPtr;
 
 					update.gizmo = Gfx::ViewportUpdate::Gizmo{};
 					Gfx::ViewportUpdate::Gizmo& gizmo = update.gizmo.Value();
@@ -562,51 +540,6 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 				}
 			}
 			returnVal.viewportUpdates.push_back(update);
-		}
-	}
-
-	// Add the debug lines for the collider
-	if (implData.selectedEntity.HasValue())
-	{
-		Entity const entity = implData.selectedEntity.Value();
-		auto const boxColliderIt = Std::FindIf(
-			implData.scene->boxColliders.begin(),
-			implData.scene->boxColliders.end(),
-			[entity](auto const& val) -> bool { return entity == val.a; });
-		if (boxColliderIt != implData.scene->boxColliders.end())
-		{
-			Physics::BoxCollider2D const& boxCollider = boxColliderIt->b;
-
-			auto const transformIt = Std::FindIf(
-				implData.scene->transforms.begin(),
-				implData.scene->transforms.end(),
-				[entity](auto const& val) -> bool { return entity == val.a; });
-			if (transformIt != implData.scene->transforms.end())
-			{
-				Transform const& transform = transformIt->b;
-
-				Math::Vec3 vertices[4] = {
-					{ -0.5f, 0.5f, 0.f },
-					{ 0.5f, 0.5f, 0.f },
-					{ 0.5f, -0.5f, 0.f },
-					{ -0.5f, -0.5f, 0.f } };
-
-				// Transform the vertices
-				Math::Mat4 worldTransform = Math::LinTran3D::Scale_Homo(boxCollider.size.x / 2.f, boxCollider.size.y / 2.f, 1.f);
-				worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation) * worldTransform;
-				Math::LinTran3D::SetTranslation(worldTransform, transform.position);
-				for (uSize i = 0; i < 4; i += 1)
-				{
-					vertices[i] = (worldTransform * vertices[i].AsVec4(1.f)).AsVec3();
-					returnVal.lineVertices.push_back(vertices[i]);
-				}
-				// And then push the first vertex again, so we close the shape
-				returnVal.lineVertices.push_back(vertices[0]);
-				Gfx::LineDrawCmd lineDrawCmd{};
-				lineDrawCmd.color = { 0.1f, 0.8f, 0.1f, 1.f };
-				lineDrawCmd.vertCount = 5;
-				returnVal.lineDrawCmds.push_back(lineDrawCmd);
-			}
 		}
 	}
 
