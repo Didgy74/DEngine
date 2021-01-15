@@ -51,6 +51,14 @@ namespace DEngine::Std
 			return *reinterpret_cast<Trait::At<i, Ts...>*>(data);
 		}
 
+		template<typename T>
+		[[nodiscard]] auto Get() noexcept -> decltype(auto)
+		{
+			constexpr unsigned int i = Trait::indexOf<T, Ts...>;
+			DENGINE_DETAIL_CONTAINERS_ASSERT(i == tracker);
+			return *reinterpret_cast<T*>(data);
+		}
+
 	private:
 		static constexpr unsigned int noValue = static_cast<unsigned int>(-1);
 		unsigned int tracker = noValue;
@@ -78,7 +86,7 @@ inline DEngine::Std::Opt<unsigned int> DEngine::Std::Variant<Ts...>::GetIndex() 
 template<typename... Ts>
 void DEngine::Std::Variant<Ts...>::Clear() noexcept
 {
-	static_assert(sizeof...(Ts) < 6, "Variant::Clear does not support more than 6 types.");
+	static_assert(sizeof...(Ts) =< 6, "Variant::Clear does not support more than 6 types.");
 
 	if (tracker == noValue)
 		return;

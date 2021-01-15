@@ -133,74 +133,91 @@ namespace DEngine::Gui::impl
 			callable);
 	}
 
-	enum class DockArea_IterateTopLevelNodeMode
+	enum class DockArea_IterateLayerMode
 	{
 		FrontToBack,
 		BackToFront,
 	};
 
-	using DockArea_IterateTopLevelNodeCallbackPFN = void(*)(
-		DockArea::TopLevelNode& topLevelNode,
-		Rect topLevelRect,
-		uSize topLevelIndex,
+	using DockArea_IterateLayerCallbackPFN = void(*)(
+		DockArea::Layer& layer,
+		Rect layerRect,
+		uSize layerIndex,
 		bool& continueIterating);
 
-	template<typename TopLevelNodeContainerType, typename Callable>
-	void DockArea_IterateTopLevelNodes(
-		DockArea_IterateTopLevelNodeMode iterateMode,
-		TopLevelNodeContainerType& topLevelNodes,
+	template<typename LayerContainerT, typename Callable>
+	void DockArea_IterateLayers(
+		DockArea_IterateLayerMode iterateMode,
+		LayerContainerT& layers,
 		Rect widgetRect,
 		bool& continueIterating,
 		Callable callable)
 	{
 		static_assert(
-			Std::Trait::isSame<Std::Trait::RemoveConst<TopLevelNodeContainerType>, decltype(DockArea::topLevelNodes)>,
-			"Wrong topLevelNodeContainerType passed into DockArea_IterateTopLevelNodes");
+			Std::Trait::isSame<Std::Trait::RemoveConst<LayerContainerT>, decltype(DockArea::layers)>,
+			"Wrong type passed into Gui::impl::DockArea_IterateLayers");
 
-		uSize topLevelNodesLength = topLevelNodes.size();
+		uSize layerCount = layers.size();
 		
 		uSize n = 0;
-		if (iterateMode == DockArea_IterateTopLevelNodeMode::BackToFront)
-			n = topLevelNodesLength;
+		if (iterateMode == DockArea_IterateLayerMode::BackToFront)
+			n = layerCount;
 		while (true)
 		{
 			uSize i = 0;
 			bool shouldContinue = false;
-			if (iterateMode == DockArea_IterateTopLevelNodeMode::FrontToBack)
+			switch (iterateMode)
 			{
-				if (n < topLevelNodesLength)
+			case DockArea_IterateLayerMode::FrontToBack:
+			{
+				if (n < layerCount)
 					shouldContinue = true;
 				i = n;
 			}
-			else if (iterateMode == DockArea_IterateTopLevelNodeMode::BackToFront)
+			break;
+			case DockArea_IterateLayerMode::BackToFront:
 			{
 				if (n > 0)
 					shouldContinue = true;
 				i = n - 1;
 			}
+			break;
+			default:
+				DENGINE_DETAIL_UNREACHABLE();
+				break;
+			}
 			if (!shouldContinue)
 				break;
 
-			auto& topLevelNode = topLevelNodes[i];
-			Rect topLevelRect = topLevelNode.rect;
-			topLevelRect.position += widgetRect.position;
-			if (i == topLevelNodesLength - 1)
-				topLevelRect = widgetRect;
+			auto& layer = layers[i];
+			Rect layerRect = layer.rect;
+			layerRect.position += widgetRect.position;
+			// If we are on the backmost layer, make it take up the size of the widget.
+			if (i == layerCount - 1)
+				layerRect = widgetRect;
 			callable(
-				topLevelNode, 
-				topLevelRect, 
+				layer, 
+				layerRect, 
 				i, 
 				continueIterating);
 			if (!continueIterating)
 				return;
 
-			if (iterateMode == DockArea_IterateTopLevelNodeMode::FrontToBack)
+			switch (iterateMode)
+			{
+			case DockArea_IterateLayerMode::FrontToBack:
 			{
 				n += 1;
 			}
-			else if (iterateMode == DockArea_IterateTopLevelNodeMode::BackToFront)
+			break;
+			case DockArea_IterateLayerMode::BackToFront:
 			{
 				n -= 1;
+			}
+			break;
+			default:
+				DENGINE_DETAIL_UNREACHABLE();
+				break;
 			}
 		}
 	}
@@ -310,16 +327,16 @@ namespace DEngine::Gui::impl
 		return middleRect;
 	}
 
-	static void DockArea_PushTopLevelToFront(
-		std::vector<DockArea::TopLevelNode>& topLevelNodes,
+	static void DockArea_PushLayerToFront(
+		std::vector<DockArea::Layer>& layers,
 		uSize index)
 	{
-		DENGINE_IMPL_GUI_ASSERT(index < topLevelNodes.size());
+		DENGINE_IMPL_GUI_ASSERT(index < layers.size());
 		if (index > 0)
 		{
-			DockArea::TopLevelNode tempTopLevelNode = Std::Move(topLevelNodes[index]);
-			topLevelNodes.erase(topLevelNodes.begin() + index);
-			topLevelNodes.insert(topLevelNodes.begin(), Std::Move(tempTopLevelNode));
+			DockArea::Layer tempLayer = Std::Move(layers[index]);
+			layers.erase(layers.begin() + index);
+			layers.insert(layers.begin(), Std::Move(tempLayer));
 		}
 	}
 
@@ -365,26 +382,26 @@ namespace DEngine::Gui::impl
 		Context const& ctx,
 		DockArea const& dockArea,
 		ImplData& implData,
-		std::vector<DockArea::TopLevelNode> const& topLevelNodes,
+		std::vector<DockArea::Layer> const& layers,
 		Rect widgetRect,
 		Extent framebufferExtent,
 		DrawInfo& drawInfo)
 	{
 		bool continueIterating = true;
-		impl::DockArea_IterateTopLevelNodes(
-			DockArea_IterateTopLevelNodeMode::BackToFront,
-			topLevelNodes,
+		impl::DockArea_IterateLayers(
+			DockArea_IterateLayerMode::BackToFront,
+			layers,
 			widgetRect,
 			continueIterating,
 			[&ctx, &dockArea, &implData, &drawInfo](
-				DockArea::TopLevelNode const& topLevelNode,
-				Rect topLevelRect,
-				uSize topLevelIndex,
+				DockArea::Layer const& layer,
+				Rect layerRect,
+				uSize layerIndex,
 				bool& continueIterating)
 			{
 				impl::DockArea_IterateNode(
-					*topLevelNode.node,
-					topLevelRect,
+					*layer.node,
+					layerRect,
 					continueIterating,
 					impl::DockArea_IterateNode_SplitCallableOrder::Last,
 					[&ctx, &dockArea, &implData, &drawInfo](
@@ -468,14 +485,14 @@ namespace DEngine::Gui::impl
 					});
 
 				impl::DockArea_IterateResizeRects(
-					topLevelRect,
+					layerRect,
 					dockArea.resizeAreaThickness,
 					dockArea.resizeHandleLength,
-					[&dockArea, &drawInfo, topLevelIndex](
+					[&dockArea, &drawInfo, layerIndex](
 						DockArea_ResizeRect side,
 						Rect rect)
 					{
-						if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
+						if (layerIndex != dockArea.layers.size() - 1)
 							drawInfo.PushFilledQuad(rect, { 1.f, 1.f, 1.f, 0.75f });
 					});
 			});
@@ -495,20 +512,20 @@ namespace DEngine::Gui::impl
 		// First find the node
 		bool nodeFound = false;
 		bool continueIterating = true;
-		impl::DockArea_IterateTopLevelNodes(
-			DockArea_IterateTopLevelNodeMode::FrontToBack,
-			dockArea.topLevelNodes,
+		impl::DockArea_IterateLayers(
+			DockArea_IterateLayerMode::FrontToBack,
+			dockArea.layers,
 			widgetRect,
 			continueIterating,
 			[&dockArea, &windowRect, &nodeFound](
-				DockArea::TopLevelNode const& topLevelNode,
-				Rect topLevelRect,
-				uSize topLevelIndex,
+				DockArea::Layer const& layer,
+				Rect layerRect,
+				uSize layerIndex,
 				bool& continueIterating)
 			{
 				impl::DockArea_IterateNode(
-					*topLevelNode.node,
-					topLevelRect,
+					*layer.node,
+					layerRect,
 					continueIterating,
 					impl::DockArea_IterateNode_SplitCallableOrder::First,
 					[&dockArea, &windowRect, &nodeFound](
@@ -575,7 +592,7 @@ void DockArea::Render(
 	Rect visibleRect, 
 	DrawInfo& drawInfo) const
 {
-	if (topLevelNodes.empty())
+	if (layers.empty())
 		return;
 
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
@@ -586,7 +603,7 @@ void DockArea::Render(
 		ctx,
 		*this,
 		implData,
-		topLevelNodes,
+		layers,
 		widgetRect,
 		framebufferExtent,
 		drawInfo);
@@ -630,25 +647,25 @@ namespace DEngine::Gui::impl
 			return;
 		// First check if we hit the resize rects
 		bool continueIterating = true;
-		impl::DockArea_IterateTopLevelNodes(
-			impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-			dockArea.topLevelNodes,
+		impl::DockArea_IterateLayers(
+			impl::DockArea_IterateLayerMode::FrontToBack,
+			dockArea.layers,
 			widgetRect,
 			continueIterating,
 			[&ctx, windowId, &dockArea, &implData, event, cursorPos](
-				DockArea::TopLevelNode& topLevelNode,
-				Rect topLevelRect,
-				uSize topLevelIndex,
+				DockArea::Layer& layer,
+				Rect layerRect,
+				uSize layerIndex,
 				bool& continueIterating)
 		{
 			Std::Opt<impl::DockArea_ResizeRect> resizeRectHit;
-			if (event.clicked && continueIterating && topLevelIndex != dockArea.topLevelNodes.size() - 1)
+			if (event.clicked && continueIterating && layerIndex != dockArea.layers.size() - 1)
 			{
 				impl::DockArea_IterateResizeRects(
-					topLevelRect,
+					layerRect,
 					dockArea.resizeAreaThickness,
 					dockArea.resizeHandleLength,
-					[topLevelRect, &resizeRectHit, cursorPos](impl::DockArea_ResizeRect side, Rect rect)
+					[layerRect, &resizeRectHit, cursorPos](impl::DockArea_ResizeRect side, Rect rect)
 					{
 						if (!resizeRectHit.HasValue() && rect.PointIsInside(cursorPos))
 							resizeRectHit = Std::Opt<impl::DockArea_ResizeRect>{ side };
@@ -656,7 +673,7 @@ namespace DEngine::Gui::impl
 				if (resizeRectHit.HasValue())
 				{
 					continueIterating = false;
-					impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+					impl::DockArea_PushLayerToFront(dockArea.layers, layerIndex);
 					dockArea.behavior = DockArea::Behavior::Resizing;
 					dockArea.behaviorData.resizing = {};
 					switch (resizeRectHit.Value())
@@ -665,19 +682,22 @@ namespace DEngine::Gui::impl
 					case DockArea_ResizeRect::Bottom: dockArea.behaviorData.resizing.resizeSide = DockArea::ResizeSide::Bottom; break;
 					case DockArea_ResizeRect::Left: dockArea.behaviorData.resizing.resizeSide = DockArea::ResizeSide::Left; break;
 					case DockArea_ResizeRect::Right: dockArea.behaviorData.resizing.resizeSide = DockArea::ResizeSide::Right; break;
+					default:
+						DENGINE_DETAIL_UNREACHABLE();
+						break;
 					}
 				}
 			}
 
-			if (!resizeRectHit.HasValue() && topLevelRect.PointIsInside(cursorPos))
+			if (!resizeRectHit.HasValue() && layerRect.PointIsInside(cursorPos))
 			{
 				// Iterate through nodes, check if we hit a tab or the titlebar.
 				impl::DockArea_IterateNode(
-					*topLevelNode.node,
-					topLevelRect,
+					*layer.node,
+					layerRect,
 					continueIterating,
 					impl::DockArea_IterateNode_SplitCallableOrder::First,
-					[&ctx, windowId, &dockArea, &implData, cursorPos, event, topLevelRect, topLevelIndex](
+					[&ctx, windowId, &dockArea, &implData, cursorPos, event, layerRect, layerIndex](
 						DockArea::Node& node,
 						Rect rect,
 						DockArea::Node* parentNode,
@@ -694,13 +714,13 @@ namespace DEngine::Gui::impl
 						if (resizeHandleRect.PointIsInside(cursorPos))
 						{
 							continueIterating = false;
-							if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
-								impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+							if (layerIndex != dockArea.layers.size() - 1)
+								impl::DockArea_PushLayerToFront(dockArea.layers, layerIndex);
 							dockArea.behavior = DockArea::Behavior::Resizing;
 							dockArea.behaviorData.resizing = {};
 							dockArea.behaviorData.resizing.resizingSplit = true;
 							dockArea.behaviorData.resizing.resizeSplitNode = &node;
-							dockArea.behaviorData.resizing.resizingSplitIsFrontNode = topLevelIndex != dockArea.topLevelNodes.size() - 1;
+							dockArea.behaviorData.resizing.resizingSplitIsFrontNode = layerIndex != dockArea.layers.size() - 1;
 							return;
 						}
 					}
@@ -736,24 +756,24 @@ namespace DEngine::Gui::impl
 											tabWasHit = true;
 											// Select this window to display, and bring it the top-level-node to front.
 											node.selectedWindow = windowIndex;
-											if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
-												impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+											if (layerIndex != dockArea.layers.size() - 1)
+												impl::DockArea_PushLayerToFront(dockArea.layers, layerIndex);
 											dockArea.behavior = DockArea::Behavior::HoldingTab;
 											dockArea.behaviorData.holdingTab = {};
 											dockArea.behaviorData.holdingTab.holdingTab = &node;
-											dockArea.behaviorData.holdingTab.holdingFrontWindow = topLevelIndex != dockArea.topLevelNodes.size() - 1;
+											dockArea.behaviorData.holdingTab.holdingFrontWindow = layerIndex != dockArea.layers.size() - 1;
 											dockArea.behaviorData.holdingTab.cursorPosRelative = cursorPos - tabRect.position;
 											break;
 										}
 									}
 								}
-								if (!tabWasHit && topLevelIndex != dockArea.topLevelNodes.size() - 1)
+								if (!tabWasHit && layerIndex != dockArea.layers.size() - 1)
 								{
 									// We hit the title bar but not any tabs, start moving it and bring it to front
 									dockArea.behavior = DockArea::Behavior::Moving;
 									dockArea.behaviorData.moving = {};
-									dockArea.behaviorData.moving.windowMovedRelativePos = cursorPos - topLevelRect.position;
-									impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+									dockArea.behaviorData.moving.windowMovedRelativePos = cursorPos - layerRect.position;
+									impl::DockArea_PushLayerToFront(dockArea.layers, layerIndex);
 								}
 							}
 							Rect contentRect = rect;
@@ -801,31 +821,31 @@ namespace DEngine::Gui::impl
 			{
 				// Delete the front-most top-level node.
 				continueIterating = false;
-				dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
+				dockArea.layers.erase(dockArea.layers.begin());
 			}
 
 			// Find out if we need to dock a window into another.
 			if (continueIterating)
 			{
-				impl::DockArea_IterateTopLevelNodes(
-					impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-					dockArea.topLevelNodes,
+				impl::DockArea_IterateLayers(
+					impl::DockArea_IterateLayerMode::FrontToBack,
+					dockArea.layers,
 					widgetRect,
 					continueIterating,
 					[&dockArea, &implData, cursorPos](
-						DockArea::TopLevelNode& topLevelNode,
-						Rect topLevelRect,
-						uSize topLevelIndex,
+						DockArea::Layer& layer,
+						Rect layerRect,
+						uSize layerIndex,
 						bool& continueIterating)
 					{
 						// We don't need to test the front-most node, since that's the one being moved.
-						if (topLevelIndex == 0)
+						if (layerIndex == 0)
 							return;
 
 						// We search for the node in which we are showing layout gizmos
 						impl::DockArea_IterateNode(
-							*topLevelNode.node,
-							topLevelRect,
+							*layer.node,
+							layerRect,
 							continueIterating,
 							impl::DockArea_IterateNode_SplitCallableOrder::First,
 							[&dockArea, &implData, cursorPos](
@@ -872,16 +892,16 @@ namespace DEngine::Gui::impl
 													newNode->windows = Std::Move(node.windows);
 													newNode->selectedWindow = node.selectedWindow;
 													node.selectedWindow = 0;
-													nodeA = Std::Move(dockArea.topLevelNodes.front().node);
-													dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
+													nodeA = Std::Move(dockArea.layers.front().node);
+													dockArea.layers.erase(dockArea.layers.begin());
 												}
 
-												if (gizmo == DockArea_LayoutGizmo::Center && dockArea.topLevelNodes.front().node->type == DockArea::Node::Type::Window)
+												if (gizmo == DockArea_LayoutGizmo::Center && dockArea.layers.front().node->type == DockArea::Node::Type::Window)
 												{
-													node.selectedWindow = node.windows.size() + dockArea.topLevelNodes.front().node->selectedWindow;
-													for (auto& window : dockArea.topLevelNodes.front().node->windows)
+													node.selectedWindow = node.windows.size() + dockArea.layers.front().node->selectedWindow;
+													for (auto& window : dockArea.layers.front().node->windows)
 														node.windows.emplace_back(Std::Move(window));
-													dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
+													dockArea.layers.erase(dockArea.layers.begin());
 												}
 											}
 										});
@@ -995,15 +1015,15 @@ namespace DEngine::Gui::impl
 		bool rectWasHit = false;
 		// Iterate over every window.
 		bool continueIterating = true;
-		impl::DockArea_IterateTopLevelNodes(
-			impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-			dockArea.topLevelNodes,
+		impl::DockArea_IterateLayers(
+			impl::DockArea_IterateLayerMode::FrontToBack,
+			dockArea.layers,
 			widgetRect,
 			continueIterating,
 			[&ctx, windowId, &dockArea, &implData, event, &rectWasHit](
-				DockArea::TopLevelNode& topLevelNode,
-				Rect topLevelRect,
-				uSize topLevelIndex,
+				DockArea::Layer& layer,
+				Rect layerRect,
+				uSize layerIndex,
 				bool& continueIterating)
 			{
 				// First we check if we hit a resize rect. We do not check this for the rear-most one
@@ -1011,13 +1031,13 @@ namespace DEngine::Gui::impl
 				if (rectWasHit)
 					return;
 				Std::Opt<DockArea_ResizeRect> resizeRectHit;
-				if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
+				if (layerIndex != dockArea.layers.size() - 1)
 				{
 					DockArea_IterateResizeRects(
-						topLevelRect,
+						layerRect,
 						dockArea.resizeAreaThickness,
 						dockArea.resizeHandleLength,
-						[topLevelRect, event, &resizeRectHit](DockArea_ResizeRect side, Rect rect)
+						[layerRect, event, &resizeRectHit](DockArea_ResizeRect side, Rect rect)
 					{
 						if (!resizeRectHit.HasValue() && rect.PointIsInside(event.position))
 							resizeRectHit = Std::Opt<DockArea_ResizeRect>{ side };
@@ -1041,13 +1061,13 @@ namespace DEngine::Gui::impl
 					}
 					return;
 				}
-				if (continueIterating && topLevelRect.PointIsInside(event.position))
+				if (continueIterating && layerRect.PointIsInside(event.position))
 				{
 					continueIterating = false;
 					bool continueIterating2 = true;
 					impl::DockArea_IterateNode(
-						*topLevelNode.node,
-						topLevelRect,
+						*layer.node,
+						layerRect,
 						continueIterating2,
 						impl::DockArea_IterateNode_SplitCallableOrder::First,
 						[&ctx, windowId, &implData, &dockArea, event, &rectWasHit](
@@ -1114,30 +1134,30 @@ namespace DEngine::Gui::impl
 		if (cursorInsideWidget)
 		{
 			// First move the window.
-			auto& topLevelNode = dockArea.topLevelNodes.front();
-			topLevelNode.rect.position = cursorPos - widgetRect.position - dockArea.behaviorData.moving.windowMovedRelativePos;
+			auto& layer = dockArea.layers.front();
+			layer.rect.position = cursorPos - widgetRect.position - dockArea.behaviorData.moving.windowMovedRelativePos;
 
 			// Check if mouse is covering the delete gizmo
 
 			bool continueIterating = true;
 			bool windowContentWasHit = false;
-			impl::DockArea_IterateTopLevelNodes(
-				impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-				dockArea.topLevelNodes,
+			impl::DockArea_IterateLayers(
+				impl::DockArea_IterateLayerMode::FrontToBack,
+				dockArea.layers,
 				widgetRect,
 				continueIterating,
 				[&dockArea, &implData, cursorPos, &windowContentWasHit](
-					DockArea::TopLevelNode& topLevelNode,
-					Rect topLevelRect,
-					uSize topLevelIndex,
+					DockArea::Layer& layer,
+					Rect layerRect,
+					uSize layerIndex,
 					bool& continueIterating)
 				{
 					// Jump over the first top-level node. It's the one we're moving.
-					if (topLevelIndex == 0)
+					if (layerIndex == 0)
 						return;
 					impl::DockArea_IterateNode(
-						*topLevelNode.node,
-						topLevelRect,
+						*layer.node,
+						layerRect,
 						continueIterating,
 						impl::DockArea_IterateNode_SplitCallableOrder::First,
 						[&dockArea, &implData, cursorPos, &windowContentWasHit](
@@ -1197,12 +1217,12 @@ namespace DEngine::Gui::impl
 		bool cursorInsideWidget = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
 		if (!cursorInsideWidget)
 			return;
-		DENGINE_IMPL_GUI_ASSERT(!dockArea.topLevelNodes.empty());
+		DENGINE_IMPL_GUI_ASSERT(!dockArea.layers.empty());
 		
 		if (dockArea.behaviorData.resizing.resizingSplit)
 		{
-			auto& topLevelNode = dockArea.behaviorData.resizing.resizingSplitIsFrontNode ? dockArea.topLevelNodes.front() : dockArea.topLevelNodes.back();
-			Rect windowRect = topLevelNode.rect;
+			auto& layer = dockArea.behaviorData.resizing.resizingSplitIsFrontNode ? dockArea.layers.front() : dockArea.layers.back();
+			Rect windowRect = layer.rect;
 			if (!dockArea.behaviorData.resizing.resizingSplitIsFrontNode)
 			{
 				windowRect.position = {};
@@ -1211,7 +1231,7 @@ namespace DEngine::Gui::impl
 				
 			bool continueIterating = true;
 			impl::DockArea_IterateNode(
-				*topLevelNode.node,
+				*layer.node,
 				windowRect,
 				continueIterating,
 				impl::DockArea_IterateNode_SplitCallableOrder::First,
@@ -1243,33 +1263,33 @@ namespace DEngine::Gui::impl
 		}
 		else
 		{
-			auto& topLevelNode = dockArea.topLevelNodes.front();
+			auto& layer = dockArea.layers.front();
 			if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Top)
 			{
-				i32 prevY = topLevelNode.rect.position.y;
+				i32 prevY = layer.rect.position.y;
 				i32 a = cursorPos.y - widgetRect.position.y;
-				i32 b = topLevelNode.rect.position.y + (i32)topLevelNode.rect.extent.height - 100;
-				topLevelNode.rect.position.y = Math::Min(a, b);
-				topLevelNode.rect.extent.height += prevY - topLevelNode.rect.position.y;
+				i32 b = layer.rect.position.y + (i32)layer.rect.extent.height - 100;
+				layer.rect.position.y = Math::Min(a, b);
+				layer.rect.extent.height += prevY - layer.rect.position.y;
 			}
 			else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Bottom)
 			{
-				topLevelNode.rect.extent.height = Math::Max(0, cursorPos.y - widgetRect.position.y - topLevelNode.rect.position.y);
+				layer.rect.extent.height = Math::Max(0, cursorPos.y - widgetRect.position.y - layer.rect.position.y);
 			}
 			else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Left)
 			{
-				i32 prevX = topLevelNode.rect.position.x;
+				i32 prevX = layer.rect.position.x;
 				i32 a = cursorPos.x - widgetRect.position.x;
-				i32 b = topLevelNode.rect.position.x + (i32)topLevelNode.rect.extent.width - 100;
-				topLevelNode.rect.position.x = Math::Min(a, b);
-				topLevelNode.rect.extent.width += prevX - topLevelNode.rect.position.x;
+				i32 b = layer.rect.position.x + (i32)layer.rect.extent.width - 100;
+				layer.rect.position.x = Math::Min(a, b);
+				layer.rect.extent.width += prevX - layer.rect.position.x;
 			}
 			else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Right)
 			{
-				topLevelNode.rect.extent.width = Math::Max(0, cursorPos.x - widgetRect.position.x - topLevelNode.rect.position.x);
+				layer.rect.extent.width = Math::Max(0, cursorPos.x - widgetRect.position.x - layer.rect.position.x);
 			}
-			topLevelNode.rect.extent.height = Math::Max(topLevelNode.rect.extent.height, 100U);
-			topLevelNode.rect.extent.width = Math::Max(topLevelNode.rect.extent.width, 100U);
+			layer.rect.extent.height = Math::Max(layer.rect.extent.height, 100U);
+			layer.rect.extent.width = Math::Max(layer.rect.extent.width, 100U);
 		}
 	}
 
@@ -1285,17 +1305,17 @@ namespace DEngine::Gui::impl
 		// First we check if we need to disconnect any tabs
 		if (cursorInsideWidget)
 		{
-			auto& topLevelNode = dockArea.behaviorData.holdingTab.holdingFrontWindow ? dockArea.topLevelNodes.front() : dockArea.topLevelNodes.back();
-			Rect topLevelRect = topLevelNode.rect;
-			topLevelRect.position += widgetRect.position;
+			auto& layer = dockArea.behaviorData.holdingTab.holdingFrontWindow ? dockArea.layers.front() : dockArea.layers.back();
+			Rect layerRect = layer.rect;
+			layerRect.position += widgetRect.position;
 			if (!dockArea.behaviorData.holdingTab.holdingFrontWindow)
 			{
-				topLevelRect = widgetRect;
+				layerRect = widgetRect;
 			}
 			bool continueIterating = true;
 			impl::DockArea_IterateNode(
-				*topLevelNode.node,
-				topLevelRect,
+				*layer.node,
+				layerRect,
 				continueIterating,
 				impl::DockArea_IterateNode_SplitCallableOrder::First,
 				[&dockArea, &implData, widgetRect, cursorPos](
@@ -1331,14 +1351,14 @@ namespace DEngine::Gui::impl
 						(cursorPos.y >= tabRect.position.y + tabRect.extent.height + dockArea.tabDisconnectRadius))
 					{
 						// We want to disconnect this tab into a new top-level node.
-						DockArea::TopLevelNode newTopLevelNode{};
-						newTopLevelNode.rect = rect;
-						newTopLevelNode.rect.position = cursorPos - widgetRect.position - dockArea.behaviorData.holdingTab.cursorPosRelative;
+						DockArea::Layer newLayer{};
+						newLayer.rect = rect;
+						newLayer.rect.position = cursorPos - widgetRect.position - dockArea.behaviorData.holdingTab.cursorPosRelative;
 						DockArea::Node* newNode = new DockArea::Node;
-						newTopLevelNode.node = Std::Box{ newNode };
+						newLayer.node = Std::Box{ newNode };
 						newNode->type = DockArea::Node::Type::Window;
 						newNode->windows.push_back(Std::Move(node.windows[node.selectedWindow]));
-						dockArea.topLevelNodes.emplace(dockArea.topLevelNodes.begin(), Std::Move(newTopLevelNode));
+						dockArea.layers.emplace(dockArea.layers.begin(), Std::Move(newLayer));
 
 						// Remove the window from the node
 						node.windows.erase(node.windows.begin() + node.selectedWindow);
@@ -1440,26 +1460,26 @@ namespace DEngine::Gui::impl
 		if (isInsideWidget)
 		{
 			bool continueIterating = true;
-			impl::DockArea_IterateTopLevelNodes(
-				impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-				dockArea.topLevelNodes,
+			impl::DockArea_IterateLayers(
+				impl::DockArea_IterateLayerMode::FrontToBack,
+				dockArea.layers,
 				widgetRect,
 				continueIterating,
 				[&ctx, &dockArea, &implData, windowId, event](
-					DockArea::TopLevelNode &topLevelNode,
-					Rect topLevelRect,
-					uSize topLevelIndex,
+					DockArea::Layer &layer,
+					Rect layerRect,
+					uSize layerIndex,
 					bool &continueIterating)
 				{
 					Std::Opt<impl::DockArea_ResizeRect> resizeRectHit;
 					if (event.type == TouchEventType::Down && continueIterating &&
-							topLevelIndex != dockArea.topLevelNodes.size() - 1)
+							layerIndex != dockArea.layers.size() - 1)
 					{
 						impl::DockArea_IterateResizeRects(
-							topLevelRect,
+							layerRect,
 							dockArea.resizeAreaThickness,
 							dockArea.resizeHandleLength,
-							[topLevelRect, &resizeRectHit, event](impl::DockArea_ResizeRect side, Rect rect)
+							[layerRect, &resizeRectHit, event](impl::DockArea_ResizeRect side, Rect rect)
 							{
 								if (!resizeRectHit.HasValue() && rect.PointIsInside(event.position))
 									resizeRectHit = Std::Opt<impl::DockArea_ResizeRect>{ side };
@@ -1467,7 +1487,7 @@ namespace DEngine::Gui::impl
 						if (resizeRectHit.HasValue())
 						{
 							continueIterating = false;
-							impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+							impl::DockArea_PushLayerToFront(dockArea.layers, layerIndex);
 							dockArea.behavior = DockArea::Behavior::Resizing;
 							dockArea.behaviorData.resizing = {};
 							switch (resizeRectHit.Value())
@@ -1487,15 +1507,15 @@ namespace DEngine::Gui::impl
 							}
 						}
 					}
-					if (!resizeRectHit.HasValue() && topLevelRect.PointIsInside(event.position))
+					if (!resizeRectHit.HasValue() && layerRect.PointIsInside(event.position))
 					{
 						// Iterate through nodes, check if we hit a tab or the titlebar.
 						impl::DockArea_IterateNode(
-							*topLevelNode.node,
-							topLevelRect,
+							*layer.node,
+							layerRect,
 							continueIterating,
 							impl::DockArea_IterateNode_SplitCallableOrder::First,
-							[&ctx, &dockArea, &implData, windowId, event, topLevelRect, topLevelIndex](
+							[&ctx, &dockArea, &implData, windowId, event, layerRect, layerIndex](
 								DockArea::Node &node,
 								Rect rect,
 								DockArea::Node *parentNode,
@@ -1515,14 +1535,14 @@ namespace DEngine::Gui::impl
 										if (resizeHandleRect.PointIsInside(event.position))
 										{
 											continueIterating = false;
-											if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
-												impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+											if (layerIndex != dockArea.layers.size() - 1)
+												impl::DockArea_PushLayerToFront(dockArea.layers, layerIndex);
 											dockArea.behavior = DockArea::Behavior::Resizing;
 											dockArea.behaviorData.resizing = {};
 											dockArea.behaviorData.resizing.resizingSplit = true;
 											dockArea.behaviorData.resizing.resizeSplitNode = &node;
 											dockArea.behaviorData.resizing.resizingSplitIsFrontNode =
-												topLevelIndex != dockArea.topLevelNodes.size() - 1;
+												layerIndex != dockArea.layers.size() - 1;
 											return;
 										}
 									}
@@ -1563,14 +1583,14 @@ namespace DEngine::Gui::impl
 														tabWasHit = true;
 														// Select this window to display, and bring it the top-level-node to front.
 														node.selectedWindow = windowIndex;
-														if (topLevelIndex != dockArea.topLevelNodes.size() - 1)
-															impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes,
-																																 topLevelIndex);
+														if (layerIndex != dockArea.layers.size() - 1)
+															impl::DockArea_PushLayerToFront(dockArea.layers,
+																																 layerIndex);
 														dockArea.behavior = DockArea::Behavior::HoldingTab;
 														dockArea.behaviorData.holdingTab = {};
 														dockArea.behaviorData.holdingTab.holdingTab = &node;
 														dockArea.behaviorData.holdingTab.holdingFrontWindow =
-															topLevelIndex != dockArea.topLevelNodes.size() - 1;
+															layerIndex != dockArea.layers.size() - 1;
 														dockArea.behaviorData.holdingTab.cursorPosRelative =
 															Math::Vec2Int{(i32) event.position.x, (i32) event.position.y} -
 															tabRect.position;
@@ -1578,15 +1598,15 @@ namespace DEngine::Gui::impl
 													}
 												}
 											}
-											if (!tabWasHit && topLevelIndex != dockArea.topLevelNodes.size() - 1)
+											if (!tabWasHit && layerIndex != dockArea.layers.size() - 1)
 											{
 												// We hit the title bar but not any tabs, start moving it and bring it to front
 												dockArea.behavior = DockArea::Behavior::Moving;
 												dockArea.behaviorData.moving = {};
 												dockArea.behaviorData.moving.windowMovedRelativePos =
 													Math::Vec2Int{(i32) event.position.x, (i32) event.position.y} -
-													topLevelRect.position;
-												impl::DockArea_PushTopLevelToFront(dockArea.topLevelNodes, topLevelIndex);
+													layerRect.position;
+												impl::DockArea_PushLayerToFront(dockArea.layers, layerIndex);
 											}
 										}
 										if (!titleBarWasHit)
@@ -1632,29 +1652,29 @@ namespace DEngine::Gui::impl
 			if (cursorInsideWidget)
 			{
 				// First move the window.
-				auto& topLevelNode = dockArea.topLevelNodes.front();
-				topLevelNode.rect.position = cursorPos - widgetRect.position - dockArea.behaviorData.moving.windowMovedRelativePos;
+				auto& layer = dockArea.layers.front();
+				layer.rect.position = cursorPos - widgetRect.position - dockArea.behaviorData.moving.windowMovedRelativePos;
 
 				bool continueIterating = true;
 
 				bool windowContentWasHit = false;
-				impl::DockArea_IterateTopLevelNodes(
-					impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-					dockArea.topLevelNodes,
+				impl::DockArea_IterateLayers(
+					impl::DockArea_IterateLayerMode::FrontToBack,
+					dockArea.layers,
 					widgetRect,
 					continueIterating,
 					[&dockArea, &implData, cursorPos, &windowContentWasHit](
-						DockArea::TopLevelNode& topLevelNode,
-						Rect topLevelRect,
-						uSize topLevelIndex,
+						DockArea::Layer& layer,
+						Rect layerRect,
+						uSize layerIndex,
 						bool& continueIterating)
 					{
 						// Jump over the first top-level node. It's the one we're moving.
-						if (topLevelIndex == 0)
+						if (layerIndex == 0)
 							return;
 						impl::DockArea_IterateNode(
-							*topLevelNode.node,
-							topLevelRect,
+							*layer.node,
+							layerRect,
 							continueIterating,
 							impl::DockArea_IterateNode_SplitCallableOrder::First,
 							[&dockArea, &implData, cursorPos, &windowContentWasHit](
@@ -1714,27 +1734,27 @@ namespace DEngine::Gui::impl
 			{
 				// Delete the front-most top-level node.
 				continueIterating = false;
-				dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
+				dockArea.layers.erase(dockArea.layers.begin());
 			}
 
 			if (continueIterating)
 			{
-				impl::DockArea_IterateTopLevelNodes(
-					impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-					dockArea.topLevelNodes,
+				impl::DockArea_IterateLayers(
+					impl::DockArea_IterateLayerMode::FrontToBack,
+					dockArea.layers,
 					widgetRect,
 					continueIterating,
 					[&dockArea, &implData, event](
-						DockArea::TopLevelNode& topLevelNode,
-						Rect topLevelRect,
-						uSize topLevelIndex,
+						DockArea::Layer& layer,
+						Rect layerRect,
+						uSize layerIndex,
 						bool& continueIterating)
 					{
-						if (topLevelIndex == 0)
+						if (layerIndex == 0)
 							return;
 						DockArea_IterateNode(
-							*topLevelNode.node,
-							topLevelRect,
+							*layer.node,
+							layerRect,
 							continueIterating,
 							impl::DockArea_IterateNode_SplitCallableOrder::First,
 							[&dockArea, &implData, event](
@@ -1781,17 +1801,17 @@ namespace DEngine::Gui::impl
 													newNode->windows = Std::Move(node.windows);
 													newNode->selectedWindow = node.selectedWindow;
 													node.selectedWindow = 0;
-													nodeA = Std::Move(dockArea.topLevelNodes.front().node);
-													dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
+													nodeA = Std::Move(dockArea.layers.front().node);
+													dockArea.layers.erase(dockArea.layers.begin());
 													dockArea.behavior = DockArea::Behavior::Normal;
 													dockArea.behaviorData.normal = {};
 												}
-												else if (gizmo == DockArea_LayoutGizmo::Center && dockArea.topLevelNodes.front().node->type == DockArea::Node::Type::Window)
+												else if (gizmo == DockArea_LayoutGizmo::Center && dockArea.layers.front().node->type == DockArea::Node::Type::Window)
 												{
-													node.selectedWindow = node.windows.size() + dockArea.topLevelNodes.front().node->selectedWindow;
-													for (auto& window : dockArea.topLevelNodes.front().node->windows)
+													node.selectedWindow = node.windows.size() + dockArea.layers.front().node->selectedWindow;
+													for (auto& window : dockArea.layers.front().node->windows)
 														node.windows.emplace_back(Std::Move(window));
-													dockArea.topLevelNodes.erase(dockArea.topLevelNodes.begin());
+													dockArea.layers.erase(dockArea.layers.begin());
 													dockArea.behavior = DockArea::Behavior::Normal;
 													dockArea.behaviorData.normal = {};
 												}
@@ -1827,12 +1847,12 @@ namespace DEngine::Gui::impl
 			bool cursorInsideWidget = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
 			if (!cursorInsideWidget)
 				return;
-			DENGINE_IMPL_GUI_ASSERT(!dockArea.topLevelNodes.empty());
+			DENGINE_IMPL_GUI_ASSERT(!dockArea.layers.empty());
 
 			if (dockArea.behaviorData.resizing.resizingSplit)
 			{
-				auto& topLevelNode = dockArea.behaviorData.resizing.resizingSplitIsFrontNode ? dockArea.topLevelNodes.front() : dockArea.topLevelNodes.back();
-				Rect windowRect = topLevelNode.rect;
+				auto& layer = dockArea.behaviorData.resizing.resizingSplitIsFrontNode ? dockArea.layers.front() : dockArea.layers.back();
+				Rect windowRect = layer.rect;
 				if (!dockArea.behaviorData.resizing.resizingSplitIsFrontNode)
 				{
 					windowRect.position = {};
@@ -1841,7 +1861,7 @@ namespace DEngine::Gui::impl
 
 				bool continueIterating = true;
 				impl::DockArea_IterateNode(
-					*topLevelNode.node,
+					*layer.node,
 					windowRect,
 					continueIterating,
 					impl::DockArea_IterateNode_SplitCallableOrder::First,
@@ -1873,33 +1893,33 @@ namespace DEngine::Gui::impl
 			}
 			else
 			{
-				auto& topLevelNode = dockArea.topLevelNodes.front();
+				auto& layer = dockArea.layers.front();
 				if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Top)
 				{
-					i32 prevY = topLevelNode.rect.position.y;
+					i32 prevY = layer.rect.position.y;
 					i32 a = event.position.y - widgetRect.position.y;
-					i32 b = topLevelNode.rect.position.y + (i32)topLevelNode.rect.extent.height - 100;
-					topLevelNode.rect.position.y = Math::Min(a, b);
-					topLevelNode.rect.extent.height += prevY - topLevelNode.rect.position.y;
+					i32 b = layer.rect.position.y + (i32)layer.rect.extent.height - 100;
+					layer.rect.position.y = Math::Min(a, b);
+					layer.rect.extent.height += prevY - layer.rect.position.y;
 				}
 				else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Bottom)
 				{
-					topLevelNode.rect.extent.height = Math::Max(0, (i32)event.position.y - widgetRect.position.y - topLevelNode.rect.position.y);
+					layer.rect.extent.height = Math::Max(0, (i32)event.position.y - widgetRect.position.y - layer.rect.position.y);
 				}
 				else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Left)
 				{
-					i32 prevX = topLevelNode.rect.position.x;
+					i32 prevX = layer.rect.position.x;
 					i32 a = event.position.x - widgetRect.position.x;
-					i32 b = topLevelNode.rect.position.x + (i32)topLevelNode.rect.extent.width - 100;
-					topLevelNode.rect.position.x = Math::Min(a, b);
-					topLevelNode.rect.extent.width += prevX - topLevelNode.rect.position.x;
+					i32 b = layer.rect.position.x + (i32)layer.rect.extent.width - 100;
+					layer.rect.position.x = Math::Min(a, b);
+					layer.rect.extent.width += prevX - layer.rect.position.x;
 				}
 				else if (dockArea.behaviorData.resizing.resizeSide == DockArea::ResizeSide::Right)
 				{
-					topLevelNode.rect.extent.width = Math::Max(0, (i32)event.position.x - widgetRect.position.x - topLevelNode.rect.position.x);
+					layer.rect.extent.width = Math::Max(0, (i32)event.position.x - widgetRect.position.x - layer.rect.position.x);
 				}
-				topLevelNode.rect.extent.height = Math::Max(topLevelNode.rect.extent.height, 100U);
-				topLevelNode.rect.extent.width = Math::Max(topLevelNode.rect.extent.width, 100U);
+				layer.rect.extent.height = Math::Max(layer.rect.extent.height, 100U);
+				layer.rect.extent.width = Math::Max(layer.rect.extent.width, 100U);
 			}
 		}
 	}
@@ -1925,17 +1945,17 @@ namespace DEngine::Gui::impl
 			// First we check if we need to disconnect any tabs
 			if (cursorInsideWidget)
 			{
-				auto &topLevelNode = dockArea.behaviorData.holdingTab.holdingFrontWindow ? dockArea.topLevelNodes.front() : dockArea.topLevelNodes.back();
-				Rect topLevelRect = topLevelNode.rect;
-				topLevelRect.position += widgetRect.position;
+				auto& layer = dockArea.behaviorData.holdingTab.holdingFrontWindow ? dockArea.layers.front() : dockArea.layers.back();
+				Rect layerRect = layer.rect;
+				layerRect.position += widgetRect.position;
 				if (!dockArea.behaviorData.holdingTab.holdingFrontWindow)
 				{
-					topLevelRect = widgetRect;
+					layerRect = widgetRect;
 				}
 				bool continueIterating = true;
 				impl::DockArea_IterateNode(
-					*topLevelNode.node,
-					topLevelRect,
+					*layer.node,
+					layerRect,
 					continueIterating,
 					impl::DockArea_IterateNode_SplitCallableOrder::First,
 					[&dockArea, &implData, widgetRect, cursorPos](
@@ -1973,15 +1993,15 @@ namespace DEngine::Gui::impl
 								 tabRect.position.y + tabRect.extent.height + dockArea.tabDisconnectRadius))
 						{
 							// We want to disconnect this tab into a new top-level node.
-							DockArea::TopLevelNode newTopLevelNode{};
-							newTopLevelNode.rect = rect;
-							newTopLevelNode.rect.position = cursorPos - widgetRect.position -
+							DockArea::Layer newLayer{};
+							newLayer.rect = rect;
+							newLayer.rect.position = cursorPos - widgetRect.position -
 																							dockArea.behaviorData.holdingTab.cursorPosRelative;
 							DockArea::Node *newNode = new DockArea::Node;
-							newTopLevelNode.node = Std::Box{newNode};
+							newLayer.node = Std::Box{newNode};
 							newNode->type = DockArea::Node::Type::Window;
 							newNode->windows.push_back(Std::Move(node.windows[node.selectedWindow]));
-							dockArea.topLevelNodes.emplace(dockArea.topLevelNodes.begin(), Std::Move(newTopLevelNode));
+							dockArea.layers.emplace(dockArea.layers.begin(), Std::Move(newLayer));
 
 							// Remove the window from the node
 							node.windows.erase(node.windows.begin() + node.selectedWindow);
@@ -2074,20 +2094,20 @@ void DockArea::TouchEvent(
 void DEngine::Gui::DockArea::InputConnectionLost(Context& ctx)
 {
 	bool continueIterating = true;
-	impl::DockArea_IterateTopLevelNodes(
-		impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-		topLevelNodes,
+	impl::DockArea_IterateLayers(
+		impl::DockArea_IterateLayerMode::FrontToBack,
+		layers,
 		Rect{},
 		continueIterating,
 		[&ctx](
-			DockArea::TopLevelNode& topLevelNode,
-			Rect topLevelRect,
-			uSize topLevelIndex,
+			DockArea::Layer& layer,
+			Rect layerRect,
+			uSize layerIndex,
 			bool& continueIterating)
 		{
 			impl::DockArea_IterateNode(
-				*topLevelNode.node,
-				topLevelRect,
+				*layer.node,
+				layerRect,
 				continueIterating,
 				impl::DockArea_IterateNode_SplitCallableOrder::First,
 				[&ctx](
@@ -2111,20 +2131,20 @@ void DEngine::Gui::DockArea::CharEnterEvent(Context& ctx)
 	// Only send events to the window in focus?
 
 	bool continueIterating = true;
-	impl::DockArea_IterateTopLevelNodes(
-		impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-		topLevelNodes,
+	impl::DockArea_IterateLayers(
+		impl::DockArea_IterateLayerMode::FrontToBack,
+		layers,
 		Rect{},
 		continueIterating,
 		[&ctx](
-			DockArea::TopLevelNode& topLevelNode,
-			Rect topLevelRect,
-			uSize topLevelIndex,
+			DockArea::Layer& layer,
+			Rect layerRect,
+			uSize layerIndex,
 			bool& continueIterating)
 		{
 			impl::DockArea_IterateNode(
-				*topLevelNode.node,
-				topLevelRect,
+				*layer.node,
+				layerRect,
 				continueIterating,
 				impl::DockArea_IterateNode_SplitCallableOrder::First,
 				[&ctx](
@@ -2150,20 +2170,20 @@ void DockArea::CharEvent(
 	// Only send events to the window in focus?
 
 	bool continueIterating = true;
-	impl::DockArea_IterateTopLevelNodes(
-		impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-		topLevelNodes,
+	impl::DockArea_IterateLayers(
+		impl::DockArea_IterateLayerMode::FrontToBack,
+		layers,
 		Rect{},
 		continueIterating,
 		[&ctx, utfValue](
-			DockArea::TopLevelNode& topLevelNode,
-			Rect topLevelRect,
-			uSize topLevelIndex,
+			DockArea::Layer& layer,
+			Rect layerRect,
+			uSize layerIndex,
 			bool& continueIterating)
 		{
 			impl::DockArea_IterateNode(
-				*topLevelNode.node,
-				topLevelRect,
+				*layer.node,
+				layerRect,
 				continueIterating,
 				impl::DockArea_IterateNode_SplitCallableOrder::First,
 				[&ctx, utfValue](
@@ -2188,19 +2208,19 @@ void DockArea::CharRemoveEvent(
 	Context& ctx)
 {
 	bool continueIterating = true;
-	impl::DockArea_IterateTopLevelNodes(
-		impl::DockArea_IterateTopLevelNodeMode::FrontToBack,
-		topLevelNodes,
+	impl::DockArea_IterateLayers(
+		impl::DockArea_IterateLayerMode::FrontToBack,
+		layers,
 		Rect{},
 		continueIterating,
 		[&ctx](
-			DockArea::TopLevelNode& topLevelNode,
-			Rect topLevelRect,
-			uSize topLevelIndex,
+			DockArea::Layer& layer,
+			Rect layerRect,
+			uSize layerIndex,
 			bool& continueIterating)
 		{
 			impl::DockArea_IterateNode(
-				*topLevelNode.node,
+				*layer.node,
 				{},
 				continueIterating,
 				impl::DockArea_IterateNode_SplitCallableOrder::First,

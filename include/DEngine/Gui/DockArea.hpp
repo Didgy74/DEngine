@@ -50,13 +50,13 @@ namespace DEngine::Gui
 			uSize selectedWindow = 0;
 			Split split{};
 		};
-		struct TopLevelNode
+		struct Layer
 		{
 			static constexpr Rect fullSizeRect{};
 			Rect rect{};
 			Std::Box<Node> node{};
 		};
-		std::vector<TopLevelNode> topLevelNodes;
+		std::vector<Layer> layers;
 		
 		u32 tabDisconnectRadius = 25;
 		u32 gizmoSize = 75;

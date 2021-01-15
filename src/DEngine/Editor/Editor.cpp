@@ -251,7 +251,7 @@ namespace DEngine::Editor
 					{
 						if (activated)
 						{
-							Gui::DockArea::TopLevelNode newTop{};
+							Gui::DockArea::Layer newTop{};
 							newTop.rect = { { 0, 0 }, { 400, 400 } };
 							Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
 							newTop.node = Std::Box{ topNode };
@@ -263,7 +263,7 @@ namespace DEngine::Editor
 							EntityIdList* entityIdList = new EntityIdList(&implData);
 							newWindow.widget = Std::Box<Gui::Widget>{ entityIdList };
 
-							implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
+							implData.dockArea->layers.emplace(implData.dockArea->layers.begin(), Std::Move(newTop));
 						}
 					});
 
@@ -275,7 +275,7 @@ namespace DEngine::Editor
 					{
 						if (activated)
 						{
-							Gui::DockArea::TopLevelNode newTop{};
+							Gui::DockArea::Layer newTop{};
 							newTop.rect = { { 250, 250 }, { 400, 400 } };
 							Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
 							newTop.node = Std::Box{ topNode };
@@ -287,7 +287,7 @@ namespace DEngine::Editor
 							ComponentList* componentList = new ComponentList(&implData);
 							newWindow.widget = Std::Box<Gui::Widget>{ componentList };
 
-							implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
+							implData.dockArea->layers.emplace(implData.dockArea->layers.begin(), Std::Move(newTop));
 						}
 					});
 
@@ -296,7 +296,7 @@ namespace DEngine::Editor
 					"New viewport",
 					[&implData]()
 					{
-						Gui::DockArea::TopLevelNode newTop{};
+						Gui::DockArea::Layer newTop{};
 						newTop.rect = { { 150, 150 }, { 400, 400 } };
 						Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
 						newTop.node = Std::Box{ topNode };
@@ -308,7 +308,7 @@ namespace DEngine::Editor
 						ViewportWidget* viewport = new ViewportWidget(implData, *implData.gfxCtx);
 						newWindow.widget = Std::Box<Gui::Widget>{ viewport };
 
-						implData.dockArea->topLevelNodes.emplace(implData.dockArea->topLevelNodes.begin(), Std::Move(newTop));
+						implData.dockArea->layers.emplace(implData.dockArea->layers.begin(), Std::Move(newTop));
 					});
 			});
 
@@ -368,7 +368,7 @@ Editor::Context Editor::Context::Create(
 		outmostLayout->AddWidget(Std::Box<Gui::Widget>{ dockArea });
 
 		{
-			Gui::DockArea::TopLevelNode newTop{};
+			Gui::DockArea::Layer newTop{};
 			newTop.rect = { { 0, 0 }, { 400, 400 } };
 			Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
 			newTop.node = Std::Box{ topNode };
@@ -380,11 +380,11 @@ Editor::Context Editor::Context::Create(
 			EntityIdList* entityIdList = new EntityIdList(&implData);
 			newWindow.widget = Std::Box<Gui::Widget>{ entityIdList };
 
-			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
+			dockArea->layers.emplace_back(Std::Move(newTop));
 		}
 
 		{
-			Gui::DockArea::TopLevelNode newTop{};
+			Gui::DockArea::Layer newTop{};
 			newTop.rect = { { 150, 150 }, { 400, 400 } };
 			Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
 			newTop.node = Std::Box{ topNode };
@@ -396,11 +396,11 @@ Editor::Context Editor::Context::Create(
 			ViewportWidget* viewport = new ViewportWidget(implData, *gfxCtx);
 			newWindow.widget = Std::Box<Gui::Widget>{ viewport };
 
-			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
+			dockArea->layers.emplace_back(Std::Move(newTop));
 		}
 
 		{
-			Gui::DockArea::TopLevelNode newTop{};
+			Gui::DockArea::Layer newTop{};
 			newTop.rect = { { 250, 250 }, { 400, 400 } };
 			Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
 			newTop.node = Std::Box{ topNode };
@@ -416,7 +416,7 @@ Editor::Context Editor::Context::Create(
 			ComponentList* componentList = new ComponentList(&implData);
 			scrollArea->widget = Std::Box<Gui::Widget>{ componentList };
 
-			dockArea->topLevelNodes.emplace_back(Std::Move(newTop));
+			dockArea->layers.emplace_back(Std::Move(newTop));
 		}
 	}
 	
