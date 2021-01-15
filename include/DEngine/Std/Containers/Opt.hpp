@@ -189,19 +189,13 @@ namespace DEngine::Std
 	template<typename T>
 	T const* Opt<T>::ToPtr() const noexcept
 	{
-		if (hasValue)
-			return &value;
-		else
-			return nullptr;
+		return hasValue ? &value : nullptr;
 	}
 
 	template<typename T>
 	T* Opt<T>::ToPtr() noexcept
 	{
-		if (hasValue)
-			return &value;
-		else
-			return nullptr;
+		return hasValue ? &value : nullptr;
 	}
 
 	template<typename T>

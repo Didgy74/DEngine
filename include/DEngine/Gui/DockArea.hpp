@@ -4,6 +4,7 @@
 
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
+#include <DEngine/Std/Containers/Variant.hpp>
 
 #include <DEngine/Math/Vector.hpp>
 
@@ -35,7 +36,8 @@ namespace DEngine::Gui
 		{
 			Std::Box<Node> a{};
 			Std::Box<Node> b{};
-			f32 split = 0.5f; // ???
+			// In the range of 0 - 1
+			f32 split = 0.5f;
 		};
 		struct Node
 		{
@@ -63,49 +65,38 @@ namespace DEngine::Gui
 		u32 gizmoPadding = 15;
 		u32 resizeAreaThickness = 30;
 		u32 resizeHandleLength = 50;
+		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.75f };
 
 		enum class ResizeSide { Top, Bottom, Left, Right, };
 
-		enum class Behavior
-		{
-			Normal,
-			Moving,
-			Resizing,
-			HoldingTab,
-		};
-		Behavior behavior = Behavior::Normal;
-
-		struct Internal_Behavior_Normal
+		struct BehaviorData_Normal
 		{
 		};
-		struct Internal_Behavior_Moving
+		struct BehaviorData_Moving
 		{
 			Math::Vec2Int windowMovedRelativePos;
 			Node const* showLayoutNodePtr;
 			bool useHighlightGizmo;
 			impl::DockArea_LayoutGizmo highlightGizmo;
 		};
-		struct Internal_Behavior_Resizing
+		struct BehaviorData_Resizing
 		{
 			ResizeSide resizeSide;
 			bool resizingSplit;
 			Node const* resizeSplitNode;
 			bool resizingSplitIsFrontNode;
 		};
-		struct Internal_Behavior_HoldingTab
+		struct BehaviorData_HoldingTab
 		{
 			bool holdingFrontWindow;
 			Node const* holdingTab;
 			Math::Vec2Int cursorPosRelative;
 		};	
-		union BehaviorData
-		{
-			Internal_Behavior_Normal normal;
-			Internal_Behavior_Moving moving;
-			Internal_Behavior_Resizing resizing;
-			Internal_Behavior_HoldingTab holdingTab;
-		};
-		BehaviorData behaviorData{};
+		Std::Variant<
+			BehaviorData_Normal, 
+			BehaviorData_Moving,
+			BehaviorData_Resizing,
+			BehaviorData_HoldingTab> behaviorData{};
 
 		void AddWindow(
 			Rect windowRect,

@@ -253,7 +253,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		physicsBody->SetMassData(&massData);
 		b2PolygonShape boxShape{};
 		boxShape.SetAsBox(0.5f, 0.5f);
-		f32 density = 1.;
+		f32 density = 1.f;
 		physicsBody->CreateFixture(&boxShape, density);
 	}
 

@@ -20,8 +20,7 @@ namespace DEngine::Std
 
 		void Set(NullVariantT) noexcept
 		{
-			if (tracker != noValue)
-				Clear();
+			Clear();
 			tracker = noValue;
 		}
 
@@ -37,7 +36,7 @@ namespace DEngine::Std
 			}
 			else
 			{
-				*reinterpret_cast<T*> = in;
+				*reinterpret_cast<T*>(data) = in;
 			}
 
 			tracker = newTypeIndex;
@@ -47,16 +46,42 @@ namespace DEngine::Std
 		[[nodiscard]] auto Get() noexcept -> decltype(auto)
 		{
 			static_assert(i < sizeof...(Ts), "Tried to Get a Variant with an index out of bounds of the types.");
-			DENGINE_DETAIL_CONTAINERS_ASSERT(i == tracker);
+			DENGINE_DETAIL_CONTAINERS_ASSERT(tracker == i);
 			return *reinterpret_cast<Trait::At<i, Ts...>*>(data);
+		}
+		template<unsigned int i>
+		[[nodiscard]] auto Get() const noexcept -> decltype(auto)
+		{
+			static_assert(i < sizeof...(Ts), "Tried to Get a Variant with an index out of bounds of the types.");
+			DENGINE_DETAIL_CONTAINERS_ASSERT(tracker == i);
+			return *reinterpret_cast<Trait::At<i, Ts...> const*>(data);
 		}
 
 		template<typename T>
 		[[nodiscard]] auto Get() noexcept -> decltype(auto)
 		{
 			constexpr unsigned int i = Trait::indexOf<T, Ts...>;
-			DENGINE_DETAIL_CONTAINERS_ASSERT(i == tracker);
+			DENGINE_DETAIL_CONTAINERS_ASSERT(tracker == i);
 			return *reinterpret_cast<T*>(data);
+		}
+		template<typename T>
+		[[nodiscard]] auto Get() const noexcept -> decltype(auto)
+		{
+			constexpr unsigned int i = Trait::indexOf<T, Ts...>;
+			DENGINE_DETAIL_CONTAINERS_ASSERT(tracker == i);
+			return *reinterpret_cast<T const*>(data);
+		}
+		template<typename T>
+		[[nodiscard]] T* ToPtr() noexcept
+		{
+			constexpr unsigned int i = Trait::indexOf<T, Ts...>;
+			return tracker == i ? reinterpret_cast<T*>(data) : nullptr;
+		}
+		template<typename T>
+		[[nodiscard]] T const* ToPtr() const noexcept
+		{
+			constexpr unsigned int i = Trait::indexOf<T, Ts...>;
+			return tracker == i ? reinterpret_cast<T const*>(data) : nullptr;
 		}
 
 	private:
@@ -86,7 +111,7 @@ inline DEngine::Std::Opt<unsigned int> DEngine::Std::Variant<Ts...>::GetIndex() 
 template<typename... Ts>
 void DEngine::Std::Variant<Ts...>::Clear() noexcept
 {
-	static_assert(sizeof...(Ts) =< 6, "Variant::Clear does not support more than 6 types.");
+	static_assert(sizeof...(Ts) <= 6, "Variant::Clear does not support more than 6 types.");
 
 	if (tracker == noValue)
 		return;

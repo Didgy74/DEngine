@@ -101,7 +101,7 @@ namespace DEngine::Std::Trait
 	using At = typename impl::At<index, Ts...>::Type;
 	// Returns the type at the index, or returs Or if the index is out of bounds.
 	template<unsigned int index, typename Or, typename... Ts>
-	using AtOr = typename impl::AtOr<index, impl::Max<0, index - sizeof...(Ts) + 1>::value, Or, Ts...>::Type;
+	using AtOr = typename impl::AtOr<index, impl::Max<0, (int)index - (int)sizeof...(Ts) + 1>::value, Or, Ts...>::Type;
 
 	template<bool expr, typename T, typename U>
 	using Conditional = typename impl::Conditional<expr, T, U>::Type;
