@@ -43,8 +43,8 @@ namespace DEngine::Gui
 
 	enum class CursorButton
 	{
-		Left,
-		Right,
+		Primary,
+		Secondary,
 		COUNT
 	};
 	struct CursorClickEvent

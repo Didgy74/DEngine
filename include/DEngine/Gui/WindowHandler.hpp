@@ -9,8 +9,9 @@ namespace DEngine::Gui
 {
 	enum class SoftInputFilter : u8
 	{
-		Float,
-		Integer,
+		SignedFloat,
+		UnsignedFloat,
+		SignedInteger,
 		UnsignedInteger
 	};
 

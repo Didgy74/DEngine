@@ -318,23 +318,27 @@ void StackLayout::Render(
 		cmd.rectExtent.y = (f32)widgetRect.extent.height / framebufferExtent.height;
 		drawInfo.drawCmds.push_back(cmd);
 	}
-
+	
 	impl::StackLayout_IterateOverChildren(
 		ctx,
 		*this,
 		widgetRect,
-		[&ctx, framebufferExtent, &drawInfo, visibleRect](Widget const& child, Rect childRect)
+		[&ctx, framebufferExtent, &drawInfo, visibleRect](
+			Widget const& child, 
+			Rect childRect)
 		{
 			Rect childVisibleRect = Rect::Intersection(childRect, visibleRect);
-			if (childVisibleRect.IsNothing())
-				return;
-
-			child.Render(
-				ctx,
-				framebufferExtent,
-				childRect,
-				childVisibleRect,
-				drawInfo);
+			if (!childVisibleRect.IsNothing())
+			{
+				drawInfo.PushScissor(childVisibleRect);
+				child.Render(
+					ctx,
+					framebufferExtent,
+					childRect,
+					childVisibleRect,
+					drawInfo);
+				drawInfo.PopScissor();
+			}
 		});
 }
 
@@ -372,13 +376,13 @@ void StackLayout::CharRemoveEvent(Context& ctx)
 	}
 }
 
-void StackLayout::InputConnectionLost(Context& ctx)
+void StackLayout::InputConnectionLost()
 {
-	ParentType::InputConnectionLost(ctx);
+	ParentType::InputConnectionLost();
 
 	for (auto& child : children)
 	{
-		child->InputConnectionLost(ctx);
+		child->InputConnectionLost();
 	}
 }
 

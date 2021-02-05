@@ -57,8 +57,7 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			Gui::TouchEvent event) override;
 
-		virtual void InputConnectionLost(
-			Context& ctx) override;
+		virtual void InputConnectionLost() override;
 
 		virtual void CharEnterEvent(
 			Context& ctx) override;

@@ -42,7 +42,7 @@ void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 
 	if (addAcceleration.MagnitudeSqrd() != 0)
 	{
-		Box2DBody* body = scene.GetComponent<Box2DBody>(entity);
+		Box2D_Component* body = scene.GetComponent<Box2D_Component>(entity);
 		if (body != nullptr)
 		{
 			body->ptr->ApplyForceToCenter({ addAcceleration.x, addAcceleration.y }, true);
@@ -122,6 +122,9 @@ namespace DEngine::impl
 		return static_cast<Gfx::Context&&>(rendererDataOpt.Value());
 	}
 
+	void CopyTransformToPhysicsWorld(
+		Scene& scene);
+
 	void RunPhysicsStep(
 		Scene& scene);
 	
@@ -136,6 +139,10 @@ namespace DEngine::impl
 int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
+
+	Math::Vec3 u = { -5, -2, -5 };
+	Math::Vec3 v = { -2, 2, 3 };
+	auto cross = Math::Vec3::Cross(u, v);
 
 	Std::NameThisThread("MainThread");
 
@@ -174,91 +181,11 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		Gfx::TextureID textureId{ 0 };
 		myScene.AddComponent(a, textureId);
 
-		b2BodyDef bodyDef{};
-		bodyDef.type = b2BodyType::b2_dynamicBody;
-		bodyDef.fixedRotation = true;
-		b2Body* physicsBody = myScene.physicsWorld->CreateBody(&bodyDef);
-		DEngine::Box2DBody body{};
-		body.ptr = physicsBody;
-		myScene.AddComponent(a, body);
-		b2MassData massData{};
-		massData.mass = 1.f;
-		physicsBody->SetMassData(&massData);
-		b2PolygonShape boxShape{};
-		boxShape.SetAsBox(0.5f, 0.5f);
-		f32 density = 1.;
-		physicsBody->CreateFixture(&boxShape, density);
+		Move move{};
+		myScene.AddComponent(a, move);
 	}
 
-	{
-		Entity a = myScene.NewEntity();
 
-		Transform transform{};
-		transform.position.x = 2.f;
-		transform.position.y = 0.f;
-		//transform.scale = { 1.f, 1.f };
-		myScene.AddComponent(a, transform);
-
-		Gfx::TextureID textureId{ 2 };
-		myScene.AddComponent(a, textureId);
-	}
-
-	{
-		Entity a = myScene.NewEntity();
-
-		Transform transform{};
-		transform.position.x = 0.f;
-		transform.position.y = -5.f;
-		//transform.scale = { 25.f, 1.f };
-		myScene.AddComponent(a, transform);
-
-		Gfx::TextureID textureId{ 0 };
-		myScene.AddComponent(a, textureId);
-
-		b2BodyDef bodyDef{};
-		bodyDef.type = b2BodyType::b2_staticBody;
-		b2Body* physicsBody = myScene.physicsWorld->CreateBody(&bodyDef);
-		DEngine::Box2DBody body{};
-		body.ptr = physicsBody;
-		myScene.AddComponent(a, body);
-		b2MassData massData{};
-		massData.mass = 1.f;
-		physicsBody->SetMassData(&massData);
-		b2PolygonShape boxShape{};
-		boxShape.SetAsBox(12.5f, 0.5f);
-		f32 density = 1.;
-		physicsBody->CreateFixture(&boxShape, density);
-	}
-
-	{
-		Entity a = myScene.NewEntity();
-
-		Transform transform{};
-		transform.position.x = -2.f;
-		transform.position.y = 0.f;
-		//transform.scale = { 1.f, 1.f };
-		myScene.AddComponent(a, transform);
-
-		Gfx::TextureID textureId{ 0 };
-		myScene.AddComponent(a, textureId);
-
-		b2BodyDef bodyDef{};
-		bodyDef.type = b2BodyType::b2_dynamicBody;
-		b2Body* physicsBody = myScene.physicsWorld->CreateBody(&bodyDef);
-		DEngine::Box2DBody body{};
-		body.ptr = physicsBody;
-		myScene.AddComponent(a, body);
-		b2MassData massData{};
-		massData.mass = 1.f;
-		physicsBody->SetMassData(&massData);
-		b2PolygonShape boxShape{};
-		boxShape.SetAsBox(0.5f, 0.5f);
-		f32 density = 1.f;
-		physicsBody->CreateFixture(&boxShape, density);
-	}
-
-	Move move{};
-	myScene.AddComponent( Entity(), move);
 
 	Editor::Context editorCtx = Editor::Context::Create(
 		mainWindow,
@@ -273,6 +200,9 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 			break;
 
 		editorCtx.ProcessEvents();
+
+		// Editor can move stuff around, so we need to update the physics world.
+		impl::CopyTransformToPhysicsWorld(myScene);
 
 		if (myScene.play)
 		{
@@ -293,11 +223,10 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	return 0;
 }
 
-void DEngine::impl::RunPhysicsStep(
-	Scene& scene)
+void DEngine::impl::CopyTransformToPhysicsWorld(Scene& scene)
 {
 	// First copy our positions into every physics body
-	for (auto const& physicsBodyPair : scene.GetComponentVector<Box2DBody>())
+	for (auto const& physicsBodyPair : scene.GetComponentVector<Box2D_Component>())
 	{
 		Entity a = physicsBodyPair.a;
 
@@ -306,9 +235,15 @@ void DEngine::impl::RunPhysicsStep(
 		Transform const& transform = *transformPtr;
 		physicsBodyPair.b.ptr->SetTransform({ transform.position.x, transform.position.y }, transform.rotation);
 	}
+}
+
+void DEngine::impl::RunPhysicsStep(
+	Scene& scene)
+{
+	CopyTransformToPhysicsWorld(scene);
 	scene.physicsWorld->Step(Time::Delta(), 8, 8);
 	// Then copy the stuff back
-	for (auto const& physicsBodyPair : scene.GetComponentVector<Box2DBody>())
+	for (auto const& physicsBodyPair : scene.GetComponentVector<Box2D_Component>())
 	{
 		Entity a = physicsBodyPair.a;
 		Transform* transformPtr = scene.GetComponent<Transform>(a);

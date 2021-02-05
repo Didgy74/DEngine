@@ -9,7 +9,7 @@ namespace DEngine::Std::Trait::impl
 	template<unsigned int index, typename T, typename... Us>
 	struct At_Impl { using Type = typename At_Impl<index - 1, Us...>::Type; };
 	// This is just a wrapper to add the static_assert of the index against the parameter pack length.
-	template<uSize index, typename... Ts>
+	template<unsigned int index, typename... Ts>
 	struct At
 	{
 		static_assert(index < sizeof...(Ts), "Tried to index further than the parameter pack.");
@@ -116,6 +116,9 @@ namespace DEngine::Std::Trait
 
 	template<typename T>
 	constexpr bool isConst = impl::IsConst<T>::value;
+
+	template<typename T>
+	constexpr bool isFloatingPoint = impl::IsSame<T, float>::value || impl::IsSame<T, double>::value;
 
 	template<typename T>
 	constexpr bool isRef = impl::IsRef<T>::value;

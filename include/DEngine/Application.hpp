@@ -217,7 +217,8 @@ enum class DEngine::Application::SoftInputFilter : DEngine::u8
 {
 	Integer,
 	UnsignedInteger,
-	Float
+	Float,
+	UnsignedFloat
 };
 
 class DEngine::Application::FileInputStream

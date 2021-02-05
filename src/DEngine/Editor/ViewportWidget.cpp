@@ -7,6 +7,239 @@
 using namespace DEngine;
 using namespace DEngine::Editor;
 
+Math::Vec3 Gizmo::DeprojectScreenspacePoint(
+	Math::Vec2 screenSpacePosNormalized,
+	Math::Mat4 projectionMatrix) noexcept
+{
+	Math::Vec4 vector = screenSpacePosNormalized.AsVec4(1.f, 1.f);
+	vector = projectionMatrix.GetInverse().Value() * vector;
+	for (auto& item : vector)
+		item /= vector.w;
+	return Math::Vec3(vector);
+}
+
+f32 Gizmo::ComputeScale(
+	Math::Mat4 const& worldTransform,
+	u32 targetSizePx,
+	Math::Mat4 const& projection,
+	Gui::Extent viewportSize) noexcept
+{
+	f32 const pixelSize = 1.f / viewportSize.height;
+	Math::Vec4 zVec = { worldTransform.At(3, 0), worldTransform.At(3, 1), worldTransform.At(3, 2), worldTransform.At(3, 3) };
+	return targetSizePx * pixelSize * (projection * zVec).w;
+}
+
+Std::Opt<f32> Gizmo::IntersectRayPlane(
+	Test_Ray ray,
+	Math::Vec3 planeNormal,
+	Math::Vec3 pointOnPlane) noexcept
+{
+	DENGINE_DETAIL_ASSERT(Math::Abs(ray.direction.Magnitude() - 1.f) <= 0.00001f);
+	DENGINE_DETAIL_ASSERT(Math::Abs(planeNormal.Magnitude() - 1.f) <= 0.00001f);
+
+	f32 d = Math::Vec3::Dot(planeNormal, pointOnPlane);
+
+	// Compute the t value for the directed line ab intersecting the plane
+	f32 t = (d - Math::Vec3::Dot(planeNormal, ray.origin)) / Math::Vec3::Dot(planeNormal, ray.direction);
+	// If t is above 0, the intersection is in front of the ray, not behind. Calculate the exact point
+	if (t >= 0.0f)
+		return Std::Opt<f32>{ t };
+	else
+		return Std::nullOpt;
+}
+
+Std::Opt<f32> Gizmo::IntersectRayCylinder(
+	Test_Ray ray, 
+	Math::Vec3 cylinderVertA, 
+	Math::Vec3 cylinderVertB, 
+	f32 cylinderRadius) noexcept
+{
+	// Reference implementation can be found in Real-Time Collision Detection p. 195
+
+	DENGINE_DETAIL_ASSERT(Math::Abs(ray.direction.Magnitude() - 1.f) <= 0.0001f);
+
+	// Also referred to as "d"
+	Math::Vec3 const cylinderAxis = cylinderVertB - cylinderVertA;
+	// Vector from cylinder base to ray start.
+	Math::Vec3 const m = ray.origin - cylinderVertA;
+
+	Std::Opt<f32> returnVal{};
+
+	f32 const md = Math::Vec3::Dot(m, cylinderAxis);
+	f32 const nd = Math::Vec3::Dot(ray.direction, cylinderAxis);
+	f32 const dd = cylinderAxis.MagnitudeSqrd();
+
+	f32 const nn = ray.direction.MagnitudeSqrd();
+	f32 const mn = Math::Vec3::Dot(m, ray.direction);
+	f32 const a = dd * nn - Math::Sqrd(nd);
+	f32 const k = m.MagnitudeSqrd() - Math::Sqrd(cylinderRadius);
+	f32 const c = dd * k - Math::Sqrd(md);
+
+	if (c < 0.f)
+	{
+		// The ray origin is inside the infinite cylinder.
+		// Check if it's also within the endcaps?
+		DENGINE_DETAIL_UNREACHABLE();
+	}
+
+	// Check if ray runs parallel to cylinder axis.
+	if (Math::Abs(a) < 0.0001f)
+	{
+		DENGINE_DETAIL_UNREACHABLE();
+		// Segment runs parallel to cylinder axis
+		if (c > 0.0f)
+			return Std::nullOpt; // a and thus the segment lie outside cylinder
+		// Now known that segment intersects cylinder; figure out how it intersects
+		f32 dist = 0.f;
+		if (md < 0.0f)
+			dist = -mn / nn; // Intersect segment against p endcap
+		else if (md > dd)
+			dist = (nd - mn) / nn; // Intersect segment against q endcap
+		else
+			dist = 0.0f; // a lies inside cylinder
+
+		return Std::Opt<f32>{ dist };
+	}
+
+	// Intersect with the infinite cylinder.
+	{
+		f32 const b = dd * mn - nd * md;
+		f32 const discr = Math::Sqrd(b) - a * c;
+		if (discr >= 0.0f)
+		{
+			// Discriminant is positive, we have an intersection.
+			f32 t = (-b - Math::Sqrt(discr)) / a;
+			// If t >= 0, it means the intersection is in front of the ray, not behind.
+			if (t >= 0.f)
+			{
+				Std::Opt<f32> cylinderHit{};
+
+				if (md + t * nd < 0.0f)
+				{
+					// Intersection outside cylinder on p side
+					if (nd > 0.f)
+					{
+						// Segment is not pointing away from endcap
+						t = -md / nd;
+						// Keep intersection if Dot(S(t) - p, S(t) - p) <= r^2
+						if (k + 2 * t * (mn + t * nn) <= 0.f)
+							cylinderHit = Std::Opt<f32>{ t };
+					}
+				}
+				else if (md + t * nd > dd) {
+					// Intersection outside cylinder on q side
+					if (nd < 0.f)
+					{
+						// Segment is not pointing away from endcap
+						t = (dd - md) / nd;
+						// Keep intersection if Dot(S(t) - q, S(t) - q) <= r^2
+						if (k + dd - 2 * md + t * (2 * (mn - nd) + t * nn) <= 0.f)
+							cylinderHit = Std::Opt<f32>{ t };
+					}
+				}
+				else
+				{
+					// Segment intersects cylinder between the endcaps; t is correct
+					cylinderHit = Std::Opt<f32>{ t };
+				}
+
+				if (cylinderHit.HasValue())
+				{
+					if (!returnVal.HasValue() || (returnVal.HasValue() && cylinderHit.Value() < returnVal.Value()))
+						returnVal = cylinderHit;
+				}
+			}
+		}
+	}
+
+	// Intersect endcaps
+	Math::Vec3 const cylinderCapVertices[2] = { cylinderVertA, cylinderVertB };
+	for (auto const& endcap : cylinderCapVertices)
+	{
+		Std::Opt<f32> const hit = IntersectRayPlane(
+			ray,
+			cylinderAxis.Normalized(),
+			endcap);
+		if (hit.HasValue())
+		{
+			f32 const distance = hit.Value();
+			Math::Vec3 const hitPoint = ray.origin + ray.direction * distance;
+			if ((hitPoint - endcap).MagnitudeSqrd() <= Math::Sqrd(cylinderRadius))
+			{
+				// Hit point is on endcap
+				if (!returnVal.HasValue() || (returnVal.HasValue() && distance < returnVal.Value()))
+					returnVal = Std::Opt{ distance };
+			}
+		}
+	}
+
+	return returnVal;
+}
+
+Std::Opt<f32> Gizmo::IntersectArrow(
+	Test_Ray ray, 
+	Arrow arrow, 
+	Math::Mat4 const& worldTransform) noexcept
+{
+	Std::Opt<f32> result;
+	Math::Vec3 const vertex1 = Math::Vec3(worldTransform * Math::Vec4{ 0, 0, 0, 1 });
+	Math::Vec3 const vertex2 = Math::Vec3(worldTransform * Math::Vec4{ 0, 0, arrow.shaftLength, 1 });
+	f32 const radius = 0.5f * arrow.shaftDiameter;
+
+	result = IntersectRayCylinder(
+		ray,
+		vertex1,
+		vertex2,
+		radius);
+
+	return result;
+}
+
+Math::Vec3 Gizmo::TranslateAlongPlane(
+	Test_Ray ray, 
+	Math::Vec3 planeNormal, 
+	Math::Vec3 initialPosition, 
+	Test_Ray initialRay) noexcept
+{
+	DENGINE_DETAIL_ASSERT(Math::Abs(ray.direction.Magnitude() - 1.f) <= 0.00001f);
+	DENGINE_DETAIL_ASSERT(Math::Abs(planeNormal.Magnitude() - 1.f) <= 0.00001f);
+	DENGINE_DETAIL_ASSERT(Math::Abs(initialRay.direction.Magnitude() - 1.f) <= 0.00001f);
+
+	// Calculate cursor offset that we'll use to prevent the center of the object from snapping to the cursor
+	Math::Vec3 offset{};
+	Std::Opt<f32> hitA = Gizmo::IntersectRayPlane(initialRay, planeNormal, initialPosition);
+	if (hitA.HasValue())
+		offset = initialPosition - (initialRay.origin + initialRay.direction * hitA.Value());
+
+	Std::Opt<f32> hitB = Gizmo::IntersectRayPlane(ray, planeNormal, initialPosition);
+	if (hitB.HasValue())
+		return ray.origin + ray.direction * hitB.Value() + offset;
+	else
+		return initialPosition;
+}
+
+InternalViewportWidget::InternalViewportWidget(
+	EditorImpl& implData, 
+	Gfx::Context& gfxCtxIn) 
+	: gfxCtx(&gfxCtxIn), implData(&implData)
+{
+	implData.viewportWidgets.push_back(this);
+
+	auto newViewportRef = gfxCtx->NewViewport();
+	viewportId = newViewportRef.ViewportID();
+}
+
+InternalViewportWidget::~InternalViewportWidget()
+{
+	gfxCtx->DeleteViewport(viewportId);
+	auto ptrIt = Std::FindIf(
+		implData->viewportWidgets.begin(),
+		implData->viewportWidgets.end(),
+		[this](decltype(implData->viewportWidgets)::value_type const& val) -> bool { return val == this; });
+	DENGINE_DETAIL_ASSERT(ptrIt != implData->viewportWidgets.end());
+	implData->viewportWidgets.erase(ptrIt);
+}
+
 Math::Vec2 InternalViewportWidget::GetNormalizedViewportPosition(
 	Math::Vec2Int cursorPos,
 	Gui::Rect viewportRect) noexcept
@@ -353,12 +586,12 @@ void InternalViewportWidget::CursorClick(
 	UpdateJoystickOrigin(widgetRect);
 	bool cursorIsInside = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
 
-	if (isCurrentlyHoldingGizmo && event.button == Gui::CursorButton::Left && !event.clicked)
+	if (isCurrentlyHoldingGizmo && event.button == Gui::CursorButton::Primary && !event.clicked)
 	{
 		isCurrentlyHoldingGizmo = false;
 	}
 
-	if (!isCurrentlyHoldingGizmo && event.clicked && event.button == Gui::CursorButton::Left && cursorIsInside && implData->selectedEntity.HasValue())
+	if (!isCurrentlyHoldingGizmo && event.clicked && event.button == Gui::CursorButton::Primary && cursorIsInside && implData->selectedEntity.HasValue())
 	{
 		Entity entity = implData->selectedEntity.Value();
 		// First check if we have a transform
@@ -384,19 +617,19 @@ void InternalViewportWidget::CursorClick(
 		}
 	}
 
-	if (event.button == Gui::CursorButton::Right && !event.clicked && isCurrentlyClicked)
+	if (event.button == Gui::CursorButton::Secondary && !event.clicked && isCurrentlyClicked)
 	{
 		isCurrentlyClicked = false;
 		App::LockCursor(false);
 	}
 
-	if (event.button == Gui::CursorButton::Right && event.clicked && !isCurrentlyClicked && cursorIsInside)
+	if (event.button == Gui::CursorButton::Secondary && event.clicked && !isCurrentlyClicked && cursorIsInside)
 	{
 		isCurrentlyClicked = true;
 		App::LockCursor(true);
 	}
 
-	if (event.button == Gui::CursorButton::Left && event.clicked)
+	if (event.button == Gui::CursorButton::Primary && event.clicked)
 	{
 		for (auto& joystick : joysticks)
 		{
@@ -410,7 +643,7 @@ void InternalViewportWidget::CursorClick(
 		}
 	}
 
-	if (event.button == Gui::CursorButton::Left && !event.clicked)
+	if (event.button == Gui::CursorButton::Primary && !event.clicked)
 	{
 		for (auto& joystick : joysticks)
 		{
@@ -448,7 +681,6 @@ void InternalViewportWidget::CursorMove(
 			}
 		}
 	}
-
 
 	// Handle regular kb+mouse style camera movement
 	if (isCurrentlyClicked)
@@ -591,6 +823,15 @@ void InternalViewportWidget::TouchEvent(
 	}
 }
 
+Gui::SizeHint InternalViewportWidget::GetSizeHint(Gui::Context const& ctx) const
+{
+	Gui::SizeHint returnVal{};
+	returnVal.preferred = { 450, 450 };
+	returnVal.expandX = true;
+	returnVal.expandY = true;
+	return returnVal;
+}
+
 void InternalViewportWidget::Render(
 	Gui::Context const& ctx,
 	Gui::Extent framebufferExtent,
@@ -626,8 +867,6 @@ void InternalViewportWidget::Render(
 				currentExtent = newExtent;
 		}
 	}
-
-
 
 	// First draw the viewport.
 	Gfx::GuiDrawCmd drawCmd{};
@@ -682,7 +921,6 @@ void InternalViewportWidget::Render(
 			drawInfo.drawCmds.push_back(cmd);
 		}
 
-
 		Gfx::GuiDrawCmd cmd{};
 		cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
 		cmd.filledMesh.color = { 1.f, 1.f, 1.f, 0.75f };
@@ -693,4 +931,16 @@ void InternalViewportWidget::Render(
 		cmd.rectExtent.y = (f32)joystickPixelRadius / framebufferExtent.height;
 		drawInfo.drawCmds.push_back(cmd);
 	}
+}
+
+ViewportWidget::ViewportWidget(EditorImpl& implData, Gfx::Context& ctx) :
+	Gui::StackLayout(Gui::StackLayout::Direction::Vertical)
+{
+	// Generate top navigation bar
+	Gui::Button* settingsBtn = new Gui::Button;
+	settingsBtn->text = "Settings";
+	AddWidget(Std::Box<Gui::Widget>{ settingsBtn });
+
+	InternalViewportWidget* viewport = new InternalViewportWidget(implData, ctx);
+	AddWidget(Std::Box<Gui::Widget>{ viewport });
 }

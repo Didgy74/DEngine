@@ -1,3 +1,6 @@
+// BIG NOTE:
+// This class doesn't work because NDK has no function for grabbing AInputQueue.
+
 package didgy.dengine;
 
 import android.app.Activity;

@@ -1,12 +1,3 @@
-// TODO: Implement filtering, like only enable . - 1-9 for example. DONE.
-// TODO: Implement filtering for -, it should only be possible to be entered if it's the first character in the string. DONE.
-// TODO: Implement the filtering mentioned above for desktop.
-// TODO: Detect when keyboard appears/disappears, possibly through onGlobalLayoutChange. CANCELLED.
-// TODO: Implement the "Submit" button functionality stuff. DONE.
-// TODO: Fix being only able to open keyboard once then never again. DONE.
-// TODO: Add support for integer type input, needs differing text filters. DONE.
-// TODO: Fix issue where switching between input fields can cause keyboard to close depending on execution order in code.
-
 package didgy.dengine.editor;
 
 import android.app.NativeActivity;
@@ -19,6 +10,7 @@ import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.util.Log;
+import android.view.InputQueue;
 import android.view.KeyEvent;
 import android.view.SurfaceHolder;
 import android.view.View;
@@ -35,6 +27,7 @@ public class DEngineActivity extends NativeActivity  {
     static public final int SOFT_INPUT_FILTER_INTEGER = 0;
     static public final int SOFT_INPUT_FILTER_UNSIGNED_INTEGER = 1;
     static public final int SOFT_INPUT_FILTER_FLOAT = 2;
+    static public final int SOFT_INPUT_FILTER_UNSIGNED_FLOAT = 3;
 
     static {
         System.loadLibrary("dengine");
@@ -56,6 +49,7 @@ public class DEngineActivity extends NativeActivity  {
 
     @Override
     protected void onCreate(Bundle savedState) {
+
         super.onCreate(savedState);
 
         mIMM = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -114,9 +108,9 @@ public class DEngineActivity extends NativeActivity  {
 
     public void openSoftInput(String text, final int softInputFilter) {
         class OpenSoftInputRunnable implements Runnable {
-            DEngineActivity activity;
-            int softInputFilter;
-            String innerText;
+            final DEngineActivity activity;
+            final int softInputFilter;
+            final String innerText;
             OpenSoftInputRunnable(DEngineActivity inActivity, String text, int filter) {
                 activity = inActivity;
                 this.softInputFilter = filter;
@@ -155,7 +149,7 @@ public class DEngineActivity extends NativeActivity  {
         return getResources().getConfiguration().orientation;
     }
 
-    static boolean contains(CharSequence seq, char character) {
+    static boolean charSequenceContains(CharSequence seq, char character) {
         int length = seq.length();
         for (int i = 0; i < length; i++) {
             if (seq.charAt(i) == character) {
@@ -184,6 +178,9 @@ public class DEngineActivity extends NativeActivity  {
                     break;
                 case SOFT_INPUT_FILTER_FLOAT:
                     inputFilters = new InputFilter[]{ new FloatTextFilter(), new DotFilter(), new MinusFilter() };
+                    break;
+                case SOFT_INPUT_FILTER_UNSIGNED_FLOAT:
+                    inputFilters = new InputFilter[]{ new UnsignedFloatTextFilter(), new DotFilter() };
                     break;
             }
 
@@ -285,6 +282,33 @@ public class DEngineActivity extends NativeActivity  {
             }
         }
 
+        static class UnsignedFloatTextFilter implements InputFilter {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                boolean sourceHasInvalidChar = false;
+                int sourceLength = end - start;
+                for (int i = start; i < end; i++) {
+                    char c = source.charAt(i);
+                    if (!('0' <= c && c <= '9') && c != '.') {
+                        sourceHasInvalidChar = true;
+                        break;
+                    }
+                }
+                if (sourceHasInvalidChar) {
+                    StringBuilder returnVal = new StringBuilder(sourceLength);
+                    for (int i = start; i < end; i++) {
+                        char c = source.charAt(i);
+                        if (('0' <= c && c <= '9') ||
+                                c == '.')
+                            returnVal.append(c);
+                    }
+                    return returnVal;
+                }
+                else
+                    return null;
+            }
+        }
+
         static class FloatTextFilter implements InputFilter {
             @Override
             public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
@@ -292,9 +316,7 @@ public class DEngineActivity extends NativeActivity  {
                 int sourceLength = end - start;
                 for (int i = start; i < end; i++) {
                     char c = source.charAt(i);
-                    if (!(48 <= c && c <= 57) &&
-                        c != '.' &&
-                        c != '-') {
+                    if (!(48 <= c && c <= 57) && c != '.' &&  c != '-') {
                         sourceHasInvalidChar = true;
                         break;
                     }
@@ -315,11 +337,17 @@ public class DEngineActivity extends NativeActivity  {
             }
         }
 
+        // Returns null if no change was made
+        static CharSequence inputFilter_oneDot(CharSequence source, Spanned dest) {
+            return null;
+        }
+
+        // Makes sure to remove dot if it doesn't follow decimal rules.
         static class DotFilter implements InputFilter {
             @Override
             public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
-                if (contains(source.subSequence(start, end), '.')) {
-                    if (contains(dest, '.')) {
+                if (charSequenceContains(source.subSequence(start, end), '.')) {
+                    if (charSequenceContains(dest, '.')) {
                         // We need to build a sequence with no dot.
                         StringBuilder returnVal = new StringBuilder(end - start);
                         for (int i = start; i < end; i++) {
@@ -334,10 +362,12 @@ public class DEngineActivity extends NativeActivity  {
             }
         }
 
+
+
         static class MinusFilter implements InputFilter {
             @Override
             public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
-                if (contains(source.subSequence(start, end), '-')) {
+                if (charSequenceContains(source.subSequence(start, end), '-')) {
                     if (dest.length() != 0) {
                         return "";
                     }
@@ -441,6 +471,9 @@ public class DEngineActivity extends NativeActivity  {
                     break;
                 case SOFT_INPUT_FILTER_FLOAT:
                     outAttrs.inputType = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED;
+                    break;
+                case SOFT_INPUT_FILTER_UNSIGNED_FLOAT:
+                    outAttrs.inputType = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL;
                     break;
             }
 

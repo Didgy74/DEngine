@@ -8,13 +8,10 @@
 using namespace DEngine;
 using namespace DEngine::Gui;
 
-Gui::LineEdit::~LineEdit()
+LineEdit::~LineEdit()
 {
-	if (this->inputConnectionCtx)
-	{
-		this->inputConnectionCtx->ClearInputConnection(*this);
-		this->inputConnectionCtx = nullptr;
-	}
+	if (CurrentlyBeingEdited())
+		ClearInputConnection();
 }
 
 bool LineEdit::CurrentlyBeingEdited() const
@@ -22,7 +19,7 @@ bool LineEdit::CurrentlyBeingEdited() const
 	return this->inputConnectionCtx;
 }
 
-SizeHint DEngine::Gui::LineEdit::GetSizeHint(Context const& ctx) const
+SizeHint LineEdit::GetSizeHint(Context const& ctx) const
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	return impl::TextManager::GetSizeHint(
@@ -39,7 +36,7 @@ void LineEdit::Render(
 {
 	Gfx::GuiDrawCmd cmd{};
 	cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-	cmd.filledMesh.color = { 0.0f, 0.0f, 0.0f, 0.3f };
+	cmd.filledMesh.color = backgroundColor;
 	cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
 	cmd.rectPosition.x = (f32)widgetRect.position.x / framebufferExtent.width;
 	cmd.rectPosition.y = (f32)widgetRect.position.y / framebufferExtent.height;
@@ -61,14 +58,13 @@ void LineEdit::CharEnterEvent(Context& ctx)
 {
 	if (inputConnectionCtx)
 	{
-		inputConnectionCtx = nullptr;
-		ctx.ClearInputConnection(*this);
 		if (text.empty())
 		{
 			text = "0";
 			if (textChangedPfn)
 				textChangedPfn(*this);
 		}
+		ClearInputConnection();
 	}
 }
 
@@ -147,12 +143,11 @@ void LineEdit::CharRemoveEvent(Context& ctx)
 	}
 }
 
-void LineEdit::InputConnectionLost(Context& ctx)
+void LineEdit::InputConnectionLost()
 {
 	if (this->inputConnectionCtx)
 	{
-		this->inputConnectionCtx->ClearInputConnection(*this);
-		this->inputConnectionCtx = nullptr;
+		ClearInputConnection();
 	}
 }
 
@@ -164,17 +159,17 @@ void LineEdit::CursorClick(
 	Math::Vec2Int cursorPos,
 	CursorClickEvent event)
 {
-	if (event.button == CursorButton::Left)
+	if (event.button == CursorButton::Primary)
 	{
 		bool cursorIsInside = widgetRect.PointIsInside(cursorPos);
 
-		if (cursorIsInside && event.clicked && inputConnectionCtx == nullptr)
+		if (cursorIsInside && event.clicked && !inputConnectionCtx)
 		{
 			SoftInputFilter filter{};
 			if (this->type == Type::Float)
-				filter = SoftInputFilter::Float;
+				filter = SoftInputFilter::SignedFloat;
 			else if (this->type == Type::Integer)
-				filter = SoftInputFilter::Integer;
+				filter = SoftInputFilter::SignedInteger;
 			else if (this->type == Type::UnsignedInteger)
 				filter = SoftInputFilter::UnsignedInteger;
 			ctx.TakeInputConnection(
@@ -185,15 +180,15 @@ void LineEdit::CursorClick(
 		}
 		else if (!cursorIsInside && event.clicked && inputConnectionCtx)
 		{
-			DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx == &ctx);
-			this->inputConnectionCtx = nullptr;
-			ctx.ClearInputConnection(*this);
 			if (text.empty())
 			{
 				text = "0";
 				if (textChangedPfn)
 					textChangedPfn(*this);
 			}
+
+			DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx == &ctx);
+			ClearInputConnection();
 		}
 	}
 }
@@ -211,9 +206,9 @@ void LineEdit::TouchEvent(
 	{
 		SoftInputFilter filter{};
 		if (this->type == Type::Float)
-			filter = SoftInputFilter::Float;
+			filter = SoftInputFilter::SignedFloat;
 		else if (this->type == Type::Integer)
-			filter = SoftInputFilter::Integer;
+			filter = SoftInputFilter::SignedInteger;
 		else if (this->type == Type::UnsignedInteger)
 			filter = SoftInputFilter::UnsignedInteger;
 		ctx.TakeInputConnection(
@@ -231,7 +226,15 @@ void LineEdit::TouchEvent(
 			if (textChangedPfn)
 				textChangedPfn(*this);
 		}
-		this->inputConnectionCtx = nullptr;
-		ctx.ClearInputConnection(*this);
+		
+		DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx == &ctx);
+		ClearInputConnection();
 	}
+}
+
+void LineEdit::ClearInputConnection()
+{
+	DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx);
+	this->inputConnectionCtx->ClearInputConnection(*this);
+	this->inputConnectionCtx = nullptr;
 }

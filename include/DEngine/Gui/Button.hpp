@@ -1,7 +1,6 @@
 #pragma once
 
 #include <DEngine/Gui/Widget.hpp>
-#include <DEngine/Gui/Text.hpp>
 
 #include <functional>
 #include <string>
@@ -44,7 +43,7 @@ namespace DEngine::Gui
 		Math::Vec4 pressedColor{ 1.f, 1.f, 1.f, 1.f };
 		Math::Vec4 pressedTextColor = Math::Vec4::Zero();
 
-		using ActivateCallback = void(Button& btn, Context*);
+		using ActivateCallback = void(Button& btn);
 		std::function<ActivateCallback> activatePfn = nullptr;
 
 		void SetToggled(bool toggled);

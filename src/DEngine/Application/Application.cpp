@@ -43,8 +43,7 @@ Application::Extent Application::GetWindowSize(WindowID window) noexcept
 	auto windowNodeIt = Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
-		[window](detail::AppData::WindowNode const& val) -> bool {
-			return window == val.id; });
+		[window](auto const& val) -> bool { return window == val.id; });
 	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	auto const& windowNode = *windowNodeIt;
 	return windowNode.windowData.size;
@@ -56,8 +55,7 @@ Application::Extent Application::GetWindowVisibleSize(WindowID window) noexcept
 	auto windowNodeIt = Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
-		[window](detail::AppData::WindowNode const& val) -> bool {
-			return window == val.id; });
+		[window](auto const& val) -> bool { return window == val.id; });
 	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	auto const& windowNode = *windowNodeIt;
 	return windowNode.windowData.visibleSize;
@@ -156,11 +154,15 @@ void Application::detail::UpdateButton(
 	for (EventInterface* eventCallback : appData.eventCallbacks)
 		eventCallback->ButtonEvent(button, pressed);
 
-	
 	if (appData.buttonEvents[(int)button] == KeyEventType::Pressed && (button == Button::Backspace || button == Button::Delete))
 	{
 		for (EventInterface* eventCallback : appData.eventCallbacks)
 			eventCallback->CharRemoveEvent();
+	}
+	else if (appData.buttonEvents[(int)button] == KeyEventType::Pressed && button == Button::Enter)
+	{
+		for (EventInterface* eventCallback : appData.eventCallbacks)
+			eventCallback->CharEnterEvent();
 	}
 }
 

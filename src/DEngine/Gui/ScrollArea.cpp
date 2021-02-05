@@ -19,7 +19,7 @@ namespace DEngine::Gui::impl
     }
     else
     {
-      childRect.extent.width = childSizeHint.preferred.width;
+      childRect.extent.width = widgetRect.extent.width - scrollBarThickness;
     }
     if (childSizeHint.expandY)
     {
@@ -28,7 +28,7 @@ namespace DEngine::Gui::impl
     else
     {
       childRect.position.y -= scrollBarPos;
-      childRect.extent.height = childSizeHint.preferred.height;
+      childRect.extent.height = Math::Max(childSizeHint.preferred.height, widgetRect.extent.height);
     }
     return childRect;
   }
@@ -80,6 +80,9 @@ void ScrollArea::Render(
   Rect visibleRect,
   DrawInfo& drawInfo) const
 {
+  if (Rect::Intersection(widgetRect, visibleRect).IsNothing())
+    return;
+
   SizeHint childSizeHint = widget->GetSizeHint(ctx);
 
   Rect childRect = impl::GetChildRect(
@@ -296,9 +299,9 @@ void ScrollArea::TouchEvent(
   }
 }
 
-void DEngine::Gui::ScrollArea::InputConnectionLost(Context& ctx)
+void ScrollArea::InputConnectionLost()
 {
-  widget->InputConnectionLost(ctx);
+  widget->InputConnectionLost();
 }
 
 void ScrollArea::CharEnterEvent(Context& ctx)

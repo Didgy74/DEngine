@@ -24,8 +24,9 @@ namespace DEngine::Math::LinearTransform3D
 	[[nodiscard]] constexpr Matrix<4, 3, f32> Translate_Reduced(f32 x, f32 y, f32 z);
 	[[nodiscard]] constexpr Matrix<4, 3, f32> Translate_Reduced(Vector<3, f32> const& input);
 
-	constexpr void SetTranslation(Matrix<4, 4, f32>& matrix, Vector<3, f32> const& input);
-	constexpr void SetTranslation(Matrix<4, 3, f32>& matrix, Vector<3, f32> const& input);
+	constexpr void SetTranslation(Matrix<4, 4, f32>& matrix, Vector<3, f32> input);
+	constexpr void SetTranslation(Matrix<4, 4, f32>& matrix, f32 x, f32 y, f32 z);
+	constexpr void SetTranslation(Matrix<4, 3, f32>& matrix, Vector<3, f32> input);
 	constexpr Vector<3, f32> GetTranslation(Matrix<4, 4, f32> const& input);
 	constexpr Vector<3, f32> GetTranslation(Matrix<4, 3, f32> const& input);
 
@@ -160,14 +161,21 @@ constexpr DEngine::Math::Matrix<4, 3, DEngine::f32> DEngine::Math::LinearTransfo
 	} } };
 }
 
-constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 4, f32>& matrix, Vector<3, f32> const& input)
+constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 4, f32>& matrix, Vector<3, f32> input)
 {
 	matrix.At(3, 0) = input.x;
 	matrix.At(3, 1) = input.y;
 	matrix.At(3, 2) = input.z;
 }
 
-constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 3, f32>& matrix, Vector<3, f32> const& input)
+constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 4, f32>& matrix, f32 x, f32 y, f32 z)
+{
+	matrix.At(3, 0) = x;
+	matrix.At(3, 1) = y;
+	matrix.At(3, 2) = z;
+}
+
+constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 3, f32>& matrix, Vector<3, f32> input)
 { 
 	matrix.At(3, 0) = input.x;
 	matrix.At(3, 1) = input.y;

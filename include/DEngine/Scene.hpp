@@ -16,7 +16,7 @@
 
 namespace DEngine
 {
-	struct Box2DBody
+	struct Box2D_Component
 	{
 		b2Body* ptr = nullptr;
 	};
@@ -49,6 +49,7 @@ namespace DEngine
 		bool play = false;
 
 		// We need this to be a pointer to heap because the struct is so huge.
+		// And lots of the objects in it require a pointer to it.
 		Std::Box<b2World> physicsWorld{ new b2World{{ 0.f, -10.f }} };
 
 		Std::Span<Entity const> GetEntities() const { return { entities.data(), entities.size() }; }
@@ -64,7 +65,7 @@ namespace DEngine
 		template<>
 		ComponentVector<Move>& GetComponentVector<Move>() { return moves; }
 		template<>
-		ComponentVector<Box2DBody>& GetComponentVector<Box2DBody>() { return b2Bodies; }
+		ComponentVector<Box2D_Component>& GetComponentVector<Box2D_Component>() { return b2Bodies; }
 
 
 
@@ -158,7 +159,7 @@ namespace DEngine
 		std::vector<Std::Pair<Entity, Transform>> transforms;
 		std::vector<Std::Pair<Entity, Gfx::TextureID>> textureIDs;
 		std::vector<Std::Pair<Entity, Move>> moves;
-		std::vector<Std::Pair<Entity, Box2DBody>> b2Bodies;
+		std::vector<Std::Pair<Entity, Box2D_Component>> b2Bodies;
 		std::vector<Entity> entities;
 	};
 }

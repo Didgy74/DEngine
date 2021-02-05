@@ -476,6 +476,8 @@ Application::Button Application::detail::Backend_GLFW_KeyboardKeyToRawButton(i32
 		return Button::Backspace;
 	case GLFW_KEY_DELETE:
 		return Button::Delete;
+	case GLFW_KEY_ENTER:
+		return Button::Enter;
 
 	}
 

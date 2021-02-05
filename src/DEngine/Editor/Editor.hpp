@@ -3,7 +3,7 @@
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 
-#include "DEngine/Math/Vector.hpp"
+#include <DEngine/Math/Vector.hpp>
 
 #include <DEngine/Gfx/Gfx.hpp>
 #include <DEngine/Application.hpp>

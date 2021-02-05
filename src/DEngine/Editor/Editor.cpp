@@ -4,16 +4,9 @@
 #include "EditorImpl.hpp"
 #include "ComponentWidgets.hpp"
 
-#include <DEngine/Gui/Button.hpp>
 #include <DEngine/Gui/DockArea.hpp>
-#include <DEngine/Gui/Image.hpp>
-#include <DEngine/Gui/LineEdit.hpp>
 #include <DEngine/Gui/LineList.hpp>
-#include <DEngine/Gui/MenuBar.hpp>
 #include <DEngine/Gui/ScrollArea.hpp>
-#include <DEngine/Gui/StackLayout.hpp>
-#include <DEngine/Gui/Text.hpp>
-#include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/Application.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
@@ -29,7 +22,6 @@
 
 #include <vector>
 #include <string>
-#include <functional>
 
 namespace DEngine::Editor
 {
@@ -37,13 +29,13 @@ namespace DEngine::Editor
 	{
 	public:
 		Gui::LineList* entitiesList = nullptr;
-		EditorImpl* ctxImpl = nullptr;
+		EditorImpl* editorImpl = nullptr;
 
-		EntityIdList(EditorImpl* ctxImpl) :
-			ctxImpl(ctxImpl)
+		EntityIdList(EditorImpl* editorImpl) :
+			editorImpl(editorImpl)
 		{
-			DENGINE_DETAIL_ASSERT(!ctxImpl->entityIdList);
-			ctxImpl->entityIdList = this;
+			DENGINE_DETAIL_ASSERT(!editorImpl->entityIdList);
+			editorImpl->entityIdList = this;
 
 			this->direction = Direction::Vertical;
 
@@ -54,10 +46,9 @@ namespace DEngine::Editor
 			topElementLayout->AddWidget(Std::Box<Gui::Widget>{ newEntityButton });
 			newEntityButton->text = "New";
 			newEntityButton->activatePfn = [this](
-				Gui::Button& btn,
-				Gui::Context* guiCtx)
+				Gui::Button& btn)
 			{
-				Entity newId = this->ctxImpl->scene->NewEntity();
+				Entity newId = this->editorImpl->scene->NewEntity();
 				AddEntityToList(newId);
 			};
 
@@ -65,17 +56,16 @@ namespace DEngine::Editor
 			topElementLayout->AddWidget(Std::Box<Gui::Widget>{ entityDeleteButton });
 			entityDeleteButton->text = "Delete";
 			entityDeleteButton->activatePfn = [this](
-				Gui::Button& btn,
-				Gui::Context* guiCtx)
+				Gui::Button& btn)
 			{
-				if (!this->ctxImpl->selectedEntity.HasValue())
+				if (!this->editorImpl->selectedEntity.HasValue())
 					return;
 
-				Entity selectedEntity = this->ctxImpl->selectedEntity.Value();
+				Entity selectedEntity = this->editorImpl->selectedEntity.Value();
 
-				this->ctxImpl->scene->DeleteEntity(selectedEntity);
+				this->editorImpl->scene->DeleteEntity(selectedEntity);
 
-				this->ctxImpl->UnselectEntity();
+				this->editorImpl->UnselectEntity();
 
 				RemoveEntityFromList(selectedEntity);
 			};
@@ -84,56 +74,56 @@ namespace DEngine::Editor
 			this->AddWidget(Std::Box<Gui::Widget>{ entityListScrollArea });
 
 			entitiesList = new Gui::LineList();
-			entitiesList->SetCanSelect(true);
-			entitiesList->selectedLineChangedCallback = [this](Gui::LineList& widget)
+			entityListScrollArea->widget = Std::Box<Gui::Widget>{ entitiesList };
+			entitiesList->canSelect = true;
+			entitiesList->selectedLineChangedCallback = [this](
+				Gui::LineList& widget)
 			{
-				Std::Opt<uSize> selectedLineOpt = widget.GetSelectedLine();
-				if (selectedLineOpt.HasValue())
+				if (widget.selectedLine.HasValue())
 				{
-					uSize selectedLine = selectedLineOpt.Value();
-					std::string_view lineText = widget.GetLine(selectedLine);
-					this->ctxImpl->SelectEntity((Entity)std::atoi(lineText.data()));
+					std::string_view lineText = widget.lines[widget.selectedLine.Value()];
+					this->editorImpl->SelectEntity((Entity)std::atoi(lineText.data()));
 				}
 			};
-			entityListScrollArea->widget = Std::Box<Gui::Widget>{ entitiesList};
 
-			for (Entity entityId : ctxImpl->scene->GetEntities())
+			auto entities = editorImpl->scene->GetEntities();
+			for (uSize i = 0; i < entities.Size(); i += 1)
 			{
+				Entity entityId = entities[i];
 				AddEntityToList(entityId);
+				if (editorImpl->selectedEntity.HasValue() && entityId == editorImpl->selectedEntity.Value())
+				{
+					entitiesList->selectedLine = i;
+				}
 			}
 		}
 
 		virtual ~EntityIdList()
 		{
-			DENGINE_DETAIL_ASSERT(ctxImpl->entityIdList == this);
-			ctxImpl->entityIdList = nullptr;
+			DENGINE_DETAIL_ASSERT(editorImpl->entityIdList == this);
+			editorImpl->entityIdList = nullptr;
 		}
 
 		void AddEntityToList(Entity id)
 		{
-			entitiesList->AddLine(std::to_string((u64)id));
+			entitiesList->lines.push_back(std::to_string((u64)id));
 		}
 
 		void RemoveEntityFromList(Entity id)
 		{
-			Std::Opt<uSize> selectedLineOpt = entitiesList->GetSelectedLine();
-			if (selectedLineOpt.HasValue())
+			if (entitiesList->selectedLine.HasValue())
 			{
-				uSize selectedLine = selectedLineOpt.Value();
-				entitiesList->RemoveLine(selectedLine);
+				entitiesList->RemoveLine(entitiesList->selectedLine.Value());
 			}
 		}
 
 		void SelectEntity(Std::Opt<Entity> previousId, Entity newId)
 		{
-			if (previousId.HasValue())
-			{
-				UnselectEntity(previousId.Value());
-			}
 		}
 
-		void UnselectEntity(Entity id)
+		void UnselectEntity()
 		{
+			entitiesList->selectedLine = Std::nullOpt;
 		}
 	};
 
@@ -144,8 +134,8 @@ namespace DEngine::Editor
 
 		MoveWidget* moveWidget = nullptr;
 		TransformWidget* transformWidget = nullptr;
-		TransformWidget2* transformWidget2 = nullptr;
 		SpriteRenderer2DWidget* spriteRendererWidget = nullptr;
+		Box2DWidget* box2DWidget = nullptr;
 
 		ComponentList(EditorImpl* ctxImpl) :
 			ctxImpl(ctxImpl)
@@ -154,6 +144,7 @@ namespace DEngine::Editor
 			ctxImpl->componentList = this;
 
 			direction = Direction::Vertical;
+			padding = 5;
 			spacing = 10;
 			this->expandNonDirection = true;
 
@@ -176,22 +167,20 @@ namespace DEngine::Editor
 			moveWidget = new MoveWidget(ctxImpl->scene, id);
 			this->AddWidget(Std::Box<Gui::Widget>{ moveWidget });
 
-			transformWidget = new TransformWidget(ctxImpl->scene, id);
+			transformWidget = new TransformWidget(*ctxImpl);
 			this->AddWidget(Std::Box<Gui::Widget>{ transformWidget });
 
-			transformWidget2 = new TransformWidget2(*ctxImpl);
-			this->AddWidget(Std::Box<Gui::Widget>{ transformWidget2 });
-
-			spriteRendererWidget = new SpriteRenderer2DWidget(ctxImpl->scene, id);
+			spriteRendererWidget = new SpriteRenderer2DWidget(*ctxImpl);
 			this->AddWidget(Std::Box<Gui::Widget>{ spriteRendererWidget });
+
+			box2DWidget = new Box2DWidget(*ctxImpl);
+			this->AddWidget(Std::Box<Gui::Widget>{ box2DWidget });
 		}
 
 		void Tick(Scene& scene, Entity id)
 		{
-			transformWidget->Tick(scene, id);
-			
 			if (auto ptr = scene.GetComponent<Transform>(id))
-				transformWidget2->Update(*ptr);
+				transformWidget->Update(*ptr);
 		}
 	};
 }
@@ -285,7 +274,10 @@ namespace DEngine::Editor
 							newWindow.title = "Components";
 							newWindow.titleBarColor = { 0.f, 0.5f, 0.5f, 1.f };
 							ComponentList* componentList = new ComponentList(&implData);
-							newWindow.widget = Std::Box<Gui::Widget>{ componentList };
+
+							Gui::ScrollArea* scrollArea = new Gui::ScrollArea;
+							newWindow.widget = Std::Box<Gui::Widget>{ scrollArea };
+							scrollArea->widget = Std::Box<Gui::Widget>{ componentList };
 
 							implData.dockArea->layers.emplace(implData.dockArea->layers.begin(), Std::Move(newTop));
 						}
@@ -325,8 +317,7 @@ namespace DEngine::Editor
 		playButton->type = Gui::Button::Type::Toggle;
 		Scene& scene = *implData.scene;
 		playButton->activatePfn = [&scene](
-			Gui::Button& btn,
-			Gui::Context* guiCtx)
+			Gui::Button& btn)
 		{
 			if (btn.GetToggled())
 			{
@@ -399,6 +390,7 @@ Editor::Context Editor::Context::Create(
 			dockArea->layers.emplace_back(Std::Move(newTop));
 		}
 
+		
 		{
 			Gui::DockArea::Layer newTop{};
 			newTop.rect = { { 250, 250 }, { 400, 400 } };
@@ -418,6 +410,7 @@ Editor::Context Editor::Context::Create(
 
 			dockArea->layers.emplace_back(Std::Move(newTop));
 		}
+		
 	}
 	
 	return newCtx;
@@ -427,9 +420,16 @@ void Editor::Context::ProcessEvents()
 {
 	EditorImpl& implData = this->ImplData();
 
-	if (App::TickCount() % 60 == 0)
-		implData.test_fpsText->String_Set(std::to_string(Time::Delta()).c_str());
+	bool guiWasChanged = false;
+	if (App::TickCount() == 0)
+		guiWasChanged = true;
 
+	if (App::TickCount() % 60 == 0)
+	{
+		implData.test_fpsText->String_Set(std::to_string(Time::Delta()).c_str());
+		guiWasChanged = true;
+	}
+		
 	for (impl::GuiEvent const& event : implData.queuedGuiEvents)
 	{
 		switch (event.type)
@@ -446,6 +446,7 @@ void Editor::Context::ProcessEvents()
 		case impl::GuiEvent::Type::WindowMoveEvent: implData.guiCtx->PushEvent(event.windowMove); break;
 		case impl::GuiEvent::Type::WindowResizeEvent: implData.guiCtx->PushEvent(event.windowResize); break;
 		}
+		guiWasChanged = true;
 	}
 	implData.queuedGuiEvents.clear();
 
@@ -456,12 +457,15 @@ void Editor::Context::ProcessEvents()
 	if (App::TickCount() % 10 == 0)
 	{
 		if (implData.componentList && implData.selectedEntity.HasValue())
+		{
 			implData.componentList->Tick(*implData.scene, implData.selectedEntity.Value());
+			guiWasChanged = true;
+		}
 	}
 
-
 	//implData.guiCtx->Tick();
-	implData.guiCtx->Render();
+	//if (guiWasChanged)
+		implData.guiCtx->Render();
 }
 
 Editor::Context::Context(Context&& other) noexcept :
@@ -515,7 +519,10 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 			{
 				Entity selected = implData.selectedEntity.Value();
 				// Find Transform component of this entity
+
 				Transform const* transformPtr = implData.scene->GetComponent<Transform>(selected);
+
+				// Draw gizmo
 				if (transformPtr != nullptr)
 				{
 					Transform const& transform = *transformPtr;
@@ -538,6 +545,47 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 					gizmo.quadScale = gizmo.scale * Gizmo::defaultPlaneScaleRelative;
 					gizmo.quadOffset = gizmo.scale * Gizmo::defaultPlaneOffsetRelative;
 				}
+
+				// Draw debug lines for collider if there is one
+				Box2D_Component const* box2DComponentPtr = implData.scene->GetComponent<Box2D_Component>(selected);
+				if (box2DComponentPtr && transformPtr)
+				{
+					Transform const& transform = *transformPtr;
+					DENGINE_DETAIL_ASSERT(box2DComponentPtr->ptr);
+					b2Body* physicsBody = box2DComponentPtr->ptr;
+
+					DENGINE_DETAIL_ASSERT(physicsBody->GetFixtureList()->GetType() == b2Shape::Type::e_polygon);
+					b2PolygonShape const* physicsShape = static_cast<b2PolygonShape const*>(physicsBody->GetFixtureList()->GetShape());
+					if (physicsShape->m_count > 0)
+					{
+						// We need to build a transform from the physics-body, not the Transform component?
+						Math::Mat4 worldTransform = Math::Mat4::Identity();
+						b2Vec2 bodyPosition = physicsBody->GetPosition();
+						Math::LinTran3D::SetTranslation(worldTransform, bodyPosition.x, bodyPosition.y, 0.f);
+						worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, physicsBody->GetAngle()) * worldTransform;
+
+						for (uSize i = 0; i < physicsShape->m_count; i += 1)
+						{
+							Math::Vec3 vertex{};
+							vertex.x = physicsShape->m_vertices[i].x;
+							vertex.y = physicsShape->m_vertices[i].y;
+							
+							// Apply the transform
+							returnVal.lineVertices.push_back((worldTransform * vertex.AsVec4(1.f)).AsVec3());
+						}
+						{
+							Math::Vec3 vertex{};
+							vertex.x = physicsShape->m_vertices[0].x;
+							vertex.y = physicsShape->m_vertices[0].y;
+							returnVal.lineVertices.push_back((worldTransform * vertex.AsVec4(1.f)).AsVec3());
+						}
+						Gfx::LineDrawCmd lineDrawCmd{};
+						lineDrawCmd.color = { 0.25f, 0.75f, 0.25f, 1.f };
+						lineDrawCmd.vertCount = physicsShape->m_count + 1;
+						returnVal.lineDrawCmds.push_back(lineDrawCmd);
+					}
+				}
+				
 			}
 			returnVal.viewportUpdates.push_back(update);
 		}
@@ -551,22 +599,23 @@ void Editor::EditorImpl::SelectEntity(Entity id)
 	if (selectedEntity.HasValue() && selectedEntity.Value() == id)
 		return;
 
+	Std::Opt<Entity> prevEntity = selectedEntity;
+	selectedEntity = id;
+
 	// Update the entity list
 	if (entityIdList)
-		entityIdList->SelectEntity(selectedEntity, id);
+		entityIdList->SelectEntity(prevEntity, id);
 
 	// Update the component list
 	if (componentList)
 		componentList->EntitySelected(id);
-
-	selectedEntity = id;
 }
 
 void Editor::EditorImpl::UnselectEntity()
 {
 	// Update the entity list
 	if (selectedEntity.HasValue() && entityIdList)
-		entityIdList->UnselectEntity(selectedEntity.Value());
+		entityIdList->UnselectEntity();
 
 	// Clear the component list
 	if (componentList)
@@ -584,10 +633,17 @@ void Editor::EditorImpl::ButtonEvent(
 		impl::GuiEvent event{};
 		event.type = impl::GuiEvent::Type::CursorClickEvent;
 		if (button == App::Button::LeftMouse)
-			event.cursorClick.button = Gui::CursorButton::Left;
+			event.cursorClick.button = Gui::CursorButton::Primary;
 		else if (button == App::Button::RightMouse)
-			event.cursorClick.button = Gui::CursorButton::Right;
+			event.cursorClick.button = Gui::CursorButton::Secondary;
 		event.cursorClick.clicked = state;
+		queuedGuiEvents.push_back(event);
+	}
+	else if (button == App::Button::Enter)
+	{
+		impl::GuiEvent event{};
+		event.type = impl::GuiEvent::Type::CharEnterEvent;
+		event.charEnter = {};
 		queuedGuiEvents.push_back(event);
 	}
 }
@@ -721,6 +777,7 @@ void Editor::EditorImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursorT
 		appCursorType = App::CursorType::VerticalResize;
 		break;
 	default:
+		DENGINE_DETAIL_UNREACHABLE();
 		break;
 	}
 	App::SetCursor((App::WindowID)id, appCursorType);
@@ -738,15 +795,20 @@ void Editor::EditorImpl::OpenSoftInput(
 	App::SoftInputFilter filter{};
 	switch (inputFilter)
 	{
-	case Gui::SoftInputFilter::Float:
+	case Gui::SoftInputFilter::SignedFloat:
 		filter = App::SoftInputFilter::Float;
 		break;
-	case Gui::SoftInputFilter::Integer:
+	case Gui::SoftInputFilter::UnsignedFloat:
+		filter = App::SoftInputFilter::UnsignedFloat;
+		break;
+	case Gui::SoftInputFilter::SignedInteger:
 		filter = App::SoftInputFilter::Integer;
 		break;
 	case Gui::SoftInputFilter::UnsignedInteger:
 		filter = App::SoftInputFilter::UnsignedInteger;
 		break;
+	default:
+		DENGINE_DETAIL_UNREACHABLE();
 	}
 	App::OpenSoftInput(currentText, filter);
 }

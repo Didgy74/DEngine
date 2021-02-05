@@ -19,10 +19,11 @@ namespace DEngine::Gui
 		enum class DockArea_LayoutGizmo { Top, Bottom, Left, Right, Center };
 	}
 
-	// TODO: Rename toplevelnode to "layer".
 	class DockArea : public Widget
 	{
 	public:
+		static constexpr Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.75f };
+
 		DockArea();
 
 		struct Node;
@@ -63,9 +64,9 @@ namespace DEngine::Gui
 		u32 tabDisconnectRadius = 25;
 		u32 gizmoSize = 75;
 		u32 gizmoPadding = 15;
-		u32 resizeAreaThickness = 30;
-		u32 resizeHandleLength = 50;
-		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.75f };
+		u32 resizeAreaThickness = 20;
+		u32 resizeHandleLength = 75;
+		
 
 		enum class ResizeSide { Top, Bottom, Left, Right, };
 
@@ -113,8 +114,6 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-
-
 		virtual void CursorMove(
 			Context& ctx,
 			WindowID windowId,
@@ -137,8 +136,7 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			Gui::TouchEvent event) override;
 
-		virtual void InputConnectionLost(
-			Context& ctx) override;
+		virtual void InputConnectionLost() override;
 
 		virtual void CharEnterEvent(
 			Context& ctx) override;

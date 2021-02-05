@@ -52,8 +52,10 @@
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/CollapsingHeader.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/Context.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/DockArea.cpp
+		${DENGINE_ROOT_DIR}/src/DEngine/Gui/Dropdown.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/Image.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/LineEdit.cpp
+		${DENGINE_ROOT_DIR}/src/DEngine/Gui/LineFloatEdit.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/LineList.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/MenuBar.cpp
 		${DENGINE_ROOT_DIR}/src/DEngine/Gui/ScrollArea.cpp

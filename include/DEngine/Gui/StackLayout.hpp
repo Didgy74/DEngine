@@ -71,8 +71,7 @@ namespace DEngine::Gui
 		virtual void CharRemoveEvent(
 			Context& ctx) override;
 
-		virtual void InputConnectionLost(
-			Context& ctx) override;
+		virtual void InputConnectionLost() override;
 
 		virtual void CursorClick(
 			Context& ctx,

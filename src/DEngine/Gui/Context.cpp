@@ -73,7 +73,7 @@ void Context::TakeInputConnection(
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 	if (implData.inputConnectionWidget)
 	{
-		implData.inputConnectionWidget->InputConnectionLost(*this);
+		implData.inputConnectionWidget->InputConnectionLost();
 	}
 	implData.windowHandler->OpenSoftInput(
 		currentText,
@@ -132,14 +132,14 @@ void Context::Test_DestroyMenu(WindowID windowId, Widget* widget)
 	auto const windowNodeIt = Std::FindIf(
 		implData.windows.begin(),
 		implData.windows.end(),
-		[windowId](decltype(implData.windows)::value_type const& val) -> bool { return windowId == val.id; });
+		[windowId](auto const& val) -> bool { return windowId == val.id; });
 	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != implData.windows.end());
 	auto& windowNode = *windowNodeIt;
 
 	auto const menuIt = Std::FindIf(
 		windowNode.test_Menus.begin(),
 		windowNode.test_Menus.end(),
-		[widget](decltype(windowNode.test_Menus)::value_type const& val) -> bool { return val.topLayout.Get() == widget; });
+		[widget](auto const& val) -> bool { return val.topLayout.Get() == widget; });
 	DENGINE_IMPL_GUI_ASSERT(menuIt != windowNode.test_Menus.end());
 
 	if (windowNode.currentlyIterating)
@@ -246,16 +246,16 @@ void Context::PushEvent(CursorClickEvent event)
 					SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
 					Rect widgetRect = { menu.rect.position, sizeHint.preferred };
 					Math::Vec2Int cursorPos = implData.cursorPosition - windowNode.data.rect.position;
+					menu.topLayout->CursorClick(
+						*this,
+						windowNode.id,
+						widgetRect,
+						widgetRect,
+						cursorPos,
+						event);
 					if (widgetRect.PointIsInside(cursorPos))
 					{
 						bleh = true;
-						menu.topLayout->CursorClick(
-							*this,
-							windowNode.id,
-							widgetRect,
-							widgetRect,
-							cursorPos,
-							event);
 					}
 				}
 			}
@@ -303,15 +303,15 @@ void Context::PushEvent(CursorMoveEvent event)
 					SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
 					Rect widgetRect = { menu.rect.position, sizeHint.preferred };
 					Math::Vec2Int cursorPos = implData.cursorPosition - windowNode.data.rect.position;
+					menu.topLayout->CursorMove(
+						*this,
+						windowNode.id,
+						widgetRect,
+						widgetRect,
+						modifiedEvent);
 					if (widgetRect.PointIsInside(cursorPos))
 					{
 						bleh = true;
-						menu.topLayout->CursorMove(
-							*this,
-							windowNode.id,
-							widgetRect,
-							widgetRect,
-							modifiedEvent);
 					}
 				}
 			}
@@ -352,15 +352,15 @@ void Context::PushEvent(TouchEvent event)
 				{
 					SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
 					Rect widgetRect = { menu.rect.position, sizeHint.preferred };
+					menu.topLayout->TouchEvent(
+						*this,
+						windowNode.id,
+						widgetRect,
+						widgetRect,
+						event);
 					if (widgetRect.PointIsInside(event.position) && event.type == TouchEventType::Down)
 					{
 						bleh = true;
-						menu.topLayout->TouchEvent(
-							*this,
-							windowNode.id,
-							widgetRect,
-							widgetRect,
-							event);
 					}
 				}
 			}
@@ -605,7 +605,7 @@ void impl::TextManager::Initialize(
 	ftError = FT_Set_Char_Size(
 		manager.face,    /* handle to face object           */
 		0,       /* char_width in 1/64th of points  */
-		46 * 64,   /* char_height in 1/64th of points */
+		40 * 64,   /* char_height in 1/64th of points */
 		0,     /* horizontal device resolution    */
 		0);   /* vertical device resolution      */
 	if (ftError != FT_Err_Ok)

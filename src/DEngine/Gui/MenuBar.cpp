@@ -145,7 +145,7 @@ void MenuBar::CursorClick(
 
 	// If cursor is outside and we have an active button, we destroy any open menus.
 	// And make button unactive
-	if (!cursorIsInside && event.clicked && event.button == CursorButton::Left && activeButton)
+	if (!cursorIsInside && event.clicked && event.button == CursorButton::Primary && activeButton)
 	{
 		ClearActiveButton(ctx, windowId);
 	}
@@ -273,7 +273,7 @@ void MenuBar::Button::CursorClick(
 	impl::ImplData& implData = *(impl::ImplData*)ctx.Internal_ImplData();
 
 	bool cursorIsInside = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
-	if (!active && cursorIsInside && event.clicked && event.button == CursorButton::Left)
+	if (!active && cursorIsInside && event.clicked && event.button == CursorButton::Primary)
 	{
 		if (parentMenuBar->activeButton)
 		{
@@ -304,11 +304,11 @@ void MenuBar::Button::CursorClick(
 			*newMenuBar);
 
 	}
-	else if (active && cursorIsInside && event.clicked && event.button == CursorButton::Left)
+	else if (active && cursorIsInside && event.clicked && event.button == CursorButton::Primary)
 	{
 		parentMenuBar->ClearActiveButton(ctx, windowId);
 	}
-	else if (active && !cursorIsInside && event.clicked && event.button == CursorButton::Left)
+	else if (active && !cursorIsInside && event.clicked && event.button == CursorButton::Primary)
 	{
 
 	}
@@ -407,11 +407,10 @@ void MenuBar::ActivatableButton::CursorClick(
 	bool cursorIsInside = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
 
 	// First check if we clicked this button, then invoke callback and remove the menu?
-	if (cursorIsInside && event.clicked && event.button == CursorButton::Left)
+	if (cursorIsInside && event.clicked && event.button == CursorButton::Primary)
 	{
 		activateCallback();
 
-		//ctx.Test_DestroyMenu(windowId, parentMenuBar);
 		MenuBar* temp = parentMenuBar;
 		while (temp)
 		{
@@ -436,7 +435,6 @@ void MenuBar::ActivatableButton::TouchEvent(
 		{
 			activateCallback();
 
-			//ctx.Test_DestroyMenu(windowId, parentMenuBar);
 			MenuBar* temp = parentMenuBar;
 			while (temp)
 			{
@@ -506,7 +504,7 @@ void MenuBar::ToggleButton::CursorClick(
 	bool cursorIsInside = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
 
 	// First check if we clicked this button, then invoke callback and remove the menu?
-	if (cursorIsInside && event.clicked && event.button == CursorButton::Left)
+	if (cursorIsInside && event.clicked && event.button == CursorButton::Primary)
 	{
 		toggled = !toggled;
 		
@@ -538,7 +536,6 @@ void MenuBar::ToggleButton::TouchEvent(
 			toggled = !toggled;
 			activateCallback(toggled);
 
-			//ctx.Test_DestroyMenu(windowId, parentMenuBar);
 			MenuBar* temp = parentMenuBar;
 			while (temp)
 			{

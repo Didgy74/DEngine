@@ -22,8 +22,6 @@ namespace DEngine::Gui
 
 		std::function<void(LineEdit& widget)> textChangedPfn = nullptr;
 
-		
-
 		std::string text;
 
 		virtual ~LineEdit();
@@ -49,8 +47,7 @@ namespace DEngine::Gui
 		virtual void CharRemoveEvent(
 			Context& ctx) override;
 
-		virtual void InputConnectionLost(
-			Context& ctx) override;
+		virtual void InputConnectionLost() override;
 
 		virtual void CursorClick(
 			Context& ctx,
@@ -67,7 +64,9 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			Gui::TouchEvent touch) override;
 
-	private:
+	protected:
 		Context* inputConnectionCtx = nullptr;
+
+		void ClearInputConnection();
 	};
 }

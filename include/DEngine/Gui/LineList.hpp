@@ -14,12 +14,15 @@ namespace DEngine::Gui
 	class LineList : public Widget
 	{
 	public:
-		void AddLine(std::string_view const& text);
-		std::string_view GetLine(uSize index) const;
-		Std::Opt<uSize> GetSelectedLine() const;
-		[[nodiscard]] uSize LineCount() const;
+		static constexpr Math::Vec4 highlightColor = { 1.f, 1.f, 1.f, 0.5f };
+		static constexpr Math::Vec4 alternatingLineColor = { 0.f, 0.f, 0.f, 0.1f };
+		static constexpr u32 horizontalPadding = 20;
+
 		void RemoveLine(uSize index);
-		void SetCanSelect(bool);
+
+		bool canSelect = false;
+		Std::Opt<uSize> selectedLine;
+		std::vector<std::string> lines;
 
 		using Callback = std::function<void(LineList&)>;
 		Callback selectedLineChangedCallback = nullptr;
@@ -47,11 +50,5 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchEvent event) override;
-
-
-	protected:
-		bool canSelect = false;
-		Std::Opt<uSize> selectedLine;
-		std::vector<std::string> lines;
 	};
 }

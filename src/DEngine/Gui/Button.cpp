@@ -21,8 +21,7 @@ void Button::Activate(
 
 	if (activatePfn)
 		activatePfn(
-			*this,
-			&ctx);
+			*this);
 }
 
 void Button::SetToggled(bool toggled)
@@ -117,7 +116,7 @@ void Button::CursorClick(
 	Math::Vec2Int cursorPos,
 	CursorClickEvent event)
 {
-	if (event.button == CursorButton::Left)
+	if (event.button == CursorButton::Primary)
 	{
 		bool temp = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
 

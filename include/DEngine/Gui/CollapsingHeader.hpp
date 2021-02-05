@@ -6,80 +6,56 @@
 
 #include <DEngine/Std/Containers/Box.hpp>
 
+#include <functional>
+#include <string_view>
+
 namespace DEngine::Gui
 {
 	class CollapsingHeader : public Widget
 	{
 	public:
-		CollapsingHeader(bool collapsed = false);
+		static constexpr Math::Vec4 fieldBackgroundColor = { 1.f, 1.f, 1.f, 0.25f };
 
-		[[nodiscard]] StackLayout& GetChildStackLayout() { return *childStackLayoutPtr; }
-		[[nodiscard]] StackLayout const& GetChildStackLayout() const { return *childStackLayoutPtr; }
-		void SetCollapsed(bool newVal)
-		{
+		CollapsingHeader(bool collapsed = true);
 
-		}
+		using CollapseFn = void(bool collapsed);
+		std::function<CollapseFn> collapseCallback;
+		[[nodiscard]] StackLayout& GetChildStackLayout() noexcept { return *childStackLayoutPtr; }
+		[[nodiscard]] StackLayout const& GetChildStackLayout() const noexcept { return *childStackLayoutPtr; }
+		[[nodiscard]] bool IsCollapsed() const noexcept;
+		void SetCollapsed(bool value);
+		void SetHeaderText(std::string_view text);
+
+
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override
-		{
-			return mainStackLayout.GetSizeHint(ctx);
-		}
+			Context const& ctx) const override;
 
 		virtual void Render(
 			Context const& ctx,
 			Extent framebufferExtent,
 			Rect widgetRect,
 			Rect visibleRect,
-			DrawInfo& drawInfo) const override
-		{
-			return mainStackLayout.Render(
-				ctx,
-				framebufferExtent,
-				widgetRect,
-				visibleRect,
-				drawInfo);
-		}
+			DrawInfo& drawInfo) const override;
 
 		virtual void CharEnterEvent(
-			Context& ctx) override
-		{
-			return mainStackLayout.CharEnterEvent(ctx);
-		}
+			Context& ctx) override;
 
 		virtual void CharEvent(
 			Context& ctx,
-			u32 utfValue) override
-		{
-			return mainStackLayout.CharEvent(ctx, utfValue);
-		}
+			u32 utfValue) override;
 
 		virtual void CharRemoveEvent(
-			Context& ctx) override
-		{
-			return mainStackLayout.CharRemoveEvent(ctx);
-		}
+			Context& ctx) override;
 		
-		virtual void InputConnectionLost(
-			Context& ctx) override
-		{
-			return mainStackLayout.InputConnectionLost(ctx);
-		}
+		virtual void InputConnectionLost() override;
 
 		virtual void CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			CursorMoveEvent event) override
-		{
-			return mainStackLayout.CursorMove(
-				ctx,
-				windowId,
-				widgetRect,
-				visibleRect,
-				event);
-		}
+			CursorMoveEvent event) override;
 
 		virtual void CursorClick(
 			Context& ctx,
@@ -87,31 +63,14 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
-			CursorClickEvent event) override
-		{
-			return mainStackLayout.CursorClick(
-				ctx,
-				windowId,
-				widgetRect,
-				visibleRect,
-				cursorPos,
-				event);
-		}
+			CursorClickEvent event) override;
 
 		virtual void TouchEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override
-		{
-			return mainStackLayout.TouchEvent(
-				ctx,
-				windowId,
-				widgetRect,
-				visibleRect,
-				event);
-		}
+			Gui::TouchEvent event) override;
 
 	private:
 		StackLayout mainStackLayout = StackLayout(StackLayout::Direction::Vertical);

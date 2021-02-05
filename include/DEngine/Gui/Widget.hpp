@@ -40,8 +40,7 @@ namespace DEngine::Gui
 		virtual void CharRemoveEvent(
 			Context& ctx) {}
 
-		virtual void InputConnectionLost(
-			Context& ctx) {}
+		virtual void InputConnectionLost() {}
 
 		virtual void CursorMove(
 			Context& ctx,

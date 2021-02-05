@@ -49,6 +49,7 @@ namespace DEngine::Std
 			DENGINE_DETAIL_CONTAINERS_ASSERT(tracker == i);
 			return *reinterpret_cast<Trait::At<i, Ts...>*>(data);
 		}
+
 		template<unsigned int i>
 		[[nodiscard]] auto Get() const noexcept -> decltype(auto)
 		{

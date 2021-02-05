@@ -2093,7 +2093,7 @@ void DockArea::TouchEvent(
 		DENGINE_DETAIL_UNREACHABLE();
 }
 
-void DEngine::Gui::DockArea::InputConnectionLost(Context& ctx)
+void DEngine::Gui::DockArea::InputConnectionLost()
 {
 	bool continueIterating = true;
 	impl::DockArea_IterateLayers(
@@ -2101,7 +2101,7 @@ void DEngine::Gui::DockArea::InputConnectionLost(Context& ctx)
 		layers,
 		Rect{},
 		continueIterating,
-		[&ctx](
+		[](
 			DockArea::Layer& layer,
 			Rect layerRect,
 			uSize layerIndex,
@@ -2112,7 +2112,7 @@ void DEngine::Gui::DockArea::InputConnectionLost(Context& ctx)
 				layerRect,
 				continueIterating,
 				impl::DockArea_IterateNode_SplitCallableOrder::First,
-				[&ctx](
+				[](
 					DockArea::Node& node,
 					Rect rect,
 					DockArea::Node* parentNode,
@@ -2122,7 +2122,7 @@ void DEngine::Gui::DockArea::InputConnectionLost(Context& ctx)
 					{
 						auto& window = node.windows[node.selectedWindow];
 						if (window.widget)
-							window.widget->InputConnectionLost(ctx);
+							window.widget->InputConnectionLost();
 					}
 				});
 		});
