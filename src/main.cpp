@@ -208,7 +208,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		{
 			//Physics::Update(myScene, Time::Delta());
 
-			for (auto const& [entity, moveComponent] : myScene.GetComponentVector<Move>())
+			for (auto const& [entity, moveComponent] : myScene.GetAllComponents<Move>())
 				moveComponent.Update(entity, myScene, Time::Delta());
 
 			impl::RunPhysicsStep(myScene);
@@ -226,7 +226,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 void DEngine::impl::CopyTransformToPhysicsWorld(Scene& scene)
 {
 	// First copy our positions into every physics body
-	for (auto const& physicsBodyPair : scene.GetComponentVector<Box2D_Component>())
+	for (auto const& physicsBodyPair : scene.GetAllComponents<Box2D_Component>())
 	{
 		Entity a = physicsBodyPair.a;
 
@@ -241,9 +241,10 @@ void DEngine::impl::RunPhysicsStep(
 	Scene& scene)
 {
 	CopyTransformToPhysicsWorld(scene);
+
 	scene.physicsWorld->Step(Time::Delta(), 8, 8);
 	// Then copy the stuff back
-	for (auto const& physicsBodyPair : scene.GetComponentVector<Box2D_Component>())
+	for (auto const& physicsBodyPair : scene.GetAllComponents<Box2D_Component>())
 	{
 		Entity a = physicsBodyPair.a;
 		Transform* transformPtr = scene.GetComponent<Transform>(a);
@@ -262,7 +263,7 @@ void DEngine::impl::SubmitRendering(
 {
 	Gfx::DrawParams params{};
 
-	for (auto const& item : scene.GetComponentVector<Gfx::TextureID>())
+	for (auto const& item : scene.GetAllComponents<Gfx::TextureID>())
 	{
 		auto& entity = item.a;
 

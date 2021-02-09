@@ -63,11 +63,10 @@ void DEngine::Gfx::Vk::QueueData::SafeQueue::Initialize(
 			break;
 		}
 
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkQueue)queue.m_handle;
-		nameInfo.objectType = queue.m_handle.objectType;
-		nameInfo.pObjectName = name.data();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			queue.m_handle,
+			name.c_str());
 	}
 }
 

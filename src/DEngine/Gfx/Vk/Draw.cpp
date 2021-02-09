@@ -26,16 +26,12 @@ namespace DEngine::Gfx::Vk
 		// We need to name the command buffer every time we reset it
 		if (globUtils.UsingDebugUtils())
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkCommandBuffer)cmdBuffer;
-			nameInfo.objectType = cmdBuffer.objectType;
 			std::string name;
 			name += "Native Window #";
 			name += std::to_string((u64)windowUpdate.id);
 			name += " - GUI CmdBuffer #";
 			name += std::to_string(inFlightIndex);
-			nameInfo.pObjectName = name.data();
-			globUtils.debugUtils.setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			globUtils.debugUtils.Helper_SetObjectName(device.handle, cmdBuffer, name.c_str());
 		}
 
 		{
@@ -371,13 +367,15 @@ namespace DEngine::Gfx::Vk
 		// We need to rename the command buffer every time we record it
 		if (globUtils.UsingDebugUtils())
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkCommandBuffer)cmdBuffer;
-			nameInfo.objectType = cmdBuffer.objectType;
-			std::string name = std::string("Graphics viewport #") + std::to_string((u64)viewportUpdate.id) + 
-				std::string(" - CmdBuffer #") + std::to_string(inFlightIndex);
-			nameInfo.pObjectName = name.data();
-			globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+			std::string name;
+			name += "Graphics viewport #";
+			name += std::to_string((u64)viewportUpdate.id);
+			name += std::string(" - CmdBuffer #");
+			name += std::to_string(inFlightIndex);
+			globUtils.debugUtils.Helper_SetObjectName(
+				globUtils.
+				device.handle, 
+				cmdBuffer, name.c_str());
 		}
 
 		vk::CommandBufferBeginInfo beginInfo{};

@@ -120,7 +120,7 @@ namespace DEngine::Math
 		returnVal.s = Cos(radians / 2);
 
 		//assert(axis.Magnitude() > 0.f);
-		Vector<3, T> const normalizedAxis = axis.Normalized();
+		Vector<3, T> const normalizedAxis = axis.GetNormalized();
 		T const sin = Sin(radians / 2);
 		returnVal.x = normalizedAxis.x * sin;
 		returnVal.y = normalizedAxis.y * sin;

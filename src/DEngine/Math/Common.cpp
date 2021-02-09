@@ -136,7 +136,7 @@ Math::Matrix<3, 3, f32> Math::LinearTransform3D::Rotate(Vector<3, f32> const& ra
 
 Math::Matrix<3, 3, f32> Math::LinearTransform3D::Rotate(Vector<3, f32> const& axisInput, f32 amountRadians)
 {
-	Vector<3, f32> const axis = axisInput.Normalized();
+	Vector<3, f32> const axis = axisInput.GetNormalized();
 	f32 const cos = Cos(amountRadians);
 	f32 const sin = Sin(amountRadians);
 	return Matrix<3, 3, f32>
@@ -152,8 +152,8 @@ Math::Matrix<4, 4, f32> Math::LinearTransform3D::LookAt_LH(
 	Vector<3, f32> const& forward,
 	Vector<3, f32> const& upVector)
 {
-	Vector<3, f32> zAxis = (forward - position).Normalized();
-	Vector<3, f32> xAxis = Vector<3, f32>::Cross(upVector, zAxis).Normalized();
+	Vector<3, f32> zAxis = (forward - position).GetNormalized();
+	Vector<3, f32> xAxis = Vector<3, f32>::Cross(upVector, zAxis).GetNormalized();
 	Vector<3, f32> yAxis = Vector<3, f32>::Cross(zAxis, xAxis);
 	return Mat4
 	{ { {
@@ -169,8 +169,8 @@ Math::Matrix<4, 4, f32> Math::LinearTransform3D::LookAt_RH(
 	Vector<3, f32> const& forward,
 	Vector<3, f32> const& upVector)
 {
-	Vector<3, f32> zAxis = (position - forward).Normalized();
-	Vector<3, f32> xAxis = Vector<3, f32>::Cross(upVector, zAxis).Normalized();
+	Vector<3, f32> zAxis = (position - forward).GetNormalized();
+	Vector<3, f32> xAxis = Vector<3, f32>::Cross(upVector, zAxis).GetNormalized();
 	Vector<3, f32> yAxis = Vector<3, f32>::Cross(zAxis, xAxis);
 	return Mat4
 	{ { {

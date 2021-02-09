@@ -64,12 +64,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		manager.filledMeshPipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkPipelineLayout)manager.filledMeshPipelineLayout;
-			nameInfo.objectType = manager.filledMeshPipelineLayout.objectType;
-			std::string name = "GuiResourceManager - FilledMesh PipelineLayout";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.filledMeshPipelineLayout,
+				"GuiResourceManager - FilledMesh PipelineLayout");
 		}
 
 		vk::DynamicState dynamicStates[2] = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
@@ -191,12 +189,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkPipeline)manager.filledMeshPipeline;
-			nameInfo.objectType = manager.filledMeshPipeline.objectType;
-			std::string name = "GuiResourceManager - FilledMesh Pipeline";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.filledMeshPipeline,
+				"GuiResourceManager - FilledMesh Pipeline");
 		}
 
 		device.destroy(vertModule);
@@ -220,12 +216,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		manager.viewportDescrSetLayout = device.createDescriptorSetLayout(descrSetLayoutInfo);
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkDescriptorSetLayout)manager.viewportDescrSetLayout;
-			nameInfo.objectType = manager.viewportDescrSetLayout.objectType;
-			std::string name = "GuiResourceManager - Viewport DescrSetLayout";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.viewportDescrSetLayout,
+				"GuiResourceManager - Viewport DescrSetLayout");
 		}
 
 		vk::DescriptorPoolSize descrPoolSize{};
@@ -238,12 +232,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		manager.viewportDescrPool = device.createDescriptorPool(descrPoolInfo);
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkDescriptorPool)manager.viewportDescrPool;
-			nameInfo.objectType = manager.viewportDescrPool.objectType;
-			std::string name = "GuiResourceManager - Viewport DescrPool";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.viewportDescrPool,
+				"GuiResourceManager - Viewport DescrPool");
 		}
 
 		vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -261,12 +253,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		manager.viewportPipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkPipelineLayout)manager.viewportPipelineLayout;
-			nameInfo.objectType = manager.viewportPipelineLayout.objectType;
-			std::string name = "GuiResourceManager - Viewport PipelineLayout";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.viewportPipelineLayout,
+				"GuiResourceManager - Viewport PipelineLayout");
 		}
 
 		vk::DynamicState dynamicStates[2] = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
@@ -373,12 +363,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 			throw std::runtime_error("DEngine - Vulkan: Unable to create GUI shader.");
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkPipeline)manager.viewportPipeline;
-			nameInfo.objectType = manager.viewportPipeline.objectType;
-			std::string name = "GuiResourceManager - Viewport Pipeline";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.viewportPipeline,
+				"GuiResourceManager - Viewport Pipeline");
 		}
 
 		device.destroy(vertModule);
@@ -401,12 +389,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		manager.font_descrPool = device.createDescriptorPool(descrPoolInfo);
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkDescriptorPool)manager.font_descrPool;
-			nameInfo.objectType = manager.font_descrPool.objectType;
-			std::string name = "GuiResourceManager - Text DescrPool";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.font_descrPool,
+				"GuiResourceManager - Text DescrPool");
 		}
 
 		vk::DescriptorSetLayoutBinding imgDescrBinding{};
@@ -420,12 +406,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		manager.font_descrSetLayout = device.createDescriptorSetLayout(descrSetLayoutInfo);
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkDescriptorSetLayout)manager.font_descrSetLayout;
-			nameInfo.objectType = manager.font_descrSetLayout.objectType;
-			std::string name = "GuiResourceManager - Text DescrSetLayout";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.font_descrSetLayout,
+				"GuiResourceManager - Text DescrSetLayout");
 		}
 
 		vk::SamplerCreateInfo samplerInfo{};
@@ -439,12 +423,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		manager.font_sampler = device.createSampler(samplerInfo);
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkSampler)manager.font_sampler;
-			nameInfo.objectType = manager.font_sampler.objectType;
-			std::string name = "GuiResourceManager - Text Sampler";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.font_sampler,
+				"GuiResourceManager - Text Sampler");
 		}
 
 		vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -466,12 +448,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		manager.font_pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkPipelineLayout)manager.font_pipelineLayout;
-			nameInfo.objectType = manager.font_pipelineLayout.objectType;
-			std::string name = "GuiResourceManager - Text PipelineLayout";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.font_pipelineLayout,
+				"GuiResourceManager - Text PipelineLayout");
 		}
 
 		vk::DynamicState dynamicStates[2] = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
@@ -555,13 +535,13 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 
 		Std::Array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = { vertStageInfo, fragStageInfo };
 
-        vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
-        depthStencilInfo.depthTestEnable = 0;
-        depthStencilInfo.depthCompareOp = vk::CompareOp::eLess;
-        depthStencilInfo.stencilTestEnable = 0;
-        depthStencilInfo.depthWriteEnable = 0;
-        depthStencilInfo.minDepthBounds = 0.f;
-        depthStencilInfo.maxDepthBounds = 1.f;
+    vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
+    depthStencilInfo.depthTestEnable = 0;
+    depthStencilInfo.depthCompareOp = vk::CompareOp::eLess;
+    depthStencilInfo.stencilTestEnable = 0;
+    depthStencilInfo.depthWriteEnable = 0;
+    depthStencilInfo.minDepthBounds = 0.f;
+    depthStencilInfo.maxDepthBounds = 1.f;
 
 		vk::GraphicsPipelineCreateInfo pipelineInfo{};
 		pipelineInfo.layout = manager.font_pipelineLayout;
@@ -586,12 +566,10 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 			throw std::runtime_error("DEngine - Vulkan: Unable to create GUI shader.");
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkPipeline)manager.font_pipeline;
-			nameInfo.objectType = manager.font_pipeline.objectType;
-			std::string name = "GuiResourceManager - Text Pipeline";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.font_pipeline,
+				"GuiResourceManager - Text Pipeline");
 		}
 
 		device.destroy(vertModule);
@@ -628,12 +606,10 @@ void Vk::GuiResourceManager::Init(
 		throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate memory for GUI vertices.");
 	if (debugUtils)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkBuffer)manager.vtxBuffer;
-		nameInfo.objectType = manager.vtxBuffer.objectType;
-		std::string name = "GuiResourceManager - VertexBuffer";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.vtxBuffer,
+			"GuiResourceManager - VertexBuffer");
 	}
 	manager.vtxMappedMem = { (u8*)vtxVmaAllocResultInfo.pMappedData, (uSize)vtxVmaAllocResultInfo.size };
 	manager.vtxInFlightCapacity = manager.vtxMappedMem.Size() / inFlightCount;
@@ -658,12 +634,10 @@ void Vk::GuiResourceManager::Init(
 		throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate memory for GUI indices.");
 	if (debugUtils)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkBuffer)manager.indexBuffer;
-		nameInfo.objectType = manager.indexBuffer.objectType;
-		std::string name = "GuiResourceManager - IndexBuffer";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.indexBuffer,
+			"GuiResourceManager - IndexBuffer");
 	}
 	manager.indexMappedMem = { (u8*)indexVmaAllocResultInfo.pMappedData, (uSize)indexVmaAllocResultInfo.size };
 	manager.indexInFlightCapacity = manager.indexMappedMem.Size() / inFlightCount;
@@ -779,14 +753,13 @@ void Vk::GuiResourceManager::NewFontTexture(
 		throw std::runtime_error("Unable to allocate font VkImage");
 	if (globUtils.UsingDebugUtils())
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkImage)newGlyphData.img;
-		nameInfo.objectType = newGlyphData.img.objectType;
 		std::string name = "GuiResourceManager - GlyphID #";
 		name += std::to_string(utfValue);
 		name += " - Img";
-		nameInfo.pObjectName = name.c_str();
-		globUtils.debugUtils.setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		globUtils.debugUtils.Helper_SetObjectName(
+			device.handle,
+			newGlyphData.img,
+			name.c_str());
 	}
 
 	vk::ImageViewCreateInfo imgViewInfo{};
@@ -799,14 +772,13 @@ void Vk::GuiResourceManager::NewFontTexture(
 	newGlyphData.imgView = globUtils.device.createImageView(imgViewInfo);
 	if (globUtils.UsingDebugUtils())
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkImageView)newGlyphData.imgView;
-		nameInfo.objectType = newGlyphData.imgView.objectType;
 		std::string name = "GuiResourceManager - GlyphID #";
 		name += std::to_string(utfValue);
 		name += " - ImgView";
-		nameInfo.pObjectName = name.c_str();
-		globUtils.debugUtils.setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		globUtils.debugUtils.Helper_SetObjectName(
+			device.handle,
+			newGlyphData.imgView,
+			name.c_str());
 	}
 
 	vk::DescriptorSetAllocateInfo descrSetAllocInfo{};
@@ -818,14 +790,13 @@ void Vk::GuiResourceManager::NewFontTexture(
 		throw std::runtime_error("Unable to allocate descriptor set for glyph");
 	if (globUtils.UsingDebugUtils())
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkDescriptorSet)newGlyphData.descrSet;
-		nameInfo.objectType = newGlyphData.descrSet.objectType;
 		std::string name = "GuiResourceManager - GlyphID #";
 		name += std::to_string(utfValue);
 		name += " - DescrSet";
-		nameInfo.pObjectName = name.c_str();
-		globUtils.debugUtils.setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		globUtils.debugUtils.Helper_SetObjectName(
+			device.handle,
+			newGlyphData.descrSet,
+			name.c_str());
 	}
 
 	// Update descriptor set

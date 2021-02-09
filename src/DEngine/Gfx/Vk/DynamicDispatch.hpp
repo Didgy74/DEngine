@@ -2,6 +2,8 @@
 
 #include "VulkanIncluder.hpp"
 
+#include <DEngine/Gfx/detail/Assert.hpp>
+
 namespace DEngine::Gfx::Vk
 {
 	PFN_vkGetInstanceProcAddr loadInstanceProcAddressPFN();
@@ -217,6 +219,18 @@ namespace DEngine::Gfx::Vk
 		void setDebugUtilsObjectNameEXT(
 			vk::Device device,
 			vk::DebugUtilsObjectNameInfoEXT const& nameInfo) const;
+
+		template<typename T>
+		void Helper_SetObjectName(vk::Device device, T handle, char const* name) const
+		{
+			using BaseType = typename T::CType;
+			DENGINE_DETAIL_GFX_ASSERT(raw.vkSetDebugUtilsObjectNameEXT != nullptr);
+			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+			nameInfo.objectHandle = uint64_t(BaseType(handle));
+			nameInfo.objectType = T::objectType;
+			nameInfo.pObjectName = name;
+			setDebugUtilsObjectNameEXT(device, nameInfo);
+		}
 	};
 
 	class InstanceDispatch

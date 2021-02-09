@@ -246,12 +246,10 @@ void Vk::NativeWindowManager::Initialize(
 	manager.copyToSwapchainCmdPool = device.createCommandPool(cmdPoolInfo);
 	if (debugUtils != nullptr)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkCommandPool)manager.copyToSwapchainCmdPool;
-		nameInfo.objectType = manager.copyToSwapchainCmdPool.objectType;
-		std::string objectName = std::string("WindowManager - CopyImg CmdPool");
-		nameInfo.pObjectName = objectName.data();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.copyToSwapchainCmdPool,
+			"WindowManager - CopyImg CmdPool");
 	}	
 }
 
@@ -270,18 +268,15 @@ void Vk::NativeWindowManager::BuildInitialNativeWindow(
 	vk::RenderPass guiRenderPass,
 	DebugUtilsDispatch const* debugUtils)
 {
-
 	NativeWindowData windowData{};
 	windowData.wsiConnection = &initialWindowConnection;
 	windowData.surface = surface;
 	if (debugUtils)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkSurfaceKHR)windowData.surface;
-		nameInfo.objectType = windowData.surface.objectType;
-		std::string name = "NativeWindow #0 - Surface";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			windowData.surface,
+			"NativeWindow #0 - Surface");
 	}
 
 	NativeWindowManagerImpl::SwapchainSettings swapchainSettings = NativeWindowManagerImpl::BuildSwapchainSettings(
@@ -429,15 +424,14 @@ static vk::SwapchainKHR Vk::NativeWindowManagerImpl::CreateSwapchain(
 	vk::SwapchainKHR swapchain = device.createSwapchainKHR(swapchainCreateInfo);
 	if (debugUtils)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkSwapchainKHR)swapchain;
-		nameInfo.objectType = swapchain.objectType;
 		std::string name;
 		name += "NativeWindow #";
 		name += std::to_string((u64)windowID);
 		name += " - Swapchain";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			swapchain,
+			name.c_str());
 	}
 
 	return swapchain;
@@ -467,16 +461,15 @@ Std::StackVec<vk::Image, Vk::Constants::maxSwapchainLength> Vk::NativeWindowMana
 	{
 		for (uSize i = 0; i < returnVal.Size(); i += 1)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkImage)returnVal[i];
-			nameInfo.objectType = returnVal[i].objectType;
 			std::string name;
 			name += "NativeWindow #";
 			name += std::to_string((u64)windowID);
 			name += " - SwapchainImg #";
 			name += std::to_string(i);
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				returnVal[i],
+				name.c_str());
 		}
 	}
 
@@ -548,7 +541,6 @@ static bool Vk::NativeWindowManagerImpl::TransitionSwapchainImages(
 	return true;
 }
 
-
 static Std::StackVec<vk::CommandBuffer, Vk::Constants::maxSwapchainLength> Vk::NativeWindowManagerImpl::AllocateSwapchainCopyCmdBuffers(
 	DeviceDispatch const& device,
 	NativeWindowID windowID,
@@ -572,16 +564,15 @@ static Std::StackVec<vk::CommandBuffer, Vk::Constants::maxSwapchainLength> Vk::N
 	{
 		for (uSize i = 0; i < returnVal.Size(); i++)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkCommandBuffer)returnVal[i];
-			nameInfo.objectType = returnVal[i].objectType;
 			std::string name;
 			name += "NativeWindow #";
 			name += std::to_string((u64)windowID);
 			name += " - CopyImg CmdBuffer #";
 			name += std::to_string(i);
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				returnVal[i],
+				name.c_str());
 		}
 	}
 
@@ -601,15 +592,14 @@ vk::Semaphore Vk::NativeWindowManagerImpl::CreateImageReadySemaphore(
 	// Give name to the semaphore
 	if (debugUtils != nullptr)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkSemaphore)returnVal;
-		nameInfo.objectType = returnVal.objectType;
 		std::string name;
 		name += "NativeWindow #";
 		name += std::to_string((u64)windowID);
 		name += " - Swapchain ImgReady Semaphore";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			returnVal,
+			name.c_str());
 	}
 	return returnVal;
 }
@@ -744,15 +734,14 @@ Vk::NativeWindowManagerImpl::CreateGuiImg_Result DEngine::Gfx::Vk::NativeWindowM
 		throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate memory for GUI render-target.");
 	if (debugUtils != nullptr)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkImage)returnVal.img;
-		nameInfo.objectType = returnVal.img.objectType;
 		std::string name;
 		name += "NativeWindow #";
 		name += std::to_string((u64)windowID);
 		name += " - GUI Img";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			returnVal.img,
+			name.c_str());
 	}
 
 	return returnVal;
@@ -833,21 +822,20 @@ vk::ImageView Vk::NativeWindowManagerImpl::CreateGuiImgView(
 	vk::ImageView imgView = device.createImageView(imgViewInfo);
 	if (debugUtils != nullptr)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkImageView)imgView;
-		nameInfo.objectType = imgView.objectType;
 		std::string name;
 		name += "NativeWindow #";
 		name += std::to_string((u64)windowID);
 		name += " - GUI ImgView";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			imgView,
+			name.c_str());
 	}
 
 	return imgView;
 }
 
-vk::Framebuffer DEngine::Gfx::Vk::NativeWindowManagerImpl::CreateGuiFramebuffer(
+vk::Framebuffer Vk::NativeWindowManagerImpl::CreateGuiFramebuffer(
 	DeviceDispatch const& device, 
 	NativeWindowID windowID,
 	vk::RenderPass renderPass,
@@ -865,15 +853,14 @@ vk::Framebuffer DEngine::Gfx::Vk::NativeWindowManagerImpl::CreateGuiFramebuffer(
 	vk::Framebuffer framebuffer = device.createFramebuffer(fbInfo);
 	if (debugUtils)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkFramebuffer)framebuffer;
-		nameInfo.objectType = framebuffer.objectType;
 		std::string name;
 		name += "NativeWindow #";
 		name += std::to_string((u64)windowID);
 		name += " - GUI Framebuffer";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			framebuffer,
+			name.c_str());
 	}
 	return framebuffer;
 }
@@ -890,15 +877,14 @@ vk::CommandPool DEngine::Gfx::Vk::NativeWindowManagerImpl::CreateGuiCmdPool(
 	vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
 	if (debugUtils != nullptr)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkCommandPool)cmdPool;
-		nameInfo.objectType = cmdPool.objectType;
 		std::string name;
 		name += "NativeWindow #";
 		name += std::to_string((u64)windowID);
 		name += " - GUI CmdPool";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			cmdPool,
+			name.c_str());
 	}
 	return cmdPool;
 }
@@ -925,16 +911,15 @@ Std::StackVec<vk::CommandBuffer, Vk::Constants::maxInFlightCount> Vk::NativeWind
 	{
 		for (uSize i = 0; i < returnVal.Size(); i += 1)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkCommandBuffer)returnVal[i];
-			nameInfo.objectType = returnVal[i].objectType;
 			std::string name;
 			name += "NativeWindow #";
 			name += std::to_string((u64)windowID);
 			name += " - GUI CmdBuffer #";
 			name += std::to_string(i);
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				returnVal[i],
+				name.c_str());
 		}
 	}
 
@@ -963,15 +948,14 @@ static void Vk::NativeWindowManagerImpl::HandleCreationJobs(
 		windowData.surface = (vk::SurfaceKHR)(VkSurfaceKHR)newSurface;
 		if (globUtils.UsingDebugUtils())
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkSurfaceKHR)windowData.surface;
-			nameInfo.objectType = windowData.surface.objectType;
 			std::string name;
 			name += "NativeWindow #";
 			name += std::to_string((u64)createJob.id);
 			name += " - Surface";
-			nameInfo.pObjectName = name.c_str();
-			globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+			globUtils.debugUtils.Helper_SetObjectName(
+				globUtils.device.handle,
+				windowData.surface,
+				name.c_str());
 		}
 
 		bool physDeviceSupportsPresentation = globUtils.instance.getPhysicalDeviceSurfaceSupportKHR(

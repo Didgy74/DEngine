@@ -53,16 +53,12 @@ namespace DEngine::Editor
 		}
 
 		constexpr Arrow defaultArrow = impl::BuildDefaultArrow();
+
 		constexpr f32 defaultGizmoSizeRelative = 0.33f;
 		// Size is relative to the gizmo size
 		constexpr f32 defaultPlaneScaleRelative = 0.25f;
 		// Relative to the gizmo size
 		constexpr f32 defaultPlaneOffsetRelative = 0.25f;
-
-		// screenSpacePos in normalized coordinates [-1, 1]
-		[[nodiscard]] Math::Vec3 DeprojectScreenspacePoint(
-			Math::Vec2 screenSpacePosNormalized,
-			Math::Mat4 projectionMatrix) noexcept;
 
 		// target_size in pixels
 		[[nodiscard]] f32 ComputeScale(
@@ -70,34 +66,6 @@ namespace DEngine::Editor
 			u32 targetSizePx,
 			Math::Mat4 const& projection,
 			Gui::Extent viewportSize) noexcept;
-
-		// Returns the distance from the ray-origin to the intersection point.
-		// Cannot be negative.
-		[[nodiscard]] Std::Opt<f32> IntersectRayPlane(
-			Test_Ray ray,
-			Math::Vec3 planeNormal,
-			Math::Vec3 pointOnPlane) noexcept;
-
-		// Returns the distance from the ray-origin to the intersection point.
-		// Cannot be negative.
-		[[nodiscard]] Std::Opt<f32> IntersectRayCylinder(
-			Test_Ray ray,
-			Math::Vec3 cylinderVertA,
-			Math::Vec3 cylinderVertB,
-			f32 cylinderRadius) noexcept;
-
-		// World-transform cannot include scale. Bake it into the arrow-struct.
-		[[nodiscard]] Std::Opt<f32> IntersectArrow(
-			Test_Ray ray,
-			Arrow arrow,
-			Math::Mat4 const& worldTransform) noexcept;
-
-		// Translate along a line
-		[[nodiscard]] Math::Vec3 TranslateAlongPlane(
-			Test_Ray ray,
-			Math::Vec3 planeNormal,
-			Math::Vec3 initialPosition,
-			Test_Ray initialRay) noexcept;
 	}
 
 	class InternalViewportWidget : public Gui::Widget
@@ -105,7 +73,7 @@ namespace DEngine::Editor
 	public:
 		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
 		Gfx::Context* gfxCtx = nullptr;
-		EditorImpl* implData = nullptr;
+		EditorImpl* editorImpl = nullptr;
 
 		mutable bool isVisible = false;
 
@@ -145,10 +113,6 @@ namespace DEngine::Editor
 		InternalViewportWidget(EditorImpl& implData, Gfx::Context& gfxCtxIn);
 
 		virtual ~InternalViewportWidget() override;
-
-		[[nodiscard]] static Math::Vec2 GetNormalizedViewportPosition(
-			Math::Vec2Int cursorPos,
-			Gui::Rect viewportRect) noexcept;
 
 		[[nodiscard]] Math::Mat4 GetViewMatrix() const noexcept;
 

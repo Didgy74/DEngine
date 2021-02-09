@@ -7,7 +7,7 @@ DEngine::f32 DEngine::Math::Vector<2, DEngine::f32>::Magnitude() const
 	return Sqrt(MagnitudeSqrd());
 }
 
-DEngine::Math::Vector<2, DEngine::f32> DEngine::Math::Vector<2, DEngine::f32>::Normalized() const
+DEngine::Math::Vector<2, DEngine::f32> DEngine::Math::Vector<2, DEngine::f32>::GetNormalized() const
 {
 	f32 mag = Magnitude();
 	return Vector<2, f32>{ x / mag, y / mag };
@@ -25,7 +25,7 @@ DEngine::f32 DEngine::Math::Vector<3, DEngine::f32>::Magnitude() const
 	return Sqrt(MagnitudeSqrd());
 }
 
-DEngine::Math::Vector<3, DEngine::f32> DEngine::Math::Vector<3, DEngine::f32>::Normalized() const
+DEngine::Math::Vector<3, DEngine::f32> DEngine::Math::Vector<3, DEngine::f32>::GetNormalized() const
 {
 	f32 mag = Magnitude();
 	return Vector<3, f32>{ x / mag, y / mag, z / mag };
@@ -44,7 +44,7 @@ DEngine::f32 DEngine::Math::Vector<4, DEngine::f32>::Magnitude() const
 	return Sqrt(MagnitudeSqrd());
 }
 
-DEngine::Math::Vector<4, DEngine::f32> DEngine::Math::Vector<4, DEngine::f32>::Normalized() const
+DEngine::Math::Vector<4, DEngine::f32> DEngine::Math::Vector<4, DEngine::f32>::GetNormalized() const
 {
 	f32 magnitude = Magnitude();
 	return Vector<4, f32>{ x / magnitude, y / magnitude, z / magnitude, w / magnitude };

@@ -16,17 +16,18 @@ namespace DEngine::Gfx::Vk::Init
 		VkDeviceSize size,
 		void* pUserData)
 	{
-		VMA_MemoryTrackingData& trackingData = *reinterpret_cast<VMA_MemoryTrackingData*>(pUserData);
+		VMA_MemoryTrackingData& trackingData = *static_cast<VMA_MemoryTrackingData*>(pUserData);
 
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64) memory;
-		nameInfo.objectType = vk::ObjectType::eDeviceMemory;
 		std::lock_guard _(trackingData.vma_idTracker_lock);
-		std::string name = std::string("VMA DeviceMemory #") + std::to_string(trackingData.vma_idTracker);
-		trackingData.vma_idTracker += 1;
-		nameInfo.pObjectName = name.data();
 
-		trackingData.debugUtils->setDebugUtilsObjectNameEXT(trackingData.deviceHandle, nameInfo);
+		std::string name = std::string("VMA DeviceMemory #") + std::to_string(trackingData.vma_idTracker);
+
+		trackingData.vma_idTracker += 1;
+
+		trackingData.debugUtils->Helper_SetObjectName(
+			trackingData.deviceHandle,
+			(vk::DeviceMemory)memory,
+			name.c_str());
 	}
 }
 

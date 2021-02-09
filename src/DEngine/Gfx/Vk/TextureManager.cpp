@@ -94,12 +94,11 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			globUtils.deletionQueue.Destroy(stagingBufferVmaAlloc, stagingBuffer);
 			if (globUtils.UsingDebugUtils())
 			{
-				vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-				nameInfo.objectHandle = (u64)(VkBuffer)stagingBuffer;
-				nameInfo.objectType = stagingBuffer.objectType;
 				std::string name = "TextureManager - Texture #" + std::to_string((u64)textureID) + " - StagingBuffer";
-				nameInfo.pObjectName = name.c_str();
-				globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+				globUtils.debugUtils.Helper_SetObjectName(
+					globUtils.device.handle,
+					stagingBuffer,
+					name.c_str());
 			}
 
 			std::byte* workingMemory = nullptr;
@@ -145,12 +144,11 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 				throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate image.");
 			if (globUtils.UsingDebugUtils())
 			{
-				vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-				nameInfo.objectHandle = (u64)(VkImage)newInner.img;
-				nameInfo.objectType = newInner.img.objectType;
 				std::string name = "TextureManager - Texture #" + std::to_string((u64)textureID) + " - Img";
-				nameInfo.pObjectName = name.c_str();
-				globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+				globUtils.debugUtils.Helper_SetObjectName(
+					globUtils.device.handle,
+					newInner.img,
+					name.c_str());
 			}
 
 			// Copy and transition image.
@@ -164,12 +162,11 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 				throw std::runtime_error("DEngine - Vulkan: Unable to allocate command buffer for copying texture.");
 			if (globUtils.UsingDebugUtils())
 			{
-				vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-				nameInfo.objectHandle = (u64)(VkCommandBuffer)cmdBuffer;
-				nameInfo.objectType = cmdBuffer.objectType;
 				std::string name = "TextureManager - Texture #" + std::to_string((u64)textureID) + " - CmdBuffer";
-				nameInfo.pObjectName = name.c_str();
-				globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+				globUtils.debugUtils.Helper_SetObjectName(
+					globUtils.device.handle,
+					cmdBuffer,
+					name.c_str());
 			}
 
 
@@ -259,12 +256,11 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			newInner.imgView = globUtils.device.createImageView(imgViewInfo);
 			if (globUtils.UsingDebugUtils())
 			{
-				vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-				nameInfo.objectHandle = (u64)(VkImageView)newInner.imgView;
-				nameInfo.objectType = newInner.imgView.objectType;
 				std::string name = "TextureManager - Texture #" + std::to_string((u64)textureID) + " - ImgView";
-				nameInfo.pObjectName = name.c_str();
-				globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+				globUtils.debugUtils.Helper_SetObjectName(
+					globUtils.device.handle,
+					newInner.imgView,
+					name.c_str());
 			}
 
 			// Make the descriptor-set and update it
@@ -277,12 +273,11 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 				throw std::runtime_error("DEngine - Vulkan: Could not alloate descriptor set.");
 			if (globUtils.UsingDebugUtils())
 			{
-				vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-				nameInfo.objectHandle = (u64)(VkDescriptorSet)newInner.descrSet;
-				nameInfo.objectType = newInner.descrSet.objectType;
 				std::string name = "TextureManager - Texture #" + std::to_string((u64)textureID) + " - DescrSet";
-				nameInfo.pObjectName = name.c_str();
-				globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+				globUtils.debugUtils.Helper_SetObjectName(
+					globUtils.device.handle,
+					newInner.descrSet,
+					name.c_str());
 			}
 
 			vk::DescriptorImageInfo descrImgInfo{};
@@ -327,12 +322,10 @@ void DEngine::Gfx::Vk::TextureManager::Init(
 	manager.sampler = device.createSampler(samplerInfo);
 	if (debugUtils)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkSampler)manager.sampler;
-		nameInfo.objectType = manager.sampler.objectType;
-		std::string name = "TextureManager - Sampler";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.sampler,
+			"TextureManager - Sampler");
 	}
 
 	// Make descriptor-pool
@@ -347,12 +340,10 @@ void DEngine::Gfx::Vk::TextureManager::Init(
 	manager.descrPoolCapacity = descrPoolSize.descriptorCount;
 	if (debugUtils)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkDescriptorPool)manager.descrPool;
-		nameInfo.objectType = manager.descrPool.objectType;
-		std::string name = "TextureManager - DescrPool";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.descrPool,
+			"TextureManager - DescrPool");
 	}
 
 	// Descriptor set layout
@@ -367,12 +358,10 @@ void DEngine::Gfx::Vk::TextureManager::Init(
 	manager.descrSetLayout = device.createDescriptorSetLayout(descrSetLayoutInfo);
 	if (debugUtils)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkDescriptorSetLayout)manager.descrSetLayout;
-		nameInfo.objectType = manager.descrSetLayout.objectType;
-		std::string name = "TextureManager - DescrSetLayout";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.descrSetLayout,
+			"TextureManager - DescrSetLayout");
 	}
 
 	// Command pool
@@ -381,11 +370,9 @@ void DEngine::Gfx::Vk::TextureManager::Init(
 	manager.cmdPool = device.createCommandPool(cmdPoolInfo);
 	if (debugUtils)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkCommandPool)manager.cmdPool;
-		nameInfo.objectType = manager.cmdPool.objectType;
-		std::string name = "TextureManager - CmdPool";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.cmdPool,
+			"TextureManager - CmdPool");
 	}
 }

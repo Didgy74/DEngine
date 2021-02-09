@@ -526,13 +526,10 @@ Std::StackVec<vk::Fence, Vk::Constants::maxInFlightCount> Vk::Init::CreateMainFe
 		if (debugUtils)
 		{
 			std::string name = std::string("Main Fence #") + std::to_string(i);
-
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkFence)returnVal[i];
-			nameInfo.objectType = returnVal[i].objectType;
-			nameInfo.pObjectName = name.data();
-
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				returnVal[i],
+				name.c_str());
 		}
 	}
 
@@ -581,11 +578,10 @@ vk::RenderPass Vk::Init::BuildMainGfxRenderPass(
 	vk::RenderPass renderPass = device.createRenderPass(rpInfo);
 	if (debugUtils)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkRenderPass)renderPass;
-		nameInfo.objectType = renderPass.objectType;
-		nameInfo.pObjectName = "Main Rendering RenderPass";
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			renderPass,
+			"Main Rendering RenderPass");
 	}
 
 	return renderPass;
@@ -623,11 +619,10 @@ vk::RenderPass Vk::Init::CreateGuiRenderPass(
 	vk::RenderPass renderPass = device.createRenderPass(createInfo);
 	if (debugUtils != nullptr)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkRenderPass)renderPass;
-		nameInfo.objectType = renderPass.objectType;
-		nameInfo.pObjectName = "GUI RenderPass";
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			renderPass,
+			"GUI RenderPass");
 	}
 
 	return renderPass;

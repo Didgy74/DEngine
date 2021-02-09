@@ -309,12 +309,10 @@ void Vk::Init::Test(APIData& apiData)
 	apiData.testPipelineLayout = apiData.globUtils.device.createPipelineLayout(pipelineLayoutInfo);
 	if (apiData.globUtils.UsingDebugUtils())
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkPipelineLayout)apiData.testPipelineLayout;
-		nameInfo.objectType = apiData.testPipelineLayout.objectType;
-		std::string name = std::string("Test Pipelinelayout");
-		nameInfo.pObjectName = name.data();
-		apiData.globUtils.debugUtils.setDebugUtilsObjectNameEXT(apiData.globUtils.device.handle, nameInfo);
+		apiData.globUtils.debugUtils.Helper_SetObjectName(
+			apiData.globUtils.device.handle,
+			apiData.testPipelineLayout,
+			"Test Pipelinelayout");
 	}
 
 	App::FileInputStream vertFile{ "data/vert.spv" };
@@ -440,12 +438,10 @@ void Vk::Init::Test(APIData& apiData)
 		throw std::runtime_error("Unable to make graphics pipeline.");
 	if (apiData.globUtils.UsingDebugUtils())
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkPipeline)apiData.testPipeline;
-		nameInfo.objectType = apiData.testPipeline.objectType;
-		std::string name = std::string("Test Pipeline");
-		nameInfo.pObjectName = name.data();
-		apiData.globUtils.debugUtils.setDebugUtilsObjectNameEXT(apiData.globUtils.device.handle, nameInfo);
+		apiData.globUtils.debugUtils.Helper_SetObjectName(
+			apiData.globUtils.device.handle,
+			apiData.testPipeline,
+			"Test Pipeline");
 	}
 
 	apiData.globUtils.device.destroy(vertModule);
@@ -508,12 +504,10 @@ namespace DEngine::Gfx::Vk
 			throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate memory for gizmo vertices.");
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkBuffer)manager.arrowVtxBuffer;
-			nameInfo.objectType = manager.arrowVtxBuffer.objectType;
-			std::string name = "GizmoManager - VertexBuffer";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.arrowVtxBuffer,
+				"GizmoManager - VertexBuffer");
 		}
 
 		// Copy vertex data over
@@ -1051,12 +1045,10 @@ namespace DEngine::Gfx::Vk
 			throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate memory for gizmo line vertices.");
 		if (debugUtils)
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkBuffer)manager.lineVtxBuffer;
-			nameInfo.objectType = manager.lineVtxBuffer.objectType;
-			std::string name = "GizmoManager - LineVtxBuffer";
-			nameInfo.pObjectName = name.c_str();
-			debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.lineVtxBuffer,
+				"GizmoManager - LineVtxBuffer");
 		}
 
 		manager.lineVtxBufferCapacity = manager.lineVtxMinCapacity;

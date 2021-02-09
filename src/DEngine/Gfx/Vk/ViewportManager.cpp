@@ -70,6 +70,15 @@ namespace DEngine::Gfx::Vk
 		cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
 		cmdPoolInfo.queueFamilyIndex = globUtils.queues.graphics.FamilyIndex();
 		viewport.cmdPool = globUtils.device.createCommandPool(cmdPoolInfo);
+		if (globUtils.UsingDebugUtils())
+		{
+			std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) + " - Cmd Pool";
+			globUtils.debugUtils.Helper_SetObjectName(
+				globUtils.device.handle,
+				viewport.cmdPool,
+				name.c_str());
+		}
+
 		vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
 		cmdBufferAllocInfo.commandBufferCount = globUtils.inFlightCount;
 		cmdBufferAllocInfo.commandPool = viewport.cmdPool;
@@ -80,20 +89,13 @@ namespace DEngine::Gfx::Vk
 			throw std::runtime_error("DEngine, Vulkan: Unable to allocate command buffers for viewport.");
 		if (globUtils.UsingDebugUtils())
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkCommandPool)viewport.cmdPool;
-			nameInfo.objectType = viewport.cmdPool.objectType;
-			std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) + " - Cmd Pool";
-			nameInfo.pObjectName = name.data();
-			globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
 			for (uSize i = 0; i < viewport.cmdBuffers.Size(); i += 1)
 			{
-				nameInfo.objectHandle = (u64)(VkCommandBuffer)viewport.cmdBuffers[i];
-				nameInfo.objectType = viewport.cmdBuffers[i].objectType;
-				name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) +
-					" - CmdBuffer #" + std::to_string(i);
-				nameInfo.pObjectName = name.data();
-				globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+				std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) + " - CmdBuffer #" + std::to_string(i);
+				globUtils.debugUtils.Helper_SetObjectName(
+					globUtils.device.handle,
+					viewport.cmdBuffers[i],
+					name.c_str());
 			}
 		}
 
@@ -107,7 +109,17 @@ namespace DEngine::Gfx::Vk
 		descrPoolInfo.poolSizeCount = 1;
 		descrPoolInfo.pPoolSizes = &descrPoolSize;
 		viewport.cameraDescrPool = globUtils.device.createDescriptorPool(descrPoolInfo);
+		if (globUtils.UsingDebugUtils())
+		{
+			std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) +
+				" - Camera-data DescrPool";
+			globUtils.debugUtils.Helper_SetObjectName(
+				globUtils.device.handle,
+				viewport.cameraDescrPool,
+				name.c_str());
+		}
 
+		
 		vk::DescriptorSetAllocateInfo descrSetAllocInfo{};
 		descrSetAllocInfo.descriptorPool = viewport.cameraDescrPool;
 		descrSetAllocInfo.descriptorSetCount = globUtils.inFlightCount;
@@ -122,22 +134,14 @@ namespace DEngine::Gfx::Vk
 			throw std::runtime_error("DEngine - Vulkan: Unable to allocate descriptor sets for viewport camera data.");
 		if (globUtils.UsingDebugUtils())
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkDescriptorPool)viewport.cameraDescrPool;
-			nameInfo.objectType = viewport.cameraDescrPool.objectType;
-			std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) +
-				" - Camera-data DescrPool";
-			nameInfo.pObjectName = name.c_str();
-			globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
 			for (uSize i = 0; i < viewport.camDataDescrSets.Size(); i += 1)
 			{
-				vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-				nameInfo.objectHandle = (u64)(VkDescriptorSet)viewport.camDataDescrSets[i];
-				nameInfo.objectType = viewport.camDataDescrSets[i].objectType;
 				std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) +
 					" - Camera-data DescrSet #" + std::to_string(i);
-				nameInfo.pObjectName = name.c_str();
-				globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+				globUtils.debugUtils.Helper_SetObjectName(
+					globUtils.device.handle,
+					viewport.camDataDescrSets[i],
+					name.c_str());
 			}
 		}
 
@@ -161,15 +165,13 @@ namespace DEngine::Gfx::Vk
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("DEngine - Vulkan: VMA unable to allocate cam-data memory for viewport.");
 		viewport.camDataMappedMem = { (u8*)resultMemInfo.pMappedData, (uSize)resultMemInfo.size };
-
 		if (globUtils.UsingDebugUtils())
 		{
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.objectHandle = (u64)(VkBuffer)viewport.camDataBuffer;
-			nameInfo.objectType = viewport.camDataBuffer.objectType;
 			std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) + " - CamData Buffer";
-			nameInfo.pObjectName = name.data();
-			globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+			globUtils.debugUtils.Helper_SetObjectName(
+				globUtils.device.handle,
+				viewport.camDataBuffer,
+				name.c_str());
 		}
 		
 
@@ -277,12 +279,10 @@ bool Vk::ViewportManager::Init(
 	manager.cameraDescrLayout = device.createDescriptorSetLayout(descrLayoutInfo);
 	if (debugUtils)
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkDescriptorSetLayout)manager.cameraDescrLayout;
-		nameInfo.objectType = manager.cameraDescrLayout.objectType;
-		std::string name = "ViewportManager - Cam DescrLayout";
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.cameraDescrLayout,
+			"ViewportManager - Cam DescrLayout");
 	}
 
 	return true;
@@ -453,12 +453,11 @@ Vk::GfxRenderTarget Vk::InitializeGfxViewportRenderTarget(
 
 	if (globUtils.UsingDebugUtils())
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkImage)returnVal.img;
-		nameInfo.objectType = returnVal.img.objectType;
 		std::string name = std::string("Graphics viewport #") + std::to_string((u64)viewportID) + " - Image";
-		nameInfo.pObjectName = name.data();
-		globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+		globUtils.debugUtils.Helper_SetObjectName(
+			globUtils.device.handle,
+			returnVal.img,
+			name.c_str());
 	}
 
 	// We have to transition this image
@@ -487,12 +486,11 @@ Vk::GfxRenderTarget Vk::InitializeGfxViewportRenderTarget(
 	returnVal.imgView = globUtils.device.createImageView(imgViewInfo);
 	if (globUtils.UsingDebugUtils())
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkImageView)returnVal.imgView;
-		nameInfo.objectType = returnVal.imgView.objectType;
 		std::string name = std::string("Graphics viewport #") + std::to_string((u64)viewportID) + " - Image View";
-		nameInfo.pObjectName = name.data();
-		globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+		globUtils.debugUtils.Helper_SetObjectName(
+			globUtils.device.handle,
+			returnVal.imgView,
+			name.c_str());
 	}
 
 	vk::FramebufferCreateInfo fbInfo{};
@@ -505,12 +503,11 @@ Vk::GfxRenderTarget Vk::InitializeGfxViewportRenderTarget(
 	returnVal.framebuffer = globUtils.device.createFramebuffer(fbInfo);
 	if (globUtils.UsingDebugUtils())
 	{
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkFramebuffer)returnVal.framebuffer;
-		nameInfo.objectType = returnVal.framebuffer.objectType;
 		std::string name = std::string("Graphics viewport #") + std::to_string((u64)viewportID) + " - Framebuffer";
-		nameInfo.pObjectName = name.data();
-		globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+		globUtils.debugUtils.Helper_SetObjectName(
+			globUtils.device.handle,
+			returnVal.imgView,
+			name.c_str());
 	}
 
 	return returnVal;

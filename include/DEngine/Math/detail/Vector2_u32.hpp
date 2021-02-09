@@ -22,7 +22,7 @@ namespace DEngine::Math
 
 		[[nodiscard]] f32 Magnitude() const;
 		[[nodiscard]] constexpr f32 MagnitudeSqrd() const;
-		[[nodiscard]] Vector<2, f32> Normalized() const;
+		[[nodiscard]] Vector<2, f32> GetNormalized() const;
 
 		[[nodiscard]] constexpr u32* Data();
 		[[nodiscard]] constexpr u32 const* Data() const;

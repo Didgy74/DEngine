@@ -44,12 +44,10 @@ void DEngine::Gfx::Vk::ObjectDataManager::HandleResizeEvent(
 	manager.mappedMem = vmaAllocResultInfo.pMappedData;
 	if (globUtils.UsingDebugUtils())
 	{
-		std::string name = std::string("ObjectData - Buffer");
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkBuffer)manager.buffer;
-		nameInfo.objectType = vk::ObjectType::eBuffer;
-		nameInfo.pObjectName = name.c_str();
-		globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+		globUtils.debugUtils.Helper_SetObjectName(
+			globUtils.device.handle,
+			manager.buffer,
+			"ObjectData - Buffer");
 	}
 
 
@@ -66,12 +64,10 @@ void DEngine::Gfx::Vk::ObjectDataManager::HandleResizeEvent(
 	manager.descrPool = globUtils.device.createDescriptorPool(descrPoolInfo);
 	if (globUtils.UsingDebugUtils())
 	{
-		std::string name = std::string("ObjectData - DescrPool");
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkDescriptorPool)manager.descrPool;
-		nameInfo.objectType = vk::ObjectType::eDescriptorPool;
-		nameInfo.pObjectName = name.c_str();
-		globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+		globUtils.debugUtils.Helper_SetObjectName(
+			globUtils.device.handle,
+			manager.descrPool,
+			"ObjectData - DescrPool");
 	}
 
 	vk::DescriptorSetAllocateInfo descrSetAllocInfo{};
@@ -83,12 +79,10 @@ void DEngine::Gfx::Vk::ObjectDataManager::HandleResizeEvent(
 		throw std::runtime_error("DEngine - Vulkan: Unable to allocate descriptor set for object-data.");
 	if (globUtils.UsingDebugUtils())
 	{
-		std::string name = std::string("ObjectData - DescrSet");
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkDescriptorSet)manager.descrSet;
-		nameInfo.objectType = vk::ObjectType::eDescriptorSet;
-		nameInfo.pObjectName = name.c_str();
-		globUtils.debugUtils.setDebugUtilsObjectNameEXT(globUtils.device.handle, nameInfo);
+		globUtils.debugUtils.Helper_SetObjectName(
+			globUtils.device.handle,
+			manager.descrSet,
+			"ObjectData - DescrSet");
 	}
 
 	// Write to the descriptor set
@@ -158,12 +152,10 @@ bool DEngine::Gfx::Vk::ObjectDataManager::Init(
 	manager.mappedMem = vmaAllocResultInfo.pMappedData;
 	if (debugUtils)
 	{
-		std::string name = std::string("ObjectData - Buffer");
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkBuffer)manager.buffer;
-		nameInfo.objectType = vk::ObjectType::eBuffer;
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.buffer,
+			"ObjectData - Buffer");
 	}
 
 	// Create descriptor set layout
@@ -178,12 +170,10 @@ bool DEngine::Gfx::Vk::ObjectDataManager::Init(
 	manager.descrSetLayout = device.createDescriptorSetLayout(descrSetLayoutInfo);
 	if (debugUtils)
 	{
-		std::string name = std::string("ObjectData - DescrSetLayout");
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkDescriptorSetLayout)manager.descrSetLayout;
-		nameInfo.objectType = vk::ObjectType::eDescriptorSetLayout;
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.descrSetLayout,
+			"ObjectData - DescrSetLayout");
 	}
 
 	// Allocate the descriptor-set stuff
@@ -199,12 +189,10 @@ bool DEngine::Gfx::Vk::ObjectDataManager::Init(
 	manager.descrPool = device.createDescriptorPool(descrPoolInfo);
 	if (debugUtils)
 	{
-		std::string name = std::string("ObjectData - DescrPool");
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkDescriptorPool)manager.descrPool;
-		nameInfo.objectType = vk::ObjectType::eDescriptorPool;
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.descrPool,
+			"ObjectData - DescrPool");
 	}
 
 	vk::DescriptorSetAllocateInfo descrSetAllocInfo{};
@@ -216,12 +204,10 @@ bool DEngine::Gfx::Vk::ObjectDataManager::Init(
 		throw std::runtime_error("DEngine - Vulkan: Unable to allocate descriptor set for object-data.");
 	if (debugUtils)
 	{
-		std::string name = std::string("ObjectData - DescrSet");
-		vk::DebugUtilsObjectNameInfoEXT nameInfo{};
-		nameInfo.objectHandle = (u64)(VkDescriptorSet)manager.descrSet;
-		nameInfo.objectType = vk::ObjectType::eDescriptorSet;
-		nameInfo.pObjectName = name.c_str();
-		debugUtils->setDebugUtilsObjectNameEXT(device.handle, nameInfo);
+		debugUtils->Helper_SetObjectName(
+			device.handle,
+			manager.descrSet,
+			"ObjectData - DescrSet");
 	}
 
 	// Write to the descriptor set

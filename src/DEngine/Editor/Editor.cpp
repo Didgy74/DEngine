@@ -119,6 +119,19 @@ namespace DEngine::Editor
 
 		void SelectEntity(Std::Opt<Entity> previousId, Entity newId)
 		{
+			// Find new entity and select it.
+			Std::Opt<uSize> newLine;
+			for (uSize i = 0; i < entitiesList->lines.size(); i += 1)
+			{
+				long id = std::stol(entitiesList->lines[i]);
+				if ((Entity)id == newId)
+				{
+					newLine = i;
+					break;
+				}
+			}
+			DENGINE_DETAIL_ASSERT(newLine.HasValue());
+			entitiesList->selectedLine = newLine.Value();
 		}
 
 		void UnselectEntity()

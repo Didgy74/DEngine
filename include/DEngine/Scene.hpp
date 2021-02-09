@@ -55,26 +55,38 @@ namespace DEngine
 		Std::Span<Entity const> GetEntities() const { return { entities.data(), entities.size() }; }
 
 		template<typename T>
-		using ComponentVector = std::vector<Std::Pair<Entity, T>>;
-		template<typename T>
-		ComponentVector<T>& GetComponentVector() = delete;
+		Std::Span<Std::Pair<Entity, T>> GetAllComponents() = delete;
 		template<>
-		ComponentVector<Transform>& GetComponentVector<Transform>() { return transforms; }
+		Std::Span<Std::Pair<Entity, Transform>> GetAllComponents<Transform>() { return { transforms.data(), transforms.size() }; }
 		template<>
-		ComponentVector<Gfx::TextureID>& GetComponentVector<Gfx::TextureID>() { return textureIDs; }
+		Std::Span<Std::Pair<Entity, Gfx::TextureID>> GetAllComponents<Gfx::TextureID>() { return { textureIDs.data(), textureIDs.size() }; }
 		template<>
-		ComponentVector<Move>& GetComponentVector<Move>() { return moves; }
+		Std::Span<Std::Pair<Entity, Move>> GetAllComponents<Move>() { return { moves.data(), moves.size() }; }
 		template<>
-		ComponentVector<Box2D_Component>& GetComponentVector<Box2D_Component>() { return b2Bodies; }
+		Std::Span<Std::Pair<Entity, Box2D_Component>> GetAllComponents<Box2D_Component>() { return { b2Bodies.data(), b2Bodies.size() }; }
 
+	private:
+		std::vector<Entity>& Internal_GetEntities() { return entities; }
+
+		template<typename T>
+		std::vector<Std::Pair<Entity, T>>& Internal_GetAllComponents() = delete;
+		template<>
+		std::vector<Std::Pair<Entity, Transform>>& Internal_GetAllComponents<Transform>() { return transforms; }
+		template<>
+		std::vector<Std::Pair<Entity, Gfx::TextureID>>& Internal_GetAllComponents<Gfx::TextureID>() { return textureIDs; }
+		template<>
+		std::vector<Std::Pair<Entity, Move>>& Internal_GetAllComponents<Move>() { return moves; }
+		template<>
+		std::vector<Std::Pair<Entity, Box2D_Component>>& Internal_GetAllComponents<Box2D_Component>() { return b2Bodies; }
+	public:
 
 
 		Entity NewEntity()
 		{
-			entities.push_back((Entity)entityIdIncrementor);
+			Entity returnVal = (Entity)entityIdIncrementor;
 			entityIdIncrementor += 1;
-
-			return entities[entities.size() - 1];
+			entities.push_back(returnVal);
+			return returnVal;
 		}
 
 		void DeleteEntity(Entity ent)
@@ -110,7 +122,7 @@ namespace DEngine
 		{
 			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
 
-			auto& componentVector = GetComponentVector<T>();
+			auto& componentVector = Internal_GetAllComponents<T>();
 			// Crash if we already got this component
 			DENGINE_DETAIL_ASSERT(GetComponent<T>(entity) == nullptr);
 
@@ -120,7 +132,7 @@ namespace DEngine
 		void DeleteComponent(Entity entity)
 		{
 			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
-			auto& componentVector = GetComponentVector<T>();
+			auto& componentVector = Internal_GetAllComponents<T>();
 			auto const componentIt = Std::FindIf(
 				componentVector.begin(),
 				componentVector.end(),
@@ -131,7 +143,7 @@ namespace DEngine
 		template<typename T>
 		void DeleteComponent_CanFail(Entity entity)
 		{
-			auto& componentVector = GetComponentVector<T>();
+			auto& componentVector = Internal_GetAllComponents<T>();
 			auto const componentIt = Std::FindIf(
 				componentVector.begin(),
 				componentVector.end(),
@@ -143,7 +155,7 @@ namespace DEngine
 		[[nodiscard]] T* GetComponent(Entity entity)
 		{
 			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
-			auto& componentVector = GetComponentVector<T>();
+			auto& componentVector = Internal_GetAllComponents<T>();
 			auto const componentIt = Std::FindIf(
 				componentVector.begin(),
 				componentVector.end(),
