@@ -14,8 +14,12 @@ Rendering is powered by Vulkan only, and supports rendering GUI as well as the 3
 
 ## How to build
 ### Windows
-Requires:
- - CMake 3.10 or higher
+Requires
+ - CMake 3.10
+
+Steps
+ - `git submodule update --init --recursive`
+ - Build with `cmake` out-of-tree.
 
 Tested on following compilers:
  - MSVC v142
