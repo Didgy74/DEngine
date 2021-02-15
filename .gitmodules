@@ -1,8 +1,0 @@
-
-[submodule "external/Texas"]
-	path = external/Texas
-	url = https://github.com/Didgy74/Texas.git
-	branch = development
-[submodule "external/box2d"]
-	path = external/box2d
-	url = git@github.com:Didgy74/box2d.git
