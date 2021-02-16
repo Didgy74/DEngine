@@ -5,3 +5,9 @@
 [submodule "external/box2d"]
 	path = external/box2d
 	url = https://github.com/Didgy74/box2d
+[submodule "external/freetype"]
+	path = external/freetype
+	url = https://gitlab.freedesktop.org/freetype/freetype
+[submodule "external/Vulkan-Headers"]
+	path = external/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers
