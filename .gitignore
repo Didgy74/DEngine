@@ -11,6 +11,7 @@ android/.idea
 android/app/app.iml
 android/app/.cxx
 android/app/build
+CmakeSettings.json
 
 
 ### CLion ###
