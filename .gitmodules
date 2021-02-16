@@ -10,3 +10,7 @@
 	path = any/external/Vulkan-Headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers
 	branch = v1.2.170
+[submodule "any/external/box2d"]
+	path = any/external/box2d
+	url = https://github.com/erincatto/box2d
+	branch = v.2.4.1
