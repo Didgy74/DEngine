@@ -7,7 +7,7 @@ project(dengine_desktop)
 
 find_package(glfw3 REQUIRED)
 
-add_subdirectory(../any any)
+add_subdirectory("../any" any)
 
 add_executable(dengine)
 target_link_libraries(dengine

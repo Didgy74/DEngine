@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "Don't build box2d unit tests.")
 set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "Don't build box2d testbed.")
 set(BOX2D_BUILD_DOCS OFF CACHE BOOL "Don't build box2d documentation.")
-
+set(CMAKE_DISABLE_FIND_PACKAGE_ZLIB ON)
 project(dengine_any)
 
 find_package(Threads REQUIRED)
@@ -64,8 +64,8 @@ target_link_libraries(dengine_any
 	PUBLIC
 		Threads::Threads
 		Vulkan-Headers
-		freetype
 		Texas
+		freetype
 		box2d
 		${CMAKE_DL_LIBS})
 target_sources(dengine_any

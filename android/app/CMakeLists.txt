@@ -7,12 +7,12 @@ set(CMAKE_SHARED_LINKER_FLAGS
 
 project(dengine)
 
-add_subdirectory(../../all all)
+add_subdirectory("../../any" "any")
 
 add_library(dengine SHARED
     "src/application.cpp")
 target_link_libraries(dengine
     PRIVATE
-        dengine_all
+        dengine_any
         log
         android)
