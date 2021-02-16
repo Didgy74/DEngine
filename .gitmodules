@@ -8,6 +8,7 @@
 [submodule "external/freetype"]
 	path = external/freetype
 	url = https://gitlab.freedesktop.org/freetype/freetype
+	branch = VER-2-10-4
 [submodule "external/Vulkan-Headers"]
 	path = external/Vulkan-Headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers
