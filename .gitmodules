@@ -2,9 +2,6 @@
 	path = any/external/Texas
 	url = https://github.com/Didgy74/Texas
 	branch = development
-[submodule "any/external/box2d"]
-	path = any/external/box2d
-	url = https://github.com/Didgy74/box2d
 [submodule "any/external/freetype"]
 	path = any/external/freetype
 	url = https://gitlab.freedesktop.org/freetype/freetype
