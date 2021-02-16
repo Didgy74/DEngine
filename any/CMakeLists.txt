@@ -1,19 +1,23 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(dengine_all)
+set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "Don't build box2d unit tests.")
+set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "Don't build box2d testbed.")
+set(BOX2D_BUILD_DOCS OFF CACHE BOOL "Don't build box2d documentation.")
+
+project(dengine_any)
 
 find_package(Threads REQUIRED)
 
-add_subdirectory(../external/box2d box2d)
-add_subdirectory(../external/Texas Texas)
-add_subdirectory(../external/freetype freetype)
-add_subdirectory(../external/Vulkan-Headers Vulkan-Headers)
+add_subdirectory(external/box2d box2d)
+add_subdirectory(external/Texas Texas)
+add_subdirectory(external/freetype freetype)
+add_subdirectory(external/Vulkan-Headers Vulkan-Headers)
 
 file(GLOB_RECURSE DENGINE_HEADERS
 	"*.hpp"
 	"include")
 
-add_library(dengine_all STATIC
+add_library(dengine_any STATIC
 		"src/main.cpp"
 		"src/DEngine/Assert.cpp"
 		"src/DEngine/Editor/Editor.cpp"
@@ -53,10 +57,10 @@ add_library(dengine_all STATIC
 		"src/DEngine/Math/Common.cpp"
 		"src/DEngine/Math/Vector.cpp")
 
-target_include_directories(dengine_all
+target_include_directories(dengine_any
 	PUBLIC
 		"include")
-target_link_libraries(dengine_all
+target_link_libraries(dengine_any
 	PUBLIC
 		Threads::Threads
 		Vulkan-Headers
@@ -64,37 +68,37 @@ target_link_libraries(dengine_all
 		Texas
 		box2d
 		${CMAKE_DL_LIBS})
-target_sources(dengine_all
+target_sources(dengine_any
 	PUBLIC
 		${DENGINE_HEADERS})
 
 
 option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ON)
 if (${DENGINE_ENABLE_ASSERT})
-	target_compile_definitions(dengine_all PUBLIC DENGINE_ENABLE_ASSERT)
+	target_compile_definitions(dengine_any PUBLIC DENGINE_ENABLE_ASSERT)
 endif()
 
 option(DENGINE_APPLICATION_ENABLE_ASSERT "Asserts inside the application code" ON)
 if (${DENGINE_APPLICATION_ENABLE_ASSERT})
-	target_compile_definitions(dengine_all PUBLIC DENGINE_APPLICATION_ENABLE_ASSERT)
+	target_compile_definitions(dengine_any PUBLIC DENGINE_APPLICATION_ENABLE_ASSERT)
 endif()
 
 option(DENGINE_CONTAINERS_ENABLE_ASSERT "Asserts inside DEngine containers" ON)	
 if (${DENGINE_CONTAINERS_ENABLE_ASSERT})
-	target_compile_definitions(dengine_all PUBLIC DENGINE_CONTAINERS_ENABLE_ASSERT)
+	target_compile_definitions(dengine_any PUBLIC DENGINE_CONTAINERS_ENABLE_ASSERT)
 endif()
 
 option(DENGINE_GFX_ENABLE_ASSERT "Asserts inside the rendering code" ON)
 if (${DENGINE_GFX_ENABLE_ASSERT})
-	target_compile_definitions(dengine_all PUBLIC DENGINE_GFX_ENABLE_ASSERT)
+	target_compile_definitions(dengine_any PUBLIC DENGINE_GFX_ENABLE_ASSERT)
 endif()
 
 option(DENGINE_GUI_ENABLE_ASSERT "Asserts inside the GUI toolkit code" ON)
 if (${DENGINE_GFX_ENABLE_ASSERT})
-	target_compile_definitions(dengine_all PUBLIC DENGINE_GUI_ENABLE_ASSERT)
+	target_compile_definitions(dengine_any PUBLIC DENGINE_GUI_ENABLE_ASSERT)
 endif()
 
 option(DENGINE_MATH_ENABLE_ASSERT "Asserts inside DEngine math" ON)	
 if (${DENGINE_MATH_ENABLE_ASSERT})
-	target_compile_definitions(dengine_all PUBLIC DENGINE_MATH_ENABLE_ASSERT)
+	target_compile_definitions(dengine_any PUBLIC DENGINE_MATH_ENABLE_ASSERT)
 endif()

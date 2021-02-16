@@ -7,13 +7,13 @@ project(dengine_desktop)
 
 find_package(glfw3 REQUIRED)
 
-add_subdirectory(../all all)
+add_subdirectory(../any any)
 
-add_executable(dengine_desktop)
-target_link_libraries(dengine_desktop
+add_executable(dengine)
+target_link_libraries(dengine
 	PRIVATE
-		dengine_all
+		dengine_any
 		glfw)
-target_sources(dengine_desktop
+target_sources(dengine
 	PRIVATE
 		"src/application.cpp")
