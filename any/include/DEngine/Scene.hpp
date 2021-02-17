@@ -62,17 +62,8 @@ namespace DEngine
 
 		template<typename T>
 		std::vector<Std::Pair<Entity, T>>& Internal_GetAllComponents() = delete;
-		template<>
-		std::vector<Std::Pair<Entity, Transform>>& Internal_GetAllComponents<Transform>() { return transforms; }
-		template<>
-		std::vector<Std::Pair<Entity, Gfx::TextureID>>& Internal_GetAllComponents<Gfx::TextureID>() { return textureIDs; }
-		template<>
-		std::vector<Std::Pair<Entity, Move>>& Internal_GetAllComponents<Move>() { return moves; }
-		template<>
-		std::vector<Std::Pair<Entity, Box2D_Component>>& Internal_GetAllComponents<Box2D_Component>() { return b2Bodies; }
+
 	public:
-
-
 		Entity NewEntity()
 		{
 			Entity returnVal = (Entity)entityIdIncrementor;
@@ -176,5 +167,13 @@ namespace DEngine
 	template<>
 	inline Std::Span<Std::Pair<Entity, Box2D_Component>> Scene::GetAllComponents<Box2D_Component>() { return { b2Bodies.data(), b2Bodies.size() }; }
 
+	template<>
+	inline std::vector<Std::Pair<Entity, Transform>>& Scene::Internal_GetAllComponents<Transform>() { return transforms; }
+	template<>
+	inline std::vector<Std::Pair<Entity, Gfx::TextureID>>& Scene::Internal_GetAllComponents<Gfx::TextureID>() { return textureIDs; }
+	template<>
+	inline std::vector<Std::Pair<Entity, Move>>& Scene::Internal_GetAllComponents<Move>() { return moves; }
+	template<>
+	inline std::vector<Std::Pair<Entity, Box2D_Component>>& Scene::Internal_GetAllComponents<Box2D_Component>() { return b2Bodies; }
 }
 
