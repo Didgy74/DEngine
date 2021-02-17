@@ -56,14 +56,6 @@ namespace DEngine
 
 		template<typename T>
 		Std::Span<Std::Pair<Entity, T>> GetAllComponents() = delete;
-		template<>
-		Std::Span<Std::Pair<Entity, Transform>> GetAllComponents<Transform>() { return { transforms.data(), transforms.size() }; }
-		template<>
-		Std::Span<Std::Pair<Entity, Gfx::TextureID>> GetAllComponents<Gfx::TextureID>() { return { textureIDs.data(), textureIDs.size() }; }
-		template<>
-		Std::Span<Std::Pair<Entity, Move>> GetAllComponents<Move>() { return { moves.data(), moves.size() }; }
-		template<>
-		Std::Span<Std::Pair<Entity, Box2D_Component>> GetAllComponents<Box2D_Component>() { return { b2Bodies.data(), b2Bodies.size() }; }
 
 	private:
 		std::vector<Entity>& Internal_GetEntities() { return entities; }
@@ -174,5 +166,15 @@ namespace DEngine
 		std::vector<Std::Pair<Entity, Box2D_Component>> b2Bodies;
 		std::vector<Entity> entities;
 	};
+
+	template<>
+	inline Std::Span<Std::Pair<Entity, Transform>> Scene::GetAllComponents<Transform>() { return { transforms.data(), transforms.size() }; }
+	template<>
+	inline Std::Span<Std::Pair<Entity, Gfx::TextureID>> Scene::GetAllComponents<Gfx::TextureID>() { return { textureIDs.data(), textureIDs.size() }; }
+	template<>
+	inline Std::Span<Std::Pair<Entity, Move>> Scene::GetAllComponents<Move>() { return { moves.data(), moves.size() }; }
+	template<>
+	inline Std::Span<Std::Pair<Entity, Box2D_Component>> Scene::GetAllComponents<Box2D_Component>() { return { b2Bodies.data(), b2Bodies.size() }; }
+
 }
 
