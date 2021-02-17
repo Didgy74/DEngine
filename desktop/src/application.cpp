@@ -8,6 +8,12 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+/* Work around old GLFW on debian */
+#ifndef GLFW_GAMEPAD_AXIS_LEFT_X
+#define GLFW_GAMEPAD_AXIS_LEFT_X        0
+#define GLFW_GAMEPAD_AXIS_LEFT_Y        1
+#endif
+
 #include <iostream>
 #include <cstdio>
 #include <cstring>
