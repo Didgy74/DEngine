@@ -5,7 +5,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 project(dengine_desktop)
 
-find_package(glfw3 REQUIRED)
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "Don't build GLFW documentation.")
+set(GLFW_INSTALL OFF CACHE BOOL "Don't build GLFW install target")
+if(WIN32)
+	add_subdirectory("external/glfw" glfw3)
+else()
+	find_package(glfw3 REQUIRED)
+endif()
 
 add_subdirectory("../any" any)
 
