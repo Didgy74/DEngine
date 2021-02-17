@@ -14,3 +14,7 @@
 	path = any/external/box2d
 	url = https://github.com/erincatto/box2d
 	branch = v.2.4.1
+[submodule "desktop/external/glfw"]
+	path = desktop/external/glfw
+	url = https://github.com/glfw/glfw.git
+	branch = 3.3.2
