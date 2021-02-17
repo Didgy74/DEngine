@@ -37,8 +37,8 @@ namespace DEngine::Math
 		[[nodiscard]] static constexpr Vector<2, i32> Left();
 		[[nodiscard]] static constexpr Vector<2, i32> Right();
 
-		[[nodiscard]] i32& operator[](uSize i) noexcept;
-		[[nodiscard]] i32 operator[](uSize i) const noexcept;
+		[[nodiscard]] constexpr i32& operator[](uSize i) noexcept;
+		[[nodiscard]] constexpr i32 operator[](uSize i) const noexcept;
 
 		constexpr Vector<2, i32>& operator+=(Vector<2, i32> const& rhs);
 		constexpr Vector<2, i32>& operator-=(Vector<2, i32> const& rhs);

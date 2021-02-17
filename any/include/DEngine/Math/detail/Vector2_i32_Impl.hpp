@@ -63,14 +63,14 @@ namespace DEngine::Math
 		return Vector<2, i32>{i32(1), i32(0)};
 	}
 
-	inline i32& Vector<2, i32>::operator[](uSize i) noexcept
+	constexpr i32& Vector<2, i32>::operator[](uSize i) noexcept
 	{
 		DENGINE_DETAIL_MATH_ASSERT_MSG(
 			i < 2,
 			"Attempted to index into a Vec<2, i32> with an index out of bounds.");
 		return (&x)[i];
 	}
-	inline i32 Vector<2, i32>::operator[](uSize i) const noexcept
+	constexpr i32 Vector<2, i32>::operator[](uSize i) const noexcept
 	{
 		DENGINE_DETAIL_MATH_ASSERT_MSG(
 			i < 2,
