@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DEngine/Std/Containers/detail/Assert.hpp>
+#include <Dengine/Std/Utility.hpp>
 
 namespace DEngine::Std
 {
@@ -65,14 +66,15 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	inline Box<T>& Box<T>::operator=(Box&& right) noexcept
+	inline Box<T>& Box<T>::operator=(
+		Box&& right) noexcept
 	{
-		if (this == &right)
-			return *this;
-		
-		Clear();
-		data = right.data;
-		right.data = nullptr;
+		delete Std::Exchange(
+			data,
+			Std::Exchange(
+				right.data,
+				nullptr));
+
 		return *this;
 	}
 
