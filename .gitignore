@@ -13,6 +13,8 @@ android/app/.cxx
 android/app/build
 CmakeSettings.json
 local.properties
+any/html
+any/latex
 
 ### CLion ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and WebStorm
