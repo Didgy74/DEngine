@@ -23,10 +23,10 @@ namespace DEngine::Gui
 			std::vector<Gfx::GuiVertex>& verticesIn,
 			std::vector<u32>& indicesIn,
 			std::vector<Gfx::GuiDrawCmd>& drawCmdsIn) :
-			framebufferExtent(framebufferExtent),
 			vertices(verticesIn),
 			indices(indicesIn),
-			drawCmds(drawCmdsIn)
+			drawCmds(drawCmdsIn),
+			framebufferExtent(framebufferExtent)
 		{
 			vertices.clear();
 			indices.clear();

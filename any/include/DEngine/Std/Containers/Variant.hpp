@@ -1,5 +1,6 @@
 #pragma once
 
+#include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Trait.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 
@@ -14,6 +15,9 @@ namespace DEngine::Std
 	class Variant
 	{
 	public:
+		template<typename T>
+		static constexpr unsigned int indexOf = Trait::indexOf<T, Ts...>;
+
 		inline ~Variant() noexcept;
 
 		[[nodiscard]] Opt<unsigned int> GetIndex() const noexcept;
@@ -37,6 +41,25 @@ namespace DEngine::Std
 			else
 			{
 				*reinterpret_cast<T*>(data) = in;
+			}
+
+			tracker = newTypeIndex;
+		}
+
+
+		template<typename T>
+		void Set(T&& in) noexcept
+		{
+			constexpr unsigned int newTypeIndex = Trait::indexOf<T, Ts...>;
+			if (tracker != noValue)
+				Clear();
+			if (newTypeIndex != tracker)
+			{
+				new(data) T(static_cast<T&&>(in));
+			}
+			else
+			{
+				*reinterpret_cast<T*>(data) = static_cast<T&&>(in);
 			}
 
 			tracker = newTypeIndex;
@@ -71,6 +94,11 @@ namespace DEngine::Std
 			constexpr unsigned int i = Trait::indexOf<T, Ts...>;
 			DENGINE_DETAIL_CONTAINERS_ASSERT(tracker == i);
 			return *reinterpret_cast<T const*>(data);
+		}
+		template<typename T>
+		[[nodiscard]] bool IsA() const noexcept
+		{
+			return tracker == Trait::indexOf<T, Ts...>;
 		}
 		template<typename T>
 		[[nodiscard]] T* ToPtr() noexcept
