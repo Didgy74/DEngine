@@ -46,20 +46,20 @@ namespace DEngine::Std
 			tracker = newTypeIndex;
 		}
 
-
 		template<typename T>
-		void Set(T&& in) noexcept
+		void Set(Trait::RemoveCVRef<T>&& in) noexcept
 		{
-			constexpr unsigned int newTypeIndex = Trait::indexOf<T, Ts...>;
+			using Type = typename Trait::RemoveCVRef<T>;
+			constexpr unsigned int newTypeIndex = Trait::indexOf<Type, Ts...>;
 			if (tracker != noValue)
 				Clear();
 			if (newTypeIndex != tracker)
 			{
-				new(data) T(static_cast<T&&>(in));
+				new(data) Type(static_cast<Type&&>(in));
 			}
 			else
 			{
-				*reinterpret_cast<T*>(data) = static_cast<T&&>(in);
+				*reinterpret_cast<Type*>(data) = static_cast<Type&&>(in);
 			}
 
 			tracker = newTypeIndex;

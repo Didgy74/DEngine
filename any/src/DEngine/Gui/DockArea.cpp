@@ -29,15 +29,9 @@ struct DockArea::Node
 		DockArea* dockArea = nullptr;
 		uSize layerIndex;
 	};
-	struct CursorClick_Result
+	[[nodiscad]] virtual bool CursorClick(CursorClick_Params const&)
 	{
-		bool eventConsumed = false;
-	};
-	virtual CursorClick_Result CursorClick(CursorClick_Params)
-	{
-		CursorClick_Result returnVal{};
-		returnVal.eventConsumed = false;
-		return returnVal;
+		return false;
 	}
 
 	struct CursorMove_Params
@@ -51,15 +45,25 @@ struct DockArea::Node
 		Rect widgetRect;
 		uSize layerIndex;
 	};
-	struct CursorMove_Result
+	[[nodiscad]] virtual bool CursorMove(CursorMove_Params const&)
 	{
-		bool eventConsumed = false;
+		return false;
+	}
+
+	struct TouchEvent_Params
+	{
+		Context* ctx = nullptr;
+		WindowID windowId;
+		Rect nodeRect;
+		Rect visibleRect;
+		Gui::TouchEvent event;
+		DockArea* dockArea = nullptr;
+		Rect widgetRect;
+		uSize layerIndex;
 	};
-	virtual CursorMove_Result CursorMove(CursorMove_Params)
+	[[nodiscad]] virtual bool TouchEvent(TouchEvent_Params const&)
 	{
-		CursorMove_Result returnVal{};
-		returnVal.eventConsumed = false;
-		return returnVal;
+		return false;
 	}
 
 	virtual ~Node() {}
@@ -140,25 +144,67 @@ namespace DEngine::Gui::impl
 			}
 		}
 
-		virtual CursorClick_Result CursorClick(
-			CursorClick_Params in) override
+		[[nodiscad]] virtual bool CursorClick(CursorClick_Params const& in) override
 		{
-			Node::CursorClick_Result returnVal{};
+			bool returnVal{};
 
+			if (in.event.button == CursorButton::Primary)
+			{
+				PointerPress_Params params{};
+				params.ctx = in.ctx;
+				params.dockArea = in.dockArea;
+				params.layerIndex = in.layerIndex;
+				params.nodeRect = in.nodeRect;
+				params.pointerId = DockArea::cursorPointerID;
+				params.pointerPos = { (f32)in.cursorPos.x, (f32)in.cursorPos.y };
+				params.pressed = in.event.clicked;
+				params.visibleRect = in.visibleRect;
+				returnVal = PointerPress(params);
+			}
+
+			return returnVal;
+		}
+
+		[[nodiscad]] virtual bool CursorMove(CursorMove_Params const& in) override
+		{
+			PointerMove_Params params{};
+			params.dockArea = in.dockArea;
+			params.layerIndex = in.layerIndex;
+			params.pointerId = DockArea::cursorPointerID;
+			params.pointerPos = { (f32)in.event.position.x, (f32)in.event.position.y };
+			params.widgetPos = in.widgetRect.position;
+			return PointerMove(params);
+		}
+
+		struct PointerPress_Params
+		{
+			Context* ctx = nullptr;
+			Rect nodeRect;
+			Rect visibleRect;
+
+			DockArea* dockArea = nullptr;
+			uSize layerIndex;
+			u8 pointerId;
+			Math::Vec2 pointerPos;
+			bool pressed;
+		};
+		// Returns true if event was consumed
+		[[nodiscard]] bool PointerPress(PointerPress_Params const& in)
+		{
+			bool eventConsumed = false;
 			if (in.dockArea->behaviorData.IsA<DockArea::BehaviorData_Normal>())
 			{
-				bool cursorInside = in.nodeRect.PointIsInside(in.cursorPos) && in.visibleRect.PointIsInside(in.cursorPos);
+				bool cursorInside = in.nodeRect.PointIsInside(in.pointerPos) && in.visibleRect.PointIsInside(in.pointerPos);
 				if (!cursorInside)
 				{
-					returnVal.eventConsumed = false;
-					return returnVal;
+					return false;
 				}
 
-				// We can now consume the event
-				returnVal.eventConsumed = true;
+				if (in.layerIndex == in.dockArea->layers.size() - 1)
+					return false;
 
 				// and push this layer to the front, if it's not the rear-most layer.
-				if (in.layerIndex != in.dockArea->layers.size() - 1)
+				if (in.layerIndex != 0 && in.layerIndex != in.dockArea->layers.size() - 1)
 					DockArea_PushLayerToFront(*in.dockArea, in.layerIndex);
 
 				auto& implData = *static_cast<impl::ImplData*>(in.ctx->Internal_ImplData());
@@ -167,30 +213,95 @@ namespace DEngine::Gui::impl
 				// dockarea widget into "moving" mode.
 				Rect titlebarRect = in.nodeRect;
 				titlebarRect.extent.height = implData.textManager.lineheight;
-				if (titlebarRect.PointIsInside(in.cursorPos))
+				if (in.pressed && titlebarRect.PointIsInside(in.pointerPos))
 				{
-					in.dockArea->behaviorData.Set(DockArea::BehaviorData_Moving{});
+					DockArea::BehaviorData_Moving newBehavior{};
+					newBehavior.pointerID = in.pointerId;
+					Math::Vec2 temp = in.pointerPos - Math::Vec2{ (f32)in.nodeRect.position.x, (f32)in.nodeRect.position.y };
+					newBehavior.pointerOffset = temp;
+					in.dockArea->behaviorData.Set(newBehavior);
+
+					eventConsumed = true;
+				}
+			}
+			else if (in.dockArea->behaviorData.IsA<DockArea::BehaviorData_Moving>())
+			{
+				auto& behaviorData = in.dockArea->behaviorData.Get<DockArea::BehaviorData_Moving>();
+				if (!in.pressed && in.pointerId == behaviorData.pointerID)
+				{
+					in.dockArea->behaviorData.Set(DockArea::BehaviorData_Normal{});
+					return true;
 				}
 			}
 
-			return returnVal;
+			return eventConsumed;
 		}
 
-		virtual CursorMove_Result CursorMove(CursorMove_Params in) override
+		struct PointerMove_Params
 		{
-			Node::CursorMove_Result returnVal{};
-			if (in.layerIndex == 0)
-				returnVal.eventConsumed = true;
+			DockArea* dockArea = nullptr;
+			Math::Vec2Int widgetPos;
+			uSize layerIndex;
+			u8 pointerId;
+			Math::Vec2 pointerPos;
+		};
+		[[nodiscard]] bool PointerMove(PointerMove_Params const& in)
+		{
+			bool eventConsumed{};
 
 			if (in.dockArea->behaviorData.IsA<DockArea::BehaviorData_Moving>())
 			{
+				if (in.layerIndex == 0)
+					eventConsumed = true;
+
+				auto& behaviorMoving = in.dockArea->behaviorData.Get<DockArea::BehaviorData_Moving>();
 				// If we only have 0-1 layer, we shouldn't be in the moving state
 				// to begin with.
 				DENGINE_IMPL_GUI_ASSERT(in.dockArea->layers.size() > 1);
-				in.dockArea->layers[in.layerIndex].rect.position = in.event.position - in.nodeRect.position;
+				if (in.pointerId == behaviorMoving.pointerID)
+				{
+					Math::Vec2 temp = in.pointerPos;
+					temp -= { (f32)in.widgetPos.x, (f32)in.widgetPos.y };
+					temp -= behaviorMoving.pointerOffset;
+					in.dockArea->layers[in.layerIndex].rect.position = { (i32)temp.x, (i32)temp.y };
+				}
 			}
-			
-			return returnVal;
+
+			return eventConsumed;
+		}
+
+
+		[[nodiscard]] virtual bool TouchEvent(TouchEvent_Params const& in) override
+		{
+			bool eventConsumed = false;
+
+			if (in.event.type == TouchEventType::Down || in.event.type == TouchEventType::Up)
+			{
+				PointerPress_Params params{};
+				params.ctx = in.ctx;
+				params.dockArea = in.dockArea;
+				params.layerIndex = in.layerIndex;
+				params.nodeRect = in.nodeRect;
+				params.pointerId = in.event.id;
+				params.pointerPos = in.event.position;
+				params.pressed = in.event.type == TouchEventType::Down;
+				params.visibleRect = in.visibleRect;
+				eventConsumed = PointerPress(params);
+			}
+			else if (in.event.type == TouchEventType::Moved)
+			{
+				PointerMove_Params params{};
+				params.dockArea = in.dockArea;
+				params.layerIndex = in.layerIndex;
+				params.pointerId = in.event.id;
+				params.pointerPos = in.event.position;
+				params.widgetPos = in.widgetRect.position;
+				eventConsumed = PointerMove(params);
+			}
+			else
+				DENGINE_DETAIL_UNREACHABLE();
+
+			return eventConsumed;
 		}
 	};
 
@@ -595,8 +706,8 @@ void DockArea::Render(
 
 			Gfx::GuiDrawCmd drawCmd{};
 			drawCmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-			drawCmd.filledMesh.mesh.vertexOffset = drawInfo.vertices.size();
-			drawCmd.filledMesh.mesh.indexOffset = drawInfo.indices.size();
+			drawCmd.filledMesh.mesh.vertexOffset = (u32)drawInfo.vertices.size();
+			drawCmd.filledMesh.mesh.indexOffset = (u32)drawInfo.indices.size();
 			drawCmd.filledMesh.mesh.indexCount = 3;
 			drawCmd.filledMesh.color = resizeHandleColor;
 			Extent fbExtent = drawInfo.GetFramebufferExtent();
@@ -641,8 +752,8 @@ void DockArea::CursorClick(
 		params.nodeRect = layerItem.layerRect;
 		params.visibleRect = visibleRect;
 		params.windowId = windowId;
-		Node::CursorClick_Result result = layerItem.rootNode.CursorClick(params);
-		if (result.eventConsumed)
+		bool eventConsumed = layerItem.rootNode.CursorClick(params);
+		if (eventConsumed)
 			break;
 	}
 }
@@ -664,9 +775,10 @@ void DockArea::CursorMove(
 		params.layerIndex = layerItem.layerIndex;
 		params.nodeRect = layerItem.layerRect;
 		params.visibleRect = visibleRect;
+		params.widgetRect = widgetRect;
 		params.windowId = windowId;
-		Node::CursorMove_Result result = layerItem.rootNode.CursorMove(params);
-		if (result.eventConsumed)
+		bool eventConsumed = layerItem.rootNode.CursorMove(params);
+		if (eventConsumed)
 			break;
 	}
 }
@@ -678,6 +790,22 @@ void DockArea::TouchEvent(
 	Rect visibleRect,
 	Gui::TouchEvent event) 
 {
+	auto const layerItPair = impl::DockArea_GetLayerItPair(*this, widgetRect);
+	for (auto const& layerItem : layerItPair)
+	{
+		Node::TouchEvent_Params params{};
+		params.ctx = &ctx;
+		params.dockArea = this;
+		params.event = event;
+		params.layerIndex = layerItem.layerIndex;
+		params.nodeRect = layerItem.layerRect;
+		params.visibleRect = visibleRect;
+		params.widgetRect = widgetRect;
+		params.windowId = windowId;
+		bool eventConsumed = layerItem.rootNode.TouchEvent(params);
+		if (eventConsumed)
+			break;
+	}
 }
 
 void DockArea::InputConnectionLost() 

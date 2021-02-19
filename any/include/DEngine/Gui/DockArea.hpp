@@ -42,11 +42,16 @@ namespace DEngine::Gui
 
 		enum class ResizeSide { Top, Bottom, Left, Right, };
 
+		static constexpr auto cursorPointerID = static_cast<u8>(-1);
+
 		struct BehaviorData_Normal
 		{
 		};
 		struct BehaviorData_Moving
 		{
+			// Pointer offset relative to window origin
+			Math::Vec2 pointerOffset;
+			u8 pointerID;
 		};
 		struct BehaviorData_Resizing
 		{
