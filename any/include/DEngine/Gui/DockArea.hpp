@@ -14,11 +14,6 @@
 
 namespace DEngine::Gui
 {
-	namespace impl
-	{
-		enum class DockArea_LayoutGizmo { Top, Bottom, Left, Right, Center };
-	}
-
 	class DockArea : public Widget
 	{
 	public:
@@ -27,7 +22,7 @@ namespace DEngine::Gui
 		struct Node;
 		struct Layer
 		{
-			static constexpr Rect fullSizeRect{};
+			// This rect is relative to the DockArea widget's position.
 			Rect rect{};
 			Std::Box<Node> root;
 		};
@@ -39,8 +34,6 @@ namespace DEngine::Gui
 		u32 resizeHandleThickness = 25;
 		u32 resizeHandleLength = 75;
 		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.75f };
-
-		enum class ResizeSide { Top, Bottom, Left, Right, };
 
 		static constexpr auto cursorPointerID = static_cast<u8>(-1);
 
