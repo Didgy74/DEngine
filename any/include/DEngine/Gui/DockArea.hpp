@@ -43,8 +43,10 @@ namespace DEngine::Gui
 		struct BehaviorData_Moving
 		{
 			// Pointer offset relative to window origin
-			Math::Vec2 pointerOffset;
-			u8 pointerID;
+			Math::Vec2 pointerOffset = {};
+			u8 pointerID = {};
+			// As the impl::DA_WindowNode type
+			void const* currWindowHovered = nullptr;
 		};
 		struct BehaviorData_Resizing
 		{

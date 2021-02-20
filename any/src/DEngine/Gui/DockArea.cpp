@@ -22,6 +22,12 @@ struct DA::Node
 		Rect visibleRect,
 		DrawInfo& drawInfo) const = 0;
 
+	// Returns true if the requested node was found.
+	virtual bool RenderLayoutGizmo(
+		Rect nodeRect,
+		Node const* hoveredWindow,
+		DrawInfo& drawInfo) const = 0;
+
 	struct PointerPress_Params
 	{
 		Context* ctx = nullptr;
@@ -43,8 +49,9 @@ struct DA::Node
 	struct PointerMove_Params
 	{
 		DA* dockArea = nullptr;
-		Math::Vec2Int widgetPos;
 		uSize layerIndex;
+		Rect nodeRect;
+		Math::Vec2Int widgetPos;
 
 		u8 pointerId;
 		Math::Vec2 pointerPos;
@@ -94,6 +101,11 @@ namespace DEngine::Gui::impl
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
+		virtual bool RenderLayoutGizmo(
+			Rect nodeRect,
+			Node const* hoveredWindow,
+			DrawInfo& drawInfo) const override;
+
 		// Returns true if event was consumed
 		[[nodiscard]] virtual bool PointerPress(PointerPress_Params const& in) override;
 
@@ -114,6 +126,11 @@ namespace DEngine::Gui::impl
 			Extent framebufferExtent,
 			Rect nodeRect,
 			Rect visibleRect,
+			DrawInfo& drawInfo) const override;
+
+		virtual bool RenderLayoutGizmo(
+			Rect nodeRect,
+			Node const* hoveredWindow,
 			DrawInfo& drawInfo) const override;
 	};
 
@@ -243,14 +260,17 @@ namespace DEngine::Gui::impl
 		return returnVal;
 	}
 
-	// Start-index is inclusive.
-	// End-index is exclusive.
+	/*
+	*	startIndex is inclusive.
+	* endIndex is exclusive.
+	*/
 	[[nodiscard]] static DA_LayerItPair<DA const> DA_GetLayerItPair(
 		DA const& dockArea,
 		Rect widgetRect,
 		uSize startIndex,
 		uSize endIndex) noexcept
 	{
+		DENGINE_IMPL_GUI_ASSERT(startIndex <= endIndex);
 		DA_LayerItPair<DA const> returnVal{};
 		returnVal.dockArea = &dockArea;
 		returnVal.widgetRect = widgetRect;
@@ -387,20 +407,18 @@ namespace DEngine::Gui::impl
 		switch (in)
 		{
 			case DA_LayoutGizmo::Top:
-				returnVal.position.x += layerRect.extent.width / 2 - gizmoSize / 2;
-				returnVal.position.y += gizmoSize;
+				returnVal.position.x += layerRect.extent.width / 2 - gizmoSize;
 				break;
 			case DA_LayoutGizmo::Bottom:
-				returnVal.position.x += layerRect.extent.width / 2 - gizmoSize / 2;
-				returnVal.position.y += layerRect.extent.height - gizmoSize * 2;
+				returnVal.position.x += layerRect.extent.width / 2 - gizmoSize;
+				returnVal.position.y += layerRect.extent.height - gizmoSize;
 				break;
 			case DA_LayoutGizmo::Left:
-				returnVal.position.x += gizmoSize;
-				returnVal.position.y += layerRect.extent.height / 2 - gizmoSize / 2;
+				returnVal.position.y += layerRect.extent.height / 2 - gizmoSize;
 				break;
 			case DA_LayoutGizmo::Right:
-				returnVal.position.x += layerRect.extent.width - gizmoSize * 2;;
-				returnVal.position.y += layerRect.extent.height / 2 - gizmoSize / 2;
+				returnVal.position.x += layerRect.extent.width - gizmoSize;
+				returnVal.position.y += layerRect.extent.height / 2 - gizmoSize;
 				break;
 			default:
 				DENGINE_DETAIL_UNREACHABLE();
@@ -433,6 +451,55 @@ namespace DEngine::Gui::impl
 	};
 	static void DA_PointerMove(DA_PointerMove_Params const& in);
 }
+
+bool impl::DA_WindowNode::PointerPress(PointerPress_Params const& in)
+{
+	bool cursorInside = in.nodeRect.PointIsInside(in.pointerPos) && in.visibleRect.PointIsInside(in.pointerPos);
+	if (!cursorInside)
+	{
+		return false;
+	}
+
+	bool eventConsumed = false;
+	if (in.dockArea->behaviorData.IsA<DA::BehaviorData_Normal>())
+	{
+		if (in.layerIndex == in.dockArea->layers.size() - 1)
+			return false;
+
+		// and push this layer to the front, if it's not the rear-most layer.
+		if (in.layerIndex != 0 && in.layerIndex != in.dockArea->layers.size() - 1)
+			DA_PushLayerToFront(*in.dockArea, in.layerIndex);
+
+		auto& implData = *static_cast<impl::ImplData*>(in.ctx->Internal_ImplData());
+
+		// If we are within the titlebar, we want to transition the
+		// dockarea widget into "moving" mode.
+		Rect titlebarRect = in.nodeRect;
+		titlebarRect.extent.height = implData.textManager.lineheight;
+		if (in.pointerPressed && titlebarRect.PointIsInside(in.pointerPos))
+		{
+			DA::BehaviorData_Moving newBehavior{};
+			newBehavior.pointerID = in.pointerId;
+			Math::Vec2 temp = Math::Vec2{ (f32)in.nodeRect.position.x, (f32)in.nodeRect.position.y } - in.pointerPos;
+			newBehavior.pointerOffset = temp;
+			in.dockArea->behaviorData.Set(newBehavior);
+
+			eventConsumed = true;
+		}
+	}
+	else if (in.dockArea->behaviorData.IsA<DA::BehaviorData_Moving>())
+	{
+		auto& behaviorData = in.dockArea->behaviorData.Get<DA::BehaviorData_Moving>();
+		if (!in.pointerPressed && in.pointerId == behaviorData.pointerID)
+		{
+			in.dockArea->behaviorData.Set(DA::BehaviorData_Normal{});
+			return true;
+		}
+	}
+
+	return eventConsumed;
+}
+
 
 void impl::DA_PointerPress(DA_PointerPress_Params const& in)
 {
@@ -508,48 +575,42 @@ void impl::DA_PointerPress(DA_PointerPress_Params const& in)
 	}
 }
 
-bool impl::DA_WindowNode::PointerPress(PointerPress_Params const& in)
+
+bool impl::DA_WindowNode::PointerMove(PointerMove_Params const& in)
 {
-	bool cursorInside = in.nodeRect.PointIsInside(in.pointerPos) && in.visibleRect.PointIsInside(in.pointerPos);
-	if (!cursorInside)
-	{
-		return false;
-	}
-
 	bool eventConsumed = false;
-	if (in.dockArea->behaviorData.IsA<DA::BehaviorData_Normal>())
+
+	if (in.dockArea->behaviorData.IsA<DA::BehaviorData_Moving>())
 	{
-		if (in.layerIndex == in.dockArea->layers.size() - 1)
-			return false;
+		DENGINE_IMPL_GUI_ASSERT(in.dockArea->layers.size() >= 2);
+		auto& behaviorMoving = in.dockArea->behaviorData.Get<DA::BehaviorData_Moving>();
 
-		// and push this layer to the front, if it's not the rear-most layer.
-		if (in.layerIndex != 0 && in.layerIndex != in.dockArea->layers.size() - 1)
-			DA_PushLayerToFront(*in.dockArea, in.layerIndex);
-
-		auto& implData = *static_cast<impl::ImplData*>(in.ctx->Internal_ImplData());
-
-		// If we are within the titlebar, we want to transition the
-		// dockarea widget into "moving" mode.
-		Rect titlebarRect = in.nodeRect;
-		titlebarRect.extent.height = implData.textManager.lineheight;
-		if (in.pointerPressed && titlebarRect.PointIsInside(in.pointerPos))
+		// If we are the first layer, we just want to 
+		// move the layer keep iterating to layers behind
+		// us to see if we hovered over a window and display it's
+		// layout gizmos
+		if (in.layerIndex == 0)
 		{
-			DA::BehaviorData_Moving newBehavior{};
-			newBehavior.pointerID = in.pointerId;
-			Math::Vec2 temp = in.pointerPos - Math::Vec2{ (f32)in.nodeRect.position.x, (f32)in.nodeRect.position.y };
-			newBehavior.pointerOffset = temp;
-			in.dockArea->behaviorData.Set(newBehavior);
-
-			eventConsumed = true;
+			
+			// If we only have 0-1 layer, we shouldn't be in the moving state
+			// to begin with.
+			DENGINE_IMPL_GUI_ASSERT(in.dockArea->layers.size() > 1);
+			if (in.pointerId == behaviorMoving.pointerID)
+			{
+				Math::Vec2 temp = in.pointerPos;
+				temp -= { (f32)in.widgetPos.x, (f32)in.widgetPos.y };
+				temp += behaviorMoving.pointerOffset;
+				in.dockArea->layers[in.layerIndex].rect.position = { (i32)temp.x, (i32)temp.y };
+			}
 		}
-	}
-	else if (in.dockArea->behaviorData.IsA<DA::BehaviorData_Moving>())
-	{
-		auto& behaviorData = in.dockArea->behaviorData.Get<DA::BehaviorData_Moving>();
-		if (!in.pointerPressed && in.pointerId == behaviorData.pointerID)
+		else if (!eventConsumed && in.nodeRect.PointIsInside(in.pointerPos))
 		{
-			in.dockArea->behaviorData.Set(DA::BehaviorData_Normal{});
-			return true;
+			// If we are not the first layer,
+			// we want to see if the mouse is hovering this node
+			// and display gizmo layouts if we are,
+			// then stop iterating through layers.
+			eventConsumed = true;
+			behaviorMoving.currWindowHovered = this;
 		}
 	}
 
@@ -565,7 +626,49 @@ void impl::DA_PointerMove(DA_PointerMove_Params const& in)
 	auto const layerItPair = impl::DA_GetLayerItPair(*in.dockArea, in.widgetRect);
 	for (auto const& layerItem : layerItPair)
 	{
+		DA::Node::PointerMove_Params params = {};
+		params.dockArea = in.dockArea;
+		params.layerIndex = layerItem.layerIndex;
+		params.nodeRect = layerItem.layerRect;
+		params.pointerId = in.pointerId;
+		params.pointerPos = in.pointerPos;
+		params.widgetPos = in.widgetRect.position;
+		bool eventConsumed = layerItem.rootNode.PointerMove(params);
+		if (eventConsumed)
+			break;
 	}
+}
+
+DockArea::DockArea()
+{
+	behaviorData.Set(BehaviorData_Normal{});
+}
+
+void DockArea::AddWindow(
+	std::string_view title,
+	Math::Vec4 color,
+	Std::Box<Widget>&& widget)
+{
+	layers.emplace(layers.begin(), DockArea::Layer{});
+	DockArea::Layer& newLayer = layers.front();
+	newLayer.rect = { { }, { 400, 400 } };
+	impl::DA_WindowNode* node = new impl::DA_WindowNode;
+	newLayer.root = Std::Box<DockArea::Node>{ node };
+	node->tabs.push_back(impl::DA_WindowTab());
+	auto& newWindow = node->tabs.back();
+	newWindow.title = title;
+	newWindow.color = color;
+	newWindow.widget = static_cast<Std::Box<Widget>&&>(widget);
+}
+
+SizeHint DockArea::GetSizeHint(
+	Context const& ctx) const
+{
+	SizeHint sizeHint{};
+	sizeHint.expandX = true;
+	sizeHint.expandY = true;
+	sizeHint.preferred = { 400, 400 };
+	return sizeHint;
 }
 
 void impl::DA_WindowNode::Render(
@@ -647,61 +750,26 @@ void impl::DA_SplitNode::Render(
 		drawInfo);
 }
 
-bool impl::DA_WindowNode::PointerMove(PointerMove_Params const& in)
+bool impl::DA_WindowNode::RenderLayoutGizmo(
+	Rect nodeRect,
+	Node const* hoveredWindow,
+	DrawInfo& drawInfo) const
 {
-	bool eventConsumed{};
+	if (this != hoveredWindow)
+		return false;
 
-	if (in.dockArea->behaviorData.IsA<DA::BehaviorData_Moving>())
-	{
-		if (in.layerIndex == 0)
-			eventConsumed = true;
-
-		auto& behaviorMoving = in.dockArea->behaviorData.Get<DA::BehaviorData_Moving>();
-		// If we only have 0-1 layer, we shouldn't be in the moving state
-		// to begin with.
-		DENGINE_IMPL_GUI_ASSERT(in.dockArea->layers.size() > 1);
-		if (in.pointerId == behaviorMoving.pointerID)
-		{
-			Math::Vec2 temp = in.pointerPos;
-			temp -= { (f32)in.widgetPos.x, (f32)in.widgetPos.y };
-			temp -= behaviorMoving.pointerOffset;
-			in.dockArea->layers[in.layerIndex].rect.position = { (i32)temp.x, (i32)temp.y };
-		}
-	}
-
-	return eventConsumed;
+	Rect gizmoRect = nodeRect;
+	gizmoRect.extent = { 30, 30 };
+	drawInfo.PushFilledQuad(gizmoRect, { 1.f, 1.f, 1.f, 0.5f });
+	return true;
 }
 
-DockArea::DockArea()
+bool impl::DA_SplitNode::RenderLayoutGizmo(
+	Rect nodeRect,
+	Node const* hoveredWindow,
+	DrawInfo& drawInfo) const
 {
-	behaviorData.Set(BehaviorData_Normal{});
-}
-
-void DockArea::AddWindow(
-	std::string_view title,
-	Math::Vec4 color,
-	Std::Box<Widget>&& widget)
-{
-	layers.emplace(layers.begin(), DockArea::Layer{});
-	DockArea::Layer& newLayer = layers.front();
-	newLayer.rect = { { }, { 400, 400 } };
-	impl::DA_WindowNode* node = new impl::DA_WindowNode;
-	newLayer.root = Std::Box<DockArea::Node>{ node };
-	node->tabs.push_back(impl::DA_WindowTab());
-	auto& newWindow = node->tabs.back();
-	newWindow.title = title;
-	newWindow.color = color;
-	newWindow.widget = static_cast<Std::Box<Widget>&&>(widget);
-}
-
-SizeHint DockArea::GetSizeHint(
-	Context const& ctx) const
-{
-	SizeHint sizeHint{};
-	sizeHint.expandX = true;
-	sizeHint.expandY = true;
-	sizeHint.preferred = { 400, 400 };
-	return sizeHint;
+	return false;
 }
 
 void DockArea::Render(
@@ -734,6 +802,7 @@ void DockArea::Render(
 			}
 			*/
 			
+			// TESTING DRAWING BOT RIGHT TRIANGLE
 			Gfx::GuiVertex vertices[3];
 			vertices[0].position = { 1.f, 1.f };
 			vertices[1].position = { 1.f, -1.f };
@@ -765,6 +834,27 @@ void DockArea::Render(
 	// If we are in the moving-state, we want to draw gizmos on top of everything else.
 	if (behaviorData.IsA<DockArea::BehaviorData_Moving>())
 	{
+		auto& behaviorMoving = behaviorData.Get<DockArea::BehaviorData_Moving>();
+
+		// If we are hovering a window, we want to find it
+		// and display it's layout gizmos.
+		if (behaviorMoving.currWindowHovered)
+		{
+			// Iterate from index 1 until the end
+			auto const layerItPair = impl::DA_GetLayerItPair(*this, widgetRect, 1, layers.size());
+			bool nodeFound = false;
+			for (auto const& layerItem : layerItPair)
+			{
+				nodeFound = layerItem.rootNode.RenderLayoutGizmo(
+					layerItem.layerRect,
+					static_cast<DA::Node const*>(behaviorMoving.currWindowHovered),
+					drawInfo);
+				if (nodeFound)
+					break;
+			}
+			DENGINE_IMPL_GUI_ASSERT(nodeFound);
+		}
+
 		Rect backLayerRect = widgetRect;
 		// Iterate over each gizmo.
 		using GizmoT = impl::DA_LayoutGizmo;
@@ -805,7 +895,13 @@ void DockArea::CursorMove(
 	Rect visibleRect,
 	CursorMoveEvent event)
 {
-	
+	impl::DA_PointerMove_Params params = {};
+	params.dockArea = this;
+	params.pointerId = DockArea::cursorPointerID;
+	params.pointerPos = { (f32)event.position.x, (f32)event.position.y };
+	params.visibleRect = visibleRect;
+	params.widgetRect = widgetRect;
+	impl::DA_PointerMove(params);
 }
 
 void DockArea::TouchEvent(
@@ -824,11 +920,18 @@ void DockArea::TouchEvent(
 		params.pointerPos = event.position;
 		params.pointerPressed = event.type == TouchEventType::Down;
 		params.visibleRect = visibleRect;
+		params.widgetRect = widgetRect;
 		impl::DA_PointerPress(params);
 	}
 	else if (event.type == TouchEventType::Moved)
 	{
-		
+		impl::DA_PointerMove_Params params = {};
+		params.dockArea = this;
+		params.pointerId = event.id;
+		params.pointerPos = event.position;
+		params.visibleRect = visibleRect;
+		params.widgetRect = widgetRect;
+		impl::DA_PointerMove(params);
 	}
 	else
 		DENGINE_DETAIL_UNREACHABLE();

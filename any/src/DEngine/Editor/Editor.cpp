@@ -488,7 +488,7 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 					u32 smallestViewportExtent = Math::Min(viewportWidget.newExtent.width, viewportWidget.newExtent.height);
 					f32 scale = Gizmo::ComputeScale(
 						worldTransform,
-						smallestViewportExtent * Gizmo::defaultGizmoSizeRelative,
+						u32(smallestViewportExtent * Gizmo::defaultGizmoSizeRelative),
 						projMat,
 						viewportWidget.newExtent);
 					gizmo.scale = scale;
