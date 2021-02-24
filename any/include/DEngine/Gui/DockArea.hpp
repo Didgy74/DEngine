@@ -47,6 +47,7 @@ namespace DEngine::Gui
 			u8 pointerID = {};
 			// As the impl::DA_WindowNode type
 			void const* currWindowHovered = nullptr;
+			Std::Opt<int> highlightSize;
 		};
 		struct BehaviorData_Resizing
 		{
