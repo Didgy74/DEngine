@@ -27,39 +27,49 @@ namespace DEngine::Gui
 			Std::Box<Node> root;
 		};
 		std::vector<Layer> layers;
-		
-		u32 tabDisconnectDist = 25;
+
 		u32 gizmoSize = 75;
-		u32 gizmoPadding = 15;
 		u32 resizeHandleThickness = 25;
 		u32 resizeHandleLength = 75;
 		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.75f };
+		Math::Vec4 dockingHighlightColor = { 0.f, 0.5f, 1.f, 0.5f };
 
 		static constexpr auto cursorPointerID = static_cast<u8>(-1);
 
-		struct BehaviorData_Normal
+		struct State_Normal
 		{
 		};
-		struct BehaviorData_Moving
+		struct State_Moving
 		{
+			bool movingSplitNode;
+
+			u8 pointerID;
 			// Pointer offset relative to window origin
-			Math::Vec2 pointerOffset = {};
-			u8 pointerID = {};
-			// As the impl::DA_WindowNode type
-			void const* currWindowHovered = nullptr;
-			Std::Opt<int> highlightSize;
+			Math::Vec2 pointerOffset;
+
+			struct HoveredWindow
+			{
+				uSize layerIndex;
+				// As the impl::DA_WindowNode type
+				void const* windowNode = nullptr;
+				Std::Opt<int> gizmoHighlightOpt;
+			};
+			Std::Opt<HoveredWindow> hoveredWindowOpt;
+			Std::Opt<int> backOuterGizmoHighlightOpt;
 		};
-		struct BehaviorData_Resizing
+		struct State_HoldingTab
 		{
-		};
-		struct BehaviorData_HoldingTab
-		{
+			// This is a impl::DA_WindowNode type
+			void const* windowBeingHeld = nullptr;
+			u8 pointerId;
+			// Pointer offset relative to tab origin
+			Math::Vec2 pointerOffset;
 		};	
-		Std::Variant<
-			BehaviorData_Normal, 
-			BehaviorData_Moving,
-			BehaviorData_Resizing,
-			BehaviorData_HoldingTab> behaviorData{};
+		using StateDataT = Std::Variant<
+			State_Normal,
+			State_Moving,
+			State_HoldingTab>;
+		StateDataT stateData{};
 
 		void AddWindow(
 			std::string_view title,
