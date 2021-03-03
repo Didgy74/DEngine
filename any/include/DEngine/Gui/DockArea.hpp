@@ -29,9 +29,10 @@ namespace DEngine::Gui
 		std::vector<Layer> layers;
 
 		u32 gizmoSize = 75;
-		u32 resizeHandleThickness = 25;
+		u32 resizeHandleThickness = 50;
 		u32 resizeHandleLength = 75;
 		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.75f };
+		Math::Vec4 deleteLayerGizmoColor = { 1.f, 0.f, 0.f, 0.75f };
 		Math::Vec4 dockingHighlightColor = { 0.f, 0.5f, 1.f, 0.5f };
 
 		static constexpr auto cursorPointerID = static_cast<u8>(-1);
@@ -43,7 +44,7 @@ namespace DEngine::Gui
 		{
 			bool movingSplitNode;
 
-			u8 pointerID;
+			u8 pointerId;
 			// Pointer offset relative to window origin
 			Math::Vec2 pointerOffset;
 
@@ -64,11 +65,18 @@ namespace DEngine::Gui
 			u8 pointerId;
 			// Pointer offset relative to tab origin
 			Math::Vec2 pointerOffset;
-		};	
+		};
+		struct State_ResizingSplitNode
+		{
+			uSize layerIndex;
+			void const* splitNode = nullptr;
+			u8 pointerId;
+		};
 		using StateDataT = Std::Variant<
 			State_Normal,
 			State_Moving,
-			State_HoldingTab>;
+			State_HoldingTab,
+			State_ResizingSplitNode>;
 		StateDataT stateData{};
 
 		void AddWindow(
