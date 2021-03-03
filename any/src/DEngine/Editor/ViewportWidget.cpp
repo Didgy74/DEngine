@@ -64,7 +64,7 @@ namespace DEngine::Editor::impl
 		Math::Vec3 rayOrigin = ray.origin;
 		Math::Vec3 rayVector = ray.direction;
 
-		f32 const EPSILON = 0.0000001;
+		f32 const EPSILON = 0.0000001f;
 		Math::Vec3 vertex0 = aIn;
 		Math::Vec3 vertex1 = bIn;
 		Math::Vec3 vertex2 = cIn;
@@ -78,7 +78,7 @@ namespace DEngine::Editor::impl
 		a = Math::Vec3::Dot(edge1, h);
 		if (a > -EPSILON && a < EPSILON)
 			return Std::nullOpt;    // This ray is parallel to this triangle.
-		f = 1.0 / a;
+		f = 1.0f / a;
 		s = rayOrigin - vertex0;
 		// u = f * s.dotProduct(h);
 		u = f * Math::Vec3::Dot(s, h);
@@ -297,7 +297,7 @@ namespace DEngine::Editor::impl
 		u32 smallestViewportExtent = Math::Min(widgetRect.extent.width, widgetRect.extent.height);
 		f32 scale = Gizmo::ComputeScale(
 			worldTransform,
-			smallestViewportExtent * Gizmo::defaultGizmoSizeRelative,
+			u32(smallestViewportExtent * Gizmo::defaultGizmoSizeRelative),
 			projMat,
 			widgetRect.extent);
 

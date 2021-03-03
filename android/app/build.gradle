@@ -42,7 +42,6 @@ android {
             jniDebuggable true
         }
     }
-    ndkVersion '22.0.6917172 rc1'
 }
 
 dependencies {

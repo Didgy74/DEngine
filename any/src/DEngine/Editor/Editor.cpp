@@ -253,19 +253,10 @@ namespace DEngine::Editor
 					{
 						if (activated)
 						{
-							Gui::DockArea::Layer newTop{};
-							newTop.rect = { { 0, 0 }, { 400, 400 } };
-							Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
-							newTop.node = Std::Box{ topNode };
-							topNode->type = Gui::DockArea::Node::Type::Window;
-							topNode->windows.push_back(Gui::DockArea::Window{});
-							auto& newWindow = topNode->windows.back();
-							newWindow.title = "Entities";
-							newWindow.titleBarColor = { 0.5f, 0.5f, 0.f, 1.f };
-							EntityIdList* entityIdList = new EntityIdList(&implData);
-							newWindow.widget = Std::Box<Gui::Widget>{ entityIdList };
-
-							implData.dockArea->layers.emplace(implData.dockArea->layers.begin(), Std::Move(newTop));
+							implData.dockArea->AddWindow(
+								"Entities",
+								{ 0.5f, 0.5f, 0.f, 1.f },
+								Std::Box<Gui::Widget>{ new EntityIdList(&implData) });
 						}
 					});
 
@@ -277,22 +268,10 @@ namespace DEngine::Editor
 					{
 						if (activated)
 						{
-							Gui::DockArea::Layer newTop{};
-							newTop.rect = { { 250, 250 }, { 400, 400 } };
-							Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
-							newTop.node = Std::Box{ topNode };
-							topNode->type = Gui::DockArea::Node::Type::Window;
-							topNode->windows.push_back(Gui::DockArea::Window{});
-							auto& newWindow = topNode->windows.back();
-							newWindow.title = "Components";
-							newWindow.titleBarColor = { 0.f, 0.5f, 0.5f, 1.f };
-							ComponentList* componentList = new ComponentList(&implData);
-
-							Gui::ScrollArea* scrollArea = new Gui::ScrollArea;
-							newWindow.widget = Std::Box<Gui::Widget>{ scrollArea };
-							scrollArea->widget = Std::Box<Gui::Widget>{ componentList };
-
-							implData.dockArea->layers.emplace(implData.dockArea->layers.begin(), Std::Move(newTop));
+							implData.dockArea->AddWindow(
+								"Components",
+								{ 0.f, 0.5f, 0.5f, 1.f },
+								Std::Box<Gui::Widget>{ new ComponentList(&implData) });
 						}
 					});
 
@@ -301,19 +280,10 @@ namespace DEngine::Editor
 					"New viewport",
 					[&implData]()
 					{
-						Gui::DockArea::Layer newTop{};
-						newTop.rect = { { 150, 150 }, { 400, 400 } };
-						Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
-						newTop.node = Std::Box{ topNode };
-						topNode->type = Gui::DockArea::Node::Type::Window;
-						topNode->windows.push_back(Gui::DockArea::Window{});
-						auto& newWindow = topNode->windows.back();
-						newWindow.title = "Viewport";
-						newWindow.titleBarColor = { 0.5f, 0.f, 0.5f, 1.f };
-						ViewportWidget* viewport = new ViewportWidget(implData, *implData.gfxCtx);
-						newWindow.widget = Std::Box<Gui::Widget>{ viewport };
-
-						implData.dockArea->layers.emplace(implData.dockArea->layers.begin(), Std::Move(newTop));
+						implData.dockArea->AddWindow(
+							"Viewport",
+							{ 0.5f, 0.f, 0.5f, 1.f },
+							Std::Box<Gui::Widget>{ new ViewportWidget(implData, *implData.gfxCtx) });
 					});
 			});
 
@@ -372,56 +342,24 @@ Editor::Context Editor::Context::Create(
 		outmostLayout->AddWidget(Std::Box<Gui::Widget>{ dockArea });
 
 		{
-			Gui::DockArea::Layer newTop{};
-			newTop.rect = { { 0, 0 }, { 400, 400 } };
-			Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
-			newTop.node = Std::Box{ topNode };
-			topNode->type = Gui::DockArea::Node::Type::Window;
-			topNode->windows.push_back(Gui::DockArea::Window{});
-			auto& newWindow = topNode->windows.back();
-			newWindow.title = "Entities";
-			newWindow.titleBarColor = { 0.5f, 0.5f, 0.f, 1.f };
-			EntityIdList* entityIdList = new EntityIdList(&implData);
-			newWindow.widget = Std::Box<Gui::Widget>{ entityIdList };
-
-			dockArea->layers.emplace_back(Std::Move(newTop));
+			implData.dockArea->AddWindow(
+				"Entities",
+				{ 0.5f, 0.5f, 0.f, 1.f },
+				Std::Box<Gui::Widget>{ new EntityIdList(&implData) });
 		}
 
 		{
-			Gui::DockArea::Layer newTop{};
-			newTop.rect = { { 150, 150 }, { 400, 400 } };
-			Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
-			newTop.node = Std::Box{ topNode };
-			topNode->type = Gui::DockArea::Node::Type::Window;
-			topNode->windows.push_back(Gui::DockArea::Window{});
-			auto& newWindow = topNode->windows.back();
-			newWindow.title = "Viewport";
-			newWindow.titleBarColor = { 0.5f, 0.f, 0.5f, 1.f };
-			ViewportWidget* viewport = new ViewportWidget(implData, *gfxCtx);
-			newWindow.widget = Std::Box<Gui::Widget>{ viewport };
-
-			dockArea->layers.emplace_back(Std::Move(newTop));
+			implData.dockArea->AddWindow(
+				"Components",
+				{ 0.f, 0.5f, 0.5f, 1.f },
+				Std::Box<Gui::Widget>{ new ComponentList(&implData) });
 		}
-
 		
 		{
-			Gui::DockArea::Layer newTop{};
-			newTop.rect = { { 250, 250 }, { 400, 400 } };
-			Gui::DockArea::Node* topNode = new Gui::DockArea::Node;
-			newTop.node = Std::Box{ topNode };
-			topNode->type = Gui::DockArea::Node::Type::Window;
-			topNode->windows.push_back(Gui::DockArea::Window{});
-			auto& newWindow = topNode->windows.back();
-			newWindow.title = "Components";
-			newWindow.titleBarColor = { 0.f, 0.5f, 0.5f, 1.f };
-
-			Gui::ScrollArea* scrollArea = new Gui::ScrollArea;
-			newWindow.widget = Std::Box<Gui::Widget>{ scrollArea };
-
-			ComponentList* componentList = new ComponentList(&implData);
-			scrollArea->widget = Std::Box<Gui::Widget>{ componentList };
-
-			dockArea->layers.emplace_back(Std::Move(newTop));
+			implData.dockArea->AddWindow(
+				"Viewport",
+				{ 0.5f, 0.f, 0.5f, 1.f },
+				Std::Box<Gui::Widget>{ new ViewportWidget(implData, *implData.gfxCtx) });
 		}
 		
 	}
@@ -550,7 +488,7 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 					u32 smallestViewportExtent = Math::Min(viewportWidget.newExtent.width, viewportWidget.newExtent.height);
 					f32 scale = Gizmo::ComputeScale(
 						worldTransform,
-						smallestViewportExtent * Gizmo::defaultGizmoSizeRelative,
+						u32(smallestViewportExtent * Gizmo::defaultGizmoSizeRelative),
 						projMat,
 						viewportWidget.newExtent);
 					gizmo.scale = scale;

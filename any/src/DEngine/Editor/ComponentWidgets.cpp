@@ -138,7 +138,7 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 		component = (Gfx::TextureID)std::stoi(widget.text.c_str());
 	};
 
-	this->collapseCallback = [this, &editorImpl](bool collapsed)
+	this->collapseCallback = [&editorImpl](bool collapsed)
 	{
 		// Confirm we have a selected entity, since the widget is alive we must have one.
 		DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());

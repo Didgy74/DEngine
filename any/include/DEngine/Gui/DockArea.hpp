@@ -14,95 +14,75 @@
 
 namespace DEngine::Gui
 {
-	namespace impl
-	{
-		enum class DockArea_LayoutGizmo { Top, Bottom, Left, Right, Center };
-	}
-
 	class DockArea : public Widget
 	{
 	public:
-		static constexpr Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.75f };
-
 		DockArea();
-
+		
 		struct Node;
-		struct Window
-		{
-			std::string title{};
-			Math::Vec4 titleBarColor{ 0.5f, 0.5f, 0.5f, 1.f };
-			Std::Box<Widget> widget;
-		};
-		struct Split
-		{
-			Std::Box<Node> a{};
-			Std::Box<Node> b{};
-			// In the range of 0 - 1
-			f32 split = 0.5f;
-		};
-		struct Node
-		{
-			enum class Type : char
-			{
-				Window,
-				HoriSplit,
-				VertSplit,
-			};
-			Type type{};
-			std::vector<Window> windows;
-			uSize selectedWindow = 0;
-			Split split{};
-		};
 		struct Layer
 		{
-			static constexpr Rect fullSizeRect{};
+			// This rect is relative to the DockArea widget's position.
 			Rect rect{};
-			Std::Box<Node> node{};
+			Std::Box<Node> root;
 		};
 		std::vector<Layer> layers;
-		
-		u32 tabDisconnectRadius = 25;
+
 		u32 gizmoSize = 75;
-		u32 gizmoPadding = 15;
-		u32 resizeAreaThickness = 20;
+		u32 resizeHandleThickness = 50;
 		u32 resizeHandleLength = 75;
-		
+		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.75f };
+		Math::Vec4 deleteLayerGizmoColor = { 1.f, 0.f, 0.f, 0.75f };
+		Math::Vec4 dockingHighlightColor = { 0.f, 0.5f, 1.f, 0.5f };
 
-		enum class ResizeSide { Top, Bottom, Left, Right, };
+		static constexpr auto cursorPointerID = static_cast<u8>(-1);
 
-		struct BehaviorData_Normal
+		struct State_Normal
 		{
 		};
-		struct BehaviorData_Moving
+		struct State_Moving
 		{
-			Math::Vec2Int windowMovedRelativePos;
-			Node const* showLayoutNodePtr;
-			bool useHighlightGizmo;
-			impl::DockArea_LayoutGizmo highlightGizmo;
+			bool movingSplitNode;
+
+			u8 pointerId;
+			// Pointer offset relative to window origin
+			Math::Vec2 pointerOffset;
+
+			struct HoveredWindow
+			{
+				uSize layerIndex;
+				// As the impl::DA_WindowNode type
+				void const* windowNode = nullptr;
+				Std::Opt<int> gizmoHighlightOpt;
+			};
+			Std::Opt<HoveredWindow> hoveredWindowOpt;
+			Std::Opt<int> backOuterGizmoHighlightOpt;
 		};
-		struct BehaviorData_Resizing
+		struct State_HoldingTab
 		{
-			ResizeSide resizeSide;
-			bool resizingSplit;
-			Node const* resizeSplitNode;
-			bool resizingSplitIsFrontNode;
+			// This is a impl::DA_WindowNode type
+			void const* windowBeingHeld = nullptr;
+			u8 pointerId;
+			// Pointer offset relative to tab origin
+			Math::Vec2 pointerOffset;
 		};
-		struct BehaviorData_HoldingTab
+		struct State_ResizingSplitNode
 		{
-			bool holdingFrontWindow;
-			Node const* holdingTab;
-			Math::Vec2Int cursorPosRelative;
-		};	
-		Std::Variant<
-			BehaviorData_Normal, 
-			BehaviorData_Moving,
-			BehaviorData_Resizing,
-			BehaviorData_HoldingTab> behaviorData{};
+			uSize layerIndex;
+			void const* splitNode = nullptr;
+			u8 pointerId;
+		};
+		using StateDataT = Std::Variant<
+			State_Normal,
+			State_Moving,
+			State_HoldingTab,
+			State_ResizingSplitNode>;
+		StateDataT stateData{};
 
 		void AddWindow(
-			Rect windowRect,
 			std::string_view title,
-			Std::Box<Widget> widget);
+			Math::Vec4 color,
+			Std::Box<Widget>&& widget);
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;

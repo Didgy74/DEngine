@@ -71,6 +71,9 @@ target_link_libraries(dengine_any
 target_sources(dengine_any
 	PUBLIC
 		${DENGINE_HEADERS})
+set_target_properties(dengine_any PROPERTIES 
+	CXX_STANDARD 17
+	CXX_EXTENSIONS OFF)
 
 
 option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ON)
