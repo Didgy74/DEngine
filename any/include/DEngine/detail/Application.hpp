@@ -89,7 +89,7 @@ namespace DEngine::Application::detail
 
 	void SetLogCallback(LogCallback callback);
 
-	AppData::WindowNode* GetWindowNode(WindowID id) noexcept;
+	AppData::WindowNode* GetWindowNode(WindowID id);
 	AppData::WindowNode* GetWindowNode(void* platformHandle);
 	void UpdateWindowSize(
 		void* platformHandle,
@@ -113,11 +113,11 @@ namespace DEngine::Application::detail
 	void UpdateOrientation(Orientation newOrient);
 
 	void UpdateCursor(
-		void* platformHandle,
+		AppData::WindowNode const& windowNode,
 		Math::Vec2Int pos,
 		Math::Vec2Int delta);
 	void UpdateCursor(
-		void* platformHandle,
+		AppData::WindowNode const& windowNode,
 		Math::Vec2Int pos);
 
 	void UpdateTouchInput(TouchEventType type, u8 id, f32 x, f32 y);

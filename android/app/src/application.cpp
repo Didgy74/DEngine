@@ -349,9 +349,55 @@ static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, in
 {
 	bool handled = false;
 
-	int32_t pointer = AMotionEvent_getAction(event);
+	if (source == AINPUT_SOURCE_MOUSE)
+	{
+		auto action = decltype(AMOTION_EVENT_ACTION_DOWN)(AMotionEvent_getAction(event));
+		int32_t index = int32_t((action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT);
+		if (action == AMOTION_EVENT_ACTION_HOVER_ENTER)
+		{
+			// The cursor started existing
+			f32 x = AMotionEvent_getX(event, index);
+			f32 y = AMotionEvent_getY(event, index);
+
+			pAppData->cursorOpt = CursorData{};
+			pAppData->cursorOpt.Value().position = { (int32_t)x, (int32_t)y };
+			pAppData->cursorOpt.Value().positionDelta = {};
+			pAppData->cursorOpt.Value().scrollDeltaY = 0;
+		}
+		else if (action == AMOTION_EVENT_ACTION_HOVER_MOVE || action == AMOTION_EVENT_ACTION_MOVE)
+		{
+			f32 x = AMotionEvent_getX(event, index);
+			f32 y = AMotionEvent_getY(event, index);
+			AppData::WindowNode* windowNode = detail::GetWindowNode(detail::pBackendData->currentWindow.Value());
+			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
+			detail::UpdateCursor(*windowNode, { (int32_t)x, (int32_t)y });
+			handled = true;
+			return handled;
+		}
+		else if (action == AMOTION_EVENT_ACTION_DOWN)
+		{
+			AppData::WindowNode* windowNode = detail::GetWindowNode(detail::pBackendData->currentWindow.Value());
+			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
+			detail::UpdateButton(Button::LeftMouse, true);
+			handled = true;
+			return handled;
+		}
+		else if (action == AMOTION_EVENT_ACTION_UP)
+		{
+			AppData::WindowNode* windowNode = detail::GetWindowNode(detail::pBackendData->currentWindow.Value());
+			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
+			detail::UpdateButton(Button::LeftMouse, false);
+			handled = true;
+			return handled;
+		}
+
+	}
+
+	auto pointer = decltype(AMOTION_EVENT_ACTION_DOWN)(AMotionEvent_getAction(event));
+
 	int32_t action = pointer & AMOTION_EVENT_ACTION_MASK;
 	size_t index = size_t((pointer & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT);
+
 	if (source == AINPUT_SOURCE_TOUCHSCREEN)
 	{
 		switch (action)

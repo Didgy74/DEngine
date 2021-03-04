@@ -302,7 +302,7 @@ void Application::detail::SetLogCallback(LogCallback callback)
 	detail::pAppData->logCallback = callback;
 }
 
-Application::detail::AppData::WindowNode* DEngine::Application::detail::GetWindowNode(WindowID id) noexcept
+Application::detail::AppData::WindowNode* DEngine::Application::detail::GetWindowNode(WindowID id)
 {
 	auto& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -437,16 +437,10 @@ void Application::detail::UpdateOrientation(Orientation newOrient)
 }
 
 void Application::detail::UpdateCursor(
-	void* platformHandle,
+	AppData::WindowNode const& windowNode,
 	Math::Vec2Int pos,
 	Math::Vec2Int delta)
 {
-	auto const& windowNode = *Std::FindIf(
-		pAppData->windows.begin(),
-		pAppData->windows.end(),
-		[platformHandle](AppData::WindowNode const& val) -> bool {
-			return val.platformHandle == platformHandle; });
-
 	Math::Vec2Int newPosition = {
 		pos.x + windowNode.windowData.position.x,
 		pos.y + windowNode.windowData.position.y };
@@ -460,19 +454,14 @@ void Application::detail::UpdateCursor(
 }
 
 void Application::detail::UpdateCursor(
-	void* platformHandle,
+	AppData::WindowNode const& windowNode,
 	Math::Vec2Int pos)
 {
-	auto const& windowNode = *Std::FindIf(
-		pAppData->windows.begin(),
-		pAppData->windows.end(),
-		[platformHandle](AppData::WindowNode const& val) -> bool {
-			return val.platformHandle == platformHandle; });
-
 	Math::Vec2Int newPosition = {
 		pos.x + windowNode.windowData.position.x,
 		pos.y + windowNode.windowData.position.y };
 
+	DENGINE_DETAIL_APPLICATION_ASSERT(pAppData->cursorOpt.HasValue());
 	CursorData& cursorData = pAppData->cursorOpt.Value();
 
 	Math::Vec2Int positionDelta = newPosition - cursorData.position;

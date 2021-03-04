@@ -285,14 +285,13 @@ static void Application::detail::Backend_GLFW_CursorPosCallback(
 		Math::Vec2Int cursorDelta = newVirtualCursorPos - backendData.virtualCursorPos;
 		backendData.virtualCursorPos = newVirtualCursorPos;
 		CursorData cursorData = Cursor().Value();
-		detail::UpdateCursor(window, cursorData.position - windowNode.windowData.position, cursorDelta);
+		detail::UpdateCursor(*GetWindowNode(window), cursorData.position - windowNode.windowData.position, cursorDelta);
 	}
 	else
 	{
 		backendData.virtualCursorPos = { (i32)xpos, (i32)ypos };
-		detail::UpdateCursor(window, { (i32)xpos, (i32)ypos });
+		detail::UpdateCursor(*GetWindowNode(window), { (i32)xpos, (i32)ypos });
 	}
-	
 }
 
 static void Application::detail::Backend_GLFW_ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
