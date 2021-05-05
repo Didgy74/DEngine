@@ -544,7 +544,9 @@ namespace DEngine::Gui::impl
 			auto& tab = tabs[currentIndex];
 			auto& implData = *static_cast<impl::ImplData*>(ctx->Internal_ImplData());
 			
-			SizeHint tabSizeHint = impl::TextManager::GetSizeHint(implData.textManager, tab.title);
+			SizeHint tabSizeHint = impl::TextManager::GetSizeHint(
+				implData.textManager, 
+				{ tab.title.data(), tab.title.size() });
 			Rect tabRect = {};
 			tabRect.position = widgetPos;
 			tabRect.position.x += horizontalOffset;
@@ -1064,7 +1066,7 @@ void impl::DA_WindowNode::Render(
 
 		TextManager::RenderText(
 			implData.textManager,
-			tabItem.tab.title,
+			{ tabItem.tab.title.data(), tabItem.tab.title.size() },
 			textColor,
 			tabItem.rect,
 			drawInfo);
@@ -1877,7 +1879,7 @@ DockArea::DockArea()
 }
 
 void DockArea::AddWindow(
-	std::string_view title,
+	Std::Str title,
 	Math::Vec4 color,
 	Std::Box<Widget>&& widget)
 {
@@ -1888,7 +1890,7 @@ void DockArea::AddWindow(
 	newLayer.root = Std::Box<DockArea::Node>{ node };
 	node->tabs.push_back(impl::DA_WindowTab());
 	auto& newWindow = node->tabs.back();
-	newWindow.title = title;
+	newWindow.title = { title.Data(), title.Size() };
 	newWindow.color = color;
 	newWindow.widget = static_cast<Std::Box<Widget>&&>(widget);
 }

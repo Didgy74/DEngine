@@ -3,7 +3,7 @@
 #include <DEngine/Gui/CursorType.hpp>
 #include <DEngine/Gui/WindowID.hpp>
 
-#include <string_view>
+#include <DEngine/Std/Containers/Str.hpp>
 
 namespace DEngine::Gui
 {
@@ -25,7 +25,7 @@ namespace DEngine::Gui
 		virtual void SetCursorType(WindowID, CursorType) = 0;
 
 		virtual void HideSoftInput() = 0;
-		virtual void OpenSoftInput(std::string_view currentText, SoftInputFilter inputFilter) = 0;
+		virtual void OpenSoftInput(Std::Str inputText, SoftInputFilter inputFilter) = 0;
 	};
 
 	inline WindowHandler::~WindowHandler() noexcept {}

@@ -5,7 +5,6 @@
 #include <DEngine/FixedWidthTypes.hpp>
 
 #include <array>
-#include <string_view>
 
 namespace DEngine::Gfx::Vk::Constants
 {

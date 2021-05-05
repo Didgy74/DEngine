@@ -5,8 +5,7 @@
 #include <DEngine/Gui/DrawInfo.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
-
-#include <string_view>
+#include <DEngine/Std/Containers/Str.hpp>
 
 namespace DEngine::Gui
 {
@@ -47,7 +46,7 @@ namespace DEngine::Gui
 		void TakeInputConnection(
 			Widget& widget,
 			SoftInputFilter softInputFilter,
-			std::string_view currentText);
+			Std::Str currentText);
 
 		void ClearInputConnection(
 			Widget& widget);

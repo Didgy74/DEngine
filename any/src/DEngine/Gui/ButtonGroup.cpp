@@ -37,7 +37,7 @@ SizeHint ButtonGroup::GetSizeHint(Context const& ctx) const
 	for (auto const& btn : buttons)
 	{
 		DENGINE_IMPL_GUI_ASSERT(!btn.title.empty());
-		SizeHint btnSizeHint = impl::TextManager::GetSizeHint(textManager, btn.title);
+		SizeHint btnSizeHint = impl::TextManager::GetSizeHint(textManager, { btn.title.data(), btn.title.size() });
 		returnVal.preferred.width += btnSizeHint.preferred.width;
 		returnVal.preferred.height = Math::Max(returnVal.preferred.height, btnSizeHint.preferred.height);
 	}
@@ -63,7 +63,7 @@ void ButtonGroup::Render(
 	for (auto const& btn : buttons)
 	{
 		DENGINE_IMPL_GUI_ASSERT(!btn.title.empty());
-		SizeHint btnSizeHint = impl::TextManager::GetSizeHint(textManager, btn.title);
+		SizeHint btnSizeHint = impl::TextManager::GetSizeHint(textManager, { btn.title.data(), btn.title.size() });
 		sizeHints.push_back(btnSizeHint);
 		maxHeight = Math::Max(maxHeight, btnSizeHint.preferred.height);
 	}
@@ -83,9 +83,10 @@ void ButtonGroup::Render(
 			color = { 0.5f, 0.5f, 0.5f, 1.f };
 		drawInfo.PushFilledQuad(btnRect, color);
 
+		auto const& title = buttons[i].title;
 		impl::TextManager::RenderText(
 			textManager,
-			buttons[i].title,
+			{ title.data(), title.size() },
 			{ 1.f, 1.f, 1.f, 1.f },
 			btnRect,
 			drawInfo);
@@ -138,7 +139,7 @@ namespace DEngine::Gui::impl
 		for (auto const& btn : widget.buttons)
 		{
 			DENGINE_IMPL_GUI_ASSERT(!btn.title.empty());
-			SizeHint btnSizeHint = impl::TextManager::GetSizeHint(textManager, btn.title);
+			SizeHint btnSizeHint = impl::TextManager::GetSizeHint(textManager, { btn.title.data(), btn.title.size() });
 			sizeHints.push_back(btnSizeHint);
 			maxHeight = Math::Max(maxHeight, btnSizeHint.preferred.height);
 		}

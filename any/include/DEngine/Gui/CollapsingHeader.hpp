@@ -5,9 +5,9 @@
 #include <DEngine/Gui/Button.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
+#include <DEngine/Std/Containers/Str.hpp>
 
 #include <functional>
-#include <string_view>
 
 namespace DEngine::Gui
 {
@@ -24,9 +24,7 @@ namespace DEngine::Gui
 		[[nodiscard]] StackLayout const& GetChildStackLayout() const noexcept { return *childStackLayoutPtr; }
 		[[nodiscard]] bool IsCollapsed() const noexcept;
 		void SetCollapsed(bool value);
-		void SetHeaderText(std::string_view text);
-
-
+		void SetHeaderText(Std::Str text);
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;

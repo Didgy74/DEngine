@@ -40,7 +40,7 @@ namespace DEngine::Math
 				{
 					T determinant = T();
 					i8 factor = -1;
-					for (size_t x = 0; x < width; x += 1)
+					for (uSize x = 0; x < width; x += 1)
 					{
 						factor = -factor;
 						if (this->data[x * width] == T(0))
@@ -61,11 +61,11 @@ namespace DEngine::Math
 			{
 				Math::Matrix<width, width, T> adjugate = GetAdjugate();
 				T determinant = T();
-				for (size_t x = 0; x < width; x += 1)
+				for (uSize x = 0; x < width; x += 1)
 					determinant += this->data[x * width] * adjugate.At(0, x);
 				if (!(determinant == T()))
 				{
-					for (size_t i = 0; i < width * width; i += 1)
+					for (uSize i = 0; i < width * width; i += 1)
 						adjugate.data[i] /= determinant;
 					return Std::Opt<Math::Matrix<width, width, T>>{ adjugate };
 				}
@@ -75,17 +75,22 @@ namespace DEngine::Math
 
 			constexpr void Transpose()
 			{
-				for (size_t x = 1; x < width; x += 1)
+				for (uSize x = 1; x < width; x += 1)
 				{
-					for (size_t y = 0; y < x; y += 1)
-						std::swap(this->data[x * width + y], this->data[y * width + x]);
+					for (uSize y = 0; y < x; y += 1)
+					{
+						auto temp = this->data[x * width + y];
+						this->data[x * width + y] = this->data[y * width + x];
+						this->data[y * width + x] = temp;
+					}
+
 				}
 			}
 
 			[[nodiscard]] static constexpr Math::Matrix<width, width, T> Identity() noexcept
 			{
 				Math::Matrix<width, width, T> temp = {};
-				for (size_t x = 0; x < width; x += 1)
+				for (uSize x = 0; x < width; x += 1)
 					temp.data[x * width + x] = T(1);
 				return temp;
 			}

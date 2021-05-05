@@ -13,7 +13,6 @@
 #include <DEngine/Scene.hpp>
 
 #include <vector>
-#include <string_view>
 
 namespace DEngine::Editor
 {
@@ -102,7 +101,7 @@ namespace DEngine::Editor
 		virtual void CloseWindow(Gui::WindowID) override;
 		virtual void SetCursorType(Gui::WindowID, Gui::CursorType) override;
 		virtual void HideSoftInput() override;
-		virtual void OpenSoftInput(std::string_view, Gui::SoftInputFilter) override;
+		virtual void OpenSoftInput(Std::Str, Gui::SoftInputFilter) override;
 
 
 		std::vector<Gfx::GuiVertex> vertices;

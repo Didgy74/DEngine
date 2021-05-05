@@ -4,10 +4,10 @@
 #include <DEngine/Gui/StackLayout.hpp>
 
 #include <DEngine/Std/Containers/Opt.hpp>
+#include <DEngine/Std/Containers/Str.hpp>
 
 #include <functional>
 #include <string>
-#include <string_view>
 
 namespace DEngine::Gui
 {
@@ -31,7 +31,7 @@ namespace DEngine::Gui
 
 			Button(
 				MenuBar* parentMenuBar,
-				std::string_view title,
+				Std::Str title,
 				std::function<SubmenuActivateCallback> callback);
 
 			void Clear(
@@ -80,7 +80,7 @@ namespace DEngine::Gui
 
 			ActivatableButton(
 				MenuBar* parentMenuBar, 
-				std::string_view title,
+				Std::Str title,
 				std::function<ButtonActivateCallback> callback);
 
 			[[nodiscard]] virtual SizeHint GetSizeHint(
@@ -119,7 +119,7 @@ namespace DEngine::Gui
 
 			ToggleButton(
 				MenuBar* parentMenuBar,
-				std::string_view title,
+				Std::Str title,
 				bool toggled,
 				std::function<ToggleButtonActivateCallback> callback);
 			
@@ -172,15 +172,15 @@ namespace DEngine::Gui
 			WindowID windowId);
 		
 		void AddSubmenuButton(
-			std::string_view title,
+			Std::Str title,
 			std::function<SubmenuActivateCallback> callback);
 
 		void AddMenuButton(
-			std::string_view title,
+			Std::Str title,
 			std::function<ButtonActivateCallback> callback);
 
 		void AddToggleMenuButton(
-			std::string_view title,
+			Std::Str title,
 			bool toggled,
 			std::function<ToggleButtonActivateCallback> callback);
 

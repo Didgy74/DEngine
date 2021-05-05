@@ -168,7 +168,7 @@ void Editor::EditorImpl::HideSoftInput()
 }
 
 void Editor::EditorImpl::OpenSoftInput(
-	std::string_view currentText,
+	Std::Str currentText,
 	Gui::SoftInputFilter inputFilter)
 {
 	App::SoftInputFilter filter{};

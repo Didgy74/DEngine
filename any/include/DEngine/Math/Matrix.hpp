@@ -80,9 +80,9 @@ namespace DEngine::Math
 	constexpr Matrix<height, width, T> Matrix<width, height, T>::Transposed() const
 	{
 		Matrix<height, width, T> temp{};
-		for (size_t x = 0; x < width; x += 1)
+		for (uSize x = 0; x < width; x += 1)
 		{
-			for (size_t y = 0; y < height; y += 1)
+			for (uSize y = 0; y < height; y += 1)
 				temp.At(x, y) = At(y, x);
 		}
 		return temp;
@@ -92,7 +92,7 @@ namespace DEngine::Math
 	constexpr Matrix<width, height, T> Matrix<width, height, T>::SingleValue(T input)
 	{
 		Matrix<width, height, T> returnMatrix{};
-		for (size_t i = 0; i < width * height; i += 1)
+		for (uSize i = 0; i < width * height; i += 1)
 			returnMatrix.data[i] = input;
 		return returnMatrix;
 	}
@@ -107,7 +107,7 @@ namespace DEngine::Math
 	constexpr Matrix<width, height, T> Matrix<width, height, T>::One()
 	{
 		Matrix<width, height, T> returnMatrix{};
-		for (size_t i = 0; i < width * height; i += 1)
+		for (uSize i = 0; i < width * height; i += 1)
 			returnMatrix.data[i] = T(1);
 		return returnMatrix;
 	}
@@ -230,7 +230,7 @@ namespace DEngine::Math
 	[[nodiscard]] constexpr Matrix<width, height, T> operator*(T left, Matrix<width, height, T> const& right)
 	{
 		Matrix<width, height, T> newMatrix{};
-		for (size_t i = 0; i < width * height; i += 1)
+		for (uSize i = 0; i < width * height; i += 1)
 			newMatrix.data[i] = left * right.data[i];
 		return newMatrix;
 	}

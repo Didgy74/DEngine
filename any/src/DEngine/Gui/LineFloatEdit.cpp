@@ -20,7 +20,7 @@ SizeHint LineFloatEdit::GetSizeHint(Context const& ctx) const
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	return impl::TextManager::GetSizeHint(
 		implData.textManager,
-		text);
+		{ text.data(), text.size() });
 }
 
 void LineFloatEdit::Render(
@@ -35,7 +35,7 @@ void LineFloatEdit::Render(
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	impl::TextManager::RenderText(
 		implData.textManager,
-		text,
+		{ text.data(), text.size() },
 		{ 1.f, 1.f, 1.f, 1.f },
 		widgetRect,
 		drawInfo);
@@ -69,7 +69,7 @@ void LineFloatEdit::CharEvent(
 		}
 		else if (charEvent == '.') // Check if we already have dot
 		{
-			bool alreadyHasDot = text.find('.') != std::string_view::npos;
+			bool alreadyHasDot = text.find('.') != std::string::npos;
 			if (!alreadyHasDot)
 			{
 				validChar = true;
@@ -234,7 +234,7 @@ void DEngine::Gui::LineFloatEdit::StartInputConnection(Context& ctx)
 	ctx.TakeInputConnection(
 		*this,
 		filter,
-		text);
+		{ text.data(), text.length() });
 	inputConnectionCtx = &ctx;
 }
 

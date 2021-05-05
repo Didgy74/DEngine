@@ -5,7 +5,6 @@
 #include <DEngine/Std/Utility.hpp>
 
 #include <vector>
-#include <string_view>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
@@ -64,7 +63,7 @@ Context::Context(Context&& other) noexcept :
 void Context::TakeInputConnection(
 	Widget& widget,
 	SoftInputFilter softInputFilter,
-	std::string_view currentText)
+	Std::Str currentText)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 	if (implData.inputConnectionWidget)
@@ -618,7 +617,7 @@ void impl::TextManager::Initialize(
 
 void impl::TextManager::RenderText(
 	TextManager& manager,
-	std::string_view string,
+	Std::Str string,
 	Math::Vec4 color,
 	Rect widgetRect,
 	DrawInfo& drawInfo)
@@ -627,7 +626,7 @@ void impl::TextManager::RenderText(
 	penPos.y += manager.lineheight;
 	penPos.y -= manager.lineMinY;
 
-	for (uSize i = 0; i < string.size(); i += 1)
+	for (uSize i = 0; i < string.Size(); i += 1)
 	{
 		u32 glyphChar = string[i];
 		GlyphData const& glyphData = GetGlyphData(manager, glyphChar);
@@ -655,13 +654,13 @@ void impl::TextManager::RenderText(
 
 SizeHint impl::TextManager::GetSizeHint(
 	TextManager& manager,
-	std::string_view str)
+	Std::Str str)
 {
 	SizeHint returnVar{};
 	returnVar.preferred.height = manager.lineheight;
 	
 	// Iterate over the string, find the bounding box width
-	for (uSize i = 0; i < str.size(); i += 1)
+	for (uSize i = 0; i < str.Size(); i += 1)
 	{
 		u32 glyphChar = str[i];
 		GlyphData const& glyphData = GetGlyphData(manager, glyphChar);

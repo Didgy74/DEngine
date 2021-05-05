@@ -24,7 +24,7 @@ SizeHint LineEdit::GetSizeHint(Context const& ctx) const
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	return impl::TextManager::GetSizeHint(
 		implData.textManager,
-		text);
+		{ text.data(), text.size() });
 }
 
 void LineEdit::Render(
@@ -39,7 +39,7 @@ void LineEdit::Render(
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	impl::TextManager::RenderText(
 		implData.textManager,
-		this->text,
+		{ text.data(), text.size() },
 		{ 1.f, 1.f, 1.f, 1.f },
 		widgetRect,
 		drawInfo);
@@ -79,7 +79,7 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 			}
 			if (charEvent == '.') // Check if we already have dot
 			{
-				bool alreadyHasDot = text.find('.') != std::string_view::npos;
+				bool alreadyHasDot = text.find('.') != std::string::npos;
 				if (!alreadyHasDot)
 				{
 					validChar = true;
@@ -166,7 +166,7 @@ void LineEdit::CursorClick(
 			ctx.TakeInputConnection(
 				*this,
 				filter,
-				text);
+				{ text.data(), text.length() });
 			this->inputConnectionCtx = &ctx;
 		}
 		else if (!cursorIsInside && event.clicked && inputConnectionCtx)
@@ -205,7 +205,7 @@ void LineEdit::TouchEvent(
 		ctx.TakeInputConnection(
 			*this,
 			filter,
-			text);
+			{ text.data(), text.length() });
 		this->inputConnectionCtx = &ctx;
 	}
 

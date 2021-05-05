@@ -59,7 +59,7 @@ SizeHint LineList::GetSizeHint(Context const& ctx) const
 	{
 		SizeHint sizeHint = impl::TextManager::GetSizeHint(
 			implData.textManager, 
-			line);
+			{ line.data(), line.size() });
 		returnVal.preferred.width = Math::Max(returnVal.preferred.width, sizeHint.preferred.width);
 	}
 	return returnVal;
@@ -189,7 +189,7 @@ void LineList::Render(
 
 		impl::TextManager::RenderText(
 			implData.textManager,
-			lines[i],
+			{ lines[i].data(), lines[i].size() },
 			{ 1.f, 1.f, 1.f, 1.f },
 			textRect,
 			drawInfo);

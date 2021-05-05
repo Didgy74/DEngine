@@ -10,7 +10,6 @@
 #include <DEngine/Math/Vector.hpp>
 
 #include <vector>
-#include <string_view>
 
 // Definitely temporary
 // Make an actual good interface instead
@@ -23,8 +22,6 @@
 #include <unordered_map>
 #include <ft2build.h>
 #include FT_FREETYPE_H
-
-
 
 namespace DEngine::Gui::impl
 {
@@ -57,14 +54,14 @@ namespace DEngine::Gui::impl
 
 		static void RenderText(
 			TextManager& manager,
-			std::string_view string,
+			Std::Str string,
 			Math::Vec4 color,
 			Rect widgetRect,
 			DrawInfo& drawInfo);
 
 		[[nodiscard]] static SizeHint GetSizeHint(
 			TextManager& manager,
-			std::string_view st);
+			Std::Str st);
 	};
 
 	struct WindowData

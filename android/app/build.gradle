@@ -2,7 +2,6 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 30
-
     defaultConfig {
         applicationId  "didgy.dengine.editor"
         minSdkVersion 27
@@ -28,18 +27,6 @@ android {
     externalNativeBuild {
         cmake {
             path 'CMakeLists.txt'
-        }
-    }
-
-    buildTypes {
-        release {
-            minifyEnabled true
-        }
-
-        debug {
-            applicationIdSuffix ".debug"
-            debuggable true
-            jniDebuggable true
         }
     }
 }

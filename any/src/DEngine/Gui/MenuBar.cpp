@@ -44,7 +44,7 @@ void MenuBar::ClearActiveButton(
 }
 
 void MenuBar::AddSubmenuButton(
-	std::string_view title, 
+	Std::Str title,
 	std::function<SubmenuActivateCallback> callback)
 {
 	MenuBar::Button* newButton = new MenuBar::Button(this, title, callback);
@@ -52,7 +52,7 @@ void MenuBar::AddSubmenuButton(
 }
 
 void MenuBar::AddMenuButton(
-	std::string_view title, 
+	Std::Str title,
 	std::function<ButtonActivateCallback> callback)
 {
 	MenuBar::ActivatableButton* newButton = new MenuBar::ActivatableButton(this, title, callback);
@@ -60,7 +60,7 @@ void MenuBar::AddMenuButton(
 }
 
 void MenuBar::AddToggleMenuButton(
-	std::string_view title, 
+	Std::Str title,
 	bool toggled, 
 	std::function<ToggleButtonActivateCallback> callback)
 {
@@ -189,10 +189,10 @@ void MenuBar::TouchEvent(
 
 MenuBar::Button::Button(
 	MenuBar* parentMenuBar, 
-	std::string_view title,
+	Std::Str title,
 	std::function<SubmenuActivateCallback> callback) :
 	parentMenuBar{ parentMenuBar },
-	title{ title },
+	title{ std::string(title.Data(), title.Size()) },
 	activateCallback{ callback }
 {
 
@@ -225,7 +225,7 @@ SizeHint MenuBar::Button::GetSizeHint(
 
 	return impl::TextManager::GetSizeHint(
 		implData.textManager,
-		title);
+		{ title.data(), title.size() });
 }
 
 void MenuBar::Button::Render(
@@ -244,7 +244,7 @@ void MenuBar::Button::Render(
 
 	impl::TextManager::RenderText(
 		implData.textManager,
-		title,
+		{ title.data(), title.size() },
 		{ 1.f, 1.f, 1.f, 1.f },
 		widgetRect,
 		drawInfo);
@@ -358,9 +358,9 @@ void MenuBar::Button::TouchEvent(
 
 MenuBar::ActivatableButton::ActivatableButton(
 	MenuBar* parentMenuBar, 
-	std::string_view title,
+	Std::Str title,
 	std::function<ButtonActivateCallback> callback) :
-	title{ title },
+	title{ std::string(title.Data(), title.Size()) },
 	parentMenuBar{ parentMenuBar },
 	activateCallback{ callback }
 {
@@ -374,7 +374,7 @@ SizeHint MenuBar::ActivatableButton::GetSizeHint(
 
 	return impl::TextManager::GetSizeHint(
 		implData.textManager,
-		title);
+		{ title.data(), title.size() });
 }
 
 void MenuBar::ActivatableButton::Render(
@@ -388,7 +388,7 @@ void MenuBar::ActivatableButton::Render(
 
 	impl::TextManager::RenderText(
 		implData.textManager,
-		title,
+		{ title.data(), title.size() },
 		{ 1.f, 1.f, 1.f, 1.f },
 		widgetRect,
 		drawInfo);
@@ -448,11 +448,11 @@ void MenuBar::ActivatableButton::TouchEvent(
 
 MenuBar::ToggleButton::ToggleButton(
 	MenuBar* parentMenuBar,
-	std::string_view title,
+	Std::Str title,
 	bool toggled,
 	std::function<ToggleButtonActivateCallback> callback) :
 	parentMenuBar{ parentMenuBar },
-	title{ title },
+	title{ std::string(title.Data(), title.Size()) },
 	toggled{ toggled },
 	activateCallback{ callback }
 {
@@ -466,7 +466,7 @@ SizeHint MenuBar::ToggleButton::GetSizeHint(
 
 	return impl::TextManager::GetSizeHint(
 		implData.textManager,
-		title);
+		{ title.data(), title.size() });
 }
 
 void MenuBar::ToggleButton::Render(
@@ -485,7 +485,7 @@ void MenuBar::ToggleButton::Render(
 
 	impl::TextManager::RenderText(
 		implData.textManager,
-		title,
+		{ title.data(), title.size() },
 		{ 1.f, 1.f, 1.f, 1.f },
 		widgetRect,
 		drawInfo);

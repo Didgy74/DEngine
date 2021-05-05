@@ -10,7 +10,6 @@
 
 #include <vector>
 #include <string>
-#include <string_view>
 
 namespace DEngine::Gui
 {
@@ -80,7 +79,7 @@ namespace DEngine::Gui
 		StateDataT stateData{};
 
 		void AddWindow(
-			std::string_view title,
+			Std::Str title,
 			Math::Vec4 color,
 			Std::Box<Widget>&& widget);
 

@@ -105,11 +105,11 @@ void Application::LockCursor(bool state)
 	backendData.cursorLocked = state;
 }
 
-void Application::OpenSoftInput(std::string_view currentText, SoftInputFilter filter)
+void Application::OpenSoftInput(Std::Str text, SoftInputFilter filter)
 {
 }
 
-void Application::UpdateCharInputContext(std::string_view)
+void Application::UpdateCharInputContext(Std::Str text)
 {
 
 }

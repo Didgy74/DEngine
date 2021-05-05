@@ -2,9 +2,8 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
-#include <DEngine/Std/Containers/detail/Assert.hpp>
 
-#include <new>
+#include <DEngine/Std/Containers/impl/Assert.hpp>
 
 namespace DEngine::Std
 {
@@ -71,7 +70,7 @@ namespace DEngine::Std
 	StackVec<T, capacity>::StackVec(uSize length) :
 		size(length)
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			length <= capacity, 
 			"Attempted to create a StackVec of size larger than it's capacity.");
 		new(values) T[length];
@@ -209,7 +208,7 @@ namespace DEngine::Std
 	template<typename T, uSize capacity>
 	void StackVec<T, capacity>::Erase(uSize index)
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			index < size,
 			"Attempted to .Erase() a StackVec with an out-of-bounds index.");
 		for (uSize i = index; i < size - 1; i += 1)
@@ -221,7 +220,7 @@ namespace DEngine::Std
 	template<typename T, uSize capacity>
 	void StackVec<T, capacity>::EraseUnsorted(uSize index)
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			index < size,
 			"Attempted to .EraseUnsorted() a StackVec with an out-of-bounds index.");
 		values[index] = static_cast<T&&>(values[size - 1]);
@@ -232,10 +231,10 @@ namespace DEngine::Std
 	template<typename T, uSize capacity>
 	void StackVec<T, capacity>::Insert(uSize index, T&& in)
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			index < size,
 			"Attempted to .Insert() a StackVec at an out-of-bounds index.");
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			CanPushBack(),
 			"Attempted to .Insert() a StackVec at max capacity.");
 		size += 1;
@@ -248,7 +247,7 @@ namespace DEngine::Std
 	template<typename T, uSize capacity>
 	void StackVec<T, capacity>::PushBack(T const& in)
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			CanPushBack(),
 			"Attempted to .PushBack() a StackVec at max capacity.");
 		new(values + size) T(in);
@@ -258,7 +257,7 @@ namespace DEngine::Std
 	template<typename T, uSize capacity>
 	void StackVec<T, capacity>::PushBack(T&& in)
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			CanPushBack(),
 			"Attempted to .PushBack() a StackVec at max capacity.");
 		new(values + size) T(static_cast<T&&>(in));
@@ -268,7 +267,7 @@ namespace DEngine::Std
 	template<typename T, uSize capacity>
 	void StackVec<T, capacity>::Resize(uSize newSize)
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			size <= capacity,
 			"Attempted to .Resize() a StackVec beyond it's capacity.");
 		if (newSize > size)
@@ -287,7 +286,7 @@ namespace DEngine::Std
 	template<typename T, uSize capacity>
 	T& StackVec<T, capacity>::At(uSize i) noexcept
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			i < size,
 			"Attempted to .At() a StackVec with an out-of-bounds index.");
 		return values[i];
@@ -296,7 +295,7 @@ namespace DEngine::Std
 	template<typename T, uSize capacity>
 	T const& StackVec<T, capacity>::At(uSize i) const noexcept
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			i < size,
 			"Attempted to .At() a StackVec with an out-of-bounds index.");
 		return values[i];

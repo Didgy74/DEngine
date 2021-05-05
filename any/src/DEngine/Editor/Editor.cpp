@@ -83,8 +83,8 @@ namespace DEngine::Editor
 			{
 				if (widget.selectedLine.HasValue())
 				{
-					std::string_view lineText = widget.lines[widget.selectedLine.Value()];
-					this->editorImpl->SelectEntity((Entity)std::atoi(lineText.data()));
+					auto lineText = widget.lines[widget.selectedLine.Value()].c_str();
+					this->editorImpl->SelectEntity((Entity)std::atoi(lineText));
 				}
 			};
 

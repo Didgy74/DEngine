@@ -37,7 +37,7 @@ SizeHint Dropdown::GetSizeHint(Context const& ctx) const
 	{
 		SizeHint childSizeHint = impl::TextManager::GetSizeHint(
 			implData.textManager,
-			item);
+			{ item.data(), item.size() });
 		returnVal.preferred.width = Math::Max(returnVal.preferred.width, childSizeHint.preferred.width);
 	}
 	
@@ -56,10 +56,11 @@ void Dropdown::Render(
 	drawInfo.PushFilledQuad(
 		widgetRect,
 		{ 0.f, 0.f, 0.f, 0.25f });
-
+	auto const& string = items[selectedItem];
+	
 	impl::TextManager::RenderText(
 		implData.textManager,
-		items[selectedItem],
+		{ string.data(), string.size() },
 		{ 1.f, 1.f, 1.f, 1.f },
 		widgetRect,
 		drawInfo);

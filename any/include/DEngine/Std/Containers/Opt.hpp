@@ -1,8 +1,6 @@
 #pragma once
 
-#include <DEngine/Std/Containers/detail/Assert.hpp>
-
-#include <new>
+#include <DEngine/Std/Containers/impl/Assert.hpp>
 
 namespace DEngine::Std
 {
@@ -170,7 +168,7 @@ namespace DEngine::Std
 	template<typename T>
 	T const& Opt<T>::Value() const noexcept
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			hasValue,
 			"Tried to deference Opt without a value.");
 		return value;
@@ -179,7 +177,7 @@ namespace DEngine::Std
 	template<typename T>
 	T& Opt<T>::Value() noexcept
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			hasValue,
 			"Tried to deference Opt without a value.");
 		return value;

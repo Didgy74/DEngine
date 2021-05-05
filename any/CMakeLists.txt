@@ -21,6 +21,7 @@ add_library(dengine_any STATIC
 		"src/main.cpp"
 		"src/DEngine/Assert.cpp"
 		"src/DEngine/Scene.cpp"
+		"src/DEngine/Std.cpp"
 		"src/DEngine/Editor/AppIntegration.cpp"
 		"src/DEngine/Editor/Editor.cpp"
 		"src/DEngine/Editor/ComponentWidgets.cpp"
@@ -78,7 +79,6 @@ target_sources(dengine_any
 set_target_properties(dengine_any PROPERTIES 
 	CXX_STANDARD 17
 	CXX_EXTENSIONS OFF)
-target_compile_options(dengine_any PUBLIC "-ftime-trace")
 
 option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ON)
 if (${DENGINE_ENABLE_ASSERT})

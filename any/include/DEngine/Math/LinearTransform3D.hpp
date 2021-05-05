@@ -113,10 +113,10 @@ constexpr DEngine::Math::Vector<3, DEngine::f32> DEngine::Math::LinearTransform3
 	Vector<3, f32> const& right)
 {
 	Vector<3, f32> newVector{};
-	for (size_t y = 0; y < 3; y++)
+	for (uSize y = 0; y < 3; y++)
 	{
 		f32 dot = 0.f;
-		for (size_t i = 0; i < 3; i++)
+		for (uSize i = 0; i < 3; i++)
 			dot += left.At(i, y) * right[i];
 		newVector[y] = dot + left.At(3, y);
 	}
@@ -127,9 +127,9 @@ template<typename T>
 constexpr DEngine::Math::Matrix<4, 4, T> DEngine::Math::LinearTransform3D::AsMat4(Matrix<4, 3, T> const& input)
 {
 	Matrix<4, 4, T> newMat;
-	for (size_t x = 0; x < 4; x++)
+	for (uSize x = 0; x < 4; x++)
 	{
-		for (size_t y = 0; y < 3; y++)
+		for (uSize y = 0; y < 3; y++)
 			newMat[x][y] = input[x][y];
 	}
 	newMat[0][3] = T(0);

@@ -45,7 +45,7 @@ SizeHint Button::GetSizeHint(
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	return impl::TextManager::GetSizeHint(
 		implData.textManager,
-		text);
+		{ text.data(), text.size() });
 }
 
 void Button::Render(
@@ -92,7 +92,7 @@ void Button::Render(
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	impl::TextManager::RenderText(
 		implData.textManager,
-		text,
+		{ text.data(), text.length() },
 		currentTextColor,
 		widgetRect,
 		drawInfo);
