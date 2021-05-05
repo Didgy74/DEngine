@@ -35,18 +35,19 @@ namespace DEngine::Editor::impl
 	// Returns the distance from the ray-origin to the intersection point.
 	// Cannot be negative.
 	[[nodiscard]] Std::Opt<f32> IntersectRayPlane(
-		Gizmo::Test_Ray ray,
+		Math::Vec3 rayOrigin,
+		Math::Vec3 rayDirection,
 		Math::Vec3 planeNormal,
 		Math::Vec3 pointOnPlane) noexcept
 	{
-		DENGINE_DETAIL_ASSERT(Math::Abs(ray.direction.Magnitude() - 1.f) <= 0.00001f);
+		DENGINE_DETAIL_ASSERT(Math::Abs(rayDirection.Magnitude() - 1.f) <= 0.00001f);
 		DENGINE_DETAIL_ASSERT(Math::Abs(planeNormal.Magnitude() - 1.f) <= 0.00001f);
 
 		f32 d = Math::Vec3::Dot(planeNormal, pointOnPlane);
 
 		// Compute the t value for the directed line ab intersecting the plane
-		f32 t = (d - Math::Vec3::Dot(planeNormal, ray.origin)) / Math::Vec3::Dot(planeNormal, ray.direction);
-		// If t is above 0, the intersection is in front of the ray, not behind. Calculate the exact point
+		f32 t = (d - Math::Vec3::Dot(planeNormal, rayOrigin)) / Math::Vec3::Dot(planeNormal, rayDirection);
+		// If t is above 0, the intersection is in front of the ray, not behind.
 		if (t >= 0.0f)
 			return Std::Opt<f32>{ t };
 		else
@@ -213,7 +214,8 @@ namespace DEngine::Editor::impl
 		for (auto const& endcap : cylinderCapVertices)
 		{
 			Std::Opt<f32> const hit = IntersectRayPlane(
-				ray,
+				ray.origin,
+				ray.direction,
 				cylinderAxis.GetNormalized(),
 				endcap);
 			if (hit.HasValue())
@@ -264,43 +266,24 @@ namespace DEngine::Editor::impl
 		DENGINE_DETAIL_ASSERT(Math::Abs(initialRay.direction.Magnitude() - 1.f) <= 0.00001f);
 
 		// Calculate cursor offset that we'll use to prevent the center of the object from snapping to the cursor
-		Math::Vec3 offset{};
-		Std::Opt<f32> hitA = IntersectRayPlane(initialRay, planeNormal, initialPosition);
+		Math::Vec3 offset = {};
+		Std::Opt<f32> hitA = IntersectRayPlane(initialRay.origin, initialRay.direction, planeNormal, initialPosition);
 		if (hitA.HasValue())
 			offset = initialPosition - (initialRay.origin + initialRay.direction * hitA.Value());
 
-		Std::Opt<f32> hitB = IntersectRayPlane(ray, planeNormal, initialPosition);
+		Std::Opt<f32> hitB = IntersectRayPlane(ray.origin, ray.direction, planeNormal, initialPosition);
 		if (hitB.HasValue())
 			return ray.origin + ray.direction * hitB.Value() + offset;
 		else
 			return initialPosition;
 	}
 
-	struct GizmoHitTestReturnType
+
+	[[nodiscard]] static Std::Opt<Gizmo::GizmoPart> GizmoHitTest_Translate(
+		Transform const& transform,
+		f32 scale,
+		Gizmo::Test_Ray ray) noexcept
 	{
-		Gizmo::GizmoPart part{};
-		Gizmo::Test_Ray ray{};
-	};
-
-	static Std::Opt<GizmoHitTestReturnType> GizmoHitTest(
-		InternalViewportWidget const& widget,
-		Gui::Rect widgetRect,
-		Math::Vec2 cursorPos,
-		Transform const& transform)
-	{
-		Math::Mat4 worldTransform = Math::Mat4::Identity();
-		Math::LinTran3D::SetTranslation(worldTransform, { transform.position.x, transform.position.y, 0.f });
-
-		f32 aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
-		Math::Mat4 projMat = widget.GetProjectionMatrix(aspectRatio);
-
-		u32 smallestViewportExtent = Math::Min(widgetRect.extent.width, widgetRect.extent.height);
-		f32 scale = Gizmo::ComputeScale(
-			worldTransform,
-			u32(smallestViewportExtent * Gizmo::defaultGizmoSizeRelative),
-			projMat,
-			widgetRect.extent);
-
 		// Gizmo cannot include scale in the world transform, so we modify the arrow struct
 		// to account for the scaling
 		Gizmo::Arrow arrow = Gizmo::defaultArrow;
@@ -309,26 +292,17 @@ namespace DEngine::Editor::impl
 		arrow.shaftDiameter *= scale;
 		arrow.shaftLength *= scale;
 
-		Gizmo::Test_Ray ray{};
-		ray.origin = widget.cam.position;
-		Math::Vec3 vector = DeprojectScreenspaceCoord(GetNormalizedViewportCoord(cursorPos, widgetRect), projMat);
-		ray.direction = (vector - widget.cam.position).GetNormalized();
-
-		Std::Opt<GizmoHitTestReturnType> returnVal{};
-
-		bool gizmoPartHit = false;
-		f32 closestDistance = 0.f;
-		Gizmo::GizmoPart gizmoPart{};
+		Std::Opt<f32> closestDistance;
+		Gizmo::GizmoPart gizmoPart = {};
 		{
 			// Next we handle the X arrow
 			Math::Mat4 worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Y, Math::pi / 2);
 			Math::LinTran3D::SetTranslation(worldTransform, Math::Vec3{ transform.position.x, transform.position.y, 0.f });
 
 			Std::Opt<f32> hit = IntersectArrow(ray, arrow, worldTransform);
-			if (hit.HasValue() && (!gizmoPartHit || hit.Value() < closestDistance))
+			if (hit.HasValue() && (!closestDistance.HasValue() || hit.Value() < closestDistance.Value()))
 			{
 				closestDistance = hit.Value();
-				gizmoPartHit = true;
 				gizmoPart = Gizmo::GizmoPart::ArrowX;
 			}
 		}
@@ -338,17 +312,16 @@ namespace DEngine::Editor::impl
 			Math::LinTran3D::SetTranslation(worldTransform, Math::Vec3{ transform.position.x, transform.position.y, 0.f });
 
 			Std::Opt<f32> hit = IntersectArrow(ray, arrow, worldTransform);
-			if (hit.HasValue() && (!gizmoPartHit || hit.Value() < closestDistance))
+			if (hit.HasValue() && (!closestDistance.HasValue() || hit.Value() < closestDistance.Value()))
 			{
 				closestDistance = hit.Value();
-				gizmoPartHit = true;
 				gizmoPart = Gizmo::GizmoPart::ArrowY;
 			}
 		}
 
 		// Then we check the XY quad
 		{
-			Std::Opt<f32> hit = IntersectRayPlane(ray, Math::Vec3{ 0.f, 0.f, 1.f }, transform.position);
+			Std::Opt<f32> hit = IntersectRayPlane(ray.origin, ray.direction, Math::Vec3::Forward(), transform.position);
 			if (hit.HasValue())
 			{
 				f32 planeScale = scale * Gizmo::defaultPlaneScaleRelative;
@@ -362,80 +335,195 @@ namespace DEngine::Editor::impl
 				f32 dotB = Math::Vec3::Dot(pointRelative, Math::Vec3{ 0.f, 1.f, 0.f });
 				if (dotA >= -planeScale / 2.f && dotA <= planeScale / 2.f && dotB >= -planeScale / 2.f && dotB <= planeScale / 2.f)
 				{
-					if (!gizmoPartHit || hit.Value() < closestDistance)
+					if (hit.HasValue() && (!closestDistance.HasValue() || hit.Value() < closestDistance.Value()))
 					{
 						closestDistance = hit.Value();
-						gizmoPartHit = true;
 						gizmoPart = Gizmo::GizmoPart::PlaneXY;
 					}
 				}
 			}
 		}
 
-		if (gizmoPartHit)
-		{
-			GizmoHitTestReturnType returnVal;
-			returnVal.part = gizmoPart;
-			returnVal.ray = ray;
-			return Std::Opt<GizmoHitTestReturnType>{ returnVal };
-		}
+		if (closestDistance.HasValue())
+			return gizmoPart;
 		else
 			return Std::nullOpt;
 	}
 
-	static bool Intersect_Ray_PhysicsCollider(
-		InternalViewportWidget& widget,
-		b2Body const* phBody,
-		Editor::Gizmo::Test_Ray ray)
+	[[nodiscard]] static Std::Opt<f32> GizmoHitTest_Rotate(
+		Transform const& transform,
+		f32 scale,
+		Math::Vec3 rayOrigin,
+		Math::Vec3 rayDirection) noexcept
 	{
-		b2Shape const* phBaseShape = phBody->GetFixtureList()->GetShape();
-		DENGINE_DETAIL_ASSERT(phBaseShape->GetType() == b2Shape::Type::e_polygon);
-		b2PolygonShape const* phShape = static_cast<b2PolygonShape const*>(phBaseShape);
-		Std::Span<b2Vec2 const> vertices = { phShape->m_vertices, (uSize)phShape->m_count };
+		auto const hitPointDistOpt = IntersectRayPlane(
+			rayOrigin,
+			rayDirection,
+			Math::Vec3::Forward(),
+			transform.position);
 
-		b2Vec2 const position = phBody->GetPosition();
-		f32 const rotation = phBody->GetAngle();
+		if (!hitPointDistOpt.HasValue())
+			return {};
+
+		f32 const distance = hitPointDistOpt.Value();
+		Math::Vec3 hitPoint = rayOrigin + (rayDirection * distance);
+
+		f32 const relativeDistSqrd = (hitPoint - transform.position).MagnitudeSqrd();
+		// Check if distance between transform position and hitpoint is within border
+		constexpr f32 outerCircleRadius = Gizmo::defaultRotateCircleOuterRadius;
+		constexpr f32 innerCircleRadius = Gizmo::defaultRotateCircleInnerRadius;
+		f32 const innerDistance = (outerCircleRadius - innerCircleRadius) * scale;
+		f32 const outerDistance = (outerCircleRadius + innerCircleRadius) * scale;
+
+		if (relativeDistSqrd >= Math::Sqrd(innerDistance) && relativeDistSqrd <= Math::Sqrd(outerDistance))
+			return hitPointDistOpt;
+		else
+			return {};
+	}
+
+	[[nodiscard]] static Math::Vec3 BuildDeprojectedDirection(
+		Gui::Rect widgetRect,
+		Math::Vec2 cursorPos,
+		Math::Vec3 origin,
+		Math::Mat4 projMat)
+	{
+		Math::Vec2 cursorNormalizedPos = GetNormalizedViewportCoord(cursorPos, widgetRect);
+		Math::Vec3 rayDir = (DeprojectScreenspaceCoord(cursorNormalizedPos, projMat) - origin).GetNormalized();
+		return rayDir;
+	}
+
+	struct GizmoHitTestReturn_T
+	{
+		Gizmo::GizmoPart part;
+		bool hitRotateGizmo;
+		f32 rotateOffset;
+		Gizmo::Test_Ray ray;
+	};
+
+	[[nodiscard]] static Std::Opt<GizmoHitTestReturn_T> GizmoHitTest(
+		InternalViewportWidget const& widget,
+		Gui::Rect widgetRect,
+		Math::Vec2 pointerPos,
+		Transform const& transform,
+		GizmoType gizmoType)
+	{
+		Math::Mat4 worldTransform = Math::Mat4::Identity();
+		Math::LinTran3D::SetTranslation(worldTransform, { transform.position.x, transform.position.y, 0.f });
+
+		f32 const aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
+		Math::Mat4 projMat = widget.GetProjectionMatrix(aspectRatio);
+
+		u32 smallestViewportExtent = Math::Min(widgetRect.extent.width, widgetRect.extent.height);
+		f32 scale = Gizmo::ComputeScale(
+			worldTransform,
+			u32(smallestViewportExtent * Gizmo::defaultGizmoSizeRelative),
+			projMat,
+			widgetRect.extent);
+
+		Gizmo::Test_Ray ray = {};
+		ray.origin = widget.cam.position;
+		ray.direction = BuildDeprojectedDirection(
+			widgetRect,
+			pointerPos,
+			ray.origin,
+			projMat);
+
+		if (gizmoType == GizmoType::Translate)
+		{
+			auto hitOpt = GizmoHitTest_Translate(
+				transform,
+				scale,
+				ray);
+			if (hitOpt.HasValue())
+			{
+				GizmoHitTestReturn_T returnVal = {};
+				returnVal.part = hitOpt.Value();
+				returnVal.ray = ray;
+				return returnVal;
+			}
+		}
+		else if (gizmoType == GizmoType::Rotate)
+		{
+			auto const hitDistanceOpt = GizmoHitTest_Rotate(
+				transform,
+				scale,
+				ray.origin,
+				ray.direction);
+			if (hitDistanceOpt.HasValue())
+			{
+				GizmoHitTestReturn_T returnVal = {};
+				returnVal.hitRotateGizmo = true;
+				returnVal.ray = ray;
+				// Calculate rotation offset from the hitpoint.
+				Math::Vec3 hitPoint = ray.origin + ray.direction * hitDistanceOpt.Value();
+				Math::Vec2 hitPointRel = (hitPoint - transform.position).AsVec2().GetNormalized();
+				Math::Vec2 transformUp = Math::Vec2::Up().GetRotated(transform.rotation);
+				returnVal.rotateOffset = -Math::Vec2::SignedAngle(hitPointRel, transformUp);
+				return returnVal;
+			}
+		}
+
+		return Std::nullOpt;
+	}
+
+	// Returns the distance of the hit.
+	[[nodiscard]] static Std::Opt<f32> Intersect_Ray_PhysicsCollider(
+		InternalViewportWidget& widget,
+		Std::Span<Math::Vec2 const> vertices,
+		Math::Vec2 position,
+		f32 rotation,
+		Gizmo::Test_Ray ray)
+	{
 		Math::Mat4 transMat = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, rotation);
-		Math::LinTran3D::SetTranslation(transMat, { position.x, position.y, 0.f });
+		Math::LinTran3D::SetTranslation(transMat, position.AsVec3());
 
 		// Compare against all trianges to check if we hit it
 		for (uSize i = 1; i < vertices.Size() - 1; i += 1)
 		{
-			Math::Vec3 tri[3] = {
-				{ vertices[0].x, vertices[0].y, 0.f },
-				{ vertices[i].x, vertices[i].y, 0.f },
-				{ vertices[i + 1].x, vertices[i + 1].y, 0.f } };
+			Math::Vec2 tri[3] = { vertices[0], vertices[i], vertices[i + 1] };
 			for (uSize j = 0; j < 3; j += 1)
-				tri[j] = Math::Vec3(transMat * tri[j].AsVec4(1.f));
+				tri[j] = Math::Vec2(transMat * tri[j].AsVec4(0.f, 1.f));
 
-			Std::Opt<f32> distance = impl::IntersectRayTri(ray, tri[0], tri[1], tri[2]);
+			Std::Opt<f32> distance = impl::IntersectRayTri(
+				ray,
+				tri[0].AsVec3(),
+				tri[1].AsVec3(),
+				tri[2].AsVec3());
 			if (distance.HasValue())
-				return true;
+				return distance;
 		}
 
-		return false;
+		return Std::nullOpt;
 	}
 
 	static void TranslateAlongGizmoAxis(
 		InternalViewportWidget const& widget,
 		Gui::Rect widgetRect,
-		Math::Vec2 cursorPos,
+		Math::Vec2 pointerPos,
 		Transform& transform)
 	{
-		Math::Vec2 cursorNormalizedPos = GetNormalizedViewportCoord(cursorPos, widgetRect);
-		f32 aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
-		Math::Mat4 projMat = widget.GetProjectionMatrix(aspectRatio);
-		Math::Vec3 rayDir = (DeprojectScreenspaceCoord(cursorNormalizedPos, projMat) - widget.cam.position).GetNormalized();
+		DENGINE_DETAIL_ASSERT(widget.holdingGizmoData.HasValue());
 
-		Gizmo::Test_Ray ray{};
-		ray.direction = rayDir;
+		auto const& gizmoHoldingData = widget.holdingGizmoData.Value();
+
+		f32 aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
+		Gizmo::Test_Ray ray = {};
+		ray.direction = BuildDeprojectedDirection(
+			widgetRect,
+			pointerPos,
+			transform.position,
+			widget.GetProjectionMatrix(aspectRatio));
 		ray.origin = widget.cam.position;
 
-		Math::Vec3 newPos = TranslateAlongPlane(ray, Math::Vec3::Forward(), widget.gizmo_initialPos, widget.gizmo_initialRay);
-		if (widget.gizmo_holdingPart == Gizmo::GizmoPart::ArrowX || widget.gizmo_holdingPart == Gizmo::GizmoPart::ArrowY)
+		Math::Vec3 newPos = TranslateAlongPlane(
+			ray,
+			Math::Vec3::Forward(),
+			gizmoHoldingData.initialPos,
+			gizmoHoldingData.initialRay);
+		if (gizmoHoldingData.holdingPart == Gizmo::GizmoPart::ArrowX || gizmoHoldingData.holdingPart == Gizmo::GizmoPart::ArrowY)
 		{
-			Math::Vec3 movementAxis;
-			switch (widget.gizmo_holdingPart)
+			Math::Vec3 movementAxis = {};
+			switch (gizmoHoldingData.holdingPart)
 			{
 			case Gizmo::GizmoPart::ArrowX:
 				movementAxis = { 1.f, 0.f, 0.f };
@@ -446,7 +534,7 @@ namespace DEngine::Editor::impl
 			default:
 				DENGINE_DETAIL_UNREACHABLE();
 			}
-			newPos = widget.gizmo_initialPos + movementAxis * Math::Vec3::Dot(movementAxis, newPos - widget.gizmo_initialPos);
+			newPos = gizmoHoldingData.initialPos + movementAxis * Math::Vec3::Dot(movementAxis, newPos - gizmoHoldingData.initialPos);
 		}
 		else
 		{
@@ -456,103 +544,260 @@ namespace DEngine::Editor::impl
 		transform.position = newPos;
 	}
 
-	static void InternalViewportWidget_HandlePointerPress(
-		InternalViewportWidget& widget,
+	static void Gizmo_HandleRotation(
+		InternalViewportWidget const& widget,
 		Gui::Rect widgetRect,
 		Math::Vec2 cursorPos,
-		Std::Opt<u8> touchID)
+		f32 rotationOffset,
+		Transform& transform)
 	{
-		DENGINE_DETAIL_ASSERT(!widget.isCurrentlyHoldingGizmo);
-		DENGINE_DETAIL_ASSERT(widgetRect.PointIsInside(cursorPos));
-
+		Math::Vec2 cursorNormalizedPos = GetNormalizedViewportCoord(cursorPos, widgetRect);
 		f32 aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
 		Math::Mat4 projMat = widget.GetProjectionMatrix(aspectRatio);
-		Math::Vec3 deprojCursor = impl::DeprojectScreenspaceCoord(impl::GetNormalizedViewportCoord(cursorPos, widgetRect), projMat);
-		Gizmo::Test_Ray ray{};
+		Math::Vec3 rayDir = (DeprojectScreenspaceCoord(cursorNormalizedPos, projMat) - widget.cam.position).GetNormalized();
+
+		Gizmo::Test_Ray ray = {};
 		ray.origin = widget.cam.position;
-		ray.direction = (deprojCursor - widget.cam.position).GetNormalized();
+		ray.direction = BuildDeprojectedDirection(
+			widgetRect,
+			cursorPos,
+			ray.origin,
+			widget.GetProjectionMatrix(aspectRatio));
 
-		// Check if we hit the gizmo
-		if (widget.editorImpl->selectedEntity.HasValue())
+		// Check if we hit the plane of the gizmo
+		auto distanceOpt = IntersectRayPlane(
+			ray.origin,
+			ray.direction,
+			Math::Vec3::Forward(),
+			transform.position);
+
+		if (!distanceOpt.HasValue())
+			return;
+
+		Math::Vec3 hitPoint = ray.origin + ray.direction * distanceOpt.Value();
+		Math::Vec3 hitPointRel = hitPoint - transform.position;
+
+		// We should technically project the hitpoint as 2D vector onto the plane,
+		// But the plane is facing directly towards Z anyways so we just ditch the Z component.
+
+		Math::Vec2 temp = hitPointRel.AsVec2().GetNormalized();
+		// Calculate angle between this and the world space Up vector.
+		transform.rotation = Math::Vec2::SignedAngle(temp, Math::Vec2::Up()) + rotationOffset;
+	}
+
+	enum class PointerType : u8
+	{
+		Primary,
+		Secondary
+	};
+	[[nodiscard]] static PointerType ToPointerType(Gui::CursorButton in) noexcept
+	{
+		switch (in)
 		{
-			Entity entity = widget.editorImpl->selectedEntity.Value();
-			// First check if we have a transform
-			Transform const* transformPtr = widget.editorImpl->scene->GetComponent<Transform>(entity);
-			if (transformPtr != nullptr)
+			case Gui::CursorButton::Primary: 
+				return PointerType::Primary;
+			case Gui::CursorButton::Secondary: 
+				return PointerType::Secondary;
+			default:
+				break;
+		}
+		DENGINE_DETAIL_UNREACHABLE();
+		return {};
+	}
+
+	static void InternalViewportWidget_PointerPress(
+		InternalViewportWidget& widget,
+		Gui::Context& ctx,
+		Gui::WindowID windowId,
+		Gui::Rect widgetRect,
+		Gui::Rect visibleRect,
+		Math::Vec2 pointerPos,
+		u8 pointerId,
+		bool pressed,
+		PointerType pointerType,
+		Gui::CursorClickEvent* cursorClick,
+		Gui::TouchEvent* touchEvent)
+	{
+		DENGINE_DETAIL_ASSERT(widget.editorImpl);
+		auto& editorImpl = *widget.editorImpl;
+		Scene const& scene = editorImpl.GetActiveScene();
+
+		bool pointerIsInside = widgetRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
+
+		// We don't want to do gizmo stuff if it was the secondary cursor button
+		if (pointerIsInside && pressed && widget.state == InternalViewportWidget::BehaviorState::Normal &&
+				pointerType == PointerType::Primary)
+		{
+			bool hitGizmo = false;
+			// If we have selected an entity, and it has a Transform component,
+			// We want to see if we hit it's gizmo.
+			if (widget.editorImpl->GetSelectedEntity().HasValue())
 			{
-				Transform const& transform = *transformPtr;
-
-				auto hitResult = impl::GizmoHitTest(
-					widget,
-					widgetRect,
-					cursorPos,
-					transform);
-
-				if (hitResult.HasValue())
+				Entity const entity = widget.editorImpl->GetSelectedEntity().Value();
+				Transform const* transformPtr = scene.GetComponent<Transform>(entity);
+				if (transformPtr)
 				{
-					auto const& hit = hitResult.Value();
-					widget.isCurrentlyHoldingGizmo = true;
-					widget.gizmo_initialRay = hit.ray;
-					widget.gizmo_initialPos = transform.position;
-					widget.gizmo_holdingPart = hit.part;
-					widget.gizmo_touchID = touchID;
+					Transform const& transform = *transformPtr;
+					auto const& hitTestOpt = impl::GizmoHitTest(
+						widget,
+						widgetRect,
+						pointerPos,
+						transform,
+						editorImpl.GetCurrentGizmoType());
+					if (hitTestOpt.HasValue())
+					{
+						auto const& hit = hitTestOpt.Value();
+						InternalViewportWidget::HoldingGizmoData holdingGizmoData = {};
+						holdingGizmoData.holdingPart = hit.part;
+						holdingGizmoData.initialPos = transform.position;
+						holdingGizmoData.initialRay = hit.ray;
+						holdingGizmoData.rotationOffset = hit.rotateOffset;
+						holdingGizmoData.pointerId = pointerId;
+						widget.holdingGizmoData = holdingGizmoData;
+						widget.state = InternalViewportWidget::BehaviorState::Gizmo;
+						hitGizmo = true;
+						return;
+					}
+				}
+
+				// If we didn't hit a gizmo, we want to see if we hit any selectable colliders.
+				if (!hitGizmo)
+				{
+					Std::Opt<Std::Pair<f32, Entity>> hitEntity;
+					Gizmo::Test_Ray ray = widget.BuildRay(widgetRect, pointerPos);
+					// Iterate over all physics components that also have a transform component
+					for (auto const& [entity, rb] : scene.GetAllComponents<Physics::Rigidbody2D>())
+					{
+						Transform const* transform = widget.editorImpl->scene->GetComponent<Transform>(entity);
+						if (transform)
+						{
+							Math::Vec2 vertices[4] = {
+								{-0.5f, 0.5f },
+								{ 0.5f, 0.5f },
+								{ 0.5f, -0.5f },
+								{ -0.5f, -0.5f } };
+							Std::Opt<f32> distanceOpt = Intersect_Ray_PhysicsCollider(
+								widget,
+								{ vertices, 4 },
+								transform->position.AsVec2(),
+								transform->rotation,
+								ray);
+							if (distanceOpt.HasValue())
+							{
+								f32 newDist = distanceOpt.Value();
+								if (!hitEntity.HasValue() || newDist <= hitEntity.Value().a)
+									hitEntity = { newDist, entity };
+							}
+						}
+					}
+					if (hitEntity.HasValue())
+					{
+						widget.editorImpl->SelectEntity(hitEntity.Value().b);
+						return;
+					}
 				}
 			}
 		}
 
-		// If we didn't hit the gizmo,
-		// Check if we hit a collider
-		if (!widget.isCurrentlyHoldingGizmo)
+		if (widget.state == InternalViewportWidget::BehaviorState::Gizmo && !pressed)
 		{
-			bool hitSelectedEntity = false;
-			if (widget.editorImpl->selectedEntity.HasValue())
-			{
-				Entity entity = widget.editorImpl->selectedEntity.Value();
-				Transform const* transform = widget.editorImpl->scene->GetComponent<Transform>(entity);
-				Box2D_Component const* phBodyComp = widget.editorImpl->scene->GetComponent<Box2D_Component>(entity);
-				if (transform && phBodyComp)
-				{
-					bool hit = Intersect_Ray_PhysicsCollider(
-						widget,
-						phBodyComp->ptr,
-						ray);
-					if (hit)
-					{
-						hitSelectedEntity = true;
-					}
-				}
-			}
-			if (!hitSelectedEntity)
-			{
-				// Iterate over all physics components that also have a transform component
-				for (auto const& pBodyComponentPair : widget.editorImpl->scene->GetAllComponents<Box2D_Component>())
-				{
-					Entity entity = pBodyComponentPair.a;
+			DENGINE_DETAIL_ASSERT(widget.holdingGizmoData.HasValue());
+			widget.holdingGizmoData = Std::nullOpt;
+			widget.state = InternalViewportWidget::BehaviorState::Normal;
+			return;
+		}
 
-					if (widget.editorImpl->selectedEntity.HasValue() && widget.editorImpl->selectedEntity.Value() == entity)
-						continue;
+		// Initiate free-look
+		if (pointerIsInside && pressed && widget.state == InternalViewportWidget::BehaviorState::Normal &&
+			cursorClick && cursorClick->button == Gui::CursorButton::Secondary)
+		{
+			widget.state = InternalViewportWidget::BehaviorState::FreeLooking;
+			App::LockCursor(true);
+			return;
+		}
 
-					Transform const* transform = widget.editorImpl->scene->GetComponent<Transform>(entity);
-					if (transform)
+		// Stop free-look
+		if (!pressed && widget.state == InternalViewportWidget::BehaviorState::FreeLooking &&
+			cursorClick && cursorClick->button == Gui::CursorButton::Secondary)
+		{
+			widget.state = InternalViewportWidget::BehaviorState::Normal;
+			App::LockCursor(false);
+			return;
+		}
+		
+	}
+
+	static void InternalViewportWidget_PointerMove(
+		InternalViewportWidget& widget,
+		Gui::Context& ctx,
+		Gui::WindowID windowId,
+		Gui::Rect widgetRect,
+		Gui::Rect visibleRect,
+		Math::Vec2 pointerPos,
+		u8 pointerId,
+		Gui::CursorMoveEvent* cursorMove,
+		Gui::TouchEvent* touchEvent)
+	{
+		if (widget.state == InternalViewportWidget::BehaviorState::Gizmo)
+		{
+			DENGINE_DETAIL_ASSERT(widget.holdingGizmoData.HasValue());
+			auto const& gizmoHoldingData = widget.holdingGizmoData.Value();
+			if (gizmoHoldingData.pointerId == pointerId && widget.editorImpl->GetSelectedEntity().HasValue())
+			{
+				Entity entity = widget.editorImpl->GetSelectedEntity().Value();
+				// First check if we have a transform
+				Scene& scene = widget.editorImpl->GetActiveScene();
+				Transform* transformPtr = scene.GetComponent<Transform>(entity);
+				if (transformPtr != nullptr)
+				{
+					Transform& transform = *transformPtr;
+
+					GizmoType const currGizmo = widget.editorImpl->GetCurrentGizmoType();
+					if (currGizmo == GizmoType::Translate)
 					{
-						bool hit = Intersect_Ray_PhysicsCollider(
+						impl::TranslateAlongGizmoAxis(
 							widget,
-							pBodyComponentPair.b.ptr,
-							ray);
-						if (hit)
-						{
-							widget.editorImpl->SelectEntity(entity);
-							break;
-						}
+							widgetRect,
+							pointerPos,
+							transform);
+					}
+					else if (currGizmo == GizmoType::Rotate)
+					{
+						impl::Gizmo_HandleRotation(
+							widget,
+							widgetRect,
+							pointerPos,
+							gizmoHoldingData.rotationOffset,
+							transform);
 					}
 				}
 			}
+		}
+
+		if (widget.state == InternalViewportWidget::BehaviorState::FreeLooking)
+		{
+			DENGINE_DETAIL_ASSERT(cursorMove);
+			f32 sensitivity = 0.2f;
+			Math::Vec2 amount = { (f32)cursorMove->positionDelta.x, (f32)-cursorMove->positionDelta.y };
+			widget.ApplyCameraRotation(amount * sensitivity * Math::degToRad);
 		}
 	}
 }
 
 using namespace DEngine;
 using namespace DEngine::Editor;
+
+[[nodiscard]] Gizmo::Test_Ray InternalViewportWidget::BuildRay(Gui::Rect widgetRect, Math::Vec2 pointerPos) const
+{
+	f32 aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
+	Math::Mat4 projMat = GetProjectionMatrix(aspectRatio);
+
+	Gizmo::Test_Ray ray{};
+	ray.origin = cam.position;
+	Math::Vec3 vector = impl::DeprojectScreenspaceCoord(impl::GetNormalizedViewportCoord(pointerPos, widgetRect), projMat);
+	ray.direction = (vector - cam.position).GetNormalized();
+	return ray;
+}
 
 // target_size in pixels
 [[nodiscard]] f32 Gizmo::ComputeScale(
@@ -682,13 +927,19 @@ Math::Vec2 InternalViewportWidget::GetRightJoystickVec() const noexcept
 	return {};
 }
 
-
 void InternalViewportWidget::TickTest(f32 deltaTime) noexcept
 {
-	this->isVisible = false;
+	if (!currentlyResizing && currentExtent != newExtent)
+	{
+		extentCorrectTickCounter += 1;
+		if (extentCorrectTickCounter >= 30)
+			currentExtent = newExtent;
+	}
+	if (currentlyResizing)
+		extentCorrectTickCounter = 0;
 
 	// Handle camera movement
-	if (isCurrentlyClicked)
+	if (state == BehaviorState::FreeLooking)
 	{
 		f32 moveSpeed = 5.f;
 		Math::Vec3 moveVector{};
@@ -747,6 +998,108 @@ void InternalViewportWidget::UpdateJoystickOrigin(Gui::Rect widgetRect) const no
 	joysticks[1].originPosition.y = widgetRect.position.y + widgetRect.extent.height - joystickPixelRadius * 2;
 }
 
+namespace DEngine::Editor::impl
+{
+	[[nodiscard]] static Gfx::ViewportUpdate::GizmoType ToGfxGizmoType(Editor::GizmoType in) noexcept
+	{
+		switch (in)
+		{
+			case Editor::GizmoType::Translate:
+				return Gfx::ViewportUpdate::GizmoType::Translate;
+			case Editor::GizmoType::Rotate:
+				return Gfx::ViewportUpdate::GizmoType::Rotate;
+			case Editor::GizmoType::Scale:
+				return Gfx::ViewportUpdate::GizmoType::Scale;
+			default:
+				break;
+		}
+		DENGINE_DETAIL_UNREACHABLE();
+		return {};
+	}
+}
+
+Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
+	Context const& editor,
+	std::vector<Math::Vec3>& lineVertices,
+	std::vector<Gfx::LineDrawCmd>& lineDrawCmds) const noexcept
+{
+	EditorImpl const& editorImpl = editor.ImplData();
+	Scene const& scene = editorImpl.GetActiveScene();
+
+	Gfx::ViewportUpdate returnVal = {};
+	returnVal.id = viewportId;
+	returnVal.width = currentExtent.width;
+	returnVal.height = currentExtent.height;
+
+	f32 aspectRatio = (f32)newExtent.width / (f32)newExtent.height;
+	Math::Mat4 projMat = GetProjectionMatrix(aspectRatio);
+
+	returnVal.transform = projMat;
+
+	if (editorImpl.GetSelectedEntity().HasValue())
+	{
+		Entity selected = editorImpl.GetSelectedEntity().Value();
+		// Find Transform component of this entity
+
+		Transform const* transformPtr = scene.GetComponent<Transform>(selected);
+
+		// Draw gizmo
+		if (transformPtr != nullptr)
+		{
+			Transform const& transform = *transformPtr;
+
+			returnVal.gizmoOpt = Gfx::ViewportUpdate::Gizmo{};
+			Gfx::ViewportUpdate::Gizmo& gizmo = returnVal.gizmoOpt.Value();
+			gizmo.type = impl::ToGfxGizmoType(editorImpl.GetCurrentGizmoType());
+			gizmo.position = transform.position;
+			gizmo.rotation = transform.rotation;
+
+			Math::Mat4 worldTransform = Math::Mat4::Identity();
+			Math::LinTran3D::SetTranslation(worldTransform, { transform.position.x, transform.position.y, 0.f });
+			u32 smallestViewportExtent = Math::Min(newExtent.width, newExtent.height);
+			f32 scale = Gizmo::ComputeScale(
+				worldTransform,
+				u32(smallestViewportExtent * Gizmo::defaultGizmoSizeRelative),
+				projMat,
+				newExtent);
+			gizmo.scale = scale;
+
+			gizmo.quadScale = gizmo.scale * Gizmo::defaultPlaneScaleRelative;
+			gizmo.quadOffset = gizmo.scale * Gizmo::defaultPlaneOffsetRelative;
+		}
+
+		// Draw debug lines for collider if there is one
+		Physics::Rigidbody2D const* rbPtr = scene.GetComponent<Physics::Rigidbody2D>(selected);
+		if (rbPtr && transformPtr)
+		{
+			Transform const& transform = *transformPtr;
+
+			Math::Vec2 vertices[4] = {
+				{-0.5f, 0.5f },
+				{ 0.5f, 0.5f },
+				{ 0.5f, -0.5f },
+				{ -0.5f, -0.5f } };
+
+			// We need to build a transform from the physics-body, not the Transform component?
+			Math::Mat4 worldTransform = Math::Mat4::Identity();
+			worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation) * worldTransform;
+			Math::LinTran3D::SetTranslation(worldTransform, transform.position);
+
+			for (uSize i = 0; i < 5; i++)
+			{
+				Math::Vec2 vertex = vertices[i % 4];
+				lineVertices.push_back((worldTransform * vertex.AsVec4(0.f, 1.f)).AsVec3());
+			}
+			Gfx::LineDrawCmd lineDrawCmd{};
+			lineDrawCmd.color = { 0.25f, 0.75f, 0.25f, 1.f };
+			lineDrawCmd.vertCount = 5;
+			lineDrawCmds.push_back(lineDrawCmd);
+		}
+	}
+
+	return returnVal;
+}
+
 void InternalViewportWidget::CursorClick(
 	Gui::Context& ctx,
 	Gui::WindowID windowId,
@@ -755,57 +1108,18 @@ void InternalViewportWidget::CursorClick(
 	Math::Vec2Int cursorPos,
 	Gui::CursorClickEvent event)
 {
-	UpdateJoystickOrigin(widgetRect);
-	bool cursorIsInside = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
-
-	if (isCurrentlyHoldingGizmo && event.button == Gui::CursorButton::Primary && !event.clicked)
-	{
-		isCurrentlyHoldingGizmo = false;
-	}
-
-	if (!isCurrentlyHoldingGizmo && event.clicked && event.button == Gui::CursorButton::Primary && cursorIsInside)
-	{
-		impl::InternalViewportWidget_HandlePointerPress(
-			*this,
-			widgetRect,
-			Math::Vec2{ (f32)cursorPos.x, (f32)cursorPos.y },
-			Std::nullOpt);
-	}
-
-	if (event.button == Gui::CursorButton::Secondary && !event.clicked && isCurrentlyClicked)
-	{
-		isCurrentlyClicked = false;
-		App::LockCursor(false);
-	}
-
-	if (event.button == Gui::CursorButton::Secondary && event.clicked && !isCurrentlyClicked && cursorIsInside)
-	{
-		isCurrentlyClicked = true;
-		App::LockCursor(true);
-	}
-
-	if (event.button == Gui::CursorButton::Primary && event.clicked)
-	{
-		for (auto& joystick : joysticks)
-		{
-			Math::Vec2Int relativeVector = cursorPos - joystick.originPosition;
-			if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelRadius))
-			{
-				// Cursor is inside circle
-				joystick.isClicked = true;
-				joystick.currentPosition = cursorPos;
-			}
-		}
-	}
-
-	if (event.button == Gui::CursorButton::Primary && !event.clicked)
-	{
-		for (auto& joystick : joysticks)
-		{
-			joystick.isClicked = false;
-			joystick.currentPosition = joystick.originPosition;
-		}
-	}
+	impl::InternalViewportWidget_PointerPress(
+		*this,
+		ctx,
+		windowId,
+		widgetRect,
+		visibleRect,
+		{ (f32)cursorPos.x, (f32)cursorPos.y },
+		InternalViewportWidget::cursorPointerId,
+		event.clicked,
+		impl::ToPointerType(event.button),
+		&event,
+		nullptr);
 }
 
 void InternalViewportWidget::CursorMove(
@@ -815,51 +1129,16 @@ void InternalViewportWidget::CursorMove(
 	Gui::Rect visibleRect,
 	Gui::CursorMoveEvent event)
 {
-	UpdateJoystickOrigin(widgetRect);
-
-	if (isCurrentlyHoldingGizmo)
-	{
-		if (this->editorImpl->selectedEntity.HasValue())
-		{
-			Entity entity = editorImpl->selectedEntity.Value();
-			// First check if we have a transform
-			Transform* transformPtr = editorImpl->scene->GetComponent<Transform>(entity);
-			if (transformPtr != nullptr)
-			{
-				Transform& transform = *transformPtr;
-
-				impl::TranslateAlongGizmoAxis(
-					*this,
-					widgetRect,
-					Math::Vec2{ (f32)event.position.x, (f32)event.position.y },
-					transform);
-			}
-		}
-	}
-
-	// Handle regular kb+mouse style camera movement
-	if (isCurrentlyClicked)
-	{
-		f32 sensitivity = 0.2f;
-		Math::Vec2 amount = { (f32)event.positionDelta.x, (f32)-event.positionDelta.y };
-		ApplyCameraRotation(amount * sensitivity * Math::degToRad);
-	}
-
-	for (auto& joystick : joysticks)
-	{
-		if (joystick.isClicked)
-		{
-			joystick.currentPosition = event.position;
-			Math::Vec2Int relativeVector = joystick.currentPosition - joystick.originPosition;
-			Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
-			if (relativeVectorFloat.MagnitudeSqrd() >= Math::Sqrd(joystickPixelRadius))
-			{
-				relativeVectorFloat = relativeVectorFloat.GetNormalized() * (f32)joystickPixelRadius;
-				joystick.currentPosition.x = joystick.originPosition.x + (i32)Math::Round(relativeVectorFloat.x);
-				joystick.currentPosition.y = joystick.originPosition.y + (i32)Math::Round(relativeVectorFloat.y);
-			}
-		}
-	}
+	impl::InternalViewportWidget_PointerMove(
+		*this,
+		ctx,
+		windowId,
+		widgetRect,
+		visibleRect,
+		{ (f32)event.position.x, (f32)event.position.y },
+		cursorPointerId,
+		&event,
+		nullptr);
 }
 
 void InternalViewportWidget::TouchEvent(
@@ -869,96 +1148,35 @@ void InternalViewportWidget::TouchEvent(
 	Gui::Rect visibleRect,
 	Gui::TouchEvent touch)
 {
-	UpdateJoystickOrigin(widgetRect);
-
-	bool touchIsInside = widgetRect.PointIsInside(touch.position) && visibleRect.PointIsInside(touch.position);
-
-	if (touch.type == Gui::TouchEventType::Down && touchIsInside)
+	if (touch.type == Gui::TouchEventType::Down || touch.type == Gui::TouchEventType::Up)
 	{
-		bool hitJoystick = false;
-		for (auto& joystick : joysticks)
-		{
-			if (hitJoystick)
-				break;
-			// If this joystick already uses touch-point, we go to the next joystick
-			if (joystick.touchID.HasValue())
-				continue;
-			Math::Vec2Int fingerPos = { (i32)touch.position.x, (i32)touch.position.y };
-			Math::Vec2Int relativeVector = fingerPos - joystick.originPosition;
-			if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelRadius))
-			{
-				// Cursor is inside circle
-				joystick.touchID = touch.id;
-				joystick.currentPosition = fingerPos;
-				hitJoystick = true;
-			}
-		}
-
-		// We didn't hit any of the joysticks, check if we hit any of the gizmo arrows.
-		if (!hitJoystick && !isCurrentlyHoldingGizmo)
-		{
-			impl::InternalViewportWidget_HandlePointerPress(
-				*this,
-				widgetRect,
-				touch.position,
-				Std::Opt<u8>{ touch.id });
-		}
+		bool isPressed = touch.type == Gui::TouchEventType::Down;
+		impl::InternalViewportWidget_PointerPress(
+			*this,
+			ctx,
+			windowId,
+			widgetRect,
+			visibleRect,
+			touch.position,
+			touch.id,
+			isPressed,
+			impl::PointerType::Primary,
+			nullptr,
+			&touch);
 	}
 
 	if (touch.type == Gui::TouchEventType::Moved)
 	{
-	  if (this->isCurrentlyHoldingGizmo && this->gizmo_touchID.HasValue() && this->gizmo_touchID.Value() == touch.id)
-	  {
-			if (this->editorImpl->selectedEntity.HasValue())
-			{
-				Entity entity = editorImpl->selectedEntity.Value();
-				// First check if we have a transform
-				Transform* transformPtr = editorImpl->scene->GetComponent<Transform>(entity);
-				if (transformPtr != nullptr)
-				{
-					Transform& transform = *transformPtr;
-					impl::TranslateAlongGizmoAxis(
-						*this,
-						widgetRect,
-						touch.position,
-						transform);
-				}
-			}
-		}
-
-		for (auto& joystick : joysticks)
-		{
-			if (joystick.touchID.HasValue() && joystick.touchID.Value() == touch.id)
-			{
-				joystick.currentPosition = { (i32)Math::Round(touch.position.x), (i32)Math::Round(touch.position.y) };
-				Math::Vec2Int relativeVector = joystick.currentPosition - joystick.originPosition;
-				Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
-				if (relativeVectorFloat.MagnitudeSqrd() >= Math::Sqrd(joystickPixelRadius))
-				{
-					relativeVectorFloat = relativeVectorFloat.GetNormalized() * (f32)joystickPixelRadius;
-					joystick.currentPosition.x = joystick.originPosition.x + (i32)Math::Round(relativeVectorFloat.x);
-					joystick.currentPosition.y = joystick.originPosition.y + (i32)Math::Round(relativeVectorFloat.y);
-				}
-			}
-		}
-	}
-	else if (touch.type == Gui::TouchEventType::Up)
-	{
-		if (this->isCurrentlyHoldingGizmo && this->gizmo_touchID.HasValue() && this->gizmo_touchID.Value() == touch.id)
-		{
-			this->isCurrentlyHoldingGizmo = false;
-			this->gizmo_touchID = Std::nullOpt;
-		}
-
-		for (auto& joystick : joysticks)
-		{
-			if (joystick.touchID.HasValue() && joystick.touchID.Value() == touch.id)
-			{
-				joystick.touchID = Std::nullOpt;
-				joystick.currentPosition = joystick.originPosition;
-				break;
-			}
-		}
+		impl::InternalViewportWidget_PointerMove(
+			*this,
+			ctx,
+			windowId,
+			widgetRect,
+			visibleRect,
+			touch.position,
+			touch.id,
+			nullptr,
+			&touch);
 	}
 }
 
@@ -979,33 +1197,9 @@ void InternalViewportWidget::Render(
 	Gui::DrawInfo& drawInfo) const
 {
 	UpdateJoystickOrigin(widgetRect);
-	this->isVisible = true;
-	if (!extentsAreInitialized)
-	{
-		currentExtent = widgetRect.extent;
-		newExtent = widgetRect.extent;
-		extentsAreInitialized = true;
-	}
-	else
-	{
-		if (newExtent != widgetRect.extent)
-		{
-			currentlyResizing = true;
-			newExtent = widgetRect.extent;
-		}
-		else
-		{
-			if (currentlyResizing)
-			{
-				currentlyResizing = false;
-				extentCorrectTickCounter = 0;
-			}
-			newExtent = widgetRect.extent;
-			extentCorrectTickCounter += 1;
-			if (extentCorrectTickCounter >= 15)
-				currentExtent = newExtent;
-		}
-	}
+	isVisible = true;
+	currentlyResizing = newExtent != widgetRect.extent;
+	newExtent = widgetRect.extent;
 
 	// First draw the viewport.
 	Gfx::GuiDrawCmd drawCmd{};
@@ -1015,35 +1209,35 @@ void InternalViewportWidget::Render(
 	drawCmd.rectPosition.y = (f32)widgetRect.position.y / framebufferExtent.height;
 	drawCmd.rectExtent.x = (f32)widgetRect.extent.width / framebufferExtent.width;
 	drawCmd.rectExtent.y = (f32)widgetRect.extent.height / framebufferExtent.height;
-	drawInfo.drawCmds.push_back(drawCmd);
+	drawInfo.drawCmds->push_back(drawCmd);
 
 	// Draw a circle, start from the top, move clockwise
 	Gfx::GuiDrawCmd::MeshSpan circleMeshSpan{};
 	{
 		u32 circleVertexCount = 30;
-		circleMeshSpan.vertexOffset = (u32)drawInfo.vertices.size();
-		circleMeshSpan.indexOffset = (u32)drawInfo.indices.size();
+		circleMeshSpan.vertexOffset = (u32)drawInfo.vertices->size();
+		circleMeshSpan.indexOffset = (u32)drawInfo.indices->size();
 		circleMeshSpan.indexCount = circleVertexCount * 3;
 		// Create the vertices, we insert the middle vertex first.
-		drawInfo.vertices.push_back({});
+		drawInfo.vertices->push_back({});
 		for (u32 i = 0; i < circleVertexCount; i++)
 		{
 			Gfx::GuiVertex newVertex{};
 			f32 currentRadians = 2 * Math::pi / circleVertexCount * i;
 			newVertex.position.x += Math::Sin(currentRadians);
 			newVertex.position.y += Math::Cos(currentRadians);
-			drawInfo.vertices.push_back(newVertex);
+			drawInfo.vertices->push_back(newVertex);
 		}
 		// Build indices
 		for (u32 i = 0; i < circleVertexCount - 1; i++)
 		{
-			drawInfo.indices.push_back(i + 1);
-			drawInfo.indices.push_back(0);
-			drawInfo.indices.push_back(i + 2);
+			drawInfo.indices->push_back(i + 1);
+			drawInfo.indices->push_back(0);
+			drawInfo.indices->push_back(i + 2);
 		}
-		drawInfo.indices.push_back(circleVertexCount);
-		drawInfo.indices.push_back(0);
-		drawInfo.indices.push_back(1);
+		drawInfo.indices->push_back(circleVertexCount);
+		drawInfo.indices->push_back(0);
+		drawInfo.indices->push_back(1);
 	}
 	// Draw both joysticks using said circle mesh
 	for (auto const& joystick : joysticks)
@@ -1057,7 +1251,7 @@ void InternalViewportWidget::Render(
 			cmd.rectPosition.y = (f32)joystick.originPosition.y / framebufferExtent.height;
 			cmd.rectExtent.x = (f32)joystickPixelRadius * 2 / framebufferExtent.width;
 			cmd.rectExtent.y = (f32)joystickPixelRadius * 2 / framebufferExtent.height;
-			drawInfo.drawCmds.push_back(cmd);
+			drawInfo.drawCmds->push_back(cmd);
 		}
 
 		Gfx::GuiDrawCmd cmd{};
@@ -1068,7 +1262,7 @@ void InternalViewportWidget::Render(
 		cmd.rectPosition.y = (f32)joystick.currentPosition.y / framebufferExtent.height;
 		cmd.rectExtent.x = (f32)joystickPixelRadius / framebufferExtent.width;
 		cmd.rectExtent.y = (f32)joystickPixelRadius / framebufferExtent.height;
-		drawInfo.drawCmds.push_back(cmd);
+		drawInfo.drawCmds->push_back(cmd);
 	}
 }
 

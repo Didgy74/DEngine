@@ -37,39 +37,39 @@ namespace DEngine::Math
 		return (lhs.x * rhs.x) + (lhs.y * rhs.y) + (lhs.z * rhs.z);
 	}
 
-	constexpr Vector<3, f32> Vector<3, f32>::SingleValue(f32 const& input)
+	constexpr Vector<3, f32> Vector<3, f32>::SingleValue(f32 const& input) noexcept
 	{
 		return { input, input, input };
 	}
-	constexpr Vector<3, f32> Vector<3, f32>::Zero()
+	constexpr Vector<3, f32> Vector<3, f32>::Zero() noexcept
 	{
 		return Vector<3, f32>{ 0.f, 0.f, 0.f };
 	}
-	constexpr Vector<3, f32> Vector<3, f32>::One()
+	constexpr Vector<3, f32> Vector<3, f32>::One() noexcept
 	{
 		return { 1.f, 1.f, 1.f };
 	}
-	constexpr Vector<3, f32> Vector<3, f32>::Up()
+	constexpr Vector<3, f32> Vector<3, f32>::Up() noexcept
 	{
 		return { 0.f, 1.f, 0.f };
 	}
-	constexpr Vector<3, f32> Vector<3, f32>::Down()
+	constexpr Vector<3, f32> Vector<3, f32>::Down() noexcept
 	{
 		return { 0.f, -1.f, 0 };
 	}
-	constexpr Vector<3, f32> Vector<3, f32>::Left()
+	constexpr Vector<3, f32> Vector<3, f32>::Left() noexcept
 	{
 		return { -1.f, 1.f, 0.f };
 	}
-	constexpr Vector<3, f32> Vector<3, f32>::Right()
+	constexpr Vector<3, f32> Vector<3, f32>::Right() noexcept
 	{
 		return { 1.f, 0.f, 0.f };
 	}
-	constexpr Vector<3, f32> Vector<3, f32>::Forward()
+	constexpr Vector<3, f32> Vector<3, f32>::Forward() noexcept
 	{
 		return { 0.f, 0.f, 1.f };
 	}
-	constexpr Vector<3, f32> Vector<3, f32>::Back()
+	constexpr Vector<3, f32> Vector<3, f32>::Back() noexcept
 	{
 		return { 0.f, 0.f, -1.f };
 	}

@@ -800,11 +800,11 @@ void Vk::GuiResourceManager::NewFontTexture(
 	}
 
 	// Update descriptor set
-	vk::DescriptorImageInfo descrImgInfo{};
+	vk::DescriptorImageInfo descrImgInfo = {};
 	descrImgInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 	descrImgInfo.imageView = newGlyphData.imgView;
 	descrImgInfo.sampler = manager.font_sampler;
-	vk::WriteDescriptorSet descrSetWrite{};
+	vk::WriteDescriptorSet descrSetWrite = {};
 	descrSetWrite.descriptorCount = 1;
 	descrSetWrite.descriptorType = vk::DescriptorType::eCombinedImageSampler;
 	descrSetWrite.dstBinding = 0;
@@ -815,12 +815,14 @@ void Vk::GuiResourceManager::NewFontTexture(
 	// Transfer the buffer to image, perform layout transition
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
 	cmdPoolInfo.queueFamilyIndex = globUtils.queues.graphics.FamilyIndex();
-	vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
+	auto cmdPoolResult = device.createCommandPool(cmdPoolInfo);
+	if (cmdPoolResult.result != vk::Result::eSuccess)
+		throw std::runtime_error("Unable to create command pool.");
 
 	vk::CommandBuffer cmdBuffer{};
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
 	cmdBufferAllocInfo.commandBufferCount = 1;
-	cmdBufferAllocInfo.commandPool = cmdPool;
+	cmdBufferAllocInfo.commandPool = cmdPoolResult.value;
 	cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
 	
 	result = device.allocateCommandBuffers(cmdBufferAllocInfo, &cmdBuffer);
@@ -895,7 +897,7 @@ void Vk::GuiResourceManager::NewFontTexture(
 
 	vmaDestroyBuffer(globUtils.vma, (VkBuffer)tempBuffer, tempBufferVmaAlloc);
 	device.destroy(fence);
-	device.destroy(cmdPool);
+	device.destroy(cmdPoolResult.value);
 
 	if (utfValue < lowUtfGlyphDatasSize)
 	{

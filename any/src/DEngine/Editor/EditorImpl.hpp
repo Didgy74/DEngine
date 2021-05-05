@@ -3,6 +3,7 @@
 #include <DEngine/Gui/Context.hpp>
 #include <DEngine/Gui/Text.hpp>
 #include <DEngine/Gui/DockArea.hpp>
+#include <DEngine/Gui/ButtonGroup.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
@@ -11,7 +12,6 @@
 #include <DEngine/Gfx/Gfx.hpp>
 #include <DEngine/Scene.hpp>
 
-#include <unordered_map>
 #include <vector>
 #include <string_view>
 
@@ -54,6 +54,7 @@ namespace DEngine::Editor
 		};
 	}
 
+	enum class GizmoType : u8 { Translate, Rotate, Scale, COUNT };
 	class EntityIdList;
 	class ComponentList;
 	class InternalViewportWidget;
@@ -104,16 +105,37 @@ namespace DEngine::Editor
 		virtual void OpenSoftInput(std::string_view, Gui::SoftInputFilter) override;
 
 
+		std::vector<Gfx::GuiVertex> vertices;
+		std::vector<u32> indices;
+		std::vector<Gfx::GuiDrawCmd> drawCmds;
+		std::vector<Gfx::NativeWindowUpdate> windowUpdates;
+
 		// App-specific stuff
+		void InvalidateRendering() { guiRenderingInvalidated = true; }
+		bool RenderIsInvalidated() const { return guiRenderingInvalidated; }
+		bool guiRenderingInvalidated = true;
 		Gfx::Context* gfxCtx = nullptr;
+
 		Scene* scene = nullptr;
+		Std::Box<Scene> tempScene;
+		Scene& GetActiveScene();
+		Scene const& GetActiveScene() const;
+		void BeginSimulating();
+		void StopSimulating();
+
 		Gui::Text* test_fpsText = nullptr;
-		Std::Opt<Entity> selectedEntity;
+		
 		EntityIdList* entityIdList = nullptr;
 		ComponentList* componentList = nullptr;
 		Gui::DockArea* dockArea = nullptr;
+		Gui::ButtonGroup* gizmoTypeBtnGroup = nullptr;
 		std::vector<InternalViewportWidget*> viewportWidgets;
 		void SelectEntity(Entity id);
 		void UnselectEntity();
+		[[nodiscard]] Std::Opt<Entity> const& GetSelectedEntity() const { return selectedEntity; }
+
+		[[nodiscard]] GizmoType GetCurrentGizmoType() const;
+	private:
+		Std::Opt<Entity> selectedEntity;
 	};
 }

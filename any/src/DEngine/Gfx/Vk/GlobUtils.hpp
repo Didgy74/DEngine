@@ -37,7 +37,7 @@ namespace DEngine::Gfx::Vk
 
 		VmaAllocator vma{};
 
-		DeletionQueue deletionQueue;
+		DeletionQueue delQueue;
 
 		u8 inFlightCount = 0;
 

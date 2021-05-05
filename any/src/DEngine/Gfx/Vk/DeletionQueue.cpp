@@ -24,7 +24,7 @@ bool DeletionQueue::Init(DeletionQueue& delQueue, u8 resourceSetCount)
 	return true;
 }
 
-void DeletionQueue::ExecuteCurrentTick(
+void DeletionQueue::ExecuteTick(
 	DeletionQueue& queue, 
 	GlobUtils const& globUtils, 
 	u8 currentInFlightIndex)

@@ -11,36 +11,44 @@ using namespace DEngine::Gfx;
 
 namespace DEngine::Gfx::Vk
 {
+	void BeginRecordingMainCmdBuffer(
+		DeviceDispatch const& device,
+		vk::CommandPool cmdPool,
+		vk::CommandBuffer cmdBuffer,
+		u8 inFlightIndex,
+		DebugUtilsDispatch const* debugUtils)
+	{
+		if (debugUtils)
+		{
+			std::string name = "Main CmdBuffer #";
+			name += std::to_string(inFlightIndex);
+			debugUtils->Helper_SetObjectName(device.handle, cmdBuffer, name.c_str());
+		}
+
+		device.resetCommandPool(cmdPool);
+
+		vk::CommandBufferBeginInfo beginInfo{};
+		beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+
+		device.beginCommandBuffer(cmdBuffer, beginInfo);
+	}
+
 	void RecordGUICmdBuffer(
 		GlobUtils const& globUtils,
 		GuiResourceManager const& guiResManager,
 		ViewportManager const& viewportManager,
 		WindowGuiData const& guiData,
 		vk::CommandBuffer cmdBuffer,
+		vk::Framebuffer framebuffer,
 		NativeWindowUpdate const& windowUpdate,
 		Std::Span<GuiDrawCmd const> guiDrawCmds,
 		u8 inFlightIndex)
 	{
 		DeviceDispatch const& device = globUtils.device;
 
-		// We need to name the command buffer every time we reset it
-		if (globUtils.UsingDebugUtils())
 		{
-			std::string name;
-			name += "Native Window #";
-			name += std::to_string((u64)windowUpdate.id);
-			name += " - GUI CmdBuffer #";
-			name += std::to_string(inFlightIndex);
-			globUtils.debugUtils.Helper_SetObjectName(device.handle, cmdBuffer, name.c_str());
-		}
-
-		{
-			vk::CommandBufferBeginInfo beginInfo{};
-			beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
-			device.beginCommandBuffer(cmdBuffer, beginInfo);
-
 			vk::RenderPassBeginInfo rpBegin{};
-			rpBegin.framebuffer = guiData.framebuffer;
+			rpBegin.framebuffer = framebuffer;
 			rpBegin.renderPass = globUtils.guiRenderPass;
 			rpBegin.renderArea.extent = guiData.extent;
 			rpBegin.clearValueCount = 1;
@@ -52,7 +60,7 @@ namespace DEngine::Gfx::Vk
 
 			device.cmdBeginRenderPass(cmdBuffer, rpBegin, vk::SubpassContents::eInline);
 
-			{			
+			{
 				vk::Viewport viewport{};
 				viewport.width = (float)guiData.extent.width;
 				viewport.height = (float)guiData.extent.height;
@@ -236,124 +244,12 @@ namespace DEngine::Gfx::Vk
 			}
 
 			device.cmdEndRenderPass(cmdBuffer);
-
-			device.endCommandBuffer(cmdBuffer);
-		}
-	}
-
-	void RecordGizmoDrawCalls(
-		GlobUtils const& globUtils,
-		GizmoManager const& gizmoManager,
-		ViewportData const& viewportData,
-		ViewportUpdate::Gizmo gizmo,
-		vk::CommandBuffer cmdBuffer,
-		u8 inFlightIndex)
-	{
-		globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, gizmoManager.arrowPipeline);
-
-		globUtils.device.cmdBindVertexBuffers(cmdBuffer, 0, { gizmoManager.arrowVtxBuffer }, { 0 });
-		Std::Array<vk::DescriptorSet, 1> descrSets = {
-			viewportData.camDataDescrSets[inFlightIndex] };
-		globUtils.device.cmdBindDescriptorSets(
-			cmdBuffer,
-			vk::PipelineBindPoint::eGraphics,
-			gizmoManager.pipelineLayout,
-			0,
-			{ (u32)descrSets.Size(), descrSets.Data() },
-			nullptr);
-
-		// Draw X arrow
-		{
-			Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
-			gizmoMatrix = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Y, Math::pi / 2) * gizmoMatrix;
-			Math::LinTran3D::SetTranslation(gizmoMatrix, gizmo.position);
-			globUtils.device.cmdPushConstants(
-				cmdBuffer,
-				gizmoManager.pipelineLayout,
-				vk::ShaderStageFlagBits::eVertex,
-				0,
-				sizeof(gizmoMatrix),
-				&gizmoMatrix);
-			Math::Vec4 color = { 1.f, 0.f, 0.f, 1.f };
-			globUtils.device.cmdPushConstants(
-				cmdBuffer,
-				gizmoManager.pipelineLayout,
-				vk::ShaderStageFlagBits::eFragment,
-				sizeof(gizmoMatrix),
-				sizeof(color),
-				&color);
-
-			globUtils.device.cmdDraw(
-				cmdBuffer,
-				gizmoManager.arrowVtxCount,
-				1,
-				0,
-				0);
-		}
-		// Draw Y arrow
-		{
-			Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
-			gizmoMatrix = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::X, -Math::pi / 2) * gizmoMatrix;
-			Math::LinTran3D::SetTranslation(gizmoMatrix, gizmo.position);
-			globUtils.device.cmdPushConstants(
-				cmdBuffer,
-				gizmoManager.pipelineLayout,
-				vk::ShaderStageFlagBits::eVertex,
-				0,
-				sizeof(gizmoMatrix),
-				&gizmoMatrix);
-			Math::Vec4 color = { 0.f, 1.f, 0.f, 1.f };
-			globUtils.device.cmdPushConstants(
-				cmdBuffer,
-				gizmoManager.pipelineLayout,
-				vk::ShaderStageFlagBits::eFragment,
-				sizeof(gizmoMatrix),
-				sizeof(color),
-				&color);
-			globUtils.device.cmdDraw(
-				cmdBuffer,
-				gizmoManager.arrowVtxCount,
-				1,
-				0,
-				0);
-		}
-
-		// Draw the floating quad thing
-		{
-			globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, gizmoManager.quadPipeline);
-
-			Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.quadScale, gizmo.quadScale, gizmo.quadScale);
-			Math::Vec3 translation = gizmo.position;
-			translation += Math::Vec3{ 1.f, 1.f, 0.f } * gizmo.quadOffset;
-
-			Math::LinTran3D::SetTranslation(gizmoMatrix, translation);
-			globUtils.device.cmdPushConstants(
-				cmdBuffer,
-				gizmoManager.pipelineLayout,
-				vk::ShaderStageFlagBits::eVertex,
-				0,
-				sizeof(gizmoMatrix),
-				&gizmoMatrix);
-			Math::Vec4 color = { 1.f, 1.f, 0.f, 0.75f };
-			globUtils.device.cmdPushConstants(
-				cmdBuffer,
-				gizmoManager.pipelineLayout,
-				vk::ShaderStageFlagBits::eFragment,
-				sizeof(gizmoMatrix),
-				sizeof(color),
-				&color);
-			globUtils.device.cmdDraw(
-				cmdBuffer,
-				4,
-				1,
-				0,
-				0);
 		}
 	}
 	
-	// Assumes the resource set is available
 	void RecordGraphicsCmdBuffer(
 		GlobUtils const& globUtils, 
+		vk::CommandBuffer cmdBuffer,
 		ObjectDataManager const& objectDataManager,
 		TextureManager const& textureManager,
 		ViewportData const& viewportData,
@@ -362,33 +258,13 @@ namespace DEngine::Gfx::Vk
 		u8 inFlightIndex,
 		APIData& test_apiData)
 	{
-		vk::CommandBuffer cmdBuffer = viewportData.cmdBuffers[inFlightIndex];
-
-		// We need to rename the command buffer every time we record it
-		if (globUtils.UsingDebugUtils())
-		{
-			std::string name;
-			name += "Graphics viewport #";
-			name += std::to_string((u64)viewportUpdate.id);
-			name += std::string(" - CmdBuffer #");
-			name += std::to_string(inFlightIndex);
-			globUtils.debugUtils.Helper_SetObjectName(
-				globUtils.
-				device.handle, 
-				cmdBuffer, name.c_str());
-		}
-
-		vk::CommandBufferBeginInfo beginInfo{};
-		beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
-		globUtils.device.beginCommandBuffer(cmdBuffer, beginInfo);
-
 		vk::RenderPassBeginInfo rpBegin{};
 		rpBegin.framebuffer = viewportData.renderTarget.framebuffer;
 		rpBegin.renderPass = globUtils.gfxRenderPass;
 		rpBegin.renderArea.extent = viewportData.renderTarget.extent;
 		rpBegin.clearValueCount = 1;
 		vk::ClearColorValue clearVal{};
-		clearVal.setFloat32({ 0.f, 0.f, 0.5f, 1.f });
+		clearVal.setFloat32({ 0.25f, 0.25f, 0.25f, 1.f });
 		vk::ClearValue clear = clearVal;
 		rpBegin.pClearValues = &clear;
 		globUtils.device.cmdBeginRenderPass(cmdBuffer, rpBegin, vk::SubpassContents::eInline);
@@ -424,117 +300,30 @@ namespace DEngine::Gfx::Vk
 		// Draw our lines
 		if (!drawParams.lineDrawCmds.empty())
 		{
-			globUtils.device.cmdBindPipeline(
+			GizmoManager::DebugLines_RecordDrawCalls(
+				test_apiData.gizmoManager,
+				globUtils,
+				viewportData,
+				{ drawParams.lineDrawCmds.data(),drawParams.lineDrawCmds.size() },
 				cmdBuffer,
-				vk::PipelineBindPoint::eGraphics,
-				test_apiData.gizmoManager.linePipeline);
-
-			Std::Array<vk::DescriptorSet, 1> descrSets = {
-				viewportData.camDataDescrSets[inFlightIndex] };
-			globUtils.device.cmdBindDescriptorSets(
-				cmdBuffer,
-				vk::PipelineBindPoint::eGraphics,
-				test_apiData.gizmoManager.pipelineLayout,
-				0,
-				{ (u32)descrSets.Size(), descrSets.Data() },
-				nullptr);
-
-			Math::Mat4 gizmoMatrix = Math::Mat4::Identity();
-			globUtils.device.cmdPushConstants(
-				cmdBuffer,
-				test_apiData.gizmoManager.pipelineLayout,
-				vk::ShaderStageFlagBits::eVertex,
-				0,
-				sizeof(gizmoMatrix),
-				&gizmoMatrix);
-
-			uSize vertexOffset = 0;
-			for (auto const& drawCmd : drawParams.lineDrawCmds)
-			{
-				// Push the color to the push-constant
-				globUtils.device.cmdPushConstants(
-					cmdBuffer,
-					test_apiData.gizmoManager.pipelineLayout,
-					vk::ShaderStageFlagBits::eFragment,
-					sizeof(gizmoMatrix),
-					sizeof(drawCmd.color),
-					&drawCmd.color);
-
-				// Bind the vertex-array
-				vk::Buffer vertexBuffer = test_apiData.gizmoManager.lineVtxBuffer;
-				uSize vertexBufferOffset = 0;
-				// Offset into the right in-flight part of the buffer
-				vertexBufferOffset += test_apiData.gizmoManager.lineVtxBufferCapacity * test_apiData.gizmoManager.lineVtxElementSize * inFlightIndex;
-				// Index into the correct vertex
-				vertexBufferOffset += test_apiData.gizmoManager.lineVtxElementSize * vertexOffset;
-				globUtils.device.cmdBindVertexBuffers(
-					cmdBuffer,
-					0,
-					vertexBuffer,
-					vertexBufferOffset);
-
-				globUtils.device.cmdDraw(
-					cmdBuffer,
-					drawCmd.vertCount,
-					1,
-					0,
-					0);
-
-				vertexOffset += drawCmd.vertCount;
-			}
+				inFlightIndex);
 		}
 
-
-
-
-
-
-
-
-
 		// Draw the gizmo for this viewport
-		if (viewportUpdate.gizmo.HasValue())
+		if (viewportUpdate.gizmoOpt.HasValue())
 		{
-			ViewportUpdate::Gizmo gizmo = viewportUpdate.gizmo.Value();
+			ViewportUpdate::Gizmo gizmo = viewportUpdate.gizmoOpt.Value();
 
-			RecordGizmoDrawCalls(
-				globUtils,
+			GizmoManager::Gizmo_RecordDrawCalls(
 				test_apiData.gizmoManager,
+				globUtils,
 				viewportData,
 				gizmo,
 				cmdBuffer,
 				inFlightIndex);
 		}
 		
-
 		globUtils.device.cmdEndRenderPass(cmdBuffer);
-
-		// We need a barrier for the render-target if we are going to sample from it in the gui pass
-		if (globUtils.editorMode)
-		{
-			vk::ImageMemoryBarrier imgBarrier{};
-			imgBarrier.image = viewportData.renderTarget.img;
-			imgBarrier.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-			imgBarrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-			imgBarrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-			imgBarrier.subresourceRange.baseArrayLayer = 0;
-			imgBarrier.subresourceRange.baseMipLevel = 0;
-			imgBarrier.subresourceRange.layerCount = 1;
-			imgBarrier.subresourceRange.levelCount = 1;
-			imgBarrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
-			imgBarrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
-
-			globUtils.device.cmdPipelineBarrier(
-				cmdBuffer,
-				vk::PipelineStageFlagBits::eColorAttachmentOutput,
-				vk::PipelineStageFlagBits::eFragmentShader,
-				vk::DependencyFlagBits(),
-				nullptr,
-				nullptr,
-				imgBarrier);
-		}
-
-		globUtils.device.endCommandBuffer(cmdBuffer);
 	}
 }
 
@@ -560,12 +349,12 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	APIData& apiData = *this;
 	DevDispatch const& device = globUtils.device;
 
-	NativeWindowManager::Update(
+	NativeWindowManager::ProcessEvents(
 		apiData.nativeWindowManager,
 		globUtils,
 		{ drawParams.nativeWindowUpdates.data(), drawParams.nativeWindowUpdates.size() });
 	// Deletes and creates viewports when needed.
-	ViewportManager::HandleEvents(
+	ViewportManager::ProcessEvents(
 		apiData.viewportManager,
 		globUtils,
 		{ drawParams.viewportUpdates.data(), drawParams.viewportUpdates.size() },
@@ -587,7 +376,7 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	vkResult = globUtils.device.waitForFences(
 		apiData.mainFences[currentInFlightIndex],
 		true,
-		5000000000); // Added a 5s timeout for testing purposes
+		3000000000); // Added a 3s timeout for testing purposes
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("Vulkan: Failed to wait for cmd buffer fence.");
 	device.resetFences(apiData.mainFences[currentInFlightIndex]);
@@ -615,44 +404,72 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		currentInFlightIndex,
 		{ drawParams.lineVertices.data(), drawParams.lineVertices.size() });
 
-	std::vector<vk::CommandBuffer> graphicsCmdBuffers{};
+	vk::CommandBuffer mainCmdBuffer = apiData.mainCmdBuffers[currentInFlightIndex];
+	bool cmdBufferBegun = false;
+
 	for (auto const& viewportUpdate : drawParams.viewportUpdates)
 	{
-		auto viewportDataIt = Std::FindIf(
+		auto const viewportDataIt = Std::FindIf(
 			apiData.viewportManager.viewportNodes.begin(),
 			apiData.viewportManager.viewportNodes.end(),
-			[&viewportUpdate](decltype(apiData.viewportManager.viewportNodes)::value_type const& val) -> bool {
-				return viewportUpdate.id == val.id; });
-		ViewportData const& viewport = viewportDataIt->viewport;
-		vk::CommandBuffer cmdBuffer = viewport.cmdBuffers[currentInFlightIndex];
-		graphicsCmdBuffers.push_back(cmdBuffer);
+			[&viewportUpdate](auto const& val) -> bool { return viewportUpdate.id == val.id; });
+		DENGINE_DETAIL_GFX_ASSERT(viewportDataIt != apiData.viewportManager.viewportNodes.end());
+		ViewportManager::Node const& viewportNode = *viewportDataIt;
 		
+		if (!cmdBufferBegun)
+		{
+			BeginRecordingMainCmdBuffer(
+				globUtils.device,
+				apiData.mainCmdPools[currentInFlightIndex],
+				mainCmdBuffer,
+				currentInFlightIndex,
+				globUtils.DebugUtilsPtr());
+			cmdBufferBegun = true;
+		}
+
 		RecordGraphicsCmdBuffer(
 			globUtils,
+			mainCmdBuffer,
 			apiData.objectDataManager,
 			apiData.textureManager,
-			viewport,
+			viewportNode.viewport,
 			viewportUpdate,
 			drawParams,
 			currentInFlightIndex,
 			apiData);
 	}
 
-	// Record all the GUI shit.
-	std::vector<NativeWindowData const*> windowsToPresent;
-	for (auto& windowUpdate : drawParams.nativeWindowUpdates)
-	{
-		auto& manager = apiData.nativeWindowManager;
-		// First find the window in the database
-		auto windowDataIt = std::find_if(
-			manager.nativeWindows.begin(),
-			manager.nativeWindows.end(),
-			[&windowUpdate](NativeWindowManager::Node const& node) -> bool { return node.id == windowUpdate.id; });
-		auto const& nativeWindow = *windowDataIt;
-		windowsToPresent.push_back(&nativeWindow.windowData);
 
-		vk::CommandBuffer cmdBuffer = nativeWindow.gui.cmdBuffers[currentInFlightIndex];
-		graphicsCmdBuffers.push_back(cmdBuffer);
+	// Record all the GUI shit.
+	std::vector<u32> swapchainIndices(drawParams.nativeWindowUpdates.size());
+	std::vector<vk::SwapchainKHR> swapchains(drawParams.nativeWindowUpdates.size());
+	std::vector<vk::Semaphore> swapchainImageReadySemaphores(drawParams.nativeWindowUpdates.size());
+	std::vector<vk::PipelineStageFlags> swapchainImageReadyStages(drawParams.nativeWindowUpdates.size());
+	for (auto& item : swapchainImageReadyStages)
+		item = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	for (uSize i = 0; i < drawParams.nativeWindowUpdates.size(); i += 1)
+	{
+		// First assert that this ID doesn't already exist?
+
+		auto const& windowUpdate = drawParams.nativeWindowUpdates[i];
+		// First find the window in the database
+		auto const windowDataIt = Std::FindIf(
+			apiData.nativeWindowManager.nativeWindows.begin(),
+			apiData.nativeWindowManager.nativeWindows.end(),
+			[&windowUpdate](auto const& node) -> bool { return node.id == windowUpdate.id; });
+		DENGINE_DETAIL_GFX_ASSERT(windowDataIt != apiData.nativeWindowManager.nativeWindows.end());
+		auto const& nativeWindow = *windowDataIt;
+
+		if (!cmdBufferBegun)
+		{
+			BeginRecordingMainCmdBuffer(
+				globUtils.device,
+				apiData.mainCmdPools[currentInFlightIndex],
+				mainCmdBuffer,
+				currentInFlightIndex,
+				globUtils.DebugUtilsPtr());
+			cmdBufferBegun = true;
+		}
 
 		Std::Span<GuiDrawCmd const> drawCmds;
 		if (!drawParams.guiDrawCmds.empty())
@@ -661,74 +478,65 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 			drawCmds = { &drawParams.guiDrawCmds[windowUpdate.drawCmdOffset], windowUpdate.drawCmdCount };
 		}
 
+		vk::ResultValue<u32> acquireResult = device.acquireNextImageKHR(
+			nativeWindow.windowData.swapchain,
+			std::numeric_limits<u64>::max(),
+			nativeWindow.windowData.swapchainImgReadySem,
+			vk::Fence());
+		if (acquireResult.result != vk::Result::eSuccess)
+			throw std::runtime_error("DEngine - Vulkan: Acquiring next swapchain image did not return success result.");
+
+		u32 index = acquireResult.value;
+		swapchainIndices[i] = index;
+		swapchains[i] = nativeWindow.windowData.swapchain;
+		swapchainImageReadySemaphores[i] = nativeWindow.windowData.swapchainImgReadySem;
+
+		vk::Framebuffer guiFramebuffer = nativeWindow.windowData.framebuffers[index];
+
 		RecordGUICmdBuffer(
 			globUtils,
 			apiData.guiResourceManager,
 			apiData.viewportManager,
 			nativeWindow.gui,
-			cmdBuffer,
+			mainCmdBuffer,
+			guiFramebuffer,
 			windowUpdate,
 			drawCmds,
 			currentInFlightIndex);
 	}
 
-	// Submit the graphics cmdBuffers
-	if (!graphicsCmdBuffers.empty())
+	if (cmdBufferBegun)
 	{
+		globUtils.device.endCommandBuffer(mainCmdBuffer);
+
 		vk::SubmitInfo submitInfo{};
-		submitInfo.commandBufferCount = (u32)graphicsCmdBuffers.size();
-		submitInfo.pCommandBuffers = graphicsCmdBuffers.data();
-		globUtils.queues.graphics.submit(submitInfo, vk::Fence());
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &mainCmdBuffer;
+		submitInfo.pWaitDstStageMask = swapchainImageReadyStages.data();
+		submitInfo.pWaitSemaphores = swapchainImageReadySemaphores.data();
+		submitInfo.waitSemaphoreCount = (u32)swapchainImageReadySemaphores.size();
+		globUtils.queues.graphics.submit(submitInfo, apiData.mainFences[currentInFlightIndex]);
+
+		if (!swapchainIndices.empty())
+		{
+			vk::PresentInfoKHR presentInfo{};
+			presentInfo.pImageIndices = swapchainIndices.data();
+			presentInfo.pSwapchains = swapchains.data();
+			presentInfo.swapchainCount = (u32)swapchains.size();
+			vkResult = globUtils.queues.graphics.presentKHR(presentInfo);
+			if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eSuboptimalKHR && vkResult != vk::Result::eErrorOutOfDateKHR)
+				throw std::runtime_error("DEngine - Vulkan: Presentation submission did not return success result.");
+		}
 	}
 
-	// Setup swapchain copy cmd buffers.
-	std::vector<u32> presentIndices;
-	std::vector<vk::SwapchainKHR> swapchains;
-	std::vector<vk::CommandBuffer> swapchainCopyCmdBuffers;
-	std::vector<vk::Semaphore> swapchainImageReadySemaphores;
-	std::vector<vk::PipelineStageFlags> swapchainCopyWaitStages;
-	for (uSize i = 0; i < windowsToPresent.size(); i += 1)
-	{
-		vk::ResultValue<u32> acquireResult = device.acquireNextImageKHR(
-			windowsToPresent[i]->swapchain,
-			std::numeric_limits<u64>::max(),
-			windowsToPresent[i]->swapchainImageReady,
-			vk::Fence());
-		if (acquireResult.result != vk::Result::eSuccess)
-			throw std::runtime_error("DEngine - Vulkan: Acquiring next swapchain image did not return success result.");
-		u32 index = acquireResult.value;
 
-		presentIndices.push_back(index);
-		swapchains.push_back(windowsToPresent[i]->swapchain);
-		swapchainCopyCmdBuffers.push_back(windowsToPresent[i]->copyCmdBuffers[index]);
-		swapchainImageReadySemaphores.push_back(windowsToPresent[i]->swapchainImageReady);
-		swapchainCopyWaitStages.push_back(vk::PipelineStageFlagBits::eTransfer);
-	}
-
-	vk::SubmitInfo submitInfo{};
-	submitInfo.commandBufferCount = (u32)swapchainCopyCmdBuffers.size();
-	submitInfo.pCommandBuffers = swapchainCopyCmdBuffers.data();
-	submitInfo.pWaitDstStageMask = swapchainCopyWaitStages.data();
-	submitInfo.pWaitSemaphores = swapchainImageReadySemaphores.data();
-	submitInfo.waitSemaphoreCount = (u32)swapchainImageReadySemaphores.size();
-
-	globUtils.queues.graphics.submit(submitInfo, apiData.mainFences[currentInFlightIndex]);
-
-	if (!presentIndices.empty())
-	{
-		vk::PresentInfoKHR presentInfo{};
-		presentInfo.pImageIndices = presentIndices.data();
-		presentInfo.pSwapchains = swapchains.data();
-		presentInfo.swapchainCount = (u32)swapchains.size();
-		vkResult = globUtils.queues.graphics.presentKHR(presentInfo);
-		if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eSuboptimalKHR)
-			throw std::runtime_error("DEngine - Vulkan: Presentation submission did not return success result.");
-	}
-
-	DeletionQueue::ExecuteCurrentTick(
-		apiData.globUtils.deletionQueue,
+	// Let the deletion-queue run it's tick.
+	DeletionQueue::ExecuteTick(
+		apiData.globUtils.delQueue,
 		globUtils,
 		currentInFlightIndex);
+
+	// Increment the in-flight index.
 	apiData.currInFlightIndex = (apiData.currInFlightIndex + 1) % apiData.globUtils.inFlightCount;
 }
 

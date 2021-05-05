@@ -92,7 +92,7 @@ namespace DEngine::Application::detail
 	AppData::WindowNode* GetWindowNode(WindowID id);
 	AppData::WindowNode* GetWindowNode(void* platformHandle);
 	void UpdateWindowSize(
-		void* platformHandle,
+		AppData::WindowNode& windowNode,
 		Extent newSize,
 		Math::Vec2Int visiblePos,
 		Extent visibleSize);

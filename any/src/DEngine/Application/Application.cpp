@@ -15,6 +15,7 @@ namespace DEngine::Application::detail
 }
 
 using namespace DEngine;
+using namespace DEngine::Application;
 
 void Application::DestroyWindow(WindowID id) noexcept
 {
@@ -37,19 +38,15 @@ u32 Application::GetWindowCount() noexcept
 	return (u32)appData.windows.size();
 }
 
-Application::Extent Application::GetWindowSize(WindowID window) noexcept
+Extent Application::GetWindowSize(WindowID window) noexcept
 {
-	auto const& appData = *detail::pAppData;
-	auto windowNodeIt = Std::FindIf(
-		appData.windows.begin(),
-		appData.windows.end(),
-		[window](auto const& val) -> bool { return window == val.id; });
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
-	auto const& windowNode = *windowNodeIt;
+	auto const windowNodePtr = detail::GetWindowNode(window);
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	auto const& windowNode = *windowNodePtr;
 	return windowNode.windowData.size;
 }
 
-Application::Extent Application::GetWindowVisibleSize(WindowID window) noexcept
+Extent Application::GetWindowVisibleSize(WindowID window) noexcept
 {
 	auto const& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -100,7 +97,7 @@ bool Application::GetWindowMinimized(WindowID window) noexcept
 	return windowNode.windowData.isMinimized;
 }
 
-Application::WindowEvents Application::GetWindowEvents(WindowID window) noexcept
+WindowEvents Application::GetWindowEvents(WindowID window) noexcept
 {
 	auto const& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -329,17 +326,11 @@ Application::detail::AppData::WindowNode* DEngine::Application::detail::GetWindo
 }
 
 void Application::detail::UpdateWindowSize(
-	void* platformHandle,
+	AppData::WindowNode& windowNode,
 	Extent newSize,
 	Math::Vec2Int visiblePos,
 	Extent visibleSize)
 {
-	auto& windowNode = *Std::FindIf(
-		pAppData->windows.begin(),
-		pAppData->windows.end(),
-		[platformHandle](AppData::WindowNode const& val) -> bool {
-			return val.platformHandle == platformHandle; });
-
 	windowNode.windowData.size = newSize;
 	windowNode.windowData.visiblePosition = visiblePos;
 	windowNode.windowData.visibleSize = visibleSize;

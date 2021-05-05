@@ -332,9 +332,11 @@ static void Application::detail::Backend_GLFW_WindowSizeCallback(
 	int width, 
 	int height)
 {
+	auto windowNodePtr = detail::GetWindowNode(window);
+
 	if (width != 0 && height != 0)
 		detail::UpdateWindowSize(
-			window, 
+			*windowNodePtr, 
 			{ (u32)width, (u32)height },
 			{},
 			{ (u32)width, (u32)height });

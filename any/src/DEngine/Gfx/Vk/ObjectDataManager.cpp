@@ -18,8 +18,8 @@ void DEngine::Gfx::Vk::ObjectDataManager::HandleResizeEvent(
 		return;
 
 	// Queue previous stuff for deletion
-	globUtils.deletionQueue.Destroy(manager.descrPool);
-	globUtils.deletionQueue.Destroy(manager.vmaAlloc, manager.buffer);
+	globUtils.delQueue.Destroy(manager.descrPool);
+	globUtils.delQueue.Destroy(manager.vmaAlloc, manager.buffer);
 
 	manager.capacity *= 2;
 

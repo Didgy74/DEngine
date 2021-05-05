@@ -46,7 +46,7 @@ namespace DEngine::Gfx::Vk
 			DeletionQueue& delQueue,
 			u8 resourceSetCount);
 
-		static void ExecuteCurrentTick(
+		static void ExecuteTick(
 			DeletionQueue& queue,
 			GlobUtils const& globUtils,
 			u8 currentInFlightIndex);

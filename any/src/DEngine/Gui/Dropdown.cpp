@@ -143,7 +143,7 @@ void Dropdown::CreateDropdownMenu(
 			button->normalColor = button->hoverColor;
 		}
 
-		button->activatePfn = [this, i, windowId, &ctx](
+		button->activatePfn = [this, i](
 			Button& btn)
 		{
 			u32 previousSelectedItem = selectedItem;

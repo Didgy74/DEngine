@@ -57,4 +57,7 @@ namespace DEngine::Math
 		[[nodiscard]] constexpr bool operator==(Vector<4, f32> const& rhs) const noexcept;
 		[[nodiscard]] constexpr bool operator!=(Vector<4, f32> const& rhs) const noexcept;
 	};
+
+	static_assert(sizeof(Vector<4, f32>) == sizeof(f32[4]), "Size of Vec4 is not as expected.");
+	static_assert(alignof(Vector<4, f32>) == alignof(f32[4]), "Alignment of Vec4 is not as expected.");
 }

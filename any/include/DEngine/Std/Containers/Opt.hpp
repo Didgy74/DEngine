@@ -40,7 +40,7 @@ namespace DEngine::Std
 		bool hasValue = false;
 		union
 		{
-			alignas(T) unsigned char unusedChar[sizeof(T)] = {};
+			alignas(T) unsigned char unusedChar[sizeof(T)];
 			T value;
 		};
 

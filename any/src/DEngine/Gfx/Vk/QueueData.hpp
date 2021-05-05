@@ -20,9 +20,9 @@ namespace DEngine::Gfx::Vk
             u32 queueIndex = invalidIndex;
         };
 
-        Indices graphics{};
-        Indices transfer{};
-        Indices compute{};
+        Indices graphics = {};
+        Indices transfer = {};
+        Indices compute = {};
     };
 
     class QueueData
@@ -59,10 +59,10 @@ namespace DEngine::Gfx::Vk
             friend class DeviceDispatch;
         };
 
-        SafeQueue graphics{};
-        SafeQueue transfer{};
+        SafeQueue graphics = {};
+        SafeQueue transfer = {};
         [[nodiscard]] inline bool HasTransfer() const { return transfer.Handle() != vk::Queue(); }
-        SafeQueue compute{};
+        SafeQueue compute = {};
         [[nodiscard]] inline bool HasCompute() const { return compute.Handle() != vk::Queue(); }
 
         static void Init(

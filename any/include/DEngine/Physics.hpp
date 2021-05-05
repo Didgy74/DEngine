@@ -1,6 +1,5 @@
 #pragma once
 
-/*
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
 
@@ -15,19 +14,14 @@ namespace DEngine::Physics
 	{
 		static constexpr f32 defaultLinearDamp = 0.95f;
 
-		Math::Vec2 velocity{};
-		Math::Vec2 acceleration{};
-		f32 angularVelocity = 0;
-		f32 torque = 0;
+		enum class Type : u8
+		{
+			Dynamic,
+			Static
+		};
+		Type type = Type::Dynamic;
 
-		f32 inverseMass = 1.f;
-
-		// Range [0, 1]
-		// Factor of velocity retention per second.
-		f32 linearDamp = defaultLinearDamp;
-
-		// Range [0, 1]
-		f32 restitution = 1.f;
+		void* b2BodyPtr = nullptr;
 	};
 
 	struct CircleCollider2D
@@ -47,4 +41,3 @@ namespace DEngine::Physics
 
 	void Update(Scene& scene, f32 deltaTime);
 }
-*/

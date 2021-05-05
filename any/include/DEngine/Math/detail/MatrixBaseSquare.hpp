@@ -82,9 +82,9 @@ namespace DEngine::Math
 				}
 			}
 
-			[[nodiscard]] static constexpr Math::Matrix<width, width, T> Identity()
+			[[nodiscard]] static constexpr Math::Matrix<width, width, T> Identity() noexcept
 			{
-				Math::Matrix<width, width, T> temp{};
+				Math::Matrix<width, width, T> temp = {};
 				for (size_t x = 0; x < width; x += 1)
 					temp.data[x * width + x] = T(1);
 				return temp;

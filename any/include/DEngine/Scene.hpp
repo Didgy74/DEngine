@@ -16,11 +16,6 @@
 
 namespace DEngine
 {
-	struct Box2D_Component
-	{
-		b2Body* ptr = nullptr;
-	};
-
 	enum class Entity : u64 { Invalid = u64(-1) };
 
 	class Scene;
@@ -41,71 +36,47 @@ namespace DEngine
 	{
 	public:
 		Scene() = default;
-		Scene(Scene const&) = delete;
 		Scene(Scene&&) = default;
-		Scene& operator=(Scene const&) = delete;
 		Scene& operator=(Scene&&) = default;
 
-		bool play = false;
+		void Copy(Scene& output) const;
 
+	private:
+
+		std::vector<Entity>& Impl_GetEntities() { return entities; }
+
+		template<typename T>
+		std::vector<Std::Pair<Entity, T>>& Impl_GetAllComponents() = delete;
+		template<typename T>
+		std::vector<Std::Pair<Entity, T>> const& Impl_GetAllComponents() const = delete;
+
+	public:
 		// We need this to be a pointer to heap because the struct is so huge.
 		// And lots of the objects in it require a pointer to it.
-		Std::Box<b2World> physicsWorld{ new b2World{{ 0.f, -10.f }} };
+		Std::Box<b2World> physicsWorld;
 
 		Std::Span<Entity const> GetEntities() const { return { entities.data(), entities.size() }; }
 
 		template<typename T>
 		Std::Span<Std::Pair<Entity, T>> GetAllComponents() = delete;
-
-	private:
-		std::vector<Entity>& Internal_GetEntities() { return entities; }
-
 		template<typename T>
-		std::vector<Std::Pair<Entity, T>>& Internal_GetAllComponents() = delete;
+		Std::Span<Std::Pair<Entity, T> const> GetAllComponents() const = delete;
 
-	public:
-		Entity NewEntity()
-		{
-			Entity returnVal = (Entity)entityIdIncrementor;
-			entityIdIncrementor += 1;
-			entities.push_back(returnVal);
-			return returnVal;
-		}
+		void Begin();
 
-		void DeleteEntity(Entity ent)
-		{
-			DENGINE_DETAIL_ASSERT(ValidateEntity(ent));
-			DeleteComponent_CanFail<Transform>(ent);
-			DeleteComponent_CanFail<Gfx::TextureID>(ent);
-			DeleteComponent_CanFail<Move>(ent);
+		Entity NewEntity() noexcept;
 
-			for (uSize i = 0; i < entities.size(); i += 1)
-			{
-				if (ent == entities[i])
-				{
-					entities.erase(entities.begin() + i);
-					break;
-				}
-			}
-		}
+		void DeleteEntity(Entity ent) noexcept;
 
 		// Confirm that this entity exists.
-		[[nodiscard]] bool ValidateEntity(Entity entity) const noexcept
-		{
-			for (auto const& item : entities)
-			{
-				if (item == entity)
-					return true;
-			}
-			return false;
-		}
+		[[nodiscard]] bool ValidateEntity(Entity entity) const noexcept;
 
 		template<typename T>
 		void AddComponent(Entity entity, T const& component)
 		{
 			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
 
-			auto& componentVector = Internal_GetAllComponents<T>();
+			auto& componentVector = Impl_GetAllComponents<T>();
 			// Crash if we already got this component
 			DENGINE_DETAIL_ASSERT(GetComponent<T>(entity) == nullptr);
 
@@ -115,7 +86,7 @@ namespace DEngine
 		void DeleteComponent(Entity entity)
 		{
 			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
-			auto& componentVector = Internal_GetAllComponents<T>();
+			auto& componentVector = Impl_GetAllComponents<T>();
 			auto const componentIt = Std::FindIf(
 				componentVector.begin(),
 				componentVector.end(),
@@ -126,7 +97,7 @@ namespace DEngine
 		template<typename T>
 		void DeleteComponent_CanFail(Entity entity)
 		{
-			auto& componentVector = Internal_GetAllComponents<T>();
+			auto& componentVector = Impl_GetAllComponents<T>();
 			auto const componentIt = Std::FindIf(
 				componentVector.begin(),
 				componentVector.end(),
@@ -138,7 +109,21 @@ namespace DEngine
 		[[nodiscard]] T* GetComponent(Entity entity)
 		{
 			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
-			auto& componentVector = Internal_GetAllComponents<T>();
+			auto& componentVector = Impl_GetAllComponents<T>();
+			auto const componentIt = Std::FindIf(
+				componentVector.begin(),
+				componentVector.end(),
+				[entity](auto const& val) -> bool { return entity == val.a; });
+			if (componentIt != componentVector.end())
+				return &componentIt->b;
+			else
+				return nullptr;
+		}
+		template<typename T>
+		[[nodiscard]] T const* GetComponent(Entity entity) const
+		{
+			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
+			auto& componentVector = Impl_GetAllComponents<T>();
 			auto const componentIt = Std::FindIf(
 				componentVector.begin(),
 				componentVector.end(),
@@ -154,26 +139,42 @@ namespace DEngine
 		std::vector<Std::Pair<Entity, Transform>> transforms;
 		std::vector<Std::Pair<Entity, Gfx::TextureID>> textureIDs;
 		std::vector<Std::Pair<Entity, Move>> moves;
-		std::vector<Std::Pair<Entity, Box2D_Component>> b2Bodies;
+		std::vector<Std::Pair<Entity, Physics::Rigidbody2D>> rigidBodies;
 		std::vector<Entity> entities;
 	};
 
 	template<>
 	inline Std::Span<Std::Pair<Entity, Transform>> Scene::GetAllComponents<Transform>() { return { transforms.data(), transforms.size() }; }
 	template<>
+	inline Std::Span<Std::Pair<Entity, Transform> const> Scene::GetAllComponents<Transform>() const { return { transforms.data(), transforms.size() }; }
+	template<>
 	inline Std::Span<Std::Pair<Entity, Gfx::TextureID>> Scene::GetAllComponents<Gfx::TextureID>() { return { textureIDs.data(), textureIDs.size() }; }
+	template<>
+	inline Std::Span<Std::Pair<Entity, Gfx::TextureID> const> Scene::GetAllComponents<Gfx::TextureID>() const { return { textureIDs.data(), textureIDs.size() }; }
 	template<>
 	inline Std::Span<Std::Pair<Entity, Move>> Scene::GetAllComponents<Move>() { return { moves.data(), moves.size() }; }
 	template<>
-	inline Std::Span<Std::Pair<Entity, Box2D_Component>> Scene::GetAllComponents<Box2D_Component>() { return { b2Bodies.data(), b2Bodies.size() }; }
+	inline Std::Span<Std::Pair<Entity, Move> const> Scene::GetAllComponents<Move>() const { return { moves.data(), moves.size() }; }
+	template<>
+	inline Std::Span<Std::Pair<Entity, Physics::Rigidbody2D>> Scene::GetAllComponents<Physics::Rigidbody2D>() { return { rigidBodies.data(), rigidBodies.size() }; }
+	template<>
+	inline Std::Span<Std::Pair<Entity, Physics::Rigidbody2D> const> Scene::GetAllComponents<Physics::Rigidbody2D>() const { return { rigidBodies.data(), rigidBodies.size() }; }
 
 	template<>
-	inline std::vector<Std::Pair<Entity, Transform>>& Scene::Internal_GetAllComponents<Transform>() { return transforms; }
+	inline std::vector<Std::Pair<Entity, Transform>>& Scene::Impl_GetAllComponents<Transform>() { return transforms; }
 	template<>
-	inline std::vector<Std::Pair<Entity, Gfx::TextureID>>& Scene::Internal_GetAllComponents<Gfx::TextureID>() { return textureIDs; }
+	inline std::vector<Std::Pair<Entity, Transform>> const& Scene::Impl_GetAllComponents<Transform>() const { return transforms; }
 	template<>
-	inline std::vector<Std::Pair<Entity, Move>>& Scene::Internal_GetAllComponents<Move>() { return moves; }
+	inline std::vector<Std::Pair<Entity, Gfx::TextureID>>& Scene::Impl_GetAllComponents<Gfx::TextureID>() { return textureIDs; }
 	template<>
-	inline std::vector<Std::Pair<Entity, Box2D_Component>>& Scene::Internal_GetAllComponents<Box2D_Component>() { return b2Bodies; }
+	inline std::vector<Std::Pair<Entity, Gfx::TextureID>> const& Scene::Impl_GetAllComponents<Gfx::TextureID>() const { return textureIDs; }
+	template<>
+	inline std::vector<Std::Pair<Entity, Move>>& Scene::Impl_GetAllComponents<Move>() { return moves; }
+	template<>
+	inline std::vector<Std::Pair<Entity, Move>> const& Scene::Impl_GetAllComponents<Move>() const { return moves; }
+	template<>
+	inline std::vector<Std::Pair<Entity, Physics::Rigidbody2D>>& Scene::Impl_GetAllComponents<Physics::Rigidbody2D>() { return rigidBodies; }
+	template<>
+	inline std::vector<Std::Pair<Entity, Physics::Rigidbody2D>> const& Scene::Impl_GetAllComponents<Physics::Rigidbody2D>() const { return rigidBodies; }
 }
 

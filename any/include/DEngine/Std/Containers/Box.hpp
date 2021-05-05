@@ -34,9 +34,11 @@ namespace DEngine::Std
 
 		// Returns the pointer and releases ownership over it.
 		[[nodiscard]] T* Release() noexcept;
-
-	private:
+		// Destroys the internals if it holds any.
 		void Clear() noexcept;
+
+	protected:
+		
 		T* data = nullptr;
 	};
 

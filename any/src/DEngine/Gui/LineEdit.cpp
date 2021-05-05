@@ -34,16 +34,7 @@ void LineEdit::Render(
 	Rect visibleRect,
 	DrawInfo& drawInfo) const
 {
-	Gfx::GuiDrawCmd cmd{};
-	cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-	cmd.filledMesh.color = backgroundColor;
-	cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
-	cmd.rectPosition.x = (f32)widgetRect.position.x / framebufferExtent.width;
-	cmd.rectPosition.y = (f32)widgetRect.position.y / framebufferExtent.height;
-	cmd.rectExtent.x = (f32)widgetRect.extent.width / framebufferExtent.width;
-	cmd.rectExtent.y = (f32)widgetRect.extent.height / framebufferExtent.height;
-
-	drawInfo.drawCmds.push_back(cmd);
+	drawInfo.PushFilledQuad(widgetRect, backgroundColor);
 
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	impl::TextManager::RenderText(

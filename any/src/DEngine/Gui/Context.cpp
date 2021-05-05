@@ -55,10 +55,6 @@ Context Context::Create(
 
 Context::Context(Context&& other) noexcept :
 	outerLayout(other.outerLayout),
-	vertices(other.vertices),
-	indices(other.indices),
-	drawCmds(other.drawCmds),
-	windowUpdates(other.windowUpdates),
 	pImplData(other.pImplData)
 {
 	other.pImplData = nullptr;
@@ -443,20 +439,20 @@ void Context::PushEvent(WindowResizeEvent event)
 	windowData.visibleRect = event.visibleRect;
 }
 
-void Context::Render() const
+void Context::Render(
+	std::vector<Gfx::GuiVertex>& vertices,
+	std::vector<u32>& indices,
+	std::vector<Gfx::GuiDrawCmd>& drawCmds,
+	std::vector<Gfx::NativeWindowUpdate>& windowUpdates) const
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 
-	vertices.clear();
-	indices.clear();
-	drawCmds.clear();
-	windowUpdates.clear();
 	for (auto& windowNode : implData.windows)
 	{
 		if (windowNode.data.isMinimized)
 			continue;
 
-		windowNode.data.drawCmdOffset = (u32)this->drawCmds.size();
+		windowNode.data.drawCmdOffset = (u32)drawCmds.size();
 
 		if (windowNode.data.topLayout)
 		{
@@ -489,7 +485,7 @@ void Context::Render() const
 			}
 		}
 
-		windowNode.data.drawCmdCount = (u32)this->drawCmds.size() - windowNode.data.drawCmdOffset;
+		windowNode.data.drawCmdCount = (u32)drawCmds.size() - windowNode.data.drawCmdOffset;
 
 		Gfx::NativeWindowUpdate newUpdate{};
 		newUpdate.id = Gfx::NativeWindowID(windowNode.id);
@@ -502,7 +498,7 @@ void Context::Render() const
 		else if (windowEvents.resize)
 			newUpdate.event = Gfx::NativeWindowEvent::Resize;
 
-		this->windowUpdates.push_back(newUpdate);
+		windowUpdates.push_back(newUpdate);
 	}
 }
 
@@ -513,13 +509,13 @@ namespace DEngine::Gui::impl
 		u32 utfValue)
 	{
 		if (utfValue == 0)
-			return {};
+			return TextManager::GlyphData{};
 
 		// Load glyph data
 		FT_UInt glyphIndex = FT_Get_Char_Index(manager.face, utfValue);
 		if (glyphIndex == 0) // 0 is an error index
 			//throw std::runtime_error("Unable to load glyph index");
-			return {};
+			return TextManager::GlyphData{};
 
 		FT_Error ftError = FT_Load_Glyph(
 			manager.face,
@@ -650,7 +646,7 @@ void impl::TextManager::RenderText(
 			cmd.rectExtent.x = (f32)glyphData.bitmapWidth / drawInfo.GetFramebufferExtent().width;
 			cmd.rectExtent.y = (f32)glyphData.bitmapHeight / drawInfo.GetFramebufferExtent().height;
 
-			drawInfo.drawCmds.push_back(cmd);
+			drawInfo.drawCmds->push_back(cmd);
 		}
 
 		penPos.x += glyphData.advanceX;

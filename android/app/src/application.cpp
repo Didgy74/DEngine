@@ -1,6 +1,7 @@
 #include <DEngine/detail/Application.hpp>
 #include <DEngine/detail/AppAssert.hpp>
 
+#include <DEngine/Std/Containers/Variant.hpp>
 #include <DEngine/Std/Utility.hpp>
 
 #include <android/configuration.h>
@@ -46,17 +47,50 @@ namespace DEngine::Application::detail
 			NativeWindowDestroyed,
 			InputQueueCreated,
 			VisibleAreaChanged,
+			NewOrientation,
 		};
-		Type type;
-		struct Data
+
+		template<Type>
+		struct Data {};
+		template<>
+		struct Data<Type::CharInput>
 		{
 			u32 charInput;
-			ANativeWindow* nativeWindow;
-			AInputQueue* inputQueue;
-			Math::Vec2Int visibleAreaChangedOffset;
-			Extent visibleAreaChangedExtent;
 		};
-		Data data{};
+		template<>
+		struct Data<Type::NativeWindowCreated>
+		{
+			ANativeWindow* nativeWindow;
+		};
+		template<>
+		struct Data<Type::InputQueueCreated>
+		{
+			AInputQueue* inputQueue;
+		};
+		template<>
+		struct Data<Type::VisibleAreaChanged>
+		{
+			i32 offsetX;
+			i32 offsetY;
+			u32 width;
+			u32 height;
+		};
+		template<>
+		struct Data<Type::NewOrientation>
+		{
+			uint8_t newOrientation;
+		};
+
+		using VariantType = Std::Variant<
+			Data<Type::CharInput>,
+			Data<Type::CharRemove>,
+			Data<Type::CharEnter>,
+			Data<Type::NativeWindowCreated>,
+			Data<Type::NativeWindowDestroyed>,
+			Data<Type::InputQueueCreated>,
+			Data<Type::VisibleAreaChanged>,
+			Data<Type::NewOrientation>>;
+		VariantType data{};
 	};
 
 	struct BackendData
@@ -71,6 +105,7 @@ namespace DEngine::Application::detail
 		AInputQueue* inputQueue = nullptr;
 		Math::Vec2Int visibleAreaOffset;
 		Extent visibleAreaExtent;
+		Orientation currentOrientation;
 
 		jobject mainActivity = nullptr;
 		// JNI Envs are per-thread. This is for the game thread, it is created when attaching
@@ -84,30 +119,29 @@ namespace DEngine::Application::detail
 
 	BackendData* pBackendData = nullptr;
 
-	static bool Backend_initJNI();
-
-	static Orientation Backend_ToOrientation(int aconfiguration_orientation);
-	static Orientation Backend_GetUpdatedOrientation();
-
-	static Button Backend_AndroidKeyCodeToButton(int32_t in);
-
-	static void Backend_HandleConfigChanged_Deferred();
-
-	static bool HandleInputEvents_Motion(
+	[[nodiscard]] static bool HandleInputEvents_Motion(
 			AInputEvent* event,
 			int32_t source);
-	static bool HandleInputKeyEvents_Key(
-			AInputEvent* event,
-			int32_t source);
-
-	static void Backend_HandleWindowInitializeEvent();
-	static void Backend_HandleWindowTerminateEvent();
 }
 
 using namespace DEngine;
 
 namespace DEngine::Application::detail
 {
+	[[nodiscard]] static Orientation ToOrientation(uint8_t aconfigOrientation)
+	{
+		switch (aconfigOrientation)
+		{
+			case ACONFIGURATION_ORIENTATION_LAND:
+				return Orientation::Landscape;
+			case ACONFIGURATION_ORIENTATION_PORT:
+				return Orientation::Portrait;
+			default:
+				break;
+		}
+		return Orientation::Invalid;
+	}
+
 	static void onStart(ANativeActivity* activity)
 	{
 		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
@@ -138,9 +172,10 @@ namespace DEngine::Application::detail
 		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
-		CustomEvent newEvent{};
-		newEvent.type = CustomEvent::Type::NativeWindowCreated;
-		newEvent.data.nativeWindow = window;
+		CustomEvent newEvent = {};
+		CustomEvent::Data<CustomEvent::Type::NativeWindowCreated> data = {};
+		data.nativeWindow = window;
+		newEvent.data.Set(data);
 
 		std::lock_guard _{ backendData.customEventQueueLock };
 		backendData.customEventQueue.push_back(newEvent);
@@ -151,8 +186,9 @@ namespace DEngine::Application::detail
 		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
-		CustomEvent newEvent{};
-		newEvent.type = CustomEvent::Type::NativeWindowDestroyed;
+		CustomEvent newEvent = {};
+		CustomEvent::Data<CustomEvent::Type::NativeWindowDestroyed> data = {};
+		newEvent.data.Set(data);
 
 		std::lock_guard _{ backendData.customEventQueueLock };
 		backendData.customEventQueue.push_back(newEvent);
@@ -163,9 +199,10 @@ namespace DEngine::Application::detail
 		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
-		CustomEvent newEvent{};
-		newEvent.type = CustomEvent::Type::InputQueueCreated;
-		newEvent.data.inputQueue = queue;
+		CustomEvent newEvent = {};
+		CustomEvent::Data<CustomEvent::Type::InputQueueCreated> data = {};
+		data.inputQueue = queue;
+		newEvent.data.Set(data);
 
 		std::lock_guard _{ backendData.customEventQueueLock };
 		backendData.customEventQueue.push_back(newEvent);
@@ -175,10 +212,24 @@ namespace DEngine::Application::detail
 	{
 		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 	}
+
+	static void onConfigurationChanged(ANativeActivity* activity)
+	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+
+		auto& backendData = *detail::pBackendData;
+
+		CustomEvent newEvent = {};
+		CustomEvent::Data<CustomEvent::Type::NewOrientation> data = {};
+		newEvent.data.Set(data);
+
+		std::lock_guard _{ backendData.customEventQueueLock };
+		backendData.customEventQueue.push_back(newEvent);
+	}
 }
 
 extern "C"
-JNIEXPORT void JNICALL ANativeActivity_onCreate(
+[[maybe_unused]] JNIEXPORT void JNICALL ANativeActivity_onCreate(
 	ANativeActivity* activity,
 	void* savedState,
 	size_t savedStateSize)
@@ -201,11 +252,12 @@ JNIEXPORT void JNICALL ANativeActivity_onCreate(
 	activity->callbacks->onNativeWindowDestroyed = &Application::detail::onNativeWindowDestroyed;
 	activity->callbacks->onInputQueueCreated = &Application::detail::onInputQueueCreated;
 	activity->callbacks->onInputQueueDestroyed = &Application::detail::onInputQueueDestroyed;
+	activity->callbacks->onConfigurationChanged = &Application::detail::onConfigurationChanged;
 }
 
 // Called at the end of onCreate in Java.
 extern "C"
-JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeInit(
+[[maybe_unused]] JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeInit(
 	JNIEnv* env,
 	jobject dengineActivity)
 {
@@ -222,6 +274,14 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeInit(
 
 	backendData.customEventQueue.reserve(25);
 
+	// Load current orientation
+	AConfiguration* tempConfig = AConfiguration_new();
+	AConfiguration_fromAssetManager(tempConfig, backendData.activity->assetManager);
+	int32_t orientation = AConfiguration_getOrientation(tempConfig);
+	backendData.currentOrientation = ToOrientation(orientation);
+	AConfiguration_delete(tempConfig);
+
+
 	auto lambda = []()
 	{
 		DENGINE_APP_MAIN_ENTRYPOINT(0, nullptr);
@@ -231,7 +291,7 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeInit(
 }
 
 extern "C"
-JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharInput(
+[[maybe_unused]] JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharInput(
 	JNIEnv* env,
 	jobject dengineActivity,
 	jint utfValue)
@@ -242,16 +302,17 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharInp
 
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent{};
-	newEvent.type = CustomEvent::Type::CharInput;
-	newEvent.data.charInput = utfValue;
+	CustomEvent newEvent = {};
+	CustomEvent::Data<CustomEvent::Type::CharInput> data = {};
+	data.charInput = utfValue;
+	newEvent.data.Set(data);
 
 	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
 }
 
 extern "C"
-JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharEnter(
+[[maybe_unused]] JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharEnter(
 	JNIEnv* env,
 	jobject dengineActivity)
 {
@@ -262,15 +323,16 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharEnt
 	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent{};
-	newEvent.type = CustomEvent::Type::CharEnter;
+	CustomEvent newEvent = {};
+	CustomEvent::Data<CustomEvent::Type::CharEnter> data = {};
+	newEvent.data.Set(data);
 
 	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
 }
 
 extern "C"
-JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharRemove(
+[[maybe_unused]] JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharRemove(
 	JNIEnv* env,
 	jobject dengineActivity)
 {
@@ -281,8 +343,9 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharRem
 	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent{};
-	newEvent.type = CustomEvent::Type::CharRemove;
+	CustomEvent newEvent = {};
+	CustomEvent::Data<CustomEvent::Type::CharRemove> data = {};
+	newEvent.data.Set(data);
 
 	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
@@ -294,13 +357,13 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnCharRem
 // onContentRectChanged doesn't actually work.
 // We need our own custom event for the View that we actually use.
 extern "C"
-JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeUpdateWindowContentRect(
+[[maybe_unused]] JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnContentRectChanged(
 	JNIEnv* env,
 	jobject dengineActivity,
-	jint top,
-	jint bottom,
-	jint left,
-	jint right)
+	jint posX,
+	jint posY,
+	jint width,
+	jint height)
 {
 	using namespace DEngine;
 	using namespace DEngine::Application;
@@ -309,40 +372,45 @@ JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeUpdateWin
 	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent{};
-	newEvent.type = CustomEvent::Type::VisibleAreaChanged;
-	newEvent.data.visibleAreaChangedOffset.x = (i32)left;
-	newEvent.data.visibleAreaChangedOffset.y = (i32)top;
-	newEvent.data.visibleAreaChangedExtent.width = (u32)right - (u32)left;
-	newEvent.data.visibleAreaChangedExtent.height = (u32)bottom - (u32)top;
-
+	CustomEvent newEvent = {};
+	CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged> data = {};
+	data.offsetX = (i32)posX;
+	data.offsetY = (i32)posY;
+	data.width = (u32)width;
+	data.height = (u32)height;
+	newEvent.data.Set(data);
 
 	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
 }
 
-static Application::Orientation Application::detail::Backend_ToOrientation(int aconfiguration_orientation)
+/*
+ * A bug in the NDK makes AConfiguration_getOrientation never have the updated value,
+ * so we have this workaround path.
+ *
+ * Possibly no configuration changes are recorded from this bug, didn't really test enough.
+ * Could possibly be that AConfiguration_fromAssetManager doesn't work in general.
+ */
+extern "C"
+[[maybe_unused]] JNIEXPORT void JNICALL Java_didgy_dengine_editor_DEngineActivity_nativeOnNewOrientation(
+	JNIEnv* env,
+	jobject thiz,
+	jint newOrientation)
 {
-	switch (aconfiguration_orientation)
-	{
-		case ACONFIGURATION_ORIENTATION_PORT:
-			return Orientation::Portrait;
-		case ACONFIGURATION_ORIENTATION_LAND:
-			return Orientation::Landscape;
-		default:
-			return Orientation::Invalid;
-	}
-}
+	using namespace DEngine;
+	using namespace DEngine::Application;
+	using namespace DEngine::Application::detail;
 
-static bool Application::detail::Backend_initJNI()
-{
-	return true;
-}
+	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
+	auto& backendData = *Application::detail::pBackendData;
 
-static Application::Orientation Application::detail::Backend_GetUpdatedOrientation()
-{
-	auto const& backendData = *detail::pBackendData;
-	return {};
+	CustomEvent newEvent = {};
+	CustomEvent::Data<CustomEvent::Type::NewOrientation> data = {};
+	data.newOrientation = (uint8_t)newOrientation;
+	newEvent.data.Set(data);
+
+	std::lock_guard _{ backendData.customEventQueueLock };
+	backendData.customEventQueue.push_back(newEvent);
 }
 
 static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, int32_t source)
@@ -485,8 +553,7 @@ namespace DEngine::Application::detail
 namespace DEngine::Application::detail
 {
 	static void HandleEvent_NativeWindowCreated(
-		ANativeWindow* window,
-		std::lock_guard<std::mutex> const& backendDataLock)
+		ANativeWindow* window)
 	{
 		auto& backendData = *detail::pBackendData;
 		auto& appData = *detail::pAppData;
@@ -502,8 +569,7 @@ namespace DEngine::Application::detail
 		}
 	}
 
-	static void HandleEvent_NativeWindowDestroyed(
-		std::lock_guard<std::mutex> const& backendDataLock)
+	static void HandleEvent_NativeWindowDestroyed()
 	{
 		auto& backendData = *detail::pBackendData;
 		auto& appData = *detail::pAppData;
@@ -520,9 +586,7 @@ namespace DEngine::Application::detail
 		backendData.nativeWindow = nullptr;
 	}
 
-	static void HandleEvent_InputQueueCreated(
-		AInputQueue* queue,
-		std::lock_guard<std::mutex> const& backendDataLock)
+	static void HandleEvent_InputQueueCreated(AInputQueue* queue)
 	{
 		auto& backendData = *detail::pBackendData;
 		auto& appData = *detail::pAppData;
@@ -537,6 +601,30 @@ namespace DEngine::Application::detail
 		auto& backendData = *detail::pBackendData;
 		backendData.visibleAreaOffset = offset;
 		backendData.visibleAreaExtent = extent;
+
+		if (backendData.currentWindow.HasValue())
+		{
+			auto windowNodePtr = detail::GetWindowNode(backendData.currentWindow.Value());
+
+			auto windowWidth = (uint32_t)ANativeWindow_getWidth(backendData.nativeWindow);
+			auto windowHeight = (uint32_t)ANativeWindow_getHeight(backendData.nativeWindow);
+
+			detail::UpdateWindowSize(
+				*windowNodePtr,
+				{ windowWidth, windowHeight },
+				offset,
+				extent);
+		}
+
+	}
+
+	static void HandleEvent_Reorientation(uint8_t newOrientation)
+	{
+		DENGINE_DETAIL_APPLICATION_ASSERT(pBackendData);
+		auto& backendData = *pBackendData;
+
+
+
 	}
 
 	using ProcessCustomEvents_CallableT = void(*)(CustomEvent);
@@ -545,33 +633,72 @@ namespace DEngine::Application::detail
 		Std::Opt<Callable> callable)
 	{
 		auto& backendData = *detail::pBackendData;
-		std::lock_guard backendDataLock{ backendData.customEventQueueLock };
-		for (CustomEvent const event : backendData.customEventQueue)
+		std::lock_guard queueLock{ backendData.customEventQueueLock };
+		for (auto const& event : backendData.customEventQueue)
 		{
 			if (callable.HasValue())
 				callable.Value()(event);
-			switch (event.type)
+			auto typeIndexOpt = event.data.GetIndex();
+			DENGINE_DETAIL_APPLICATION_ASSERT(typeIndexOpt.HasValue());
+			switch (typeIndexOpt.Value())
 			{
-				case CustomEvent::Type::NativeWindowCreated:
-					HandleEvent_NativeWindowCreated(event.data.nativeWindow, backendDataLock);
+				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NativeWindowCreated>>:
+				{
+					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::NativeWindowCreated>>();
+					HandleEvent_NativeWindowCreated(data.nativeWindow);
 					break;
-				case CustomEvent::Type::NativeWindowDestroyed:
-					HandleEvent_NativeWindowDestroyed(backendDataLock);
+				}
+
+				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NativeWindowDestroyed>>:
+				{
+					HandleEvent_NativeWindowDestroyed();
 					break;
-				case CustomEvent::Type::InputQueueCreated:
-					HandleEvent_InputQueueCreated(event.data.inputQueue, backendDataLock);
+				}
+
+				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::InputQueueCreated>>:
+				{
+					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::InputQueueCreated>>();
+					HandleEvent_InputQueueCreated(data.inputQueue);
 					break;
-				case CustomEvent::Type::VisibleAreaChanged:
-					HandleEvent_VisibleAreaChanged(event.data.visibleAreaChangedOffset, event.data.visibleAreaChangedExtent);
+				}
+
+				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged>>:
+				{
+					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged>>();
+					HandleEvent_VisibleAreaChanged(
+						{ data.offsetX, data.offsetY },
+						{ data.width, data.height });
 					break;
-				case CustomEvent::Type::CharInput:
-					detail::PushCharInput(event.data.charInput);
+				}
+
+				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::CharInput>>:
+				{
+					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::CharInput>>();
+					detail::PushCharInput(data.charInput);
 					break;
-				case CustomEvent::Type::CharRemove:
+				}
+
+				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::CharRemove>>:
+				{
 					detail::PushCharRemoveEvent();
 					break;
-				case CustomEvent::Type::CharEnter:
+				}
+
+				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::CharEnter>>:
+				{
 					detail::PushCharEnterEvent();
+					break;
+				}
+
+				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NewOrientation>>:
+				{
+					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::NewOrientation>>();
+					HandleEvent_Reorientation(data.newOrientation);
+					break;
+				}
+
+				default:
+					DENGINE_DETAIL_UNREACHABLE();
 					break;
 			}
 		}
@@ -665,17 +792,19 @@ bool Application::detail::Backend_Initialize() noexcept
 	while (!nativeWindowSet || !inputQueueSet || !visibleAreaSet)
 	{
 		ProcessCustomEvents(
-			[&nativeWindowSet, &inputQueueSet, &visibleAreaSet](CustomEvent event)
+			[&nativeWindowSet, &inputQueueSet, &visibleAreaSet](CustomEvent const& event)
 			{
-				switch (event.type)
+				auto typeIndexOpt = event.data.GetIndex();
+				DENGINE_DETAIL_APPLICATION_ASSERT(typeIndexOpt.HasValue());
+				switch (typeIndexOpt.Value())
 				{
-					case CustomEvent::Type::InputQueueCreated:
+					case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::InputQueueCreated>>:
 						inputQueueSet = true;
 						break;
-					case CustomEvent::Type::NativeWindowCreated:
+					case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NativeWindowCreated>>:
 						nativeWindowSet = true;
 						break;
-					case CustomEvent::Type::VisibleAreaChanged:
+					case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged>>:
 						visibleAreaSet = true;
 						break;
 					default:

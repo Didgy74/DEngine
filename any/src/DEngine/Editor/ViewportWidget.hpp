@@ -5,6 +5,7 @@
 #include <DEngine/Gui/Button.hpp>
 #include <DEngine/Gui/MenuBar.hpp>
 
+#include "Editor.hpp"
 #include "EditorImpl.hpp"
 
 #include <DEngine/Gfx/Gfx.hpp>
@@ -20,8 +21,8 @@ namespace DEngine::Editor
 	{
 		struct Test_Ray
 		{
-			Math::Vec3 origin{};
-			Math::Vec3 direction{};
+			Math::Vec3 origin = {};
+			Math::Vec3 direction = {};
 		};
 
 		enum class GizmoPart
@@ -43,7 +44,7 @@ namespace DEngine::Editor
 		{
 			[[nodiscard]] constexpr Arrow BuildDefaultArrow() noexcept
 			{
-				Arrow arrow{};
+				Arrow arrow = {};
 				arrow.capLength = 1 / 3.f;
 				arrow.capSize = 0.2f;
 				arrow.shaftDiameter = 0.1f;
@@ -60,6 +61,9 @@ namespace DEngine::Editor
 		// Relative to the gizmo size
 		constexpr f32 defaultPlaneOffsetRelative = 0.25f;
 
+		constexpr f32 defaultRotateCircleInnerRadius = 0.1f;
+		constexpr f32 defaultRotateCircleOuterRadius = 1.f - defaultRotateCircleInnerRadius;
+
 		// target_size in pixels
 		[[nodiscard]] f32 ComputeScale(
 			Math::Mat4 const& worldTransform,
@@ -71,24 +75,37 @@ namespace DEngine::Editor
 	class InternalViewportWidget : public Gui::Widget
 	{
 	public:
+		static constexpr u8 cursorPointerId = static_cast<u8>(-1);
+
 		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
 		Gfx::Context* gfxCtx = nullptr;
 		EditorImpl* editorImpl = nullptr;
 
 		mutable bool isVisible = false;
 
-		mutable Gui::Extent currentExtent{};
+		Gui::Extent currentExtent{};
 		mutable Gui::Extent newExtent{};
 		mutable bool currentlyResizing = false;
-		mutable u32 extentCorrectTickCounter = 0;
-		mutable bool extentsAreInitialized = false;
+		u32 extentCorrectTickCounter = 0;
 
-		bool isCurrentlyClicked = false;
-		bool isCurrentlyHoldingGizmo = false;
-		Std::Opt<u8> gizmo_touchID{};
-		Gizmo::GizmoPart gizmo_holdingPart{};
-		Gizmo::Test_Ray gizmo_initialRay{};
-		Math::Vec3 gizmo_initialPos{};
+		enum class BehaviorState : u8
+		{
+			Normal,
+			FreeLooking,
+			Gizmo,
+		};
+		BehaviorState state = BehaviorState::Normal;
+		struct HoldingGizmoData
+		{
+			u8 pointerId;
+			Gizmo::GizmoPart holdingPart;
+			Gizmo::Test_Ray initialRay;
+			Math::Vec3 initialPos;
+			// Current rotation offset from the pointer. In radians [-pi, pi]
+			f32 rotationOffset;
+		};
+		Std::Opt<HoldingGizmoData> holdingGizmoData;
+
 
 		int joystickPixelRadius = 50;
 		int joystickPixelDeadZone = 10;
@@ -118,7 +135,9 @@ namespace DEngine::Editor
 
 		[[nodiscard]] Math::Mat4 GetPerspectiveMatrix(f32 aspectRatio) const noexcept;
 
-		Math::Mat4 GetProjectionMatrix(f32 aspectRatio) const noexcept;
+		[[nodiscard]] Math::Mat4 GetProjectionMatrix(f32 aspectRatio) const noexcept;
+
+		[[nodiscard]] Gizmo::Test_Ray BuildRay(Gui::Rect widgetRect, Math::Vec2 pointerPos) const;
 
 		void ApplyCameraRotation(Math::Vec2 input) noexcept;
 
@@ -132,6 +151,11 @@ namespace DEngine::Editor
 
 		// Pixel space
 		void UpdateJoystickOrigin(Gui::Rect widgetRect) const noexcept;
+
+		Gfx::ViewportUpdate GetViewportUpdate(
+			Context const& editor,
+			std::vector<Math::Vec3>& lineVertices,
+			std::vector<Gfx::LineDrawCmd>& lineDrawCmds) const noexcept;
 
 		virtual void CursorClick(
 			Gui::Context& ctx,

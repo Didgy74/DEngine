@@ -10,8 +10,8 @@
 
     <application
         android:label="@string/app_name"
-        android:isGame="true">
-        <!-- android:theme="@android:style/Theme.NoTitleBar.Fullscreen" -->
+        android:isGame="true"
+        android:theme="@android:style/Theme.NoTitleBar">
 
         <!-- Our activity is the built-in NativeActivity framework class.
              This will take care of integrating with our NDK code. -->

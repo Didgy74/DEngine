@@ -14,10 +14,17 @@ namespace DEngine::Math
 	[[nodiscard]] f32 Ceil(f32 input);
 	[[nodiscard]] f64 Ceil(f64 input);
 
+	template<typename T>
+	[[nodiscard]] constexpr auto CeilToMultiple(T const& value, T const& multiple) noexcept
+	{
+		return value + multiple - T(1) - (value - T(1)) % multiple;
+	}
+	/*
 	[[nodiscard]] constexpr u8 CeilToMultiple(u8 value, u8 multiple);
 	[[nodiscard]] constexpr u16 CeilToMultiple(u16 value, u16 multiple);
 	[[nodiscard]] constexpr u32 CeilToMultiple(u32 value, u32 multiple);
 	[[nodiscard]] constexpr u64 CeilToMultiple(u64 value, u64 multiple);
+	 */
 
 	[[nodiscard]] constexpr i8 Clamp(i8 value, i8 min, i8 max);
 	[[nodiscard]] constexpr i16 Clamp(i16 value, i16 min, i16 max);
@@ -37,17 +44,12 @@ namespace DEngine::Math
 
 	[[nodiscard]] f32 Log(f32 in);
 
-	[[nodiscard]] constexpr i8 Min(i8 a, i8 b);
-	[[nodiscard]] constexpr i16 Min(i16 a, i16 b);
-	[[nodiscard]] constexpr i32 Min(i32 a, i32 b);
-	[[nodiscard]] constexpr i64 Min(i64 a, i64 b);
-	[[nodiscard]] constexpr u8 Min(u8 a, u8 b);
-	[[nodiscard]] constexpr u16 Min(u16 a, u16 b);
-	[[nodiscard]] constexpr u32 Min(u32 a, u32 b);
-	[[nodiscard]] constexpr u64 Min(u64 a, u64 b);
-	[[nodiscard]] constexpr f32 Min(f32 a, f32 b);
-	[[nodiscard]] constexpr f64 Min(f64 a, f64 b);
+	template<typename T>
+	[[nodiscard]] constexpr auto Min(T const& a, T const& b) noexcept { return a < b ? a : b; }
 
+	template<typename T>
+	[[nodiscard]] constexpr auto Max(T const& a, T const& b) noexcept { return a > b ? a : b; }
+	/*
 	[[nodiscard]] constexpr i8 Max(i8 a, i8 b);
 	[[nodiscard]] constexpr i16 Max(i16 a, i16 b);
 	[[nodiscard]] constexpr i32 Max(i32 a, i32 b);
@@ -58,6 +60,7 @@ namespace DEngine::Math
 	[[nodiscard]] constexpr u64 Max(u64 a, u64 b);
 	[[nodiscard]] constexpr f32 Max(f32 a, f32 b);
 	[[nodiscard]] constexpr f64 Max(f64 a, f64 b);
+	 */
 
 	[[nodiscard]] f32 Pow(f32 coefficient, f32 exponent);
 	[[nodiscard]] f64 Pow(f64 coefficient, f64 exponent);
@@ -120,10 +123,12 @@ constexpr DEngine::i64 DEngine::Math::Abs(i64 input) { return detail::Abs(input)
 constexpr DEngine::f32 DEngine::Math::Abs(f32 input) { return detail::Abs(input); }
 constexpr DEngine::f64 DEngine::Math::Abs(f64 input) { return detail::Abs(input); }
 
+/*
 constexpr DEngine::u8 DEngine::Math::CeilToMultiple(u8 value, u8 multiple) { return detail::CeilToMultiple_Unsigned(value, multiple); }
 constexpr DEngine::u16 DEngine::Math::CeilToMultiple(u16 value, u16 multiple) { return detail::CeilToMultiple_Unsigned(value, multiple); }
 constexpr DEngine::u32 DEngine::Math::CeilToMultiple(u32 value, u32 multiple) { return detail::CeilToMultiple_Unsigned(value, multiple); }
 constexpr DEngine::u64 DEngine::Math::CeilToMultiple(u64 value, u64 multiple) { return detail::CeilToMultiple_Unsigned(value, multiple); }
+*/
 
 constexpr DEngine::i8 DEngine::Math::Clamp(i8 value, i8 min, i8 max) { return detail::Clamp(value, min, max); }
 constexpr DEngine::i16 DEngine::Math::Clamp(i16 value, i16 min, i16 max) { return detail::Clamp(value, min, max); }
@@ -139,6 +144,7 @@ constexpr DEngine::f64 DEngine::Math::Clamp(f64 value, f64 min, f64 max) { retur
 constexpr DEngine::f32 DEngine::Math::Lerp(f32 a, f32 b, f32 delta) { return detail::Lerp(a, b, delta); }
 constexpr DEngine::f64 DEngine::Math::Lerp(f64 a, f64 b, f64 delta) { return detail::Lerp(a, b, delta); }
 
+/*
 constexpr DEngine::i8 DEngine::Math::Min(i8 a, i8 b) { return detail::Min(a, b); }
 constexpr DEngine::i16 DEngine::Math::Min(i16 a, i16 b) { return detail::Min(a, b); }
 constexpr DEngine::i32 DEngine::Math::Min(i32 a, i32 b) { return detail::Min(a, b); }
@@ -149,7 +155,8 @@ constexpr DEngine::u32 DEngine::Math::Min(u32 a, u32 b) { return detail::Min(a, 
 constexpr DEngine::u64 DEngine::Math::Min(u64 a, u64 b) { return detail::Min(a, b); }
 constexpr DEngine::f32 DEngine::Math::Min(f32 a, f32 b) { return detail::Min(a, b); }
 constexpr DEngine::f64 DEngine::Math::Min(f64 a, f64 b) { return detail::Min(a, b); }
-
+ */
+/*
 constexpr DEngine::i8 DEngine::Math::Max(i8 a, i8 b) { return detail::Max(a, b); }
 constexpr DEngine::i16 DEngine::Math::Max(i16 a, i16 b) { return detail::Max(a, b); }
 constexpr DEngine::i32 DEngine::Math::Max(i32 a, i32 b) { return detail::Max(a, b); }
@@ -160,7 +167,7 @@ constexpr DEngine::u32 DEngine::Math::Max(u32 a, u32 b) { return detail::Max(a, 
 constexpr DEngine::u64 DEngine::Math::Max(u64 a, u64 b) { return detail::Max(a, b); }
 constexpr DEngine::f32 DEngine::Math::Max(f32 a, f32 b) { return detail::Max(a, b); }
 constexpr DEngine::f64 DEngine::Math::Max(f64 a, f64 b) { return detail::Max(a, b); }
-
+*/
 constexpr DEngine::i32 DEngine::Math::Sqrd(i32 input) { return detail::Sqrd(input); }
 constexpr DEngine::i64 DEngine::Math::Sqrd(i64 input) { return detail::Sqrd(input); }
 constexpr DEngine::u32 DEngine::Math::Sqrd(u32 input) { return detail::Sqrd(input); }

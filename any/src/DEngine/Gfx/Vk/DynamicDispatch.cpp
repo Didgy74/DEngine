@@ -7,8 +7,9 @@
 
 using namespace DEngine;
 using namespace DEngine::Gfx;
+using namespace DEngine::Gfx::Vk;
 
-Vk::BaseDispatchRaw Vk::BaseDispatchRaw::Build(PFN_vkGetInstanceProcAddr getInstanceProcAddr)
+BaseDispatchRaw BaseDispatchRaw::Build(PFN_vkGetInstanceProcAddr getInstanceProcAddr)
 {
 	BaseDispatchRaw returnVal{};
 	returnVal.vkCreateInstance = (PFN_vkCreateInstance)getInstanceProcAddr(nullptr, "vkCreateInstance");
@@ -18,7 +19,7 @@ Vk::BaseDispatchRaw Vk::BaseDispatchRaw::Build(PFN_vkGetInstanceProcAddr getInst
 	return returnVal;
 }
 
-Vk::InstanceDispatchRaw Vk::InstanceDispatchRaw::Build(
+InstanceDispatchRaw InstanceDispatchRaw::Build(
 	vk::Instance inInstance, 
 	PFN_vkGetInstanceProcAddr getInstanceProcAddr)
 {
@@ -35,7 +36,7 @@ Vk::InstanceDispatchRaw Vk::InstanceDispatchRaw::Build(
 	return returnVal;
 }
 
-Vk::DeviceDispatchRaw Vk::DeviceDispatchRaw::Build(
+DeviceDispatchRaw DeviceDispatchRaw::Build(
 	vk::Device inDevice, 
 	PFN_vkGetDeviceProcAddr getDeviceProcAddr)
 {
@@ -123,7 +124,7 @@ Vk::DeviceDispatchRaw Vk::DeviceDispatchRaw::Build(
 	return returnVal;
 }
 
-Vk::EXT_DebugUtilsDispatchRaw Vk::EXT_DebugUtilsDispatchRaw::Build(
+EXT_DebugUtilsDispatchRaw EXT_DebugUtilsDispatchRaw::Build(
 	vk::Instance inInstance,
 	PFN_vkGetInstanceProcAddr instanceProcAddr)
 {
@@ -135,7 +136,7 @@ Vk::EXT_DebugUtilsDispatchRaw Vk::EXT_DebugUtilsDispatchRaw::Build(
 	return returnVal;
 }
 
-Vk::KHR_SurfaceDispatchRaw Vk::KHR_SurfaceDispatchRaw::Build(
+KHR_SurfaceDispatchRaw KHR_SurfaceDispatchRaw::Build(
 	vk::Instance inInstance,
 	PFN_vkGetInstanceProcAddr instanceProcAddr)
 {
@@ -149,7 +150,7 @@ Vk::KHR_SurfaceDispatchRaw Vk::KHR_SurfaceDispatchRaw::Build(
 	return returnVal;
 }
 
-Vk::KHR_SwapchainDispatchRaw Vk::KHR_SwapchainDispatchRaw::Build(vk::Device inDevice, PFN_vkGetDeviceProcAddr getProcAddr)
+KHR_SwapchainDispatchRaw KHR_SwapchainDispatchRaw::Build(vk::Device inDevice, PFN_vkGetDeviceProcAddr getProcAddr)
 {
 	VkDevice device = static_cast<VkDevice>(inDevice);
 	KHR_SwapchainDispatchRaw returnVal{};
@@ -161,14 +162,14 @@ Vk::KHR_SwapchainDispatchRaw Vk::KHR_SwapchainDispatchRaw::Build(vk::Device inDe
 	return returnVal;
 }
 
-void Vk::BaseDispatch::BuildInPlace(
+void BaseDispatch::BuildInPlace(
 	BaseDispatch& dispatcher,
 	PFN_vkGetInstanceProcAddr procAddr)
 {
 	dispatcher.raw = BaseDispatchRaw::Build(procAddr);
 }
 
-vk::Instance Vk::BaseDispatch::createInstance(
+vk::Instance BaseDispatch::createInstance(
 	vk::InstanceCreateInfo const& createInfo, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -182,7 +183,7 @@ vk::Instance Vk::BaseDispatch::createInstance(
 	return returnVal;
 }
 
-vk::Result Vk::BaseDispatch::enumerateInstanceExtensionProperties(
+vk::Result BaseDispatch::enumerateInstanceExtensionProperties(
 	char const* pLayerName, 
 	std::uint32_t* pPropertyCount,
 	vk::ExtensionProperties* pProperties) const
@@ -193,7 +194,7 @@ vk::Result Vk::BaseDispatch::enumerateInstanceExtensionProperties(
 		reinterpret_cast<VkExtensionProperties*>(pProperties)));
 }
 
-vk::Result Vk::BaseDispatch::enumerateInstanceLayerProperties(
+vk::Result BaseDispatch::enumerateInstanceLayerProperties(
 	std::uint32_t* pPropertyCount, 
 	vk::LayerProperties* pProperties) const
 {
@@ -202,7 +203,7 @@ vk::Result Vk::BaseDispatch::enumerateInstanceLayerProperties(
 		reinterpret_cast<VkLayerProperties*>(pProperties)));
 }
 
-std::uint32_t Vk::BaseDispatch::enumerateInstanceVersion() const
+std::uint32_t BaseDispatch::enumerateInstanceVersion() const
 {
 	vk::Result vkResult{};
 	std::uint32_t returnVal;
@@ -217,7 +218,7 @@ std::uint32_t Vk::BaseDispatch::enumerateInstanceVersion() const
 		return VK_MAKE_VERSION(1, 0, 0);
 }
 
-void Vk::InstanceDispatch::BuildInPlace(
+void InstanceDispatch::BuildInPlace(
 	InstanceDispatch& dispatcher,
 	vk::Instance instance,
 	PFN_vkGetInstanceProcAddr getInstanceProcAddr)
@@ -228,7 +229,7 @@ void Vk::InstanceDispatch::BuildInPlace(
 	dispatcher.surfaceRaw = KHR_SurfaceDispatchRaw::Build(instance, getInstanceProcAddr);
 }
 
-vk::Device Vk::InstanceDispatch::createDevice(
+vk::Device InstanceDispatch::createDevice(
 	vk::PhysicalDevice physDevice, 
 	vk::DeviceCreateInfo const& createInfo, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
@@ -244,14 +245,14 @@ vk::Device Vk::InstanceDispatch::createDevice(
 	return outDevice;
 }
 
-void Vk::InstanceDispatch::destroy(vk::Optional<vk::AllocationCallbacks> allocator) const
+void InstanceDispatch::destroy(vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	raw.vkDestroyInstance(
 		static_cast<VkInstance>(handle),
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator)));
 }
 
-vk::Result Vk::InstanceDispatch::enumeratePhysicalDeviceExtensionProperties(
+vk::Result InstanceDispatch::enumeratePhysicalDeviceExtensionProperties(
 	vk::PhysicalDevice physDevice,
 	std::uint32_t* pPropertyCount,
 	vk::ExtensionProperties* pProperties) const
@@ -263,7 +264,7 @@ vk::Result Vk::InstanceDispatch::enumeratePhysicalDeviceExtensionProperties(
 		reinterpret_cast<VkExtensionProperties*>(pProperties)));
 }
 
-vk::Result Vk::InstanceDispatch::enumeratePhysicalDevices(
+vk::Result InstanceDispatch::enumeratePhysicalDevices(
 	std::uint32_t* pPhysicalDeviceCount,
 	vk::PhysicalDevice* pPhysicalDevices) const
 {
@@ -273,7 +274,7 @@ vk::Result Vk::InstanceDispatch::enumeratePhysicalDevices(
 		reinterpret_cast<VkPhysicalDevice*>(pPhysicalDevices)));
 }
 
-vk::PhysicalDeviceFeatures Vk::InstanceDispatch::getPhysicalDeviceFeatures(vk::PhysicalDevice physDevice) const
+vk::PhysicalDeviceFeatures InstanceDispatch::getPhysicalDeviceFeatures(vk::PhysicalDevice physDevice) const
 {
 	vk::PhysicalDeviceFeatures outFeatures;
 	raw.vkGetPhysicalDeviceFeatures(
@@ -282,7 +283,7 @@ vk::PhysicalDeviceFeatures Vk::InstanceDispatch::getPhysicalDeviceFeatures(vk::P
 	return outFeatures;
 }
 
-vk::PhysicalDeviceMemoryProperties Vk::InstanceDispatch::getPhysicalDeviceMemoryProperties(vk::PhysicalDevice physDevice) const
+vk::PhysicalDeviceMemoryProperties InstanceDispatch::getPhysicalDeviceMemoryProperties(vk::PhysicalDevice physDevice) const
 {
 	vk::PhysicalDeviceMemoryProperties outMemProperties;
 	raw.vkGetPhysicalDeviceMemoryProperties(
@@ -291,7 +292,7 @@ vk::PhysicalDeviceMemoryProperties Vk::InstanceDispatch::getPhysicalDeviceMemory
 	return outMemProperties;
 }
 
-vk::PhysicalDeviceProperties Vk::InstanceDispatch::getPhysicalDeviceProperties(vk::PhysicalDevice physDevice) const
+vk::PhysicalDeviceProperties InstanceDispatch::getPhysicalDeviceProperties(vk::PhysicalDevice physDevice) const
 {
 	vk::PhysicalDeviceProperties outProperties;
 	raw.vkGetPhysicalDeviceProperties(
@@ -300,7 +301,7 @@ vk::PhysicalDeviceProperties Vk::InstanceDispatch::getPhysicalDeviceProperties(v
 	return outProperties;
 }
 
-void Vk::InstanceDispatch::getPhysicalDeviceQueueFamilyProperties(
+void InstanceDispatch::getPhysicalDeviceQueueFamilyProperties(
 	vk::PhysicalDevice physDevice, 
 	std::uint32_t* pQueueFamilyPropertyCount,
 	vk::QueueFamilyProperties* pQueueFamilyProperties) const
@@ -311,7 +312,7 @@ void Vk::InstanceDispatch::getPhysicalDeviceQueueFamilyProperties(
 		reinterpret_cast<VkQueueFamilyProperties*>(pQueueFamilyProperties));
 }
 
-void Vk::DebugUtilsDispatch::BuildInPlace(
+void DebugUtilsDispatch::BuildInPlace(
 	DebugUtilsDispatch& dispatcher,
 	vk::Instance instance,
 	PFN_vkGetInstanceProcAddr instanceProcAddr)
@@ -319,7 +320,7 @@ void Vk::DebugUtilsDispatch::BuildInPlace(
 	dispatcher.raw = EXT_DebugUtilsDispatchRaw::Build(instance, instanceProcAddr);
 }
 
-vk::DebugUtilsMessengerEXT Vk::DebugUtilsDispatch::createDebugUtilsMessengerEXT(
+vk::DebugUtilsMessengerEXT DebugUtilsDispatch::createDebugUtilsMessengerEXT(
 	vk::Instance instance,
 	vk::DebugUtilsMessengerCreateInfoEXT const& createInfo, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
@@ -335,7 +336,7 @@ vk::DebugUtilsMessengerEXT Vk::DebugUtilsDispatch::createDebugUtilsMessengerEXT(
 	return returnVal;
 }
 
-void Vk::DebugUtilsDispatch::destroyDebugUtilsMessengerEXT(
+void DebugUtilsDispatch::destroyDebugUtilsMessengerEXT(
 	vk::Instance instance, 
 	vk::DebugUtilsMessengerEXT messenger,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
@@ -346,7 +347,7 @@ void Vk::DebugUtilsDispatch::destroyDebugUtilsMessengerEXT(
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator)));
 }
 
-void Vk::DebugUtilsDispatch::setDebugUtilsObjectNameEXT(
+void DebugUtilsDispatch::setDebugUtilsObjectNameEXT(
 	vk::Device device,
 	vk::DebugUtilsObjectNameInfoEXT const& nameInfo) const
 {
@@ -381,7 +382,7 @@ PFN_vkGetInstanceProcAddr Vk::loadInstanceProcAddressPFN()
 	return procAddr;
 }
 
-void Vk::InstanceDispatch::destroy(
+void InstanceDispatch::destroy(
 	vk::SurfaceKHR in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -391,7 +392,7 @@ void Vk::InstanceDispatch::destroy(
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator)));
 }
 
-vk::SurfaceCapabilitiesKHR Vk::InstanceDispatch::getPhysicalDeviceSurfaceCapabilitiesKHR(
+vk::SurfaceCapabilitiesKHR InstanceDispatch::getPhysicalDeviceSurfaceCapabilitiesKHR(
 	vk::PhysicalDevice physDevice, 
 	vk::SurfaceKHR surface) const
 {
@@ -405,7 +406,7 @@ vk::SurfaceCapabilitiesKHR Vk::InstanceDispatch::getPhysicalDeviceSurfaceCapabil
 	return surfaceCaps;
 }
 
-vk::Result Vk::InstanceDispatch::getPhysicalDeviceSurfaceFormatsKHR(
+vk::Result InstanceDispatch::getPhysicalDeviceSurfaceFormatsKHR(
 	vk::PhysicalDevice physDevice, 
 	vk::SurfaceKHR surface,
 	std::uint32_t* pSurfaceFormatCount, 
@@ -418,7 +419,7 @@ vk::Result Vk::InstanceDispatch::getPhysicalDeviceSurfaceFormatsKHR(
 		reinterpret_cast<VkSurfaceFormatKHR*>(pSurfaceFormats)));
 }
 
-vk::Result Vk::InstanceDispatch::getPhysicalDeviceSurfacePresentModesKHR(
+vk::Result InstanceDispatch::getPhysicalDeviceSurfacePresentModesKHR(
 	vk::PhysicalDevice physDevice, 
 	vk::SurfaceKHR surface,
 	std::uint32_t* pPresentModeCount, 
@@ -431,7 +432,7 @@ vk::Result Vk::InstanceDispatch::getPhysicalDeviceSurfacePresentModesKHR(
 		reinterpret_cast<VkPresentModeKHR*>(pPresentModes)));
 }
 
-bool Vk::InstanceDispatch::getPhysicalDeviceSurfaceSupportKHR(
+bool InstanceDispatch::getPhysicalDeviceSurfaceSupportKHR(
 	vk::PhysicalDevice physDevice,
 	std::uint32_t queueFamilyIndex,
 	vk::SurfaceKHR surface) const
@@ -447,7 +448,7 @@ bool Vk::InstanceDispatch::getPhysicalDeviceSurfaceSupportKHR(
 	return surfaceSupported;
 }
 
-void Vk::DeviceDispatch::BuildInPlace(
+void DeviceDispatch::BuildInPlace(
 	DeviceDispatch& dispatcher,
 	vk::Device device,
 	PFN_vkGetDeviceProcAddr getProcAddr)
@@ -458,9 +459,9 @@ void Vk::DeviceDispatch::BuildInPlace(
 	dispatcher.swapchainRaw = KHR_SwapchainDispatchRaw::Build(device, getProcAddr);
 }
 
-vk::Result Vk::DeviceDispatch::allocateCommandBuffers(
+vk::Result DeviceDispatch::allocateCommandBuffers(
 	vk::CommandBufferAllocateInfo const& allocateInfo,
-	vk::CommandBuffer* pCommandBuffers) const
+	vk::CommandBuffer* pCommandBuffers) const noexcept
 {
 	return static_cast<vk::Result>(raw.vkAllocateCommandBuffers(
 		static_cast<VkDevice>(handle),
@@ -468,9 +469,9 @@ vk::Result Vk::DeviceDispatch::allocateCommandBuffers(
 		reinterpret_cast<VkCommandBuffer*>(pCommandBuffers)));
 }
 
-vk::Result Vk::DeviceDispatch::allocateDescriptorSets(
+vk::Result DeviceDispatch::allocateDescriptorSets(
 	vk::DescriptorSetAllocateInfo const& allocInfo,
-	vk::DescriptorSet* pDescriptorSets) const
+	vk::DescriptorSet* pDescriptorSets) const noexcept
 {
 	return static_cast<vk::Result>(raw.vkAllocateDescriptorSets(
 		static_cast<VkDevice>(handle),
@@ -478,7 +479,7 @@ vk::Result Vk::DeviceDispatch::allocateDescriptorSets(
 		reinterpret_cast<VkDescriptorSet*>(pDescriptorSets)));
 }
 
-vk::DeviceMemory Vk::DeviceDispatch::allocateMemory(
+vk::DeviceMemory DeviceDispatch::allocateMemory(
 	vk::MemoryAllocateInfo const& allocInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -493,7 +494,7 @@ vk::DeviceMemory Vk::DeviceDispatch::allocateMemory(
 	return temp;
 }
 
-void Vk::DeviceDispatch::beginCommandBuffer(
+void DeviceDispatch::beginCommandBuffer(
 	vk::CommandBuffer cmdBuffer,
 	vk::CommandBufferBeginInfo const& beginInfo) const
 {
@@ -504,10 +505,10 @@ void Vk::DeviceDispatch::beginCommandBuffer(
 		throw std::runtime_error("DEngine - Vulkan: Unable to begin vk::CommandBuffer");
 }
 
-void Vk::DeviceDispatch::cmdBeginRenderPass(
+void DeviceDispatch::cmdBeginRenderPass(
 	vk::CommandBuffer commandBuffer, 
 	vk::RenderPassBeginInfo const& renderPassBegin,
-	vk::SubpassContents contents) const
+	vk::SubpassContents contents) const noexcept
 {
 	raw.vkCmdBeginRenderPass(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -515,13 +516,13 @@ void Vk::DeviceDispatch::cmdBeginRenderPass(
 		static_cast<VkSubpassContents>(contents));
 }
 
-void Vk::DeviceDispatch::cmdBindDescriptorSets(
+void DeviceDispatch::cmdBindDescriptorSets(
 	vk::CommandBuffer commandBuffer, 
 	vk::PipelineBindPoint pipelineBindPoint, 
 	vk::PipelineLayout layout, 
 	std::uint32_t firstSet, 
 	vk::ArrayProxy<vk::DescriptorSet const> descriptorSets, 
-	vk::ArrayProxy<uint32_t const> dynamicOffsets) const
+	vk::ArrayProxy<uint32_t const> dynamicOffsets) const noexcept
 {
 	raw.vkCmdBindDescriptorSets(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -534,11 +535,11 @@ void Vk::DeviceDispatch::cmdBindDescriptorSets(
 		dynamicOffsets.data());
 }
 
-void Vk::DeviceDispatch::cmdBindIndexBuffer(
+void DeviceDispatch::cmdBindIndexBuffer(
 	vk::CommandBuffer commandBuffer, 
 	vk::Buffer buffer, 
 	vk::DeviceSize offset, 
-	vk::IndexType indexType) const
+	vk::IndexType indexType) const noexcept
 {
 	raw.vkCmdBindIndexBuffer(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -547,10 +548,10 @@ void Vk::DeviceDispatch::cmdBindIndexBuffer(
 		static_cast<VkIndexType>(indexType));
 }
 
-void Vk::DeviceDispatch::cmdBindPipeline(
+void DeviceDispatch::cmdBindPipeline(
 	vk::CommandBuffer commandBuffer, 
 	vk::PipelineBindPoint pipelineBindPoint, 
-	vk::Pipeline pipeline) const
+	vk::Pipeline pipeline) const noexcept
 {
 	raw.vkCmdBindPipeline(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -558,11 +559,11 @@ void Vk::DeviceDispatch::cmdBindPipeline(
 		static_cast<VkPipeline>(pipeline));
 }
 
-void Vk::DeviceDispatch::cmdBindVertexBuffers(
+void DeviceDispatch::cmdBindVertexBuffers(
 	vk::CommandBuffer commandBuffer,
 	uint32_t firstBinding,
 	vk::ArrayProxy<vk::Buffer const> buffers,
-	vk::ArrayProxy<vk::DeviceSize const> offsets) const
+	vk::ArrayProxy<vk::DeviceSize const> offsets) const noexcept
 {
 	raw.vkCmdBindVertexBuffers(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -572,11 +573,11 @@ void Vk::DeviceDispatch::cmdBindVertexBuffers(
 		offsets.data());
 }
 
-void Vk::DeviceDispatch::cmdCopyBuffer(
+void DeviceDispatch::cmdCopyBuffer(
 	vk::CommandBuffer commandBuffer,
 	vk::Buffer srcBuffer, 
 	vk::Buffer dstBuffer, 
-	vk::ArrayProxy<vk::BufferCopy const> regions) const
+	vk::ArrayProxy<vk::BufferCopy const> regions) const noexcept
 {
 	raw.vkCmdCopyBuffer(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -586,12 +587,12 @@ void Vk::DeviceDispatch::cmdCopyBuffer(
 		reinterpret_cast<VkBufferCopy const*>(regions.data()));
 }
 
-void Vk::DeviceDispatch::cmdCopyBufferToImage(
+void DeviceDispatch::cmdCopyBufferToImage(
 	vk::CommandBuffer cmdBuffer,
 	vk::Buffer srcBuffer,
 	vk::Image dstImage,
 	vk::ImageLayout dstImageLayout,
-	vk::ArrayProxy<vk::BufferImageCopy const> regions) const
+	vk::ArrayProxy<vk::BufferImageCopy const> regions) const noexcept
 {
 	raw.vkCmdCopyBufferToImage(
 		static_cast<VkCommandBuffer>(cmdBuffer),
@@ -602,13 +603,13 @@ void Vk::DeviceDispatch::cmdCopyBufferToImage(
 		reinterpret_cast<VkBufferImageCopy const*>(regions.data()));
 }
 
-void Vk::DeviceDispatch::cmdCopyImage(
+void DeviceDispatch::cmdCopyImage(
 	vk::CommandBuffer commandBuffer, 
 	vk::Image srcImage, 
 	vk::ImageLayout srcImageLayout,
 	vk::Image dstImage,
 	vk::ImageLayout dstImageLayout,
-	vk::ArrayProxy<vk::ImageCopy const> regions) const
+	vk::ArrayProxy<vk::ImageCopy const> regions) const noexcept
 {
 	raw.vkCmdCopyImage(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -620,12 +621,12 @@ void Vk::DeviceDispatch::cmdCopyImage(
 		reinterpret_cast<VkImageCopy const*>(regions.data()));
 }
 
-void Vk::DeviceDispatch::cmdDraw(
+void DeviceDispatch::cmdDraw(
 	vk::CommandBuffer commandBuffer,
 	std::uint32_t vertexCount,
 	std::uint32_t instanceCount, 
 	std::uint32_t firstVertex, 
-	std::uint32_t firstInstance) const
+	std::uint32_t firstInstance) const noexcept
 {
 	raw.vkCmdDraw(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -635,13 +636,13 @@ void Vk::DeviceDispatch::cmdDraw(
 		firstInstance);
 }
 
-void Vk::DeviceDispatch::cmdDrawIndexed(
+void DeviceDispatch::cmdDrawIndexed(
 	vk::CommandBuffer commandBuffer,
 	std::uint32_t indexCount, 
 	std::uint32_t instanceCount,
 	std::uint32_t firstIndex, 
 	std::int32_t vertexOffset, 
-	std::uint32_t firstInstance) const
+	std::uint32_t firstInstance) const noexcept
 {
 	raw.vkCmdDrawIndexed(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -652,19 +653,19 @@ void Vk::DeviceDispatch::cmdDrawIndexed(
 		firstInstance);
 }
 
-void Vk::DeviceDispatch::cmdEndRenderPass(vk::CommandBuffer commandBuffer) const
+void DeviceDispatch::cmdEndRenderPass(vk::CommandBuffer commandBuffer) const noexcept
 {
 	raw.vkCmdEndRenderPass(static_cast<VkCommandBuffer>(commandBuffer));
 }
 
-void Vk::DeviceDispatch::cmdPipelineBarrier(
+void DeviceDispatch::cmdPipelineBarrier(
 	vk::CommandBuffer commandBuffer,
 	vk::PipelineStageFlags srcStageMask,
 	vk::PipelineStageFlags dstStageMask,
 	vk::DependencyFlags dependencyFlags,
 	vk::ArrayProxy<vk::MemoryBarrier const> memoryBarriers,
 	vk::ArrayProxy<vk::BufferMemoryBarrier const> bufferMemoryBarriers, 
-	vk::ArrayProxy<vk::ImageMemoryBarrier const> imageMemoryBarriers) const
+	vk::ArrayProxy<vk::ImageMemoryBarrier const> imageMemoryBarriers) const noexcept
 {
 	raw.vkCmdPipelineBarrier(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -679,13 +680,13 @@ void Vk::DeviceDispatch::cmdPipelineBarrier(
 		reinterpret_cast<VkImageMemoryBarrier const*>(imageMemoryBarriers.data()));
 }
 
-void Vk::DeviceDispatch::cmdPushConstants(
+void DeviceDispatch::cmdPushConstants(
 	vk::CommandBuffer commandBuffer,
 	vk::PipelineLayout layout,
 	vk::ShaderStageFlags stageFlags,
 	std::uint32_t offset,
 	std::uint32_t size,
-	void const* pValues) const
+	void const* pValues) const noexcept
 {
 	raw.vkCmdPushConstants(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -696,10 +697,10 @@ void Vk::DeviceDispatch::cmdPushConstants(
 		pValues);
 }
 
-void Vk::DeviceDispatch::cmdSetScissor(
+void DeviceDispatch::cmdSetScissor(
 	vk::CommandBuffer commandBuffer,
 	std::uint32_t firstScissor,
-	vk::ArrayProxy<vk::Rect2D const> scissors) const
+	vk::ArrayProxy<vk::Rect2D const> scissors) const noexcept
 {
 	raw.vkCmdSetScissor(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -708,10 +709,10 @@ void Vk::DeviceDispatch::cmdSetScissor(
 		reinterpret_cast<VkRect2D const*>(scissors.data()));
 }
 
-void Vk::DeviceDispatch::cmdSetViewport(
+void DeviceDispatch::cmdSetViewport(
 	vk::CommandBuffer commandBuffer, 
 	std::uint32_t firstViewport, 
-	vk::ArrayProxy<vk::Viewport const> viewports) const
+	vk::ArrayProxy<vk::Viewport const> viewports) const noexcept
 {
 	raw.vkCmdSetViewport(
 		static_cast<VkCommandBuffer>(commandBuffer),
@@ -720,9 +721,9 @@ void Vk::DeviceDispatch::cmdSetViewport(
 		reinterpret_cast<VkViewport const*>(viewports.data()));
 }
 
-vk::CommandPool Vk::DeviceDispatch::createCommandPool(
+vk::ResultValue<vk::CommandPool> DeviceDispatch::createCommandPool(
 	vk::CommandPoolCreateInfo const& createInfo,
-	vk::Optional<vk::AllocationCallbacks> allocator) const
+	vk::Optional<vk::AllocationCallbacks> allocator) const noexcept
 {
 	vk::CommandPool temp;
 	vk::Result result = static_cast<vk::Result>(raw.vkCreateCommandPool(
@@ -730,12 +731,10 @@ vk::CommandPool Vk::DeviceDispatch::createCommandPool(
 		reinterpret_cast<VkCommandPoolCreateInfo const*>(&createInfo),
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator)),
 		reinterpret_cast<VkCommandPool*>(&temp)));
-	if (result != vk::Result::eSuccess)
-		throw std::runtime_error("DEngine - Vulkan: Unable to create Vulkan command pool.");
-	return temp;
+	return { result, temp };
 }
 
-vk::DescriptorPool Vk::DeviceDispatch::createDescriptorPool(
+vk::DescriptorPool DeviceDispatch::createDescriptorPool(
 	vk::DescriptorPoolCreateInfo const& createInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -750,7 +749,7 @@ vk::DescriptorPool Vk::DeviceDispatch::createDescriptorPool(
 	return temp;
 }
 
-vk::DescriptorSetLayout Vk::DeviceDispatch::createDescriptorSetLayout(
+vk::DescriptorSetLayout DeviceDispatch::createDescriptorSetLayout(
 	vk::DescriptorSetLayoutCreateInfo const& createInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -765,7 +764,7 @@ vk::DescriptorSetLayout Vk::DeviceDispatch::createDescriptorSetLayout(
 	return temp;
 }
 
-vk::Fence Vk::DeviceDispatch::createFence(
+vk::Fence DeviceDispatch::createFence(
 	vk::FenceCreateInfo const& createInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -780,7 +779,7 @@ vk::Fence Vk::DeviceDispatch::createFence(
 	return outFence;
 }
 
-vk::Framebuffer Vk::DeviceDispatch::createFramebuffer(
+vk::Framebuffer DeviceDispatch::createFramebuffer(
 	vk::FramebufferCreateInfo const& createInfo, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -795,7 +794,7 @@ vk::Framebuffer Vk::DeviceDispatch::createFramebuffer(
 	return outFramebuffer;
 }
 
-vk::Image Vk::DeviceDispatch::createImage(
+vk::Image DeviceDispatch::createImage(
 	vk::ImageCreateInfo const& createInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -810,7 +809,7 @@ vk::Image Vk::DeviceDispatch::createImage(
 	return temp;
 }
 
-vk::ImageView Vk::DeviceDispatch::createImageView(
+vk::ImageView DeviceDispatch::createImageView(
 	vk::ImageViewCreateInfo const& createInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -825,7 +824,7 @@ vk::ImageView Vk::DeviceDispatch::createImageView(
 	return temp;
 }
 
-vk::PipelineLayout Vk::DeviceDispatch::createPipelineLayout(
+vk::PipelineLayout DeviceDispatch::createPipelineLayout(
 	vk::PipelineLayoutCreateInfo const& createInfo, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -840,7 +839,7 @@ vk::PipelineLayout Vk::DeviceDispatch::createPipelineLayout(
 	return outPipelineLayout;
 }
 
-vk::RenderPass Vk::DeviceDispatch::createRenderPass(
+vk::RenderPass DeviceDispatch::createRenderPass(
 	vk::RenderPassCreateInfo const& createInfo, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -855,7 +854,7 @@ vk::RenderPass Vk::DeviceDispatch::createRenderPass(
 	return outRenderPass;
 }
 
-vk::Sampler Vk::DeviceDispatch::createSampler(
+vk::Sampler DeviceDispatch::createSampler(
 	vk::SamplerCreateInfo const& createInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -870,7 +869,7 @@ vk::Sampler Vk::DeviceDispatch::createSampler(
 	return temp;
 }
 
-vk::ResultValue<vk::Semaphore> Vk::DeviceDispatch::createSemaphore(
+vk::ResultValue<vk::Semaphore> DeviceDispatch::createSemaphore(
 	vk::SemaphoreCreateInfo const& createInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -883,7 +882,7 @@ vk::ResultValue<vk::Semaphore> Vk::DeviceDispatch::createSemaphore(
 	return { result, temp };
 }
 
-vk::ShaderModule Vk::DeviceDispatch::createShaderModule(
+vk::ShaderModule DeviceDispatch::createShaderModule(
 	vk::ShaderModuleCreateInfo const& createInfo, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -898,7 +897,7 @@ vk::ShaderModule Vk::DeviceDispatch::createShaderModule(
 	return outShaderModule;
 }
 
-vk::Result Vk::DeviceDispatch::createGraphicsPipelines(
+vk::Result DeviceDispatch::createGraphicsPipelines(
 	vk::PipelineCache pipelineCache,
 	vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> createInfos,
 	vk::Optional<vk::AllocationCallbacks> allocator,
@@ -920,68 +919,68 @@ vk::Result Vk::DeviceDispatch::createGraphicsPipelines(
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator))); \
 		
 
-void Vk::DeviceDispatch::destroy(
+void DeviceDispatch::destroy(
 	vk::CommandPool in,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(CommandPool)
 }
 
-void Vk::DeviceDispatch::destroy(
+void DeviceDispatch::destroy(
 	vk::DescriptorPool in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(DescriptorPool)
 }
 
-void Vk::DeviceDispatch::destroy(
+void DeviceDispatch::destroy(
 	vk::Fence in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Fence)
 }
 
-void Vk::DeviceDispatch::destroy(
+void DeviceDispatch::destroy(
 	vk::Framebuffer in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Framebuffer)
 }
 
-void Vk::DeviceDispatch::destroy(
+void DeviceDispatch::destroy(
 	vk::Image in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Image)
 }
 
-void Vk::DeviceDispatch::destroy(
+void DeviceDispatch::destroy(
 	vk::ImageView in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(ImageView)
 }
 
-void Vk::DeviceDispatch::destroy(
+void DeviceDispatch::destroy(
 	vk::RenderPass in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(RenderPass)
 }
 
-void Vk::DeviceDispatch::destroy(
+void DeviceDispatch::destroy(
 	vk::ShaderModule in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(ShaderModule)
 }
 
-void Vk::DeviceDispatch::endCommandBuffer(vk::CommandBuffer cmdBuffer) const
+void DeviceDispatch::endCommandBuffer(vk::CommandBuffer cmdBuffer) const
 {
 	raw.vkEndCommandBuffer(static_cast<VkCommandBuffer>(cmdBuffer));
 }
 
-void Vk::DeviceDispatch::freeCommandBuffers(
+void DeviceDispatch::freeCommandBuffers(
 	vk::CommandPool cmdPool, 
 	vk::ArrayProxy<vk::CommandBuffer const> cmdBuffers) const
 {
@@ -992,7 +991,7 @@ void Vk::DeviceDispatch::freeCommandBuffers(
 		reinterpret_cast<VkCommandBuffer const*>(cmdBuffers.data()));
 }
 
-void Vk::DeviceDispatch::freeMemory(
+void DeviceDispatch::freeMemory(
 	vk::DeviceMemory memory, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -1002,14 +1001,14 @@ void Vk::DeviceDispatch::freeMemory(
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator)));
 }
 
-vk::Result Vk::DeviceDispatch::getFenceStatus(vk::Fence fence) const
+vk::Result DeviceDispatch::getFenceStatus(vk::Fence fence) const noexcept
 {
 	return static_cast<vk::Result>(raw.vkGetFenceStatus(
 		static_cast<VkDevice>(handle),
 		static_cast<VkFence>(fence)));
 }
 
-vk::Queue Vk::DeviceDispatch::getQueue(
+vk::Queue DeviceDispatch::getQueue(
 	std::uint32_t familyIndex,
 	std::uint32_t queueIndex) const
 {
@@ -1022,7 +1021,17 @@ vk::Queue Vk::DeviceDispatch::getQueue(
 	return outQueue;
 }
 
-void Vk::DeviceDispatch::resetFences(vk::ArrayProxy<vk::Fence const> fences) const
+void DeviceDispatch::resetCommandPool(
+	vk::CommandPool commandPool, 
+	vk::CommandPoolResetFlags flags) const
+{
+	raw.vkResetCommandPool(
+		static_cast<VkDevice>(handle),
+		static_cast<VkCommandPool>(commandPool),
+		static_cast<VkCommandPoolResetFlags>(flags));
+}
+
+void DeviceDispatch::resetFences(vk::ArrayProxy<vk::Fence const> fences) const
 {
 	raw.vkResetFences(
 		static_cast<VkDevice>(handle),
@@ -1030,7 +1039,7 @@ void Vk::DeviceDispatch::resetFences(vk::ArrayProxy<vk::Fence const> fences) con
 		reinterpret_cast<VkFence const*>(fences.data()));
 }
 
-void Vk::DeviceDispatch::updateDescriptorSets(
+void DeviceDispatch::updateDescriptorSets(
 	vk::ArrayProxy<vk::WriteDescriptorSet const> descriptorWrites,
 	vk::ArrayProxy<vk::CopyDescriptorSet const> descriptorCopies) const
 {
@@ -1042,10 +1051,10 @@ void Vk::DeviceDispatch::updateDescriptorSets(
 		reinterpret_cast<VkCopyDescriptorSet const*>(descriptorCopies.data()));
 }
 
-vk::Result Vk::DeviceDispatch::waitForFences(
+vk::Result DeviceDispatch::waitForFences(
 	vk::ArrayProxy<vk::Fence const> fences, 
 	bool waitAll, 
-	std::uint64_t timeout) const
+	std::uint64_t timeout) const noexcept
 {
 	return static_cast<vk::Result>(raw.vkWaitForFences(
 		static_cast<VkDevice>(handle),
@@ -1056,7 +1065,7 @@ vk::Result Vk::DeviceDispatch::waitForFences(
 }
 
 #include "QueueData.hpp"
-void Vk::DeviceDispatch::waitIdle() const
+void DeviceDispatch::waitIdle() const
 {
 	// Go through all queues and lock their mutexes.
 	std::lock_guard graphicsLock{ m_queueDataPtr->graphics.m_lock };
@@ -1066,11 +1075,11 @@ void Vk::DeviceDispatch::waitIdle() const
 	raw.vkDeviceWaitIdle(static_cast<VkDevice>(handle));
 }
 
-vk::ResultValue<std::uint32_t> Vk::DeviceDispatch::acquireNextImageKHR(
+vk::ResultValue<std::uint32_t> DeviceDispatch::acquireNextImageKHR(
 	vk::SwapchainKHR swapchain, 
 	std::uint64_t timeout, 
 	vk::Semaphore semaphore, 
-	vk::Fence fence) const
+	vk::Fence fence) const noexcept
 {
 	std::uint32_t outIndex;
 	vk::Result result = static_cast<vk::Result>(swapchainRaw.vkAcquireNextImageKHR(
@@ -1083,7 +1092,7 @@ vk::ResultValue<std::uint32_t> Vk::DeviceDispatch::acquireNextImageKHR(
 	return { result, outIndex };
 }
 
-vk::SwapchainKHR Vk::DeviceDispatch::createSwapchainKHR(
+vk::SwapchainKHR DeviceDispatch::createSwapchainKHR(
 	vk::SwapchainCreateInfoKHR const& createInfo, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -1098,7 +1107,7 @@ vk::SwapchainKHR Vk::DeviceDispatch::createSwapchainKHR(
 	return outSwapchain;
 }
 
-void Vk::DeviceDispatch::destroy(
+void DeviceDispatch::destroy(
 	vk::SwapchainKHR in,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -1108,10 +1117,10 @@ void Vk::DeviceDispatch::destroy(
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator)));
 }
 
-vk::Result Vk::DeviceDispatch::getSwapchainImagesKHR(
+vk::Result DeviceDispatch::getSwapchainImagesKHR(
 	vk::SwapchainKHR swapchain,
 	std::uint32_t* pSwapchainImageCount,
-	vk::Image* pSwapchainImages) const
+	vk::Image* pSwapchainImages) const noexcept
 {
 	return static_cast<vk::Result>(swapchainRaw.vkGetSwapchainImagesKHR(
 		static_cast<VkDevice>(handle),
@@ -1120,9 +1129,9 @@ vk::Result Vk::DeviceDispatch::getSwapchainImagesKHR(
 		reinterpret_cast<VkImage*>(pSwapchainImages)));
 }
 
-vk::Result Vk::DeviceDispatch::queuePresentKHR(
+vk::Result DeviceDispatch::queuePresentKHR(
 	vk::Queue queue, 
-	vk::PresentInfoKHR const& presentInfo) const
+	vk::PresentInfoKHR const& presentInfo) const noexcept
 {
 	return static_cast<vk::Result>(swapchainRaw.vkQueuePresentKHR(
 		static_cast<VkQueue>(queue),

@@ -41,10 +41,12 @@ void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 
 	if (addAcceleration.MagnitudeSqrd() != 0)
 	{
-		Box2D_Component* body = scene.GetComponent<Box2D_Component>(entity);
+		Physics::Rigidbody2D* body = scene.GetComponent<Physics::Rigidbody2D>(entity);
 		if (body != nullptr)
 		{
-			body->ptr->ApplyForceToCenter({ addAcceleration.x, addAcceleration.y }, true);
+			DENGINE_DETAIL_ASSERT(body->b2BodyPtr);
+			b2Body* physBody = (b2Body*)body->b2BodyPtr;
+			physBody->ApplyForceToCenter({ addAcceleration.x, addAcceleration.y }, true);
 		}
 	}
 }
@@ -106,12 +108,13 @@ namespace DEngine::impl
 		Gfx::LogInterface& logger,
 		Std::Span<char const*> requiredVkInstanceExtensions)
 	{
-		Gfx::InitInfo rendererInitInfo{};
+		Gfx::InitInfo rendererInitInfo = {};
 		rendererInitInfo.initialWindowConnection = &wsiConnection;
 		rendererInitInfo.texAssetInterface = &textureAssetConnection;
 		rendererInitInfo.optional_logger = &logger;
 		rendererInitInfo.requiredVkInstanceExtensions = requiredVkInstanceExtensions;
 		rendererInitInfo.gizmoArrowMesh = Editor::BuildGizmoArrowMesh();
+		rendererInitInfo.gizmoCircleLineMesh = Editor::BuildGizmoTorusMesh();
 		Std::Opt<Gfx::Context> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
 		if (!rendererDataOpt.HasValue())
 		{
@@ -133,15 +136,148 @@ namespace DEngine::impl
 		Scene& scene);
 }
 
-#include <DEngine/Std/Containers/Variant.hpp>
+/*
+namespace DEngine::impl
+{
+	[[nodiscard]] constexpr unsigned long long FNV_1a_Hash(char const* str, unsigned long long length) noexcept
+	{
+		constexpr unsigned long long FNV_Basis = 14695981039346656037ULL;
+		constexpr unsigned long long FNV_Prime = 1099511628211ULL;
+		unsigned long long hasher = FNV_Basis;
+		for (unsigned long long i = 0; i < length; i += 1)
+		{
+			hasher = hasher ^ str[i];
+			hasher = hasher * FNV_Prime;
+		}
+		return hasher;
+	}
+
+	// Should NOT include null-terminator.
+	struct CompileTimeString
+	{
+		char const* ptr;
+		unsigned long long length;
+	};
+
+	// Lengths should NOT include null-terminator.
+	// Returns index if found. Returns -1 if not found.
+	[[nodiscard]] constexpr signed long long FindSubstring(
+		char const* srcPtr,
+		unsigned long long srcLength,
+		char const* substringPtr,
+		unsigned long long substringLength) noexcept
+	{
+		constexpr auto failValue = (signed long long)(-1);
+
+		unsigned long long lengthToSearch = substringLength > srcLength ? 0 : srcLength - substringLength + 1;
+		// Check every substring in src
+		for (unsigned long long i = 0; i < lengthToSearch; i += 1)
+		{
+			char const* srcSubstring = srcPtr + i;
+			bool found = true;
+			// Compare substring to toFind.
+			for (unsigned long long j = 0; j < substringLength; j += 1)
+			{
+				char const a = srcSubstring[j];
+				char const b = substringPtr[j];
+				if (a != b)
+				{
+					found = false;
+					break;
+				}
+			}
+			if (found)
+				return i;
+		}
+
+		return failValue;
+	}
+
+	template<typename T>
+	[[nodiscard]] constexpr auto GetPrettyFunctionString() noexcept
+	{
+#if defined(__clang__)
+#	define DENGINE_FN_SIGNATURE __FUNCSIG__
+#	define DENGINE_FN_PREFIX "auto __cdecl DEngine::impl::GetPrettyFunctionString(void) [T = "
+#	define DENGINE_FN_POSTFIX "]"
+#elif defined(_MSC_VER)
+#	define DENGINE_FN_SIGNATURE __FUNCSIG__
+#	define DENGINE_FN_PREFIX "auto __cdecl DEngine::impl::GetPrettyFunctionString<"
+#	define DENGINE_FN_POSTFIX ">(void) noexcept"
+#else
+#	error "Need to implement function name thing"
+#endif
+		constexpr const char* name = DENGINE_FN_SIGNATURE;
+		constexpr auto nameLength = sizeof(DENGINE_FN_SIGNATURE) - 1;
+
+		constexpr const char* preFix = DENGINE_FN_PREFIX;
+		constexpr auto preFixLength = sizeof(DENGINE_FN_PREFIX) - 1;
+
+		constexpr const char* postFix = DENGINE_FN_POSTFIX;
+		constexpr auto postFixLength = sizeof(DENGINE_FN_POSTFIX) - 1;
+#undef DENGINE_FN_SIGNATURE
+#undef DENGINE_FN_PREFIX
+#undef DENGINE_FN_POSTFIX
+
+		char const* returnPtr = name;
+		unsigned long long returnLength = nameLength;
+
+		// Filter away the front
+		static_assert(nameLength > preFixLength, "Needs to be able to fit the postfix string in source string.");
+		// Assert that the source has this substring at the very front
+		constexpr auto preFixIndex = FindSubstring(name, preFixLength, preFix, preFixLength);
+		static_assert(preFixIndex == 0, "Could not find the preFix string in the source string.");
+
+		returnPtr += preFixLength;
+		returnLength -= preFixLength;
+
+		// Filter away the rear
+		static_assert(nameLength > postFixLength, "Needs to be able to fit the postfix string in source string.");
+		// Assert that the source has this substring at the very end
+		constexpr auto postFixIndex = FindSubstring(name + nameLength - postFixLength, postFixLength, postFix, postFixLength);
+		static_assert(postFixIndex == 0, "Could not find the postFix string in the source string.");
+
+		returnLength -= postFixLength;
+
+		// Filter away class keyword
+		constexpr char classLabel[] = "class ";
+		char const* classLabelPtr = classLabel;
+		constexpr unsigned long long classLabelLength = sizeof(classLabel) - 1;
+		if (FindSubstring(returnPtr, returnLength, classLabelPtr, classLabelLength) == 0)
+		{
+			returnPtr += classLabelLength + 1;
+			returnLength -= classLabelLength + 1;
+		}
+
+		// Filter away struct keyword
+		constexpr char structLabel[] = "struct ";
+		char const* structLabelPtr = structLabel;
+		constexpr unsigned long long structLabelLength = sizeof(structLabel) - 1;
+		if (FindSubstring(returnPtr, returnLength, structLabelPtr, structLabelLength) == 0)
+		{
+			returnPtr += classLabelLength + 1;
+			returnLength -= classLabelLength + 1;
+		}
+
+		return CompileTimeString{ returnPtr, returnLength };
+	}
+
+	[[nodiscard]] constexpr unsigned long long Hash(CompileTimeString in) noexcept
+	{
+		return FNV_1a_Hash(in.ptr, in.length);
+	}
+
+	template<typename T>
+	constexpr unsigned long long GetTypeID() noexcept
+	{
+		return Hash(GetPrettyFunctionString<T>());
+	}
+}
+ */
 
 int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
-
-	Math::Vec3 u = { -5, -2, -5 };
-	Math::Vec3 v = { -2, 2, 3 };
-	auto cross = Math::Vec3::Cross(u, v);
 
 	Std::NameThisThread("MainThread");
 
@@ -168,23 +304,21 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	Scene myScene;
 
 	{
-		Entity a = myScene.NewEntity();
+		Entity ent = myScene.NewEntity();
 
-		Transform transform{};
+		Transform transform = {};
 		transform.position.x = 0.f;
 		transform.position.y = 0.f;
 		//transform.rotation = 0.707f;
 		//transform.scale = { 1.f, 1.f };
-		myScene.AddComponent(a, transform);
+		myScene.AddComponent(ent, transform);
 
 		Gfx::TextureID textureId{ 0 };
-		myScene.AddComponent(a, textureId);
+		myScene.AddComponent(ent, textureId);
 
-		Move move{};
-		myScene.AddComponent(a, move);
+		Move move = {};
+		myScene.AddComponent(ent, move);
 	}
-
-
 
 	Editor::Context editorCtx = Editor::Context::Create(
 		mainWindow,
@@ -200,23 +334,28 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 		editorCtx.ProcessEvents();
 
-		// Editor can move stuff around, so we need to update the physics world.
-		impl::CopyTransformToPhysicsWorld(myScene);
+		Scene* renderedScene = &myScene;
 
-		if (myScene.play)
+		if (editorCtx.CurrentlySimulating())
 		{
+			Scene& scene = editorCtx.GetActiveScene();
+			renderedScene = &scene;
+
+			// Editor can move stuff around, so we need to update the physics world.
+			impl::CopyTransformToPhysicsWorld(scene);
+
 			//Physics::Update(myScene, Time::Delta());
 
-			for (auto const& [entity, moveComponent] : myScene.GetAllComponents<Move>())
-				moveComponent.Update(entity, myScene, Time::Delta());
+			for (auto const& [entity, moveComponent] : scene.GetAllComponents<Move>())
+				moveComponent.Update(entity, scene, Time::Delta());
 
-			impl::RunPhysicsStep(myScene);
+			impl::RunPhysicsStep(scene);
 		}
 
 		impl::SubmitRendering(
 			gfxCtx, 
 			editorCtx, 
-			myScene);
+			*renderedScene);
 	}
 
 	return 0;
@@ -225,14 +364,15 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 void DEngine::impl::CopyTransformToPhysicsWorld(Scene& scene)
 {
 	// First copy our positions into every physics body
-	for (auto const& physicsBodyPair : scene.GetAllComponents<Box2D_Component>())
+	for (auto const& physicsBodyPair : scene.GetAllComponents<Physics::Rigidbody2D>())
 	{
 		Entity a = physicsBodyPair.a;
 
 		Transform const* transformPtr = scene.GetComponent<Transform>(a);
 		DENGINE_DETAIL_ASSERT(transformPtr != nullptr);
 		Transform const& transform = *transformPtr;
-		physicsBodyPair.b.ptr->SetTransform({ transform.position.x, transform.position.y }, transform.rotation);
+		b2Body* pBody = (b2Body*)physicsBodyPair.b.b2BodyPtr;
+		pBody->SetTransform({ transform.position.x, transform.position.y }, transform.rotation);
 	}
 }
 
@@ -242,14 +382,17 @@ void DEngine::impl::RunPhysicsStep(
 	CopyTransformToPhysicsWorld(scene);
 
 	scene.physicsWorld->Step(Time::Delta(), 8, 8);
+
 	// Then copy the stuff back
-	for (auto const& physicsBodyPair : scene.GetAllComponents<Box2D_Component>())
+	for (auto const& physicsBodyPair : scene.GetAllComponents<Physics::Rigidbody2D>())
 	{
 		Entity a = physicsBodyPair.a;
 		Transform* transformPtr = scene.GetComponent<Transform>(a);
 		DENGINE_DETAIL_ASSERT(transformPtr != nullptr);
 		Transform& transform = *transformPtr;
-		auto physicsBodyTransform = physicsBodyPair.b.ptr->GetTransform();
+
+		b2Body* pBody = (b2Body*)physicsBodyPair.b.b2BodyPtr;
+		auto physicsBodyTransform = pBody->GetTransform();
 		transform.position = { physicsBodyTransform.p.x, physicsBodyTransform.p.y };
 		transform.rotation = physicsBodyTransform.q.GetAngle();
 	}
@@ -260,7 +403,7 @@ void DEngine::impl::SubmitRendering(
 	Editor::Context& editorCtx,
 	Scene& scene)
 {
-	Gfx::DrawParams params{};
+	Gfx::DrawParams params = {};
 
 	for (auto const& item : scene.GetAllComponents<Gfx::TextureID>())
 	{
@@ -289,6 +432,8 @@ void DEngine::impl::SubmitRendering(
 	params.lineDrawCmds = editorDrawData.lineDrawCmds;
 
 
-
-	gfxData.Draw(params);
+	if (!params.nativeWindowUpdates.empty())
+	{
+		gfxData.Draw(params);
+	}
 }

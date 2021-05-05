@@ -2,6 +2,7 @@ package didgy.dengine.editor;
 
 import android.app.NativeActivity;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.text.Editable;
@@ -38,14 +39,21 @@ public class DEngineActivity extends NativeActivity  {
     public native void nativeOnCharInput(int utfValue);
     public native void nativeOnCharEnter();
     public native void nativeOnCharRemove();
-
-    public native void nativeUpdateWindowContentRect(int top, int bottom, int left, int right);
+    public native void nativeOnNewOrientation(int newOrientation);
+    public native void nativeOnContentRectChanged(int posX, int posY, int width, int height);
 
     public int mInputConnectionCounter = 0;
     public int softInputFilter = 0;
     public NativeContentView mNativeContentView = null;
     public InputEditable mEditable = null;
     public InputMethodManager mIMM = null;
+    public Configuration mCurrentConfig = null;
+
+
+    int mLastContentX = 0;
+    int mLastContentY = 0;
+    int mLastContentWidth = 0;
+    int mLastContentHeight = 0;
 
     @Override
     protected void onCreate(Bundle savedState) {
@@ -64,6 +72,8 @@ public class DEngineActivity extends NativeActivity  {
         mNativeContentView.getViewTreeObserver().addOnGlobalLayoutListener(this);
 
         nativeInit();
+
+        mCurrentConfig = new Configuration(getResources().getConfiguration());
     }
 
     @Override
@@ -74,13 +84,32 @@ public class DEngineActivity extends NativeActivity  {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+
+        if (newConfig.orientation != mCurrentConfig.orientation)
+        {
+            nativeOnNewOrientation(newConfig.orientation);
+        }
+
+        mCurrentConfig = newConfig;
     }
 
     @Override
     public void onGlobalLayout() {
         super.onGlobalLayout();
 
-        // TODO: The on-screen display is changed in this event.
+        final int[] newLocation = new int[2];
+
+        mNativeContentView.getLocationInWindow(newLocation);
+        int w = mNativeContentView.getWidth();
+        int h = mNativeContentView.getHeight();
+        if (newLocation[0] != mLastContentX || newLocation[1] != mLastContentY
+                || w != mLastContentWidth || h != mLastContentHeight) {
+            mLastContentX = newLocation[0];
+            mLastContentY = newLocation[1];
+            mLastContentWidth = w;
+            mLastContentHeight = h;
+            nativeOnContentRectChanged(mLastContentX, mLastContentY, mLastContentWidth, mLastContentHeight);
+        }
     }
 
     @Override
@@ -91,19 +120,11 @@ public class DEngineActivity extends NativeActivity  {
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
         super.surfaceCreated(holder);
+    }
 
-        android.graphics.Rect test = new android.graphics.Rect();
-        mNativeContentView.getWindowVisibleDisplayFrame(test);
-
-        nativeUpdateWindowContentRect(test.top, test.bottom, test.left, test.right);
-
-        android.graphics.Rect x = new android.graphics.Rect();
-        mNativeContentView.getDrawingRect(x);
-
-        android.graphics.Point pointTest = new android.graphics.Point();
-        mNativeContentView.getDisplay().getSize(pointTest);
-
-        WindowInsets yo = mNativeContentView.getRootWindowInsets();
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        super.surfaceChanged(holder, format, width, height);
     }
 
     public void openSoftInput(String text, final int softInputFilter) {
@@ -142,11 +163,6 @@ public class DEngineActivity extends NativeActivity  {
         }
         HideSoftInputRunnable test = new HideSoftInputRunnable();
         runOnUiThread(test);
-    }
-
-    public int getCurrentOrientation()
-    {
-        return getResources().getConfiguration().orientation;
     }
 
     static boolean charSequenceContains(CharSequence seq, char character) {

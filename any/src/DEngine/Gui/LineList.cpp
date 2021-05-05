@@ -81,7 +81,7 @@ void LineList::CursorClick(
 		u32 const lineHeight = implData.textManager.lineheight;
 		uSize const visibleBegin = impl::LineList_GetFirstVisibleLine(lineHeight, widgetRect.position.y, visibleRect.position.y);
 		uSize const visibleEnd = visibleBegin + impl::LineList_GetVisibleLineCount(lineHeight, visibleRect.extent.height);
-		uSize const lineEnd = Math::Min(visibleEnd, lines.size());
+		uSize const lineEnd = Math::Min((u32)visibleEnd, (u32)lines.size());
 
 		for (uSize i = visibleBegin; i < lineEnd; i++)
 		{
