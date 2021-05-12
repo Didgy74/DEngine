@@ -55,7 +55,7 @@ namespace DEngine::Gfx::Vk::Init
 
 	void TransitionGfxImage(
 		DeviceDispatch const& device,
-		DeletionQueue const& deletionQueue,
+		DeletionQueue const& delQueue,
 		QueueData const& queues,
 		vk::Image img,
 		bool useEditorPipeline);

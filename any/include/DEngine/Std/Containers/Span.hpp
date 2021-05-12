@@ -1,8 +1,9 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
-#include <DEngine/Std/Containers/detail/Assert.hpp>
 #include <DEngine/Std/Containers/Range.hpp>
+
+#include <DEngine/Std/Containers/impl/Assert.hpp>
 
 namespace DEngine::Std
 {
@@ -79,10 +80,10 @@ namespace DEngine::Std
 	template<typename T>
 	T& Span<T>::At(uSize i) const
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			m_data != nullptr,
 			"Tried to .At() a Span with data pointer set to nullptr.");
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			i < m_size,
 			"Tried to .At() a Span with index out of bounds.");
 		return m_data[i];

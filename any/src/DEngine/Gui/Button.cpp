@@ -45,7 +45,7 @@ SizeHint Button::GetSizeHint(
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	return impl::TextManager::GetSizeHint(
 		implData.textManager,
-		text);
+		{ text.data(), text.size() });
 }
 
 void Button::Render(
@@ -87,22 +87,12 @@ void Button::Render(
 		}
 	}
 
-
-	Gfx::GuiDrawCmd cmd{};
-	cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-	cmd.filledMesh.color = currentColor;
-	cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
-	cmd.rectPosition.x = (f32)widgetRect.position.x / framebufferExtent.width;
-	cmd.rectPosition.y = (f32)widgetRect.position.y / framebufferExtent.height;
-	cmd.rectExtent.x = (f32)widgetRect.extent.width / framebufferExtent.width;
-	cmd.rectExtent.y = (f32)widgetRect.extent.height / framebufferExtent.height;
-	drawInfo.drawCmds.push_back(cmd);
-
+	drawInfo.PushFilledQuad(widgetRect, currentColor);
 
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 	impl::TextManager::RenderText(
 		implData.textManager,
-		text,
+		{ text.data(), text.length() },
 		currentTextColor,
 		widgetRect,
 		drawInfo);

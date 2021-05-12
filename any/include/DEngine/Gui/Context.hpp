@@ -5,8 +5,7 @@
 #include <DEngine/Gui/DrawInfo.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
-
-#include <string_view>
+#include <DEngine/Std/Containers/Str.hpp>
 
 namespace DEngine::Gui
 {
@@ -26,7 +25,11 @@ namespace DEngine::Gui
 		Context& operator=(Context const&) = delete;
 		Context& operator=(Context&&) noexcept;
 
-		void Render() const;
+		void Render(
+			std::vector<Gfx::GuiVertex>& vertices,
+			std::vector<u32>& indices,
+			std::vector<Gfx::GuiDrawCmd>& drawCmds,
+			std::vector<Gfx::NativeWindowUpdate>& windowUpdates) const;
 
 		void PushEvent(CharEnterEvent);
 		void PushEvent(CharEvent);
@@ -43,7 +46,7 @@ namespace DEngine::Gui
 		void TakeInputConnection(
 			Widget& widget,
 			SoftInputFilter softInputFilter,
-			std::string_view currentText);
+			Std::Str currentText);
 
 		void ClearInputConnection(
 			Widget& widget);
@@ -55,10 +58,6 @@ namespace DEngine::Gui
 		
 		// TEMPORARY FIELDS
 		StackLayout* outerLayout = nullptr;
-		mutable std::vector<Gfx::GuiVertex> vertices;
-		mutable std::vector<u32> indices;
-		mutable std::vector<Gfx::GuiDrawCmd> drawCmds;
-		mutable std::vector<Gfx::NativeWindowUpdate> windowUpdates;
 
 		void* Internal_ImplData() const { return pImplData; }
 

@@ -2,7 +2,7 @@
 
 #include <random>
 
-#include <string>
+#include <cstring>
 
 // For Std::NameThisThread
 #include <DEngine/Application.hpp>
@@ -47,18 +47,27 @@ f32 Std::RandRange(f32 a, f32 b)
 	return dis(gen);
 }
 
-void Std::NameThisThread(std::string const& name)
+void Std::NameThisThread(Str name)
 {
+	// Maximum size set by POSIX.
+	// This includes the null-terminator.
+	[[maybe_unused]] constexpr u32 maxThreadNameLength = 16;
+	
+	DENGINE_DETAIL_ASSERT(name.Size() < maxThreadNameLength);
+
 #if defined(DENGINE_OS_WINDOWS)
-	std::basic_string<wchar_t> tempString;
-	tempString.reserve(name.size());
-	for (auto character : name)
-		tempString.push_back(character);
+	wchar_t tempString[maxThreadNameLength] = {};
+	for (u8 i = 0; i < (u8)name.Size(); i += 1)
+		tempString[i] = name[i];
 
 	HRESULT r = SetThreadDescription(
 		GetCurrentThread(),
-		tempString.data());
+		tempString);
 #elif defined(DENGINE_OS_LINUX) || defined(DENGINE_OS_ANDROID)
-	pthread_setname_np(pthread_self(), name.data());
+	char tempString[maxThreadNameLength] = {};
+	for (u8 i = 0; i < (u8)name.Size(); i += 1)
+		tempString[i] = name[i];
+
+	pthread_setname_np(pthread_self(), tempString);
 #endif
 }

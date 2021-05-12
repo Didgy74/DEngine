@@ -25,9 +25,9 @@ void Text::String_PopBack()
 	text.pop_back();
 }
 
-std::string_view Text::StringView() const
+Std::Str Text::StringView() const
 {
-	return text;
+	return { text.data(), text.size() };
 }
 
 SizeHint Text::GetSizeHint(
@@ -39,7 +39,7 @@ SizeHint Text::GetSizeHint(
 
 		cachedSizeHint = impl::TextManager::GetSizeHint(
 			implData.textManager,
-			text);
+			{ text.data(), text.size() });
 
 		invalidated = false;
 	}
@@ -57,7 +57,7 @@ void Text::Render(
 
 	impl::TextManager::RenderText(
 		implData.textManager,
-		this->text,
+		{ text.data(), text.length() },
 		this->color,
 		widgetRect,
 		drawInfo);

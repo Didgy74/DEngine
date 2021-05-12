@@ -10,8 +10,10 @@ namespace DEngine::Gui
 {
 	struct Extent
 	{
-		u32 width{};
-		u32 height{};
+		u32 width = {};
+		u32 height = {};
+
+		[[nodiscard]] constexpr f32 Aspect() const noexcept;
 
 		[[nodiscard]] constexpr u32& operator[](uSize index) noexcept
 		{
@@ -34,8 +36,8 @@ namespace DEngine::Gui
 
 	struct Rect
 	{
-		Math::Vec2Int position{};
-		Extent extent{};
+		Math::Vec2Int position = {};
+		Extent extent = {};
 
 		[[nodiscard]] constexpr i32 Top() const noexcept;
 		[[nodiscard]] constexpr i32 Bottom() const noexcept;
@@ -53,6 +55,8 @@ namespace DEngine::Gui
 		[[nodiscard]] constexpr bool operator!=(Rect const&) const noexcept;
 	};
 }
+
+constexpr DEngine::f32 DEngine::Gui::Extent::Aspect() const noexcept { return (f32)width / (f32)height; }
 
 constexpr bool DEngine::Gui::Extent::operator==(Extent const& other) const noexcept
 {

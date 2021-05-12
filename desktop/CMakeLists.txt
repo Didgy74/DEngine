@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
 project(dengine_desktop)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "Don't build GLFW documentation.")
@@ -18,7 +15,7 @@ add_subdirectory("../any" any)
 add_executable(dengine)
 target_sources(dengine
 	PRIVATE
-		"src/application.cpp")
+		"src/Application.cpp")
 target_link_libraries(dengine
 	PRIVATE
 		dengine_any

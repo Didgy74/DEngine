@@ -20,11 +20,15 @@ file(GLOB_RECURSE DENGINE_HEADERS
 add_library(dengine_any STATIC
 		"src/main.cpp"
 		"src/DEngine/Assert.cpp"
+		"src/DEngine/Scene.cpp"
+		"src/DEngine/Std.cpp"
+		"src/DEngine/Editor/AppIntegration.cpp"
 		"src/DEngine/Editor/Editor.cpp"
 		"src/DEngine/Editor/ComponentWidgets.cpp"
 		"src/DEngine/Editor/ViewportWidget.cpp"
 		"src/DEngine/FrameAllocator.cpp"
 		"src/DEngine/Gui/Button.cpp"
+		"src/DEngine/Gui/ButtonGroup.cpp"
 		"src/DEngine/Gui/CollapsingHeader.cpp"
 		"src/DEngine/Gui/Context.cpp"
 		"src/DEngine/Gui/DockArea.cpp"
@@ -46,6 +50,7 @@ add_library(dengine_any STATIC
 		"src/DEngine/Gfx/Vk/Draw.cpp"
 		"src/DEngine/Gfx/Vk/DynamicDispatch.cpp"
 		"src/DEngine/Gfx/Vk/Init.cpp"
+		"src/DEngine/Gfx/Vk/GizmoManager.cpp"
 		"src/DEngine/Gfx/Vk/GuiResourceManager.cpp"
 		"src/DEngine/Gfx/Vk/NativeWindowManager.cpp"
 		"src/DEngine/Gfx/Vk/ObjectDataManager.cpp"
@@ -74,7 +79,6 @@ target_sources(dengine_any
 set_target_properties(dengine_any PROPERTIES 
 	CXX_STANDARD 17
 	CXX_EXTENSIONS OFF)
-
 
 option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ON)
 if (${DENGINE_ENABLE_ASSERT})

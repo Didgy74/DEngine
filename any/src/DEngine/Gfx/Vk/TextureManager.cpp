@@ -91,7 +91,7 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			if (vkResult != vk::Result::eSuccess)
 				throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate staging buffer for texture.");
 			// Queue the staging buffer up for deletion.
-			globUtils.deletionQueue.Destroy(stagingBufferVmaAlloc, stagingBuffer);
+			globUtils.delQueue.Destroy(stagingBufferVmaAlloc, stagingBuffer);
 			if (globUtils.UsingDebugUtils())
 			{
 				std::string name = "TextureManager - Texture #" + std::to_string((u64)textureID) + " - StagingBuffer";
@@ -243,7 +243,7 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			globUtils.queues.graphics.submit(submit, nullptr);
 			// I think we can do this without the fence, because we wait for this stuff
 			// in the graphics queue anyways...
-			globUtils.deletionQueue.Destroy(manager.cmdPool, { &cmdBuffer, 1 });
+			globUtils.delQueue.Destroy(manager.cmdPool, { &cmdBuffer, 1 });
 
 
 			vk::ImageViewCreateInfo imgViewInfo{};
@@ -367,7 +367,10 @@ void DEngine::Gfx::Vk::TextureManager::Init(
 	// Command pool
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
 	cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
-	manager.cmdPool = device.createCommandPool(cmdPoolInfo);
+	auto cmdPoolResult = device.createCommandPool(cmdPoolInfo);
+	if (cmdPoolResult.result != vk::Result::eSuccess)
+		throw std::runtime_error("Error: Failed to make command pool");
+	manager.cmdPool = cmdPoolResult.value;
 	if (debugUtils)
 	{
 		debugUtils->Helper_SetObjectName(

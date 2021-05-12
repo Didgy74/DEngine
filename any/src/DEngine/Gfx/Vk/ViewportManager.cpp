@@ -8,6 +8,8 @@
 #include <DEngine/Gfx/detail/Assert.hpp>
 #include <DEngine/Std/Utility.hpp>
 
+#include <string>
+
 namespace DEngine::Gfx::Vk
 {
 	[[nodiscard]] static GfxRenderTarget InitializeGfxViewportRenderTarget(
@@ -17,7 +19,7 @@ namespace DEngine::Gfx::Vk
 
 	static void TransitionGfxImage(
 		DeviceDispatch const& device,
-		DeletionQueue const& deletionQueue,
+		DeletionQueue const& delQueue,
 		QueueData const& queues,
 		vk::Image img,
 		bool useEditorPipeline);
@@ -28,8 +30,6 @@ namespace DEngine::Gfx::Vk
 		GlobUtils const& globUtils,
 		ViewportUpdate updateData)
 	{
-		vk::Result vkResult{};
-
 		// We need to create this virtual viewport
 		renderTarget = InitializeGfxViewportRenderTarget(
 			globUtils,
@@ -45,9 +45,9 @@ namespace DEngine::Gfx::Vk
 	{
 		// This image needs to be resized. We just make a new one and push a job to delete the old one.
 		// VMA should handle memory allocations to be effective and reused.
-		globUtils.deletionQueue.Destroy(renderTarget.framebuffer);
-		globUtils.deletionQueue.Destroy(renderTarget.imgView);
-		globUtils.deletionQueue.Destroy(renderTarget.vmaAllocation, renderTarget.img);
+		globUtils.delQueue.Destroy(renderTarget.framebuffer);
+		globUtils.delQueue.Destroy(renderTarget.imgView);
+		globUtils.delQueue.Destroy(renderTarget.vmaAllocation, renderTarget.img);
 
 		renderTarget = InitializeGfxViewportRenderTarget(
 			globUtils,
@@ -65,40 +65,6 @@ namespace DEngine::Gfx::Vk
 
 		ViewportData viewport{};
 
-		// Make the command buffer stuff
-		vk::CommandPoolCreateInfo cmdPoolInfo{};
-		cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
-		cmdPoolInfo.queueFamilyIndex = globUtils.queues.graphics.FamilyIndex();
-		viewport.cmdPool = globUtils.device.createCommandPool(cmdPoolInfo);
-		if (globUtils.UsingDebugUtils())
-		{
-			std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) + " - Cmd Pool";
-			globUtils.debugUtils.Helper_SetObjectName(
-				globUtils.device.handle,
-				viewport.cmdPool,
-				name.c_str());
-		}
-
-		vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
-		cmdBufferAllocInfo.commandBufferCount = globUtils.inFlightCount;
-		cmdBufferAllocInfo.commandPool = viewport.cmdPool;
-		cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
-		viewport.cmdBuffers.Resize(cmdBufferAllocInfo.commandBufferCount);
-		vkResult = globUtils.device.allocateCommandBuffers(cmdBufferAllocInfo, viewport.cmdBuffers.Data());
-		if (vkResult != vk::Result::eSuccess)
-			throw std::runtime_error("DEngine, Vulkan: Unable to allocate command buffers for viewport.");
-		if (globUtils.UsingDebugUtils())
-		{
-			for (uSize i = 0; i < viewport.cmdBuffers.Size(); i += 1)
-			{
-				std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) + " - CmdBuffer #" + std::to_string(i);
-				globUtils.debugUtils.Helper_SetObjectName(
-					globUtils.device.handle,
-					viewport.cmdBuffers[i],
-					name.c_str());
-			}
-		}
-
 		// Make the descriptorpool and sets
 		vk::DescriptorPoolSize descrPoolSize{};
 		descrPoolSize.type = vk::DescriptorType::eUniformBuffer;
@@ -111,12 +77,10 @@ namespace DEngine::Gfx::Vk
 		viewport.cameraDescrPool = globUtils.device.createDescriptorPool(descrPoolInfo);
 		if (globUtils.UsingDebugUtils())
 		{
-			std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) +
-				" - Camera-data DescrPool";
-			globUtils.debugUtils.Helper_SetObjectName(
-				globUtils.device.handle,
-				viewport.cameraDescrPool,
-				name.c_str());
+			std::string name = "Graphics viewport #";
+			name += (int)createJob.id;
+			name +=	" - Camera-data DescrPool";
+			globUtils.debugUtils.Helper_SetObjectName(globUtils.device.handle, viewport.cameraDescrPool, name.c_str());
 		}
 
 		
@@ -136,12 +100,11 @@ namespace DEngine::Gfx::Vk
 		{
 			for (uSize i = 0; i < viewport.camDataDescrSets.Size(); i += 1)
 			{
-				std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) +
-					" - Camera-data DescrSet #" + std::to_string(i);
-				globUtils.debugUtils.Helper_SetObjectName(
-					globUtils.device.handle,
-					viewport.camDataDescrSets[i],
-					name.c_str());
+				std::string name = "Graphics viewport #";
+				name += (int)createJob.id;
+				name += " - Camera-data DescrSet #";
+				name +=	(int)i;
+				globUtils.debugUtils.Helper_SetObjectName(globUtils.device.handle, viewport.camDataDescrSets[i], name.c_str());
 			}
 		}
 
@@ -167,11 +130,10 @@ namespace DEngine::Gfx::Vk
 		viewport.camDataMappedMem = { (u8*)resultMemInfo.pMappedData, (uSize)resultMemInfo.size };
 		if (globUtils.UsingDebugUtils())
 		{
-			std::string name = std::string("Graphics viewport #") + std::to_string((u64)createJob.id) + " - CamData Buffer";
-			globUtils.debugUtils.Helper_SetObjectName(
-				globUtils.device.handle,
-				viewport.camDataBuffer,
-				name.c_str());
+			std::string name = "Graphics viewport #";
+			name += (int)createJob.id;
+			name += " - CamData Buffer";
+			globUtils.debugUtils.Helper_SetObjectName(globUtils.device.handle, viewport.camDataBuffer,name.c_str());
 		}
 		
 
@@ -207,23 +169,22 @@ namespace DEngine::Gfx::Vk
 		std::lock_guard lock{ viewportManager.deleteQueue_Lock };
 
 		// Execute pending deletions
-		for (ViewportID id : viewportManager.deleteQueue)
+		for (auto id : viewportManager.deleteQueue)
 		{
-			auto const viewportDataNodeIt = std::find_if(
+			auto const viewportDataNodeIt = Std::FindIf(
 				viewportManager.viewportNodes.begin(),
 				viewportManager.viewportNodes.end(),
-				[id](Std::Trait::RemoveCVRef<decltype(viewportManager.viewportNodes[0])> const& val) -> bool { return id == val.id; });
+				[id](auto const& val) -> bool { return id == val.id; });
 			DENGINE_DETAIL_GFX_ASSERT(viewportDataNodeIt != viewportManager.viewportNodes.end());
 			auto& viewportNode = *viewportDataNodeIt;
 			ViewportData& viewportData = viewportDataNodeIt->viewport;
 
 			// Delete all the resources
-			globUtils.deletionQueue.Destroy(viewportData.cameraDescrPool);
-			globUtils.deletionQueue.Destroy(viewportData.camVmaAllocation, viewportData.camDataBuffer);
-			globUtils.deletionQueue.Destroy(viewportData.cmdPool);
-			globUtils.deletionQueue.Destroy(viewportData.renderTarget.framebuffer);
-			globUtils.deletionQueue.Destroy(viewportData.renderTarget.imgView);
-			globUtils.deletionQueue.Destroy(viewportData.renderTarget.vmaAllocation, viewportData.renderTarget.img);
+			globUtils.delQueue.Destroy(viewportData.cameraDescrPool);
+			globUtils.delQueue.Destroy(viewportData.camVmaAllocation, viewportData.camDataBuffer);
+			globUtils.delQueue.Destroy(viewportData.renderTarget.framebuffer);
+			globUtils.delQueue.Destroy(viewportData.renderTarget.imgView);
+			globUtils.delQueue.Destroy(viewportData.renderTarget.vmaAllocation, viewportData.renderTarget.img);
 
 			// Swap with back, remove the element.
 			std::swap(viewportNode, viewportManager.viewportNodes.back());
@@ -236,8 +197,6 @@ namespace DEngine::Gfx::Vk
 		ViewportManager& viewportManager,
 		GlobUtils const& globUtils)
 	{
-		vk::Result vkResult{};
-
 		std::lock_guard lock{ viewportManager.createQueue_Lock };
 
 		for (ViewportManager::CreateJob const& createJob : viewportManager.createQueue)
@@ -303,32 +262,32 @@ void Vk::ViewportManager::NewViewport(
 }
 
 void Vk::ViewportManager::DeleteViewport(
-	ViewportManager& viewportManager,
+	ViewportManager& manager,
 	ViewportID viewportId)
 {
-	std::lock_guard lock{ viewportManager.deleteQueue_Lock };
-	viewportManager.deleteQueue.push_back(viewportId);
+	std::lock_guard lock{ manager.deleteQueue_Lock };
+	manager.deleteQueue.push_back(viewportId);
 }
 
-void Vk::ViewportManager::HandleEvents(
-	ViewportManager& viewportManager,
+void Vk::ViewportManager::ProcessEvents(
+	ViewportManager& manager,
 	GlobUtils const& globUtils,
 	Std::Span<ViewportUpdate const> viewportUpdates,
 	GuiResourceManager const& guiResourceManager)
 {
 	vk::Result vkResult{};
 
-	HandleViewportDeleteJobs(viewportManager, globUtils);
-	HandleViewportCreationJobs(viewportManager, globUtils);
+	HandleViewportDeleteJobs(manager, globUtils);
+	HandleViewportCreationJobs(manager, globUtils);
 
 	// First we handle any viewportManager that need to be initialized, not resized.
 	for (Gfx::ViewportUpdate const& updateData : viewportUpdates)
 	{
 		auto const viewportDataNodeIt = Std::FindIf(
-			viewportManager.viewportNodes.begin(),
-			viewportManager.viewportNodes.end(),
-			[&updateData](Std::Trait::RemoveCVRef<decltype(viewportManager.viewportNodes[0])> const& val) -> bool {return updateData.id == val.id; });
-		DENGINE_DETAIL_GFX_ASSERT(viewportDataNodeIt != viewportManager.viewportNodes.end());
+			manager.viewportNodes.begin(),
+			manager.viewportNodes.end(),
+			[&updateData](auto const& val) -> bool {return updateData.id == val.id; });
+		DENGINE_DETAIL_GFX_ASSERT(viewportDataNodeIt != manager.viewportNodes.end());
 		ViewportData& viewportData = viewportDataNodeIt->viewport;
 		if (viewportData.renderTarget.img == vk::Image())
 		{
@@ -383,25 +342,25 @@ void Vk::ViewportManager::HandleEvents(
 }
 
 void Vk::ViewportManager::UpdateCameras(
-	ViewportManager& viewportManager,
+	ViewportManager& manager,
 	GlobUtils const& globUtils,
-	Std::Span<ViewportUpdate const> viewportUpdates,
+	Std::Span<ViewportUpdate const> updates,
 	u8 inFlightIndex)
 {
-	for (auto const& viewportUpdate : viewportUpdates)
+	for (auto const& viewportUpdate : updates)
 	{
 		auto nodeIt = Std::FindIf(
-			viewportManager.viewportNodes.begin(),
-			viewportManager.viewportNodes.end(),
-			[&viewportUpdate](Std::Trait::RemoveCVRef<decltype(viewportManager.viewportNodes[0])> const& val) -> bool {
+			manager.viewportNodes.begin(),
+			manager.viewportNodes.end(),
+			[&viewportUpdate](auto const& val) -> bool {
 				return viewportUpdate.id == val.id; });
-		DENGINE_DETAIL_GFX_ASSERT(nodeIt != viewportManager.viewportNodes.end());
+		DENGINE_DETAIL_GFX_ASSERT(nodeIt != manager.viewportNodes.end());
 		auto& node = *nodeIt;
-		DENGINE_DETAIL_GFX_ASSERT(viewportManager.camElementSize * inFlightIndex < node.viewport.camDataMappedMem.Size());
+		DENGINE_DETAIL_GFX_ASSERT(manager.camElementSize * inFlightIndex < node.viewport.camDataMappedMem.Size());
 		std::memcpy(
-			node.viewport.camDataMappedMem.Data() + viewportManager.camElementSize * inFlightIndex,
+			node.viewport.camDataMappedMem.Data() + manager.camElementSize * inFlightIndex,
 			&viewportUpdate.transform,
-			viewportManager.camElementSize);
+			manager.camElementSize);
 	}
 }
 
@@ -463,7 +422,7 @@ Vk::GfxRenderTarget Vk::InitializeGfxViewportRenderTarget(
 	// We have to transition this image
 	TransitionGfxImage(
 		globUtils.device,
-		globUtils.deletionQueue,
+		globUtils.delQueue,
 		globUtils.queues,
 		returnVal.img,
 		globUtils.editorMode);
@@ -516,7 +475,7 @@ Vk::GfxRenderTarget Vk::InitializeGfxViewportRenderTarget(
 
 void Vk::TransitionGfxImage(
 	DeviceDispatch const& device,
-	DeletionQueue const& deletionQueue,
+	DeletionQueue const& delQueue,
 	QueueData const& queues,
 	vk::Image img,
 	bool useEditorPipeline)
@@ -525,11 +484,13 @@ void Vk::TransitionGfxImage(
 
 	vk::CommandPoolCreateInfo cmdPoolInfo{};
 	cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
-	vk::CommandPool cmdPool = device.createCommandPool(cmdPoolInfo);
+	auto cmdPool = device.createCommandPool(cmdPoolInfo);
+	if (cmdPool.result != vk::Result::eSuccess)
+		throw std::runtime_error("Unable to allocate command pool.");
 
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo{};
 	cmdBufferAllocInfo.commandBufferCount = 1;
-	cmdBufferAllocInfo.commandPool = cmdPool;
+	cmdBufferAllocInfo.commandPool = cmdPool.value;
 	cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
 	vk::CommandBuffer cmdBuffer{};
 	vkResult = device.allocateCommandBuffers(cmdBufferAllocInfo, &cmdBuffer);
@@ -583,5 +544,5 @@ void Vk::TransitionGfxImage(
 	submitInfo.pCommandBuffers = &cmdBuffer;
 	queues.graphics.submit(submitInfo, fence);
 
-	deletionQueue.Destroy(fence, cmdPool);
+	delQueue.Destroy(fence, cmdPool.value);
 }

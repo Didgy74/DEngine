@@ -35,6 +35,8 @@ namespace DEngine::Math::LinearTransform3D
 	[[nodiscard]] Matrix<3, 3, f32> Rotate(f32 xRadians, f32 yRadians, f32 zRadians);
 	[[nodiscard]] Matrix<3, 3, f32> Rotate(Vector<3, f32> const& radians);
 	[[nodiscard]] Matrix<3, 3, f32> Rotate(Vector<3, f32> const& axis, f32 amountRadians);
+	// Rotate a vector by a unit quaternion.
+	[[nodiscard]] constexpr Vector<3, f32> Rotate(Vector<3, f32> const& in, UnitQuat const& rotation) noexcept;
 	[[nodiscard]] constexpr Matrix<3, 3, f32> Rotate(UnitQuat const& quat);
 	[[nodiscard]] constexpr Matrix<4, 4, f32> Rotate_Homo(UnitQuat const& quat);
 	[[nodiscard]] constexpr Matrix<4, 3, f32> Rotate_Reduced(UnitQuat const& quat);
@@ -79,7 +81,7 @@ namespace DEngine::Math::LinearTransform3D
 
 namespace DEngine::Math
 {
-	namespace LinTran3D = LinearTransform3D;
+	namespace LinAlg3D = LinearTransform3D;
 }
 
 constexpr DEngine::Math::Matrix<4, 3, DEngine::f32> DEngine::Math::LinearTransform3D::Multiply_Reduced(
@@ -113,10 +115,10 @@ constexpr DEngine::Math::Vector<3, DEngine::f32> DEngine::Math::LinearTransform3
 	Vector<3, f32> const& right)
 {
 	Vector<3, f32> newVector{};
-	for (size_t y = 0; y < 3; y++)
+	for (uSize y = 0; y < 3; y++)
 	{
 		f32 dot = 0.f;
-		for (size_t i = 0; i < 3; i++)
+		for (uSize i = 0; i < 3; i++)
 			dot += left.At(i, y) * right[i];
 		newVector[y] = dot + left.At(3, y);
 	}
@@ -127,9 +129,9 @@ template<typename T>
 constexpr DEngine::Math::Matrix<4, 4, T> DEngine::Math::LinearTransform3D::AsMat4(Matrix<4, 3, T> const& input)
 {
 	Matrix<4, 4, T> newMat;
-	for (size_t x = 0; x < 4; x++)
+	for (uSize x = 0; x < 4; x++)
 	{
-		for (size_t y = 0; y < 3; y++)
+		for (uSize y = 0; y < 3; y++)
 			newMat[x][y] = input[x][y];
 	}
 	newMat[0][3] = T(0);
@@ -180,6 +182,27 @@ constexpr void DEngine::Math::LinearTransform3D::SetTranslation(Matrix<4, 3, f32
 	matrix.At(3, 0) = input.x;
 	matrix.At(3, 1) = input.y;
 	matrix.At(3, 2) = input.z;
+}
+
+constexpr DEngine::Math::Vector<3, DEngine::f32> DEngine::Math::LinearTransform3D::Rotate(
+	Vector<3, f32> const& in, 
+	UnitQuat const& rotation) noexcept
+{
+	// Reference:
+	// https://gamedev.stackexchange.com/questions/28395/rotating-vector3-by-a-quaternion
+
+	auto const& v = in;
+
+	// Extract the vector part of the quaternion
+	Math::Vector<3, f32> const u = { rotation.X(), rotation.Y(), rotation.Z() };
+
+	// Extract the scalar part of the quaternion
+	f32 const s = rotation.S();
+
+	// Do the math
+	return 2.0f * Vector<3, f32>::Dot(u, v) * u
+		+ (s * s - Vector<3, f32>::Dot(u, u)) * v
+		+ 2.0f * s * Vector<3, f32>::Cross(u, v);
 }
 
 constexpr DEngine::Math::Matrix<3, 3, DEngine::f32> DEngine::Math::LinearTransform3D::Rotate(UnitQuat const& quat)

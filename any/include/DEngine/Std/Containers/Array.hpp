@@ -1,7 +1,7 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
-#include <DEngine/Std/Containers/detail/Assert.hpp>
+#include <DEngine/Std/Containers/impl/Assert.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 
 namespace DEngine::Std
@@ -69,7 +69,7 @@ namespace DEngine::Std
 	template<typename T, uSize length>
 	T& Array<T, length>::At(uSize i) noexcept
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			i < length,
 			"Attempted to .At() an Array with an index out of bounds.");
 		return data[i];
@@ -78,7 +78,7 @@ namespace DEngine::Std
 	template<typename T, uSize length>
 	T const& Array<T, length>::At(uSize i) const noexcept
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			i < length,
 			"Attempted to .At() an Array with an index out of bounds.");
 		return data[i];

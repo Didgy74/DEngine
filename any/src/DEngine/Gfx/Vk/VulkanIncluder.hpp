@@ -6,6 +6,7 @@
 
 #define VK_NO_PROTOTYPES
 #include <vulkan/vulkan.h>
+#define VULKAN_HPP_DISABLE_IMPLICIT_RESULT_VALUE_CAST
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 #undef max

@@ -9,10 +9,10 @@ namespace DEngine::Gui
 {
 	struct DrawInfo
 	{
-		std::vector<Gfx::GuiVertex>& vertices;
-		std::vector<u32>& indices;
-		std::vector<Gfx::GuiDrawCmd>& drawCmds;
-	private:
+		std::vector<Gfx::GuiVertex>* vertices;
+		std::vector<u32>* indices;
+		std::vector<Gfx::GuiDrawCmd>* drawCmds;
+	protected:
 		Extent framebufferExtent;
 		std::vector<Rect> scissors;
 	public:
@@ -23,15 +23,11 @@ namespace DEngine::Gui
 			std::vector<Gfx::GuiVertex>& verticesIn,
 			std::vector<u32>& indicesIn,
 			std::vector<Gfx::GuiDrawCmd>& drawCmdsIn) :
-			vertices(verticesIn),
-			indices(indicesIn),
-			drawCmds(drawCmdsIn),
+			vertices(&verticesIn),
+			indices(&indicesIn),
+			drawCmds(&drawCmdsIn),
 			framebufferExtent(framebufferExtent)
 		{
-			vertices.clear();
-			indices.clear();
-			drawCmds.clear();
-
 			BuildQuad();
 		}
 
@@ -39,33 +35,33 @@ namespace DEngine::Gui
 		u32 quadIndexOffset = 0;
 		void BuildQuad()
 		{
-			quadVertexOffset = (u32)vertices.size();
-			quadIndexOffset = (u32)indices.size();
+			quadVertexOffset = (u32)vertices->size();
+			quadIndexOffset = (u32)indices->size();
 
 			// Insert vertices
-			vertices.reserve(vertices.size() + 4);
+			vertices->reserve(vertices->size() + 4);
 			Gfx::GuiVertex newVertex{};
 			// Top left
 			newVertex = { { 0.f, 0.f }, { 0.f, 0.f } };
-			vertices.push_back(newVertex);
+			vertices->push_back(newVertex);
 			// Top right
 			newVertex = { { 1.f, 0.f}, { 1.f, 0.f } };
-			vertices.push_back(newVertex);
+			vertices->push_back(newVertex);
 			// Bottom left
 			newVertex = { { 0.f, 1.f}, { 0.f, 1.f } };
-			vertices.push_back(newVertex);
+			vertices->push_back(newVertex);
 			// Bottom right
 			newVertex = { { 1.f, 1.f}, { 1.f, 1.f } };
-			vertices.push_back(newVertex);
+			vertices->push_back(newVertex);
 
 			// Insert indices
-			indices.reserve(indices.size() + 6);
-			indices.push_back(0);
-			indices.push_back(2);
-			indices.push_back(1);
-			indices.push_back(1);
-			indices.push_back(2);
-			indices.push_back(3);
+			indices->reserve(indices->size() + 6);
+			indices->push_back(0);
+			indices->push_back(2);
+			indices->push_back(1);
+			indices->push_back(1);
+			indices->push_back(2);
+			indices->push_back(3);
 		}
 
 		Gfx::GuiDrawCmd::MeshSpan GetQuadMesh() const
@@ -91,7 +87,7 @@ namespace DEngine::Gui
 			cmd.rectPosition.y = (f32)rectToUse.position.y / framebufferExtent.height;
 			cmd.rectExtent.x = (f32)rectToUse.extent.width / framebufferExtent.width;
 			cmd.rectExtent.y = (f32)rectToUse.extent.height / framebufferExtent.height;
-			drawCmds.push_back(cmd);
+			drawCmds->push_back(cmd);
 		}
 
 		void PopScissor()
@@ -113,7 +109,7 @@ namespace DEngine::Gui
 				cmd.rectPosition = {};
 				cmd.rectExtent = { 1.f, 1.f };
 			}
-			drawCmds.push_back(cmd);
+			drawCmds->push_back(cmd);
 		}
 
 		void PushFilledQuad(Rect rect, Math::Vec4 color)
@@ -126,7 +122,7 @@ namespace DEngine::Gui
 			cmd.rectPosition.y = f32(rect.position.y) / framebufferExtent.height;
 			cmd.rectExtent.x = f32(rect.extent.width) / framebufferExtent.width;
 			cmd.rectExtent.y = f32(rect.extent.height) / framebufferExtent.height;
-			drawCmds.push_back(cmd);
+			drawCmds->push_back(cmd);
 		}
 	};
 }

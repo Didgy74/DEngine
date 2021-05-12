@@ -281,7 +281,7 @@ SizeHint StackLayout::GetSizeHint(
 		else if (this->direction == Direction::Vertical)
 			returnVal.expandX = true;
 		else
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 	}
 		
 	// Add padding
@@ -308,15 +308,7 @@ void StackLayout::Render(
 	// Only draw the quad of the layout if the alpha of the color is high enough to be visible.
 	if (color.w > 0.01f)
 	{
-		Gfx::GuiDrawCmd cmd{};
-		cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-		cmd.filledMesh.color = color;
-		cmd.filledMesh.mesh = drawInfo.GetQuadMesh();
-		cmd.rectPosition.x = (f32)widgetRect.position.x / framebufferExtent.width;
-		cmd.rectPosition.y = (f32)widgetRect.position.y / framebufferExtent.height;
-		cmd.rectExtent.x = (f32)widgetRect.extent.width / framebufferExtent.width;
-		cmd.rectExtent.y = (f32)widgetRect.extent.height / framebufferExtent.height;
-		drawInfo.drawCmds.push_back(cmd);
+		drawInfo.PushFilledQuad(widgetRect, color);
 	}
 	
 	impl::StackLayout_IterateOverChildren(

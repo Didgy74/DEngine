@@ -86,15 +86,14 @@ namespace DEngine::Editor
 		void Update(Gfx::TextureID const& component);
 	};
 
-	class Box2DWidget : public Gui::CollapsingHeader
+	class RigidbodyWidget : public Gui::CollapsingHeader
 	{
 		Gui::Dropdown* bodyTypeDropdown = nullptr;
-		Gui::LineFloatEdit* restitutionLineEdit = nullptr;
 
 		Gui::Text* debug_VelocityLabel = nullptr;
 
 	public:
-		Box2DWidget(EditorImpl const& editorImpl);
-		void Update(Box2D_Component const& component);
+		RigidbodyWidget(EditorImpl const& editorImpl);
+		void Update(Physics::Rigidbody2D const& component);
 	};
 }

@@ -2,7 +2,6 @@
 
 namespace DEngine
 {
-	// Integers
 	using i8 = signed char;
 	using i16 = signed short;
 	using i32 = signed int;
@@ -13,23 +12,8 @@ namespace DEngine
 	using u32 = unsigned int;
 	using u64 = unsigned long long;
 
-#if defined(_WIN32) || defined(_WIN64)
-#	if defined(_WIN64)
-	using iSize = i64;
-	using uSize = u64;
-#	else
-	using iSize = i32;
-	using uSize = u32;
-#	endif
-#elif defined(__GNUC__)
-#	if defined(__x86_64__) || defined(__aarch64__)
-	using iSize = i64;
-	using uSize = u64;
-#else
-	using iSize = i32;
-	using uSize = u32;
-#	endif
-#endif
+	using uSize = decltype(sizeof(void*));
+	using iSize = decltype((char*)0 - (char*)0);
 
 	using f32 = float;
 	using f64 = double;
@@ -45,8 +29,8 @@ static_assert(sizeof(DEngine::u16) == 2, "Error. Size of u16 is not 2");
 static_assert(sizeof(DEngine::u32) == 4, "Error. Size of u32 is not 4");
 static_assert(sizeof(DEngine::u64) == 8, "Error. Size of u64 is not 8");
 
-static_assert(sizeof(DEngine::iSize) == sizeof(void*), "Error. Size of iSize is not pointer-sized.");
 static_assert(sizeof(DEngine::uSize) == sizeof(void*), "Error. Size of uSize is not pointer-sized.");
+static_assert(sizeof(DEngine::iSize) == sizeof(void*), "Error. Size of iSize is not pointer-sized.");
 
 static_assert(sizeof(DEngine::f32) == 4, "Error. Size of f32 is not 4.");
 static_assert(sizeof(DEngine::f64) == 8, "Error. Size of f64 is not 8");

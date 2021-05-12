@@ -1,15 +1,14 @@
 #pragma once
 
-#include <DEngine/Std/Containers/Range.hpp>
+
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Trait.hpp>
-
-#include <string_view>
-#include <utility>
+#include <DEngine/Std/Containers/Range.hpp>
+#include <DEngine/Std/Containers/Str.hpp>
 
 namespace DEngine::Std
 {
-	void NameThisThread(std::string const& name);
+	void NameThisThread(Str name);
 	
 	template<typename T>
 	[[nodiscard]] constexpr Trait::RemoveRef<T>&& Move(T&& in) noexcept;
@@ -27,13 +26,8 @@ namespace DEngine::Std
 	template<>
 	f32 RandRange<f32>(f32 a, f32 b);
 
-
-
 	template<typename T>
 	constexpr void Swap(T& a, T& b) noexcept;
-
-	template<typename T, typename U>
-	constexpr T Exchange(T &a, U &&b) noexcept;
 
 	template<typename Iterator, typename BoolCallable>
 	bool AllOf(
@@ -77,14 +71,6 @@ constexpr void DEngine::Std::Swap(T& a, T& b) noexcept
 	T temp = Move(a);
 	a = Move(b);
 	b = Move(temp);
-}
-
-template<typename T, typename U>
-constexpr T DEngine::Std::Exchange(T &a, U &&b) noexcept
-{
-	T result = Move(a);
-	a = std::forward<U>(b);
-	return result;
 }
 
 template<typename Iterator, typename BoolCallable>

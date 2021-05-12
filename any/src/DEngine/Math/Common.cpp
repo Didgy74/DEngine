@@ -42,19 +42,29 @@ f64 Math::Pow(f64 coefficient, f64 exponent)
 	return powl(coefficient, exponent);
 }
 
-f32 Math::Sin(f32 radians)
+f32 Math::Sin(f32 radians) noexcept
 {
 	return sinf(radians);
 }
 
-f32 Math::Cos(f32 radians)
+f32 Math::Cos(f32 radians) noexcept
 {
 	return cosf(radians);
 }
 
-f32 Math::Tan(f32 radians)
+f32 Math::ArcCos(f32 in) noexcept
+{
+	return acosf(in);
+}
+
+f32 Math::Tan(f32 radians) noexcept
 {
 	return tanf(radians);
+}
+
+f32 Math::ArcTan2(f32 a, f32 b) noexcept
+{
+	return atan2f(a, b);
 }
 
 Math::Matrix<3, 3, f32> Math::LinearTransform3D::Rotate(ElementaryAxis axis, f32 amountRadians)
@@ -120,6 +130,7 @@ Math::Matrix<4, 4, f32> Math::LinearTransform3D::Rotate_Homo(ElementaryAxis axis
 			0, 0, 0, 1
 		} } };
 	default:
+		DENGINE_IMPL_UNREACHABLE();
 		return {};
 	};
 }

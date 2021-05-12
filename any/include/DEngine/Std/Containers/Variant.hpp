@@ -1,10 +1,9 @@
 #pragma once
 
-#include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Trait.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 
-#include <new>
+#include <DEngine/Std/Containers/impl/Assert.hpp>
 
 namespace DEngine::Std
 {
@@ -18,7 +17,7 @@ namespace DEngine::Std
 		template<typename T>
 		static constexpr unsigned int indexOf = Trait::indexOf<T, Ts...>;
 
-		inline ~Variant() noexcept;
+		~Variant() noexcept;
 
 		[[nodiscard]] Opt<unsigned int> GetIndex() const noexcept;
 
@@ -26,22 +25,23 @@ namespace DEngine::Std
 		{
 			Clear();
 			tracker = noValue;
+			destructorPFN = nullptr;
 		}
 
 		template<typename T>
 		void Set(T const& in) noexcept
 		{
-			constexpr unsigned int newTypeIndex = Trait::indexOf<T, Ts...>;
-			if (tracker != noValue)
-				Clear();
+			constexpr auto newTypeIndex = Trait::indexOf<T, Ts...>;
 			if (newTypeIndex != tracker)
 			{
+				Clear();
 				new(data) T(in);
 			}
 			else
 			{
 				*reinterpret_cast<T*>(data) = in;
 			}
+			SetDestructorPfn<T>();
 
 			tracker = newTypeIndex;
 		}
@@ -50,49 +50,49 @@ namespace DEngine::Std
 		void Set(Trait::RemoveCVRef<T>&& in) noexcept
 		{
 			using Type = typename Trait::RemoveCVRef<T>;
-			constexpr unsigned int newTypeIndex = Trait::indexOf<Type, Ts...>;
-			if (tracker != noValue)
-				Clear();
+			constexpr auto newTypeIndex = Trait::indexOf<Type, Ts...>;
 			if (newTypeIndex != tracker)
 			{
+				Clear();
 				new(data) Type(static_cast<Type&&>(in));
 			}
 			else
 			{
 				*reinterpret_cast<Type*>(data) = static_cast<Type&&>(in);
 			}
+			SetDestructorPfn<T>();
 
 			tracker = newTypeIndex;
 		}
 
 		template<unsigned int i>
-		[[nodiscard]] auto Get() noexcept -> decltype(auto)
+		[[nodiscard]] decltype(auto) Get() noexcept
 		{
 			static_assert(i < sizeof...(Ts), "Tried to Get a Variant with an index out of bounds of the types.");
-			DENGINE_DETAIL_CONTAINERS_ASSERT(tracker == i);
+			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);
 			return *reinterpret_cast<Trait::At<i, Ts...>*>(data);
 		}
 
 		template<unsigned int i>
-		[[nodiscard]] auto Get() const noexcept -> decltype(auto)
+		[[nodiscard]] decltype(auto) Get() const noexcept
 		{
 			static_assert(i < sizeof...(Ts), "Tried to Get a Variant with an index out of bounds of the types.");
-			DENGINE_DETAIL_CONTAINERS_ASSERT(tracker == i);
+			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);
 			return *reinterpret_cast<Trait::At<i, Ts...> const*>(data);
 		}
 
 		template<typename T>
-		[[nodiscard]] auto Get() noexcept -> decltype(auto)
+		[[nodiscard]] decltype(auto) Get() noexcept
 		{
 			constexpr unsigned int i = Trait::indexOf<T, Ts...>;
-			DENGINE_DETAIL_CONTAINERS_ASSERT(tracker == i);
+			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);
 			return *reinterpret_cast<T*>(data);
 		}
 		template<typename T>
-		[[nodiscard]] auto Get() const noexcept -> decltype(auto)
+		[[nodiscard]] decltype(auto) Get() const noexcept
 		{
 			constexpr unsigned int i = Trait::indexOf<T, Ts...>;
-			DENGINE_DETAIL_CONTAINERS_ASSERT(tracker == i);
+			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);
 			return *reinterpret_cast<T const*>(data);
 		}
 		template<typename T>
@@ -114,22 +114,26 @@ namespace DEngine::Std
 		}
 
 	private:
+		alignas(Trait::max<alignof(Ts)...>) unsigned char data[Trait::max<sizeof(Ts)...>];
 		static constexpr unsigned int noValue = static_cast<unsigned int>(-1);
 		unsigned int tracker = noValue;
-		alignas(Trait::max<alignof(Ts)...>) unsigned char data[Trait::max<sizeof(Ts)...>] = {};
+		using DestructorPFN = void(*)(void* data) noexcept;
+		DestructorPFN destructorPFN = nullptr;
 
-		inline void Clear() noexcept;
+		void Clear() noexcept;
+		template<typename U>
+		void SetDestructorPfn() noexcept;
 	};
 }
 
 template<typename... Ts>
-inline DEngine::Std::Variant<Ts...>::~Variant() noexcept
+DEngine::Std::Variant<Ts...>::~Variant() noexcept
 {
 	Clear();
 }
 
 template<typename... Ts>
-inline DEngine::Std::Opt<unsigned int> DEngine::Std::Variant<Ts...>::GetIndex() const noexcept
+DEngine::Std::Opt<unsigned int> DEngine::Std::Variant<Ts...>::GetIndex() const noexcept
 {
 	if (tracker == noValue)
 		return Std::nullOpt;
@@ -140,52 +144,22 @@ inline DEngine::Std::Opt<unsigned int> DEngine::Std::Variant<Ts...>::GetIndex() 
 template<typename... Ts>
 void DEngine::Std::Variant<Ts...>::Clear() noexcept
 {
-	static_assert(sizeof...(Ts) <= 6, "Variant::Clear does not support more than 6 types.");
-
 	if (tracker == noValue)
+	{
+		DENGINE_IMPL_CONTAINERS_ASSERT(!destructorPFN);
 		return;
+	}
+	
+	DENGINE_IMPL_CONTAINERS_ASSERT(destructorPFN);
+	destructorPFN(data);
+}
 
-	using TriviallyDesctructibleT = char;
-	switch (tracker)
-	{
-	case 0:
-	{
-		using T = Trait::AtOr<0, TriviallyDesctructibleT, Ts...>;
-		reinterpret_cast<T*>(data)->~T();
-	}
-	break;
-	case 1:
-	{
-		using T = Trait::AtOr<1, TriviallyDesctructibleT, Ts...>;
-		reinterpret_cast<T*>(data)->~T();
-	}
-	break;
-	case 2:
-	{
-		using T = Trait::AtOr<2, TriviallyDesctructibleT, Ts...>;
-		reinterpret_cast<T*>(data)->~T();
-	}
-	break;
-	case 3:
-	{
-		using T = Trait::AtOr<3, TriviallyDesctructibleT, Ts...>;
-		reinterpret_cast<T*>(data)->~T();
-	}
-	break;
-	case 4:
-	{
-		using T = Trait::AtOr<4, TriviallyDesctructibleT, Ts...>;
-		reinterpret_cast<T*>(data)->~T();
-	}
-	break;
-	case 5:
-	{
-		using T = Trait::AtOr<5, TriviallyDesctructibleT, Ts...>;
-		reinterpret_cast<T*>(data)->~T();
-	}
-	break;
-	default:
-		DENGINE_DETAIL_UNREACHABLE();
-		break;
-	}
+template<typename... Ts>
+template<typename U>
+void DEngine::Std::Variant<Ts...>::SetDestructorPfn() noexcept
+{
+	destructorPFN = [](void* data) noexcept 
+	{ 
+		reinterpret_cast<U*>(data)->~U(); 
+	};
 }

@@ -2,12 +2,11 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
-#include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
+#include <DEngine/Std/Containers/StackVec.hpp>
+#include <DEngine/Std/Containers/Str.hpp>
 
 #include <DEngine/Math/Vector.hpp>
-
-#include <string_view>
 
 #if defined(_WIN32) || defined(_WIN64)
 #	define DENGINE_OS_WINDOWS
@@ -97,8 +96,8 @@ namespace DEngine::Application
 	void RemoveEventInterface(EventInterface&);
 
 	enum class SoftInputFilter : u8;
-	void OpenSoftInput(std::string_view currentText, SoftInputFilter inputFilter);
-	void UpdateCharInputContext(std::string_view);
+	void OpenSoftInput(Std::Str text, SoftInputFilter inputFilter);
+	void UpdateCharInputContext(Std::Str text);
 	void HideSoftInput();
 
 	class FileInputStream;

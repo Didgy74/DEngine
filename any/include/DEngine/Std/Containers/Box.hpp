@@ -1,7 +1,7 @@
 #pragma once
 
-#include <DEngine/Std/Containers/detail/Assert.hpp>
-#include <Dengine/Std/Utility.hpp>
+#include <DEngine/Std/Containers/impl/Assert.hpp>
+#include <DEngine/Std/Utility.hpp>
 
 namespace DEngine::Std
 {
@@ -34,9 +34,11 @@ namespace DEngine::Std
 
 		// Returns the pointer and releases ownership over it.
 		[[nodiscard]] T* Release() noexcept;
-
-	private:
+		// Destroys the internals if it holds any.
 		void Clear() noexcept;
+
+	protected:
+		
 		T* data = nullptr;
 	};
 
@@ -69,11 +71,9 @@ namespace DEngine::Std
 	inline Box<T>& Box<T>::operator=(
 		Box&& right) noexcept
 	{
-		delete Std::Exchange(
-			data,
-			Std::Exchange(
-				right.data,
-				nullptr));
+		Clear();
+		data = right.data;
+		right.data = nullptr;
 
 		return *this;
 	}
@@ -105,7 +105,7 @@ namespace DEngine::Std
 	template<typename T>
 	inline T& Box<T>::operator*() noexcept
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			data != nullptr,
 			"Attempted to dereference a Std::Box with a nullptr value.");
 		return *data;
@@ -114,7 +114,7 @@ namespace DEngine::Std
 	template<typename T>
 	inline T const& Box<T>::operator*() const noexcept
 	{
-		DENGINE_DETAIL_CONTAINERS_ASSERT_MSG(
+		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			data != nullptr,
 			"Attempted to dereference a Std::Box with a nullptr value.");
 		return *data;

@@ -24,42 +24,39 @@ namespace DEngine::Gfx::Vk
 	struct NativeWindowData
 	{
 		WsiInterface* wsiConnection = nullptr;
-		vk::SurfaceKHR surface{};
-		vk::SwapchainKHR swapchain{};
-		Std::StackVec<vk::Image, Constants::maxSwapchainLength> swapchainImages{};
-		// Has length of resource sets
-		Std::StackVec<vk::CommandBuffer, Constants::maxInFlightCount> copyCmdBuffers{};
-		vk::Semaphore swapchainImageReady{};
+		vk::SurfaceKHR surface = {};
+		vk::SwapchainKHR swapchain = {};
+		Std::StackVec<vk::Image, Constants::maxSwapchainLength> swapchainImages;
+		Std::StackVec<vk::ImageView, Const::maxSwapchainLength> swapchainImgViews;
+		vk::Semaphore swapchainImgReadySem = {};
+		Std::StackVec<vk::Framebuffer, Const::maxSwapchainLength> framebuffers;
 	};
 
 	struct WindowGuiData
 	{
 		vk::Extent2D extent{};
-		VmaAllocation vmaAllocation{};
-		vk::Image img{};
-		vk::ImageView imgView{};
-		vk::Framebuffer framebuffer{};
 
 		vk::SurfaceTransformFlagBitsKHR surfaceRotation = vk::SurfaceTransformFlagBitsKHR::eIdentity;
 		Math::Mat2 rotation{};
-
-		vk::CommandPool cmdPool{};
-		Std::StackVec<vk::CommandBuffer, Constants::maxInFlightCount> cmdBuffers{};
 	};
 
 	struct NativeWindowManager
 	{
-		std::mutex lock;
-
+		// Insertion job resources
+		std::mutex createQueueLock;
 		u64 nativeWindowIdTracker = 0;
-
 		struct CreateJob
 		{
 			NativeWindowID id;
 			WsiInterface* windowConnection;
 		};
 		std::vector<CreateJob> createJobs;
+		// Insertion locked resources end
 
+
+		// Main data resources start
+		// This doesn't need a lock because it's ever accessed
+		// from the rendering thread.
 		struct Node
 		{
 			NativeWindowID id;
@@ -67,11 +64,10 @@ namespace DEngine::Gfx::Vk
 			WindowGuiData gui;
 		};
 		std::vector<Node> nativeWindows;
-
-		vk::CommandPool copyToSwapchainCmdPool{};
+		// Main data resources end
 
 		// This requires the manager's mutex to already be locked.
-		static void Update(
+		static void ProcessEvents(
 			NativeWindowManager& manager,
 			GlobUtils const& globUtils,
 			Std::Span<NativeWindowUpdate const> windowUpdates);
@@ -88,7 +84,7 @@ namespace DEngine::Gfx::Vk
 			DeviceDispatch const& device,
 			vk::PhysicalDevice physDevice,
 			QueueData const& queues,
-			DeletionQueue const& deletionQueue,
+			DeletionQueue const& delQueue,
 			SurfaceInfo const& surfaceInfo,
 			VmaAllocator vma,
 			u8 inFlightCount,
@@ -97,7 +93,7 @@ namespace DEngine::Gfx::Vk
 			vk::RenderPass guiRenderPass,
 			DebugUtilsDispatch const* debugUtils);
 
-		static NativeWindowID PushCreateWindowJob(
+		[[nodiscard]] static NativeWindowID PushCreateWindowJob(
 			NativeWindowManager& manager,
 			WsiInterface& windowConnection);
 	};

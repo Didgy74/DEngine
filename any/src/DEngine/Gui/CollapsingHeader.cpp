@@ -95,11 +95,11 @@ void CollapsingHeader::SetCollapsed(bool collapsed)
 	}
 }
 
-void CollapsingHeader::SetHeaderText(std::string_view text)
+void CollapsingHeader::SetHeaderText(Std::Str text)
 {
 	Button& btn = *static_cast<Button*>(&mainStackLayout.At(0));
 
-	btn.text = text;
+	btn.text = std::string(text.Data(), text.Size());
 }
 
 SizeHint CollapsingHeader::GetSizeHint(

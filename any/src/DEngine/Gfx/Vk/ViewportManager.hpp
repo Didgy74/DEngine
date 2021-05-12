@@ -31,8 +31,6 @@ namespace DEngine::Gfx::Vk
 	struct ViewportData
 	{
 		GfxRenderTarget renderTarget{};
-		vk::CommandPool cmdPool{};
-		Std::StackVec<vk::CommandBuffer, Constants::maxInFlightCount> cmdBuffers{};
 
 		vk::DescriptorPool cameraDescrPool{};
 		Std::StackVec<vk::DescriptorSet, Constants::maxInFlightCount> camDataDescrSets{};
@@ -48,6 +46,7 @@ namespace DEngine::Gfx::Vk
 	// This variable should basically not be accessed anywhere except from APIData.
 	struct ViewportManager
 	{
+		// Create queue resources start
 		std::mutex createQueue_Lock;
 		struct CreateJob
 		{
@@ -55,17 +54,23 @@ namespace DEngine::Gfx::Vk
 		};
 		uSize viewportIDTracker = 0;
 		std::vector<CreateJob> createQueue{};
+		// Create queue resources end
 
+		// Delete queue resources start
 		std::mutex deleteQueue_Lock;
 		std::vector<ViewportID> deleteQueue{};
+		// Delete queue resources end
 
-		// Unsorted vector holding viewport-data and their ID.
+		// Main mutable resources start
+		// This doesn't need a mutex because it's only ever accessed by the rendering thread.
 		struct Node
 		{
 			ViewportID id;
 			ViewportData viewport;
 		};
+		// Unsorted vector holding viewport-data and their ID.
 		std::vector<Node> viewportNodes{};
+		// Main mutable resources end
 
 		static constexpr uSize minimumCamDataCapacity = 8;
 		// Thread safe to access
@@ -88,7 +93,7 @@ namespace DEngine::Gfx::Vk
 
 		// Making it static made it more explicit.
 		// Easier to identify in the main loop
-		static void HandleEvents(
+		static void ProcessEvents(
 			ViewportManager& viewportManager,
 			GlobUtils const& globUtils,
 			Std::Span<ViewportUpdate const> viewportUpdates,

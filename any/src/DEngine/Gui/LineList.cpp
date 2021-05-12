@@ -59,7 +59,7 @@ SizeHint LineList::GetSizeHint(Context const& ctx) const
 	{
 		SizeHint sizeHint = impl::TextManager::GetSizeHint(
 			implData.textManager, 
-			line);
+			{ line.data(), line.size() });
 		returnVal.preferred.width = Math::Max(returnVal.preferred.width, sizeHint.preferred.width);
 	}
 	return returnVal;
@@ -81,7 +81,7 @@ void LineList::CursorClick(
 		u32 const lineHeight = implData.textManager.lineheight;
 		uSize const visibleBegin = impl::LineList_GetFirstVisibleLine(lineHeight, widgetRect.position.y, visibleRect.position.y);
 		uSize const visibleEnd = visibleBegin + impl::LineList_GetVisibleLineCount(lineHeight, visibleRect.extent.height);
-		uSize const lineEnd = Math::Min(visibleEnd, lines.size());
+		uSize const lineEnd = Math::Min((u32)visibleEnd, (u32)lines.size());
 
 		for (uSize i = visibleBegin; i < lineEnd; i++)
 		{
@@ -189,7 +189,7 @@ void LineList::Render(
 
 		impl::TextManager::RenderText(
 			implData.textManager,
-			lines[i],
+			{ lines[i].data(), lines[i].size() },
 			{ 1.f, 1.f, 1.f, 1.f },
 			textRect,
 			drawInfo);

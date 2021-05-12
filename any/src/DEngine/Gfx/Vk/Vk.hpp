@@ -80,14 +80,14 @@ namespace DEngine::Gfx::Vk
 		Gfx::LogInterface* logger = nullptr;
 		Gfx::TextureAssetInterface const* test_textureAssetInterface = nullptr;
 
-		SurfaceInfo surface{};
-
 		u8 currInFlightIndex = 0;
 
 		// Do not touch this.
 		VMA_MemoryTrackingData vma_trackingData{};
 
-		Std::StackVec<vk::Fence, Constants::maxInFlightCount> mainFences{};
+		Std::StackVec<vk::Fence, Const::maxInFlightCount> mainFences;
+		Std::StackVec<vk::CommandPool, Const::maxInFlightCount> mainCmdPools;
+		Std::StackVec<vk::CommandBuffer, Const::maxInFlightCount> mainCmdBuffers;
 
 		GlobUtils globUtils{};
 

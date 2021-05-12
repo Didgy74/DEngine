@@ -27,7 +27,7 @@ namespace DEngine::Gui::impl
 		case DA_OuterLayoutGizmo::Left: return DA_InnerLayoutGizmo::Left;
 		case DA_OuterLayoutGizmo::Right: return DA_InnerLayoutGizmo::Right;
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 			return {};
 		}
 	}
@@ -145,6 +145,16 @@ struct DA::Node
 		return {};
 	}
 
+	virtual void InputConnectionLost() {}
+
+	virtual void CharEnterEvent(
+		Context& ctx) {}
+	virtual void CharEvent(
+		Context& ctx,
+		u32 utfValue) {}
+	virtual void CharRemoveEvent(
+		Context& ctx) {}
+
 	virtual ~Node() {}
 };
 
@@ -191,6 +201,15 @@ namespace DEngine::Gui::impl
 		[[nodiscard]] PointerMove_Result PointerMove_StateHoldingTab(PointerMove_Params const& in);
 		[[nodiscard]] PointerMove_Result PointerMove_StateMoving(PointerMove_Params const& in);
 		[[nodiscard]] virtual PointerMove_Result PointerMove(PointerMove_Params const& in) override;
+
+		virtual void InputConnectionLost() override;
+		virtual void CharEnterEvent(
+			Context& ctx) override;
+		virtual void CharEvent(
+			Context& ctx,
+			u32 utfValue) override;
+		virtual void CharRemoveEvent(
+			Context& ctx) override;
 	};
 
 	struct DA_SplitNode : public DA::Node
@@ -233,6 +252,15 @@ namespace DEngine::Gui::impl
 		[[nodiscard]] virtual PointerPress_Result PointerPress(PointerPress_Params const& in) override;
 
 		[[nodiscard]] virtual PointerMove_Result PointerMove(PointerMove_Params const& in) override;
+
+		virtual void InputConnectionLost() override;
+		virtual void CharEnterEvent(
+			Context& ctx) override;
+		virtual void CharEvent(
+			Context& ctx,
+			u32 utfValue) override;
+		virtual void CharRemoveEvent(
+			Context& ctx) override;
 	};
 
 	static void DA_PushLayerToFront(
@@ -516,7 +544,9 @@ namespace DEngine::Gui::impl
 			auto& tab = tabs[currentIndex];
 			auto& implData = *static_cast<impl::ImplData*>(ctx->Internal_ImplData());
 			
-			SizeHint tabSizeHint = impl::TextManager::GetSizeHint(implData.textManager, tab.title);
+			SizeHint tabSizeHint = impl::TextManager::GetSizeHint(
+				implData.textManager, 
+				{ tab.title.data(), tab.title.size() });
 			Rect tabRect = {};
 			tabRect.position = widgetPos;
 			tabRect.position.x += horizontalOffset;
@@ -695,7 +725,7 @@ namespace DEngine::Gui::impl
 			}
 			break;
 			default:
-				DENGINE_DETAIL_UNREACHABLE();
+				DENGINE_IMPL_UNREACHABLE();
 				break;
 		}
 		return returnVal;
@@ -783,7 +813,7 @@ namespace DEngine::Gui::impl
 				returnVal.position.y += layerRect.extent.height / 2 - gizmoSize / 2;
 				break;
 			default:
-				DENGINE_DETAIL_UNREACHABLE();
+				DENGINE_IMPL_UNREACHABLE();
 				break;
 		}
 		return returnVal;
@@ -856,7 +886,7 @@ namespace DEngine::Gui::impl
 			returnVal.position.x += gizmoSize;
 			break;
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 			break;
 		}
 		return returnVal;
@@ -908,7 +938,7 @@ namespace DEngine::Gui::impl
 			case DA_InnerLayoutGizmo::Center:
 				break;
 			default:
-				DENGINE_DETAIL_UNREACHABLE();
+				DENGINE_IMPL_UNREACHABLE();
 				break;
 		}
 		return returnVal;
@@ -1036,7 +1066,7 @@ void impl::DA_WindowNode::Render(
 
 		TextManager::RenderText(
 			implData.textManager,
-			tabItem.tab.title,
+			{ tabItem.tab.title.data(), tabItem.tab.title.size() },
 			textColor,
 			tabItem.rect,
 			drawInfo);
@@ -1658,6 +1688,42 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove(PointerMove_Params
 	return returnVal;
 }
 
+void impl::DA_WindowNode::InputConnectionLost()
+{
+	DENGINE_IMPL_GUI_ASSERT(!tabs.empty());
+	DENGINE_IMPL_GUI_ASSERT(selectedTab < tabs.size());
+	auto& tab = tabs[selectedTab];
+	if (tab.widget)
+		tab.widget->InputConnectionLost();
+}
+
+void impl::DA_WindowNode::CharEnterEvent(Context& ctx)
+{
+	DENGINE_IMPL_GUI_ASSERT(!tabs.empty());
+	DENGINE_IMPL_GUI_ASSERT(selectedTab < tabs.size());
+	auto& tab = tabs[selectedTab];
+	if (tab.widget)
+		tab.widget->CharEnterEvent(ctx);
+}
+
+void impl::DA_WindowNode::CharEvent(Context& ctx, u32 utfValue)
+{
+	DENGINE_IMPL_GUI_ASSERT(!tabs.empty());
+	DENGINE_IMPL_GUI_ASSERT(selectedTab < tabs.size());
+	auto& tab = tabs[selectedTab];
+	if (tab.widget)
+		tab.widget->CharEvent(ctx, utfValue);
+}
+
+void impl::DA_WindowNode::CharRemoveEvent(Context& ctx)
+{
+	DENGINE_IMPL_GUI_ASSERT(!tabs.empty());
+	DENGINE_IMPL_GUI_ASSERT(selectedTab < tabs.size());
+	auto& tab = tabs[selectedTab];
+	if (tab.widget)
+		tab.widget->CharRemoveEvent(ctx);
+}
+
 DA::Node::PointerMove_Result impl::DA_SplitNode::PointerMove(PointerMove_Params const& in)
 {
 	DENGINE_IMPL_GUI_ASSERT(a);
@@ -1677,7 +1743,7 @@ DA::Node::PointerMove_Result impl::DA_SplitNode::PointerMove(PointerMove_Params 
 			else
 				normalizedPos = f32(tempPointerPos.y - in.nodeRect.position.y) / in.nodeRect.extent.height;
 
-			split = Math::Clamp(normalizedPos, 0.2f, 0.8f);
+			split = Math::Clamp(normalizedPos, 0.1f, 0.9f);
 
 			result.eventConsumed = true;
 			return result;
@@ -1697,6 +1763,39 @@ DA::Node::PointerMove_Result impl::DA_SplitNode::PointerMove(PointerMove_Params 
 	params.nodeRect = childRects[1];
 	result = b->PointerMove(params);
 	return result;
+}
+
+void impl::DA_SplitNode::InputConnectionLost()
+{
+	DENGINE_IMPL_GUI_ASSERT(a);
+	DENGINE_IMPL_GUI_ASSERT(b);
+
+	a->InputConnectionLost();
+	b->InputConnectionLost();
+}
+
+void DEngine::Gui::impl::DA_SplitNode::CharEnterEvent(Context& ctx)
+{
+	DENGINE_IMPL_GUI_ASSERT(a);
+	DENGINE_IMPL_GUI_ASSERT(b);
+	a->CharEnterEvent(ctx);
+	b->CharEnterEvent(ctx);
+}
+
+void impl::DA_SplitNode::CharEvent(Context& ctx, u32 utfValue)
+{
+	DENGINE_IMPL_GUI_ASSERT(a);
+	DENGINE_IMPL_GUI_ASSERT(b);
+	a->CharEvent(ctx, utfValue);
+	b->CharEvent(ctx, utfValue);
+}
+
+void impl::DA_SplitNode::CharRemoveEvent(Context& ctx)
+{
+	DENGINE_IMPL_GUI_ASSERT(a);
+	DENGINE_IMPL_GUI_ASSERT(b);
+	a->CharRemoveEvent(ctx);
+	b->CharRemoveEvent(ctx);
 }
 
 void impl::DA_PointerMove(DA_PointerMove_Params const& in)
@@ -1780,7 +1879,7 @@ DockArea::DockArea()
 }
 
 void DockArea::AddWindow(
-	std::string_view title,
+	Std::Str title,
 	Math::Vec4 color,
 	Std::Box<Widget>&& widget)
 {
@@ -1791,7 +1890,7 @@ void DockArea::AddWindow(
 	newLayer.root = Std::Box<DockArea::Node>{ node };
 	node->tabs.push_back(impl::DA_WindowTab());
 	auto& newWindow = node->tabs.back();
-	newWindow.title = title;
+	newWindow.title = { title.Data(), title.Size() };
 	newWindow.color = color;
 	newWindow.widget = static_cast<Std::Box<Widget>&&>(widget);
 }
@@ -2006,22 +2105,45 @@ void DockArea::TouchEvent(
 		impl::DA_PointerMove(params);
 	}
 	else
-		DENGINE_DETAIL_UNREACHABLE();
+		DENGINE_IMPL_UNREACHABLE();
 }
 
 void DockArea::InputConnectionLost() 
 {
+	auto const layerItPair = impl::DA_GetLayerItPair(*this, Rect());
+	for (auto const& layer : layerItPair)
+	{
+		layer.rootNode.InputConnectionLost();
+	}
 }
 
 void DockArea::CharEnterEvent(
-	Context& ctx) {}
+	Context& ctx) 
+{
+	auto const layerItPair = impl::DA_GetLayerItPair(*this, Rect());
+	for (auto const& layer : layerItPair)
+	{
+		layer.rootNode.CharEnterEvent(ctx);
+	}
+}
 
 void DockArea::CharEvent(
 	Context& ctx,
-	u32 utfValue) {}
+	u32 utfValue) 
+{
+	auto const layerItPair = impl::DA_GetLayerItPair(*this, Rect());
+	for (auto const& layer : layerItPair)
+	{
+		layer.rootNode.CharEvent(ctx, utfValue);
+	}
+}
 
 void DockArea::CharRemoveEvent(
 	Context& ctx)
 {
-
+	auto const layerItPair = impl::DA_GetLayerItPair(*this, Rect());
+	for (auto const& layer : layerItPair)
+	{
+		layer.rootNode.CharRemoveEvent(ctx);
+	}
 }

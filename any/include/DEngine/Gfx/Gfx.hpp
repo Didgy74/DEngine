@@ -76,15 +76,18 @@ namespace DEngine::Gfx
 		u32 height;
 		Math::Mat4 transform;
 
+		enum class GizmoType : u8 { Translate, Rotate, Scale, COUNT };
 		struct Gizmo
 		{
 			// In world space
-			Math::Vec3 position{};
-			f32 scale{};
-			f32 quadOffset{};
-			f32 quadScale{};
+			Math::Vec3 position;
+			f32 rotation;
+			f32 scale;
+			GizmoType type;
+			f32 quadOffset;
+			f32 quadScale;
 		};
-		Std::Opt<Gizmo> gizmo;
+		Std::Opt<Gizmo> gizmoOpt;
 	};
 
 	struct GuiVertex
@@ -147,7 +150,7 @@ namespace DEngine::Gfx
 	struct LineDrawCmd
 	{
 		Math::Vec4 color;
-		uSize vertCount;
+		u32 vertCount;
 	};
 
 	struct DrawParams
@@ -176,6 +179,7 @@ namespace DEngine::Gfx
 		Std::Span<char const*> requiredVkInstanceExtensions{};
 
 		std::vector<Math::Vec3> gizmoArrowMesh;
+		std::vector<Math::Vec3> gizmoCircleLineMesh;
 	};
 
 	class LogInterface

@@ -45,6 +45,7 @@ Std::Opt<Gfx::Context> Gfx::Initialize(InitInfo const& initInfo)
 
 void Gfx::Context::Draw(DrawParams const& params)
 {
+	DENGINE_DETAIL_GFX_ASSERT(!params.nativeWindowUpdates.empty());
 	static_cast<APIDataBase*>(this->apiDataBuffer)->Draw(params);
 }
 

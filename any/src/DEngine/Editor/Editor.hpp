@@ -33,13 +33,16 @@ namespace DEngine::Editor
 		Context& operator=(Context&&) noexcept;
 		virtual ~Context();
 
-		EditorImpl& ImplData() const { return *implData; }
+		[[nodiscard]] EditorImpl& ImplData() const { return *implData; }
 
 		void ProcessEvents();
 
-		DrawInfo GetDrawInfo() const;
+		[[nodiscard]] DrawInfo GetDrawInfo() const;
 
-		static Context Create(
+		[[nodiscard]] bool CurrentlySimulating() const;
+		[[nodiscard]] Scene& GetActiveScene() const;
+
+		[[nodiscard]] static Context Create(
 			App::WindowID mainWindow,
 			Scene* scene,
 			Gfx::Context* gfxCtx);
@@ -52,4 +55,5 @@ namespace DEngine::Editor
 	};
 
 	std::vector<Math::Vec3> BuildGizmoArrowMesh();
+	std::vector<Math::Vec3> BuildGizmoTorusMesh();
 }

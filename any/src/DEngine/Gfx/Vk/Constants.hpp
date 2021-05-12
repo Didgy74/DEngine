@@ -5,16 +5,15 @@
 #include <DEngine/FixedWidthTypes.hpp>
 
 #include <array>
-#include <string_view>
 
 namespace DEngine::Gfx::Vk::Constants
 {
 	constexpr u32 maxInFlightCount = 4;
-	constexpr u32 preferredInFlightCount = 2;
+	constexpr u32 preferredInFlightCount = 3;
 
 	constexpr vk::PresentModeKHR preferredPresentMode = vk::PresentModeKHR::eFifo;
 	constexpr u32 maxSwapchainLength = 4;
-	constexpr u32 preferredSwapchainLength = 2;
+	constexpr u32 preferredSwapchainLength = 3;
 
 	constexpr char const* khronosLayerName { "VK_LAYER_KHRONOS_validation" };
 	constexpr char const* armMaliPerfLayerName { "VK_LAYER_ARM_mali_perf_doc" };
@@ -44,4 +43,9 @@ namespace DEngine::Gfx::Vk::Constants
 	} };
 
 	constexpr u32 invalidIndex = static_cast<u32>(-1);
+}
+
+namespace DEngine::Gfx::Vk
+{
+	namespace Const = Constants;
 }

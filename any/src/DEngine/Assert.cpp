@@ -1,7 +1,6 @@
 #include <DEngine/detail/Assert.hpp>
 
 #include <iostream>
-#include <cstdlib>
 
 namespace DEngine::detail
 {

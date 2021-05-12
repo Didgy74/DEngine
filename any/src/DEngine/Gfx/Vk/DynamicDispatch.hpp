@@ -326,11 +326,11 @@ namespace DEngine::Gfx::Vk
 
 		[[nodiscard]] vk::Result allocateCommandBuffers(
 			vk::CommandBufferAllocateInfo const& allocateInfo,
-			vk::CommandBuffer* pCommandBuffers) const;
+			vk::CommandBuffer* pCommandBuffers) const noexcept;
 
 		[[nodiscard]] vk::Result allocateDescriptorSets(
 			vk::DescriptorSetAllocateInfo const& allocInfo,
-			vk::DescriptorSet* pDescriptorSets) const;
+			vk::DescriptorSet* pDescriptorSets) const noexcept;
 
 		[[nodiscard]] vk::DeviceMemory allocateMemory(
 			vk::MemoryAllocateInfo const& allocInfo,
@@ -353,7 +353,7 @@ namespace DEngine::Gfx::Vk
 		void cmdBeginRenderPass(
 			vk::CommandBuffer commandBuffer,
 			vk::RenderPassBeginInfo const& renderPassBegin,
-			vk::SubpassContents contents) const;
+			vk::SubpassContents contents) const noexcept;
 
 		void cmdBindDescriptorSets(
 			vk::CommandBuffer commandBuffer,
@@ -361,37 +361,37 @@ namespace DEngine::Gfx::Vk
 			vk::PipelineLayout layout,
 			std::uint32_t firstSet,
 			vk::ArrayProxy<vk::DescriptorSet const> descriptorSets,
-			vk::ArrayProxy<uint32_t const> dynamicOffsets) const;
+			vk::ArrayProxy<uint32_t const> dynamicOffsets) const noexcept;
 
 		void cmdBindIndexBuffer(
 			vk::CommandBuffer commandBuffer,
 			vk::Buffer buffer, 
 			vk::DeviceSize offset, 
-			vk::IndexType indexType) const;
+			vk::IndexType indexType) const noexcept;
 
 		void cmdBindPipeline(
 			vk::CommandBuffer commandBuffer,
 			vk::PipelineBindPoint pipelineBindPoint,
-			vk::Pipeline pipeline) const;
+			vk::Pipeline pipeline) const noexcept;
 
 		void cmdBindVertexBuffers(
 			vk::CommandBuffer commandBuffer,
 			uint32_t firstBinding,
 			vk::ArrayProxy<vk::Buffer const> buffers,
-			vk::ArrayProxy<vk::DeviceSize const> offsets) const;
+			vk::ArrayProxy<vk::DeviceSize const> offsets) const noexcept;
 
 		void cmdCopyBuffer(
 			vk::CommandBuffer commandBuffer,
 			vk::Buffer srcBuffer,
 			vk::Buffer dstBuffer,
-			vk::ArrayProxy<vk::BufferCopy const> regions) const;
+			vk::ArrayProxy<vk::BufferCopy const> regions) const noexcept;
 		
 		void cmdCopyBufferToImage(
 			vk::CommandBuffer commandBuffer,
 			vk::Buffer srcBuffer,
 			vk::Image dstImage,
 			vk::ImageLayout dstImageLayout,
-			vk::ArrayProxy<vk::BufferImageCopy const> regions) const;
+			vk::ArrayProxy<vk::BufferImageCopy const> regions) const noexcept;
 
 		void cmdCopyImage(
 			vk::CommandBuffer commandBuffer,
@@ -399,14 +399,14 @@ namespace DEngine::Gfx::Vk
 			vk::ImageLayout srcImageLayout,
 			vk::Image dstImage,
 			vk::ImageLayout dstImageLayout,
-			vk::ArrayProxy<vk::ImageCopy const> regions) const;
+			vk::ArrayProxy<vk::ImageCopy const> regions) const noexcept;
 
 		void cmdDraw(
 			vk::CommandBuffer commandBuffer,
 			std::uint32_t vertexCount,
 			std::uint32_t instanceCount,
 			std::uint32_t firstVertex,
-			std::uint32_t firstInstance) const;
+			std::uint32_t firstInstance) const noexcept;
 
 		void cmdDrawIndexed(
 			vk::CommandBuffer commandBuffer,
@@ -414,9 +414,9 @@ namespace DEngine::Gfx::Vk
 			std::uint32_t instanceCount,
 			std::uint32_t firstIndex,
 			std::int32_t vertexOffset,
-			std::uint32_t firstInstance) const;
+			std::uint32_t firstInstance) const noexcept;
 
-		void cmdEndRenderPass(vk::CommandBuffer commandBuffer) const;
+		void cmdEndRenderPass(vk::CommandBuffer commandBuffer) const noexcept;
 
 		void cmdPipelineBarrier(
 			vk::CommandBuffer commandBuffer,
@@ -425,7 +425,7 @@ namespace DEngine::Gfx::Vk
 			vk::DependencyFlags dependencyFlags,
 			vk::ArrayProxy<vk::MemoryBarrier const> memoryBarriers,
 			vk::ArrayProxy<vk::BufferMemoryBarrier const> bufferMemoryBarriers,
-			vk::ArrayProxy<vk::ImageMemoryBarrier const> imageMemoryBarriers) const;
+			vk::ArrayProxy<vk::ImageMemoryBarrier const> imageMemoryBarriers) const noexcept;
 
 		void cmdPushConstants(
 			vk::CommandBuffer commandBuffer,
@@ -433,25 +433,25 @@ namespace DEngine::Gfx::Vk
 			vk::ShaderStageFlags stageFlags,
 			std::uint32_t offset,
 			std::uint32_t size,
-			void const* pValues) const;
+			void const* pValues) const noexcept;
 
 		void cmdSetScissor(
 			vk::CommandBuffer commandBuffer,
 			std::uint32_t firstScissor,
-			vk::ArrayProxy<vk::Rect2D const> scissors) const;
+			vk::ArrayProxy<vk::Rect2D const> scissors) const noexcept;
 
 		void cmdSetViewport(
 			vk::CommandBuffer commandBuffer,
 			std::uint32_t firstViewport,
-			vk::ArrayProxy<vk::Viewport const> viewports) const;
+			vk::ArrayProxy<vk::Viewport const> viewports) const noexcept;
 
 		[[nodiscard]] vk::Buffer createBuffer(
 			vk::BufferCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		[[nodiscard]] vk::CommandPool createCommandPool(
+		[[nodiscard]] vk::ResultValue<vk::CommandPool> createCommandPool(
 			vk::CommandPoolCreateInfo const& createInfo,
-			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const noexcept;
 
 		[[nodiscard]] vk::DescriptorPool createDescriptorPool(
 			vk::DescriptorPoolCreateInfo const& createInfo,
@@ -541,7 +541,7 @@ namespace DEngine::Gfx::Vk
 			vk::DeviceMemory memory,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		[[nodiscard]] vk::Result getFenceStatus(vk::Fence fence) const;
+		[[nodiscard]] vk::Result getFenceStatus(vk::Fence fence) const noexcept;
 
 		[[nodiscard]] vk::Queue getQueue(
 			std::uint32_t familyIndex, 
@@ -553,6 +553,9 @@ namespace DEngine::Gfx::Vk
 			vk::DeviceSize size,
 			vk::MemoryMapFlags flags) const;
 
+		void resetCommandPool(
+			vk::CommandPool commandPool,
+			vk::CommandPoolResetFlags flags = vk::CommandPoolResetFlags()) const;
 		void resetFences(vk::ArrayProxy<vk::Fence const> fences) const;
 
 		void updateDescriptorSets(
@@ -562,7 +565,7 @@ namespace DEngine::Gfx::Vk
 		[[nodiscard]] vk::Result waitForFences(
 			vk::ArrayProxy<vk::Fence const> fences,
 			bool waitAll,
-			std::uint64_t timeout = std::numeric_limits<std::uint64_t>::max()) const;
+			std::uint64_t timeout = std::numeric_limits<std::uint64_t>::max()) const noexcept;
 
 		QueueData const* m_queueDataPtr = nullptr;
 		void waitIdle() const;
@@ -574,7 +577,7 @@ namespace DEngine::Gfx::Vk
 			vk::SwapchainKHR swapchain,
 			std::uint64_t timeout,
 			vk::Semaphore semaphore,
-			vk::Fence fence) const;
+			vk::Fence fence) const noexcept;
 
 		[[nodiscard]] vk::SwapchainKHR createSwapchainKHR(
 			vk::SwapchainCreateInfoKHR const& createInfo,
@@ -587,11 +590,11 @@ namespace DEngine::Gfx::Vk
 		[[nodiscard]] vk::Result getSwapchainImagesKHR(
 			vk::SwapchainKHR swapchain, 
 			std::uint32_t* pSwapchainImageCount,
-			vk::Image* pSwapchainImages) const;
+			vk::Image* pSwapchainImages) const noexcept;
 
 		[[nodiscard]] vk::Result queuePresentKHR(
 			vk::Queue queue,
-			vk::PresentInfoKHR const& presentInfo) const;
+			vk::PresentInfoKHR const& presentInfo) const noexcept;
 	};
 
 	using DevDispatch = DeviceDispatch;

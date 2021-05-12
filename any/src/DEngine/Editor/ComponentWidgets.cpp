@@ -29,8 +29,8 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 		inputField->type = Gui::LineEdit::Type::Float;
 		inputField->textChangedPfn = [i, &editorImpl](Gui::LineEdit& widget)
 		{
-			DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());
-			auto entity = editorImpl.selectedEntity.Value();
+			DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+			auto entity = editorImpl.GetSelectedEntity().Value();
 			auto componentPtr = editorImpl.scene->GetComponent<Transform>(entity);
 			DENGINE_DETAIL_ASSERT(componentPtr);
 			auto& component = *componentPtr;
@@ -50,8 +50,8 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 	rotationLayout->AddWidget(Std::Box<Gui::Widget>{ rotationInput });
 	rotationInput->textChangedPfn = [&editorImpl](Gui::LineEdit& widget)
 	{
-		DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());
-		auto entity = editorImpl.selectedEntity.Value();
+		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+		auto entity = editorImpl.GetSelectedEntity().Value();
 		auto componentPtr = editorImpl.scene->GetComponent<Transform>(entity);
 		DENGINE_DETAIL_ASSERT(componentPtr);
 		auto& component = *componentPtr;
@@ -61,8 +61,8 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 	this->collapseCallback = [this, &editorImpl](bool collapsed)
 	{
 		// Confirm we have a selected entity, since the widget is alive we must have one.
-		DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());
-		auto entity = editorImpl.selectedEntity.Value();
+		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+		auto entity = editorImpl.GetSelectedEntity().Value();
 		if (collapsed)
 		{
 			// Confirm we have no component atm.
@@ -83,8 +83,8 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 		}
 	};
 
-	DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());
-	auto entity = editorImpl.selectedEntity.Value();
+	DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+	auto entity = editorImpl.GetSelectedEntity().Value();
 	if (auto componentPtr = editorImpl.scene->GetComponent<Transform>(entity))
 	{
 		this->SetCollapsed(false);
@@ -130,8 +130,8 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 	textureIdInput->type = Gui::LineEdit::Type::Integer;
 	textureIdInput->textChangedPfn = [&editorImpl](Gui::LineEdit& widget)
 	{
-		DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());
-		auto entity = editorImpl.selectedEntity.Value();
+		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+		auto entity = editorImpl.GetSelectedEntity().Value();
 		auto componentPtr = editorImpl.scene->GetComponent<Gfx::TextureID>(entity);
 		DENGINE_DETAIL_ASSERT(componentPtr);
 		auto& component = *componentPtr;
@@ -141,8 +141,8 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 	this->collapseCallback = [&editorImpl](bool collapsed)
 	{
 		// Confirm we have a selected entity, since the widget is alive we must have one.
-		DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());
-		auto entity = editorImpl.selectedEntity.Value();
+		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+		auto entity = editorImpl.GetSelectedEntity().Value();
 		if (collapsed)
 		{
 			// Confirm we have no component atm.
@@ -161,8 +161,8 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 		}
 	};
 
-	DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());
-	auto entity = editorImpl.selectedEntity.Value();
+	DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+	auto entity = editorImpl.GetSelectedEntity().Value();
 	if (auto componentPtr = editorImpl.scene->GetComponent<Gfx::TextureID>(entity))
 	{
 		this->SetCollapsed(false);
@@ -180,9 +180,9 @@ void SpriteRenderer2DWidget::Update(Gfx::TextureID const& component)
 		textureIdInput->text = std::to_string((unsigned int)component).c_str();
 }
 
-Box2DWidget::Box2DWidget(EditorImpl const& editorImpl)
+RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 {
-	this->SetHeaderText("Box2D");
+	this->SetHeaderText("Rigidbody2D");
 
 	Gui::StackLayout& mainLayout = this->GetChildStackLayout();
 
@@ -196,47 +196,19 @@ Box2DWidget::Box2DWidget(EditorImpl const& editorImpl)
 		
 		Gui::Dropdown* bodyTypeDropdown = new Gui::Dropdown;
 		bodyTypeLayout->AddWidget(Std::Box<Widget>{ bodyTypeDropdown });
-		bodyTypeDropdown->items.push_back("Static"); // b2BodyType::b2_staticBody = 0
-		bodyTypeDropdown->items.push_back("Kinematic"); // b2BodyType::b2_kinematicBody = 1
-		bodyTypeDropdown->items.push_back("Dynamic");// b2BodyType::b2_dynamicBody = 1
-		bodyTypeDropdown->selectedItem = b2BodyType::b2_dynamicBody;
+		bodyTypeDropdown->items.push_back("Dynamic"); // Rigidbody2D::Type::Dynamic = 0
+		bodyTypeDropdown->items.push_back("Static"); // Rigidbody2D::Type::Static = 0
+		bodyTypeDropdown->selectedItem = (u32)Physics::Rigidbody2D::Type::Dynamic;
 		bodyTypeDropdown->selectedItemChangedCallback = [&editorImpl](
 			Gui::Dropdown& dropdown)
 		{
 			// Update the box2D body
-			DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());
-			Entity entity = editorImpl.selectedEntity.Value();
-			auto componentPtr = editorImpl.scene->GetComponent<Box2D_Component>(entity);
+			DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+			Entity entity = editorImpl.GetSelectedEntity().Value();
+			auto componentPtr = editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity);
 			DENGINE_DETAIL_ASSERT(componentPtr);
 			auto& component = *componentPtr;
-			component.ptr->SetType(b2BodyType(dropdown.selectedItem));
-		};
-	}
-
-	{
-		Gui::StackLayout* restitutionLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-		mainLayout.AddWidget(Std::Box<Widget>{ restitutionLayout });
-
-		Gui::Text* restitutionLabel = new Gui::Text;
-		restitutionLayout->AddWidget(Std::Box<Widget>{ restitutionLabel });
-		restitutionLabel->String_Set("Restitution");
-
-		restitutionLineEdit = new Gui::LineFloatEdit;
-		restitutionLayout->AddWidget(Std::Box<Widget>{ restitutionLineEdit });
-		restitutionLineEdit->min = 0.0;
-		restitutionLineEdit->max = 1.0;
-		restitutionLineEdit->text = "0.000";
-		restitutionLineEdit->valueChangedCallback = [&editorImpl](
-			Gui::LineFloatEdit& widget,
-			f64 newValue)
-		{
-			// Update the box2D body
-			DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());
-			Entity entity = editorImpl.selectedEntity.Value();
-			auto componentPtr = editorImpl.scene->GetComponent<Box2D_Component>(entity);
-			DENGINE_DETAIL_ASSERT(componentPtr);
-			auto& component = *componentPtr;
-			component.ptr->GetFixtureList()->SetRestitution((f32)newValue);
+			component.type = (Physics::Rigidbody2D::Type)dropdown.selectedItem;
 		};
 	}
 
@@ -254,67 +226,28 @@ Box2DWidget::Box2DWidget(EditorImpl const& editorImpl)
 	this->collapseCallback = [this, &editorImpl](bool collapsed)
 	{
 		// Confirm we have a selected entity, since the widget is alive we must have one.
-		DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());
-		auto entity = editorImpl.selectedEntity.Value();
+		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+		auto entity = editorImpl.GetSelectedEntity().Value();
 		if (collapsed)
 		{
-			// Confirm we have no transform component atm.
-			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<Box2D_Component>(entity));
+			// Confirm we have no rigidbody component atm.
+			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity));
 
-			// Check if we have a transform component
-			auto const* transformPtr = editorImpl.scene->GetComponent<Transform>(entity);
-			
-			// Add the component
-			b2BodyDef bodyDef{};
-			if (transformPtr)
-			{
-				auto& transform = *transformPtr;
-				bodyDef.position = { transform.position.x, transform.position.y };
-				bodyDef.angle = transform.rotation;
-			}
-			else
-			{
-				bodyDef.position = {};
-				bodyDef.angle = {};
-			}
-			bodyDef.allowSleep = false;
-			bodyDef.gravityScale = 1.f;
-			bodyDef.type = b2BodyType::b2_dynamicBody;
-			auto bodyPtr = editorImpl.scene->physicsWorld->CreateBody(&bodyDef);
-			DENGINE_DETAIL_ASSERT(bodyPtr);
-			
-			b2FixtureDef fixtureDef{};
-			fixtureDef.density = 1.f;
-			fixtureDef.friction = 1.f;
-			fixtureDef.restitution = 0.f;
-			
-			b2PolygonShape shape{};
-			shape.SetAsBox(0.5f, 0.5f);
-			fixtureDef.shape = &shape;
-
-			bodyPtr->CreateFixture(&fixtureDef);
-
-			Box2D_Component newComponent{};
-			newComponent.ptr = bodyPtr;
+			Physics::Rigidbody2D newComponent = {};
 
 			editorImpl.scene->AddComponent(entity, newComponent);
-			Update(*editorImpl.scene->GetComponent<Box2D_Component>(entity));
+			Update(*editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity));
 		}
 		else
 		{
-			// Confirm we have transform component atm
-			auto componentPtr = editorImpl.scene->GetComponent<Box2D_Component>(entity);
-			DENGINE_DETAIL_ASSERT(componentPtr);
-			auto const component = *componentPtr;
-			// Remove the component
-			editorImpl.scene->physicsWorld->DestroyBody(component.ptr);
-			editorImpl.scene->DeleteComponent<Box2D_Component>(entity);
+		
+			editorImpl.scene->DeleteComponent<Physics::Rigidbody2D>(entity);
 		}
 	};
 
-	DENGINE_DETAIL_ASSERT(editorImpl.selectedEntity.HasValue());
-	auto entity = editorImpl.selectedEntity.Value();
-	if (auto componentPtr = editorImpl.scene->GetComponent<Box2D_Component>(entity))
+	DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+	auto entity = editorImpl.GetSelectedEntity().Value();
+	if (auto componentPtr = editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity))
 	{
 		this->SetCollapsed(false);
 		Update(*componentPtr);
@@ -325,11 +258,12 @@ Box2DWidget::Box2DWidget(EditorImpl const& editorImpl)
 	}
 }
 
-void Box2DWidget::Update(Box2D_Component const& component)
+void RigidbodyWidget::Update(Physics::Rigidbody2D const& component)
 {
-	DENGINE_DETAIL_ASSERT(component.ptr);
-
-	auto velocity = component.ptr->GetLinearVelocity();
+	if (!component.b2BodyPtr)
+		return;
+	b2Body* physBody = (b2Body*)component.b2BodyPtr;
+	auto velocity = physBody->GetLinearVelocity();
 	std::string velocityText = "Velocity: " + std::to_string(velocity.x) + " , " + std::to_string(velocity.y);
 	debug_VelocityLabel->String_Set(velocityText.c_str());
 }

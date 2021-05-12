@@ -141,34 +141,34 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 			vkResult = baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data());
 
 			if (!debugUtilsIsAvailable)
-						{
-					// Debug utils is not confirmed to be available yet,
-					// We look if we find the KHRONOS layer is available,
-					// it guarantees debug-utils to be availab.
-								for (const auto& availableLayer : availableLayers)
-								{
-										char const* khronosLayerName = Constants::khronosLayerName;
-										char const* availableLayerName = availableLayer.layerName;
-										if (std::strcmp(khronosLayerName, availableLayerName) == 0)
-										{
-												// If the layer is available, we know it implements debug utils.
-												debugUtilsIsAvailable = true;
-												break;
-										}
-								}
-						}
+			{
+				// Debug utils is not confirmed to be available yet,
+				// We look if we find the KHRONOS layer is available,
+				// it guarantees debug-utils to be availab.
+				for (const auto& availableLayer : availableLayers)
+				{
+					char const* khronosLayerName = Constants::khronosLayerName;
+					char const* availableLayerName = availableLayer.layerName;
+					if (std::strcmp(khronosLayerName, availableLayerName) == 0)
+					{
+						// If the layer is available, we know it implements debug utils.
+						debugUtilsIsAvailable = true;
+						break;
+					}
+				}
+			}
 
 			if (debugUtilsIsAvailable)
 			{
-					// Add all preferred layers that are also available.
-					for (auto const& availableLayer : availableLayers)
-								{
-							for (auto const& preferredLayerName : Constants::preferredLayerNames)
-										{
-									if (std::strcmp(availableLayer.layerName, preferredLayerName) == 0)
-											layersToUse.PushBack(preferredLayerName);
-										}
-								}
+				// Add all preferred layers that are also available.
+				for (auto const& availableLayer : availableLayers)
+				{
+					for (auto const& preferredLayerName : Constants::preferredLayerNames)
+					{
+						if (std::strcmp(availableLayer.layerName, preferredLayerName) == 0)
+							layersToUse.PushBack(preferredLayerName);
+					}
+				}
 
 				totalRequiredExtensions.push_back(Constants::debugUtilsExtensionName);
 				returnValue.debugUtilsEnabled = true;
@@ -215,7 +215,7 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	return returnValue;
 }
 
-vk::DebugUtilsMessengerEXT DEngine::Gfx::Vk::Init::CreateLayerMessenger(
+vk::DebugUtilsMessengerEXT Vk::Init::CreateLayerMessenger(
 	vk::Instance instanceHandle,
 	DebugUtilsDispatch const* debugUtilsOpt,
 	void* userData)
@@ -541,39 +541,54 @@ vk::RenderPass Vk::Init::BuildMainGfxRenderPass(
 	bool useEditorPipeline,
 	DebugUtilsDispatch const* debugUtils)
 {
-	vk::AttachmentDescription colorAttach{};
+	if (!useEditorPipeline)
+		DENGINE_IMPL_UNREACHABLE(); // We haven't implemented this yet.
+
+	vk::AttachmentDescription colorAttach = {};
 	colorAttach.loadOp = vk::AttachmentLoadOp::eClear;
 	colorAttach.storeOp = vk::AttachmentStoreOp::eStore;
 	colorAttach.samples = vk::SampleCountFlagBits::e1;
 	colorAttach.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
 	colorAttach.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
 	colorAttach.format = vk::Format::eR8G8B8A8Srgb;
-	if (useEditorPipeline)
-	{
-		// We want to sample from the finalized image into the editor GUI
-		colorAttach.initialLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-		colorAttach.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-	}
-	else
-	{
-		// We want to transfer it to a swapchain image later
-		colorAttach.initialLayout = vk::ImageLayout::eTransferSrcOptimal;
-		colorAttach.finalLayout = vk::ImageLayout::eTransferSrcOptimal;
-	}
+	colorAttach.initialLayout = vk::ImageLayout::eUndefined;
+	// We want to sample from the finalized image into the editor GUI
+	colorAttach.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-	vk::AttachmentReference colorAttachRef{};
+	// We want to render into the graphics viewport on subpass 0.
+	vk::AttachmentReference colorAttachRef = {};
 	colorAttachRef.attachment = 0;
 	colorAttachRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
 
-	vk::SubpassDescription subpass{};
+	vk::SubpassDescription subpass = {};
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colorAttachRef;
 
-	vk::RenderPassCreateInfo rpInfo{};
+	vk::SubpassDependency dependencies[2] = {};
+	dependencies[0].dependencyFlags = vk::DependencyFlags();
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].srcAccessMask = vk::AccessFlagBits::eShaderRead;
+	dependencies[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+	dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eFragmentShader;
+	dependencies[0].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+
+	dependencies[1].dependencyFlags = vk::DependencyFlags();
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+	dependencies[1].dstAccessMask = vk::AccessFlagBits::eShaderRead;
+	dependencies[1].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	dependencies[1].dstStageMask = vk::PipelineStageFlagBits::eFragmentShader;
+	
+
+	vk::RenderPassCreateInfo rpInfo = {};
 	rpInfo.attachmentCount = 1;
 	rpInfo.pAttachments = &colorAttach;
 	rpInfo.subpassCount = 1;
 	rpInfo.pSubpasses = &subpass;
+	rpInfo.dependencyCount = 2;
+	rpInfo.pDependencies = dependencies;
 
 	vk::RenderPass renderPass = device.createRenderPass(rpInfo);
 	if (debugUtils)
@@ -581,7 +596,7 @@ vk::RenderPass Vk::Init::BuildMainGfxRenderPass(
 		debugUtils->Helper_SetObjectName(
 			device.handle,
 			renderPass,
-			"Main Rendering RenderPass");
+			"Main Gfx RenderPass");
 	}
 
 	return renderPass;
@@ -593,28 +608,53 @@ vk::RenderPass Vk::Init::CreateGuiRenderPass(
 	DebugUtilsDispatch const* debugUtils)
 {
 	vk::AttachmentDescription colorAttachment{};
-	colorAttachment.initialLayout = vk::ImageLayout::eTransferSrcOptimal;
-	colorAttachment.finalLayout = vk::ImageLayout::eTransferSrcOptimal;
+	colorAttachment.initialLayout = vk::ImageLayout::eUndefined;
+	// We want to present the image after we're done rendering to it.
+	colorAttachment.finalLayout = vk::ImageLayout::ePresentSrcKHR;
 	colorAttachment.format = guiTargetFormat;
 	colorAttachment.samples = vk::SampleCountFlagBits::e1;
 	colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
 	colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
 	colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
 	colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+
 	vk::AttachmentDescription attachments[1] = { colorAttachment };
+
+	// We want to render into the GUI in subpass 0.
 	vk::AttachmentReference colorAttachmentRef{};
 	colorAttachmentRef.attachment = 0;
 	colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
+
 	vk::SubpassDescription subpassDescription{};
 	subpassDescription.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
 	subpassDescription.colorAttachmentCount = 1;
 	subpassDescription.pColorAttachments = &colorAttachmentRef;
+
+	vk::SubpassDependency dependencies[2] = {};
+	dependencies[0].dependencyFlags = vk::DependencyFlags();
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].srcAccessMask = vk::AccessFlagBits::eMemoryRead;
+	dependencies[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+	dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eTopOfPipe;
+	dependencies[0].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+
+	dependencies[1].dependencyFlags = vk::DependencyFlags();
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+	dependencies[1].dstAccessMask = vk::AccessFlagBits::eMemoryRead;
+	dependencies[1].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	dependencies[1].dstStageMask = vk::PipelineStageFlagBits::eBottomOfPipe;
+
 	// Set up render pass
 	vk::RenderPassCreateInfo createInfo{};
 	createInfo.attachmentCount = 1;
 	createInfo.pAttachments = attachments;
 	createInfo.subpassCount = 1;
 	createInfo.pSubpasses = &subpassDescription;
+	createInfo.dependencyCount = 2;
+	createInfo.pDependencies = dependencies;
 
 	vk::RenderPass renderPass = device.createRenderPass(createInfo);
 	if (debugUtils != nullptr)

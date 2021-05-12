@@ -3,9 +3,9 @@
 #include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/Math/Vector.hpp>
+#include <DEngine/Std/Containers/Str.hpp>
 
 #include <string>
-#include <string_view>
 
 namespace DEngine::Gui
 {
@@ -21,7 +21,7 @@ namespace DEngine::Gui
 		void String_Set(char const* string);
 		void String_PushBack(u8 value);
 		void String_PopBack();
-		[[nodiscard]] std::string_view StringView() const;
+		[[nodiscard]] Std::Str StringView() const;
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
