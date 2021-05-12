@@ -13,16 +13,16 @@ namespace DEngine::detail
 
 #ifdef DENGINE_ENABLE_ASSERT
 
-#  define DENGINE_DETAIL_UNREACHABLE() ::DEngine::detail::Assert("Hit an unreachable.", __FILE__, __LINE__, "Hit an unreachable.")
+#  define DENGINE_IMPL_UNREACHABLE() ::DEngine::detail::Assert("Hit an unreachable.", __FILE__, __LINE__, "Hit an unreachable.")
 
 #elif
 
 #	ifdef _MSC_VER
-#  define DENGINE_DETAIL_UNREACHABLE() __assume(0)
+#  define DENGINE_IMPL_UNREACHABLE() __assume(0)
 # elif defined(__clang__)
-#  define DENGINE_DETAIL_UNREACHABLE() __builtin_unreachable()
+#  define DENGINE_IMPL_UNREACHABLE() __builtin_unreachable()
 # else
-#  define DENGINE_DETAIL_UNREACHABLE() __builtin_unreachable()
+#  define DENGINE_IMPL_UNREACHABLE() __builtin_unreachable()
 # endif
 
 #endif

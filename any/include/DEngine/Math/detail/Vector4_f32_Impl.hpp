@@ -38,7 +38,7 @@ namespace DEngine::Math
 		case 3:
 			return w;
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 		}
 	}
 
@@ -55,7 +55,7 @@ namespace DEngine::Math
 		case 3:
 			return w;
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 		}
 	}
 
@@ -124,7 +124,7 @@ namespace DEngine::Math
 		case 3:
 			return w;
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 		}
 	}
 
@@ -141,7 +141,7 @@ namespace DEngine::Math
 		case 3:
 			return w;
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 		}
 	}
 

@@ -65,7 +65,7 @@ void Std::NameThisThread(Str name)
 		tempString);
 #elif defined(DENGINE_OS_LINUX) || defined(DENGINE_OS_ANDROID)
 	char tempString[maxThreadNameLength] = {};
-	for (u8 i = 0; i < (u8)name.Length(); i += 1)
+	for (u8 i = 0; i < (u8)name.Size(); i += 1)
 		tempString[i] = name[i];
 
 	pthread_setname_np(pthread_self(), tempString);

@@ -698,7 +698,7 @@ namespace DEngine::Application::detail
 				}
 
 				default:
-					DENGINE_DETAIL_UNREACHABLE();
+					DENGINE_IMPL_UNREACHABLE();
 					break;
 			}
 		}
@@ -944,14 +944,14 @@ void Application::detail::Backend_Log(char const* msg)
 	__android_log_print(ANDROID_LOG_ERROR, "DEngine: ", "%s", msg);
 }
 
-void Application::OpenSoftInput(char const* text, u64 textLength, SoftInputFilter inputFilter)
+void Application::OpenSoftInput(Std::Str inputString, SoftInputFilter inputFilter)
 {
 	auto const& backendData = *detail::pBackendData;
 	std::basic_string<jchar> tempString;
-	tempString.reserve(textLength);
-	for (uSize i = 0; i < textLength; i++)
+	tempString.reserve(inputString.Size());
+	for (uSize i = 0; i < inputString.Size(); i++)
 	{
-		tempString.push_back((jchar)text[i]);
+		tempString.push_back((jchar)inputString[i]);
 	}
 
 	jstring javaString = backendData.gameThreadJniEnv->NewString(tempString.data(), tempString.length());
@@ -965,7 +965,7 @@ void Application::OpenSoftInput(char const* text, u64 textLength, SoftInputFilte
 	//backendData.gameThreadJniEnv->ReleaseStringChars(javaString, tempString.data());
 }
 
-void Application::UpdateCharInputContext(char const* currentText, u64 textLength)
+void Application::UpdateCharInputContext(Std::Str inputString)
 {
 
 }

@@ -14,7 +14,7 @@ namespace DEngine::Std
 		Str(char const* nullTerminString) noexcept;
 		constexpr Str(char const* in, uSize length) noexcept : ptr(in), length(length) {}
 
-		[[nodiscard]] constexpr u32 Size() const noexcept { return length; }
+		[[nodiscard]] constexpr uSize Size() const noexcept { return length; }
 		[[nodiscard]] constexpr char const* Data() const noexcept { return ptr; }
 
 		[[nodiscard]] constexpr char operator[](u32 index) const noexcept 

@@ -21,15 +21,15 @@ namespace DEngine::Math
 		[[nodiscard]] constexpr Vector<4, f32> AsVec4(f32 const& wValue = f32()) const;
 
 		[[nodiscard]] f32 Magnitude() const;
-		[[nodiscard]] constexpr f32 MagnitudeSqrd() const;
+		[[nodiscard]] constexpr f32 MagnitudeSqrd() const noexcept;
 		[[nodiscard]] Vector<3, f32> GetNormalized() const;
 		void Normalize();
 
-		[[nodiscard]] constexpr f32* Data();
-		[[nodiscard]] constexpr f32 const* Data() const;
+		[[nodiscard]] constexpr f32* Data() noexcept;
+		[[nodiscard]] constexpr f32 const* Data() const noexcept;
 
-		[[nodiscard]] static constexpr Vector<3, f32> Cross(Vector<3, f32> const& lhs, Vector<3, f32> const& rhs);
-		[[nodiscard]] static constexpr f32 Dot(Vector<3, f32> const& lhs, Vector<3, f32> const& rhs);
+		[[nodiscard]] static constexpr Vector<3, f32> Cross(Vector<3, f32> const& lhs, Vector<3, f32> const& rhs) noexcept;
+		[[nodiscard]] static constexpr f32 Dot(Vector<3, f32> const& lhs, Vector<3, f32> const& rhs) noexcept;
 
 		[[nodiscard]] static constexpr Vector<3, f32> SingleValue(f32 const& input) noexcept;
 		[[nodiscard]] static constexpr Vector<3, f32> Zero() noexcept;
@@ -43,14 +43,14 @@ namespace DEngine::Math
 
 		[[nodiscard]] constexpr f32& operator[](uSize index) noexcept;
 		[[nodiscard]] constexpr f32 operator[](uSize index) const noexcept;
-		constexpr Vector<3, f32>& operator+=(Vector<3, f32> const& rhs);
-		constexpr Vector<3, f32>& operator-=(Vector<3, f32> const& rhs);
-		constexpr Vector<3, f32>& operator*=(f32 const& rhs);
-		[[nodiscard]] constexpr Vector<3, f32> operator+(Vector<3, f32> const& rhs) const;
-		[[nodiscard]] constexpr Vector<3, f32> operator-(Vector<3, f32> const& rhs) const;
-		[[nodiscard]] constexpr Vector<3, f32> operator-() const;
-		[[nodiscard]] constexpr bool operator==(Vector<3, f32> const& rhs) const;
-		[[nodiscard]] constexpr bool operator!=(Vector<3, f32> const& rhs) const;
+		constexpr Vector<3, f32>& operator+=(Vector<3, f32> const& rhs) noexcept;
+		constexpr Vector<3, f32>& operator-=(Vector<3, f32> const& rhs) noexcept;
+		constexpr Vector<3, f32>& operator*=(f32 const& rhs) noexcept;
+		[[nodiscard]] constexpr Vector<3, f32> operator+(Vector<3, f32> const& rhs) const noexcept;
+		[[nodiscard]] constexpr Vector<3, f32> operator-(Vector<3, f32> const& rhs) const noexcept;
+		[[nodiscard]] constexpr Vector<3, f32> operator-() const noexcept;
+		[[nodiscard]] constexpr bool operator==(Vector<3, f32> const& rhs) const noexcept;
+		[[nodiscard]] constexpr bool operator!=(Vector<3, f32> const& rhs) const noexcept;
 	};
 
 	static_assert(sizeof(Vector<3, f32>) == sizeof(f32[3]), "Size of Vec3 is not as expected.");

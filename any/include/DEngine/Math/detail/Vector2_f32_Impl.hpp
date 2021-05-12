@@ -1,10 +1,20 @@
 #pragma once
 
 #include <DEngine/detail/Assert.hpp>
-#include "Vector2_f32.hpp"
+#include <DEngine/Math/detail/Vector2_f32.hpp>
 
 namespace DEngine::Math
 {
+	[[nodiscard]] constexpr Vector<2, f32> operator*(Vector<2, f32> const& lhs, f32 rhs) noexcept
+	{
+		return Vector<2, f32>{ lhs.x * rhs, lhs.y * rhs };
+	}
+
+	[[nodiscard]] constexpr Vector<2, f32> operator*(f32 lhs, Vector<2, f32> const& rhs) noexcept
+	{
+		return Vector<2, f32>{ lhs * rhs.x, lhs * rhs.y };
+	}
+
 	constexpr Vector<3, f32> Vector<2, f32>::AsVec3(f32 zValue) const noexcept
 	{
 		return Vector<3, f32>{ x, y, zValue };
@@ -24,6 +34,13 @@ namespace DEngine::Math
 	constexpr f32 Vector<2, f32>::MagnitudeSqrd() const noexcept
 	{
 		return (x * x) + (y * y);
+	}
+
+	constexpr Vector<2, f32> Vector<2, f32>::GetRotated90(bool counterClock) const noexcept
+	{
+		// Multiply the vector with -1 if input is false
+		// Didgy: I tried doing this branchless. Might be stupid, idk
+		return Vector<2, f32>{ -y, x } * (f32)(((i8)counterClock * 2) - 1);
 	}
 
 	constexpr f32* Vector<2, f32>::Data() noexcept
@@ -85,7 +102,7 @@ namespace DEngine::Math
 		case 1:
 			return y;
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 		}
 	}
 
@@ -98,7 +115,7 @@ namespace DEngine::Math
 		case 1:
 			return y;
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 		}
 	}
 
@@ -146,15 +163,5 @@ namespace DEngine::Math
 	constexpr bool Vector<2, f32>::operator!=(Vector<2, f32> const& rhs) const noexcept
 	{
 		return x != rhs.x || y != rhs.y;
-	}
-
-	[[nodiscard]] constexpr Vector<2, f32> operator*(Vector<2, f32> const& lhs, f32 rhs) noexcept
-	{
-		return Vector<2, f32>{ lhs.x * rhs, lhs.y * rhs };
-	}
-
-	[[nodiscard]] constexpr Vector<2, f32> operator*(f32 lhs, Vector<2, f32> const& rhs) noexcept
-	{
-		return Vector<2, f32>{ lhs * rhs.x, lhs * rhs.y };
 	}
 }

@@ -79,7 +79,7 @@ void Scene::Begin()
 			bodyDef.type = b2BodyType::b2_staticBody;
 			break;
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 			break;
 		}
 		b2Body* newBody = physWorld->CreateBody(&bodyDef);

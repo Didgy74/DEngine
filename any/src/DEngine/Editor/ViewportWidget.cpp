@@ -2,8 +2,6 @@
 
 #include <DEngine/Std/Trait.hpp>
 
-#include <iostream> // For testing
-
 namespace DEngine::Editor::impl
 {
 	// Translates cursorpos into [-1, 1] of the viewport-rect.
@@ -14,22 +12,11 @@ namespace DEngine::Editor::impl
 		Math::Vec2 cursorNormalizedPos = {
 			(cursorPos.x - viewportRect.position.x) / viewportRect.extent.width,
 			(cursorPos.y - viewportRect.position.y) / viewportRect.extent.height };
+		// Now go from [0, 1] to [-1, 1]
 		cursorNormalizedPos -= { 0.5f, 0.5f };
 		cursorNormalizedPos *= 2.f;
 		cursorNormalizedPos.y = -cursorNormalizedPos.y;
 		return cursorNormalizedPos;
-	}
-
-	// screenSpacePos in normalized coordinates [-1, 1]
-	[[nodiscard]] Math::Vec3 DeprojectScreenspaceCoord(
-		Math::Vec2 screenSpacePosNormalized,
-		Math::Mat4 projectionMatrix) noexcept
-	{
-		Math::Vec4 vector = screenSpacePosNormalized.AsVec4(1.f, 1.f);
-		vector = projectionMatrix.GetInverse().Value() * vector;
-		for (auto& item : vector)
-			item /= vector.w;
-		return Math::Vec3(vector);
 	}
 
 	// Returns the distance from the ray-origin to the intersection point.
@@ -55,15 +42,15 @@ namespace DEngine::Editor::impl
 	}
 
 	[[nodiscard]] Std::Opt<f32> IntersectRayTri(
-		Gizmo::Test_Ray ray,
+		Math::Vec3 rayOrigin,
+		Math::Vec3 rayDir,
 		Math::Vec3 aIn,
 		Math::Vec3 bIn,
 		Math::Vec3 cIn)
 	{
 		// Moller-Trumbore Intersection algorithm
 
-		Math::Vec3 rayOrigin = ray.origin;
-		Math::Vec3 rayVector = ray.direction;
+		Math::Vec3 rayVector = rayDir;
 
 		f32 const EPSILON = 0.0000001f;
 		Math::Vec3 vertex0 = aIn;
@@ -89,7 +76,7 @@ namespace DEngine::Editor::impl
 		q = Math::Vec3::Cross(s, edge1);
 		//v = f * rayVector.dotProduct(q);
 		v = f * Math::Vec3::Dot(rayVector, q);
-		if (v < 0.0 || u + v > 1.0)
+		if (v < 0.0f || u + v > 1.0f)
 			return Std::nullOpt;
 		// At this stage we can compute t to find out where the intersection point is on the line.
 		//float t = f * edge2.dotProduct(q);
@@ -106,28 +93,29 @@ namespace DEngine::Editor::impl
 	// Returns the distance from the ray-origin to the intersection point.
 	// Cannot be negative.
 	[[nodiscard]] Std::Opt<f32> IntersectRayCylinder(
-		Gizmo::Test_Ray ray,
+		Math::Vec3 rayOrigin,
+		Math::Vec3 rayDir,
 		Math::Vec3 cylinderVertA,
 		Math::Vec3 cylinderVertB,
 		f32 cylinderRadius) noexcept
 	{
 		// Reference implementation can be found in Real-Time Collision Detection p. 195
 
-		DENGINE_DETAIL_ASSERT(Math::Abs(ray.direction.Magnitude() - 1.f) <= 0.0001f);
+		DENGINE_DETAIL_ASSERT(Math::Abs(rayDir.Magnitude() - 1.f) <= 0.0001f);
 
 		// Also referred to as "d"
 		Math::Vec3 const cylinderAxis = cylinderVertB - cylinderVertA;
 		// Vector from cylinder base to ray start.
-		Math::Vec3 const m = ray.origin - cylinderVertA;
+		Math::Vec3 const m = rayOrigin - cylinderVertA;
 
 		Std::Opt<f32> returnVal{};
 
 		f32 const md = Math::Vec3::Dot(m, cylinderAxis);
-		f32 const nd = Math::Vec3::Dot(ray.direction, cylinderAxis);
+		f32 const nd = Math::Vec3::Dot(rayDir, cylinderAxis);
 		f32 const dd = cylinderAxis.MagnitudeSqrd();
 
-		f32 const nn = ray.direction.MagnitudeSqrd();
-		f32 const mn = Math::Vec3::Dot(m, ray.direction);
+		f32 const nn = rayDir.MagnitudeSqrd();
+		f32 const mn = Math::Vec3::Dot(m, rayDir);
 		f32 const a = dd * nn - Math::Sqrd(nd);
 		f32 const k = m.MagnitudeSqrd() - Math::Sqrd(cylinderRadius);
 		f32 const c = dd * k - Math::Sqrd(md);
@@ -136,13 +124,13 @@ namespace DEngine::Editor::impl
 		{
 			// The ray origin is inside the infinite cylinder.
 			// Check if it's also within the endcaps?
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 		}
 
 		// Check if ray runs parallel to cylinder axis.
 		if (Math::Abs(a) < 0.0001f)
 		{
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 			// Segment runs parallel to cylinder axis
 			if (c > 0.0f)
 				return Std::nullOpt; // a and thus the segment lie outside cylinder
@@ -214,14 +202,14 @@ namespace DEngine::Editor::impl
 		for (auto const& endcap : cylinderCapVertices)
 		{
 			Std::Opt<f32> const hit = IntersectRayPlane(
-				ray.origin,
-				ray.direction,
+				rayOrigin,
+				rayDir,
 				cylinderAxis.GetNormalized(),
 				endcap);
 			if (hit.HasValue())
 			{
 				f32 const distance = hit.Value();
-				Math::Vec3 const hitPoint = ray.origin + ray.direction * distance;
+				Math::Vec3 const hitPoint = rayOrigin + rayDir * distance;
 				if ((hitPoint - endcap).MagnitudeSqrd() <= Math::Sqrd(cylinderRadius))
 				{
 					// Hit point is on endcap
@@ -236,7 +224,8 @@ namespace DEngine::Editor::impl
 
 	// World-transform cannot include scale. Bake it into the arrow-struct.
 	[[nodiscard]] Std::Opt<f32> IntersectArrow(
-		Gizmo::Test_Ray ray,
+		Math::Vec3 rayOrigin,
+		Math::Vec3 rayDir,
 		Gizmo::Arrow arrow,
 		Math::Mat4 const& worldTransform) noexcept
 	{
@@ -246,7 +235,8 @@ namespace DEngine::Editor::impl
 		f32 const radius = 0.5f * arrow.shaftDiameter;
 
 		result = IntersectRayCylinder(
-			ray,
+			rayOrigin,
+			rayDir,
 			vertex1,
 			vertex2,
 			radius);
@@ -256,50 +246,51 @@ namespace DEngine::Editor::impl
 
 	// Translate along a line
 	[[nodiscard]] Math::Vec3 TranslateAlongPlane(
-		Gizmo::Test_Ray ray,
+		Math::Vec3 rayOrigin,
+		Math::Vec3 rayDir,
 		Math::Vec3 planeNormal,
 		Math::Vec3 initialPosition,
-		Gizmo::Test_Ray initialRay) noexcept
+		Math::Vec3 offset) noexcept
 	{
-		DENGINE_DETAIL_ASSERT(Math::Abs(ray.direction.Magnitude() - 1.f) <= 0.00001f);
+		DENGINE_DETAIL_ASSERT(Math::Abs(rayDir.Magnitude() - 1.f) <= 0.00001f);
 		DENGINE_DETAIL_ASSERT(Math::Abs(planeNormal.Magnitude() - 1.f) <= 0.00001f);
-		DENGINE_DETAIL_ASSERT(Math::Abs(initialRay.direction.Magnitude() - 1.f) <= 0.00001f);
 
-		// Calculate cursor offset that we'll use to prevent the center of the object from snapping to the cursor
-		Math::Vec3 offset = {};
-		Std::Opt<f32> hitA = IntersectRayPlane(initialRay.origin, initialRay.direction, planeNormal, initialPosition);
-		if (hitA.HasValue())
-			offset = initialPosition - (initialRay.origin + initialRay.direction * hitA.Value());
-
-		Std::Opt<f32> hitB = IntersectRayPlane(ray.origin, ray.direction, planeNormal, initialPosition);
+		Std::Opt<f32> hitB = IntersectRayPlane(rayOrigin, rayDir, planeNormal, initialPosition - offset);
 		if (hitB.HasValue())
-			return ray.origin + ray.direction * hitB.Value() + offset;
+			return rayOrigin + rayDir * hitB.Value() + offset;
 		else
 			return initialPosition;
 	}
 
-
-	[[nodiscard]] static Std::Opt<Gizmo::GizmoPart> GizmoHitTest_Translate(
-		Transform const& transform,
-		f32 scale,
-		Gizmo::Test_Ray ray) noexcept
+	struct GizmoHitTest_Translate_ReturnT
+	{
+		Gizmo::GizmoPart gizmoPart;
+		f32 distance;
+	};
+	[[nodiscard]] static Std::Opt<GizmoHitTest_Translate_ReturnT> GizmoHitTest_Translate(
+		Math::Vec3 gizmoPosition,
+		f32 gizmoRotation,
+		f32 gizmoScale,
+		Math::Vec3 rayOrigin,
+		Math::Vec3 rayDir) noexcept
 	{
 		// Gizmo cannot include scale in the world transform, so we modify the arrow struct
 		// to account for the scaling
 		Gizmo::Arrow arrow = Gizmo::defaultArrow;
-		arrow.capLength *= scale;
-		arrow.capSize *= scale;
-		arrow.shaftDiameter *= scale;
-		arrow.shaftLength *= scale;
+		arrow.capLength *= gizmoScale;
+		arrow.capSize *= gizmoScale;
+		arrow.shaftDiameter *= gizmoScale;
+		arrow.shaftLength *= gizmoScale;
 
 		Std::Opt<f32> closestDistance;
 		Gizmo::GizmoPart gizmoPart = {};
 		{
 			// Next we handle the X arrow
-			Math::Mat4 worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Y, Math::pi / 2);
-			Math::LinTran3D::SetTranslation(worldTransform, Math::Vec3{ transform.position.x, transform.position.y, 0.f });
+			Math::Mat4 worldTransform = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Y, Math::pi / 2);
+			worldTransform = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, gizmoRotation) * worldTransform;
+			Math::LinAlg3D::SetTranslation(worldTransform, gizmoPosition);
 
-			Std::Opt<f32> hit = IntersectArrow(ray, arrow, worldTransform);
+			Std::Opt<f32> hit = IntersectArrow(rayOrigin, rayDir, arrow, worldTransform);
 			if (hit.HasValue() && (!closestDistance.HasValue() || hit.Value() < closestDistance.Value()))
 			{
 				closestDistance = hit.Value();
@@ -308,10 +299,11 @@ namespace DEngine::Editor::impl
 		}
 		{
 			// Next we handle the Y arrow
-			Math::Mat4 worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::X, -Math::pi / 2);
-			Math::LinTran3D::SetTranslation(worldTransform, Math::Vec3{ transform.position.x, transform.position.y, 0.f });
+			Math::Mat4 worldTransform = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::X, -Math::pi / 2);
+			worldTransform = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, gizmoRotation) * worldTransform;
+			Math::LinAlg3D::SetTranslation(worldTransform, gizmoPosition);
 
-			Std::Opt<f32> hit = IntersectArrow(ray, arrow, worldTransform);
+			Std::Opt<f32> hit = IntersectArrow(rayOrigin, rayDir, arrow, worldTransform);
 			if (hit.HasValue() && (!closestDistance.HasValue() || hit.Value() < closestDistance.Value()))
 			{
 				closestDistance = hit.Value();
@@ -321,18 +313,19 @@ namespace DEngine::Editor::impl
 
 		// Then we check the XY quad
 		{
-			Std::Opt<f32> hit = IntersectRayPlane(ray.origin, ray.direction, Math::Vec3::Forward(), transform.position);
+			Std::Opt<f32> hit = IntersectRayPlane(rayOrigin, rayDir, Math::Vec3::Forward(), gizmoPosition);
 			if (hit.HasValue())
 			{
-				f32 planeScale = scale * Gizmo::defaultPlaneScaleRelative;
-				f32 planeOffset = scale * Gizmo::defaultPlaneOffsetRelative;
+				f32 planeScale = gizmoScale * Gizmo::defaultPlaneScaleRelative;
+				f32 planeOffset = gizmoScale * Gizmo::defaultPlaneOffsetRelative;
 
-				Math::Vec3 quadPosition = transform.position + Math::Vec3{ 1.f, 1.f, 0.f } *planeOffset;
+				Math::Vec3 quadPosition = gizmoPosition + Math::Vec2{ 1.f, 1.f }.GetRotated(gizmoRotation).AsVec3() * planeOffset;
 
-				Math::Vec3 point = ray.origin + ray.direction * hit.Value();
+				Math::Vec3 point = rayOrigin + rayDir * hit.Value();
 				Math::Vec3 pointRelative = point - quadPosition;
-				f32 dotA = Math::Vec3::Dot(pointRelative, Math::Vec3{ 1.f, 0.f, 0.f });
-				f32 dotB = Math::Vec3::Dot(pointRelative, Math::Vec3{ 0.f, 1.f, 0.f });
+				Math::Vec2 up = Math::Vec2::Up().GetRotated(gizmoRotation);
+				f32 dotA = Math::Vec3::Dot(pointRelative, Math::Vec2::Right().GetRotated(gizmoRotation).AsVec3());
+				f32 dotB = Math::Vec3::Dot(pointRelative, Math::Vec2::Up().GetRotated(gizmoRotation).AsVec3());
 				if (dotA >= -planeScale / 2.f && dotA <= planeScale / 2.f && dotB >= -planeScale / 2.f && dotB <= planeScale / 2.f)
 				{
 					if (hit.HasValue() && (!closestDistance.HasValue() || hit.Value() < closestDistance.Value()))
@@ -345,13 +338,19 @@ namespace DEngine::Editor::impl
 		}
 
 		if (closestDistance.HasValue())
-			return gizmoPart;
+		{
+			GizmoHitTest_Translate_ReturnT returnVal = {};
+			returnVal.distance = closestDistance.Value();
+			returnVal.gizmoPart = gizmoPart;
+			return returnVal;
+		}
 		else
 			return Std::nullOpt;
 	}
 
+	// Returns distance to hitpoint if any
 	[[nodiscard]] static Std::Opt<f32> GizmoHitTest_Rotate(
-		Transform const& transform,
+		Math::Vec3 gizmoPosition,
 		f32 scale,
 		Math::Vec3 rayOrigin,
 		Math::Vec3 rayDirection) noexcept
@@ -360,7 +359,7 @@ namespace DEngine::Editor::impl
 			rayOrigin,
 			rayDirection,
 			Math::Vec3::Forward(),
-			transform.position);
+			gizmoPosition);
 
 		if (!hitPointDistOpt.HasValue())
 			return {};
@@ -368,7 +367,7 @@ namespace DEngine::Editor::impl
 		f32 const distance = hitPointDistOpt.Value();
 		Math::Vec3 hitPoint = rayOrigin + (rayDirection * distance);
 
-		f32 const relativeDistSqrd = (hitPoint - transform.position).MagnitudeSqrd();
+		f32 const relativeDistSqrd = (hitPoint - gizmoPosition).MagnitudeSqrd();
 		// Check if distance between transform position and hitpoint is within border
 		constexpr f32 outerCircleRadius = Gizmo::defaultRotateCircleOuterRadius;
 		constexpr f32 innerCircleRadius = Gizmo::defaultRotateCircleInnerRadius;
@@ -381,83 +380,65 @@ namespace DEngine::Editor::impl
 			return {};
 	}
 
-	[[nodiscard]] static Math::Vec3 BuildDeprojectedDirection(
-		Gui::Rect widgetRect,
-		Math::Vec2 cursorPos,
-		Math::Vec3 origin,
-		Math::Mat4 projMat)
-	{
-		Math::Vec2 cursorNormalizedPos = GetNormalizedViewportCoord(cursorPos, widgetRect);
-		Math::Vec3 rayDir = (DeprojectScreenspaceCoord(cursorNormalizedPos, projMat) - origin).GetNormalized();
-		return rayDir;
-	}
-
 	struct GizmoHitTestReturn_T
 	{
 		Gizmo::GizmoPart part;
 		bool hitRotateGizmo;
 		f32 rotateOffset;
-		Gizmo::Test_Ray ray;
+		Math::Vec3 normalizedOffset;
 	};
 
 	[[nodiscard]] static Std::Opt<GizmoHitTestReturn_T> GizmoHitTest(
 		InternalViewportWidget const& widget,
 		Gui::Rect widgetRect,
 		Math::Vec2 pointerPos,
-		Transform const& transform,
+		Math::Vec3 gizmoPosition,
+		f32 gizmoRotation,
 		GizmoType gizmoType)
 	{
 		Math::Mat4 worldTransform = Math::Mat4::Identity();
-		Math::LinTran3D::SetTranslation(worldTransform, { transform.position.x, transform.position.y, 0.f });
+		Math::LinAlg3D::SetTranslation(worldTransform, gizmoPosition);
 
-		f32 const aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
-		Math::Mat4 projMat = widget.GetProjectionMatrix(aspectRatio);
-
-		u32 smallestViewportExtent = Math::Min(widgetRect.extent.width, widgetRect.extent.height);
 		f32 scale = Gizmo::ComputeScale(
 			worldTransform,
-			u32(smallestViewportExtent * Gizmo::defaultGizmoSizeRelative),
-			projMat,
+			widget.BuildProjectionMatrix(widgetRect.extent.Aspect()),
 			widgetRect.extent);
 
-		Gizmo::Test_Ray ray = {};
-		ray.origin = widget.cam.position;
-		ray.direction = BuildDeprojectedDirection(
-			widgetRect,
-			pointerPos,
-			ray.origin,
-			projMat);
+		Math::Vec3 rayOrigin = widget.cam.position;
+		Math::Vec3 rayDir = widget.BuildRayDirection(widgetRect, pointerPos);
 
 		if (gizmoType == GizmoType::Translate)
 		{
-			auto hitOpt = GizmoHitTest_Translate(
-				transform,
+			auto const hitOpt = GizmoHitTest_Translate(
+				gizmoPosition,
+				gizmoRotation,
 				scale,
-				ray);
+				rayOrigin,
+				rayDir);
 			if (hitOpt.HasValue())
 			{
+				auto const& hit = hitOpt.Value();
 				GizmoHitTestReturn_T returnVal = {};
-				returnVal.part = hitOpt.Value();
-				returnVal.ray = ray;
+				returnVal.part = hit.gizmoPart;
+				returnVal.normalizedOffset = (gizmoPosition - (rayOrigin + rayDir * hit.distance)) * (1.f / scale);
 				return returnVal;
 			}
 		}
 		else if (gizmoType == GizmoType::Rotate)
 		{
 			auto const hitDistanceOpt = GizmoHitTest_Rotate(
-				transform,
+				gizmoPosition,
 				scale,
-				ray.origin,
-				ray.direction);
+				rayOrigin,
+				rayDir);
 			if (hitDistanceOpt.HasValue())
 			{
 				GizmoHitTestReturn_T returnVal = {};
 				returnVal.hitRotateGizmo = true;
-				returnVal.ray = ray;
 				// Calculate rotation offset from the hitpoint.
-				Math::Vec3 hitPoint = ray.origin + ray.direction * hitDistanceOpt.Value();
-				Math::Vec2 hitPointRel = (hitPoint - transform.position).AsVec2().GetNormalized();
-				Math::Vec2 transformUp = Math::Vec2::Up().GetRotated(transform.rotation);
+				Math::Vec3 hitPoint = rayOrigin + rayDir * hitDistanceOpt.Value();
+				Math::Vec2 hitPointRel = (hitPoint - gizmoPosition).AsVec2().GetNormalized();
+				Math::Vec2 transformUp = Math::Vec2::Up().GetRotated(gizmoRotation);
 				returnVal.rotateOffset = -Math::Vec2::SignedAngle(hitPointRel, transformUp);
 				return returnVal;
 			}
@@ -472,10 +453,11 @@ namespace DEngine::Editor::impl
 		Std::Span<Math::Vec2 const> vertices,
 		Math::Vec2 position,
 		f32 rotation,
-		Gizmo::Test_Ray ray)
+		Math::Vec3 rayOrigin,
+		Math::Vec3 rayDir)
 	{
-		Math::Mat4 transMat = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, rotation);
-		Math::LinTran3D::SetTranslation(transMat, position.AsVec3());
+		Math::Mat4 transMat = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, rotation);
+		Math::LinAlg3D::SetTranslation(transMat, position.AsVec3());
 
 		// Compare against all trianges to check if we hit it
 		for (uSize i = 1; i < vertices.Size() - 1; i += 1)
@@ -485,7 +467,8 @@ namespace DEngine::Editor::impl
 				tri[j] = Math::Vec2(transMat * tri[j].AsVec4(0.f, 1.f));
 
 			Std::Opt<f32> distance = impl::IntersectRayTri(
-				ray,
+				rayOrigin,
+				rayDir,
 				tri[0].AsVec3(),
 				tri[1].AsVec3(),
 				tri[2].AsVec3());
@@ -506,33 +489,35 @@ namespace DEngine::Editor::impl
 
 		auto const& gizmoHoldingData = widget.holdingGizmoData.Value();
 
-		f32 aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
-		Gizmo::Test_Ray ray = {};
-		ray.direction = BuildDeprojectedDirection(
-			widgetRect,
-			pointerPos,
-			transform.position,
-			widget.GetProjectionMatrix(aspectRatio));
-		ray.origin = widget.cam.position;
+		Math::Vec3 rayOrigin = widget.cam.position;
+		Math::Vec3 rayDir = widget.BuildRayDirection(widgetRect, pointerPos);
+		
+		auto transformMat = Math::LinAlg3D::Translate(transform.position);
+		f32 const scale = Gizmo::ComputeScale(
+			transformMat,
+			widget.BuildProjectionMatrix(widgetRect.extent.Aspect()),
+			widgetRect.extent);
 
 		Math::Vec3 newPos = TranslateAlongPlane(
-			ray,
+			rayOrigin,
+			rayDir,
 			Math::Vec3::Forward(),
 			gizmoHoldingData.initialPos,
-			gizmoHoldingData.initialRay);
+			gizmoHoldingData.normalizedOffset * scale);
 		if (gizmoHoldingData.holdingPart == Gizmo::GizmoPart::ArrowX || gizmoHoldingData.holdingPart == Gizmo::GizmoPart::ArrowY)
 		{
 			Math::Vec3 movementAxis = {};
 			switch (gizmoHoldingData.holdingPart)
 			{
-			case Gizmo::GizmoPart::ArrowX:
-				movementAxis = { 1.f, 0.f, 0.f };
-				break;
-			case Gizmo::GizmoPart::ArrowY:
-				movementAxis = { 0.f, 1.f, 0.f };
-				break;
-			default:
-				DENGINE_DETAIL_UNREACHABLE();
+				case Gizmo::GizmoPart::ArrowX:
+					movementAxis = Math::Vec2::Right().GetRotated(transform.rotation).AsVec3();
+					break;
+				case Gizmo::GizmoPart::ArrowY:
+					movementAxis = Math::Vec2::Up().GetRotated(transform.rotation).AsVec3();
+					break;
+				default:
+					DENGINE_IMPL_UNREACHABLE();
+					break;
 			}
 			newPos = gizmoHoldingData.initialPos + movementAxis * Math::Vec3::Dot(movementAxis, newPos - gizmoHoldingData.initialPos);
 		}
@@ -547,34 +532,24 @@ namespace DEngine::Editor::impl
 	static void Gizmo_HandleRotation(
 		InternalViewportWidget const& widget,
 		Gui::Rect widgetRect,
-		Math::Vec2 cursorPos,
+		Math::Vec2 pointerPos,
 		f32 rotationOffset,
 		Transform& transform)
 	{
-		Math::Vec2 cursorNormalizedPos = GetNormalizedViewportCoord(cursorPos, widgetRect);
-		f32 aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
-		Math::Mat4 projMat = widget.GetProjectionMatrix(aspectRatio);
-		Math::Vec3 rayDir = (DeprojectScreenspaceCoord(cursorNormalizedPos, projMat) - widget.cam.position).GetNormalized();
-
-		Gizmo::Test_Ray ray = {};
-		ray.origin = widget.cam.position;
-		ray.direction = BuildDeprojectedDirection(
-			widgetRect,
-			cursorPos,
-			ray.origin,
-			widget.GetProjectionMatrix(aspectRatio));
+		Math::Vec3 rayOrigin = widget.cam.position;
+		Math::Vec3 rayDir = widget.BuildRayDirection(widgetRect, pointerPos);
 
 		// Check if we hit the plane of the gizmo
 		auto distanceOpt = IntersectRayPlane(
-			ray.origin,
-			ray.direction,
+			rayOrigin,
+			rayDir,
 			Math::Vec3::Forward(),
 			transform.position);
 
 		if (!distanceOpt.HasValue())
 			return;
 
-		Math::Vec3 hitPoint = ray.origin + ray.direction * distanceOpt.Value();
+		Math::Vec3 hitPoint = rayOrigin + rayDir * distanceOpt.Value();
 		Math::Vec3 hitPointRel = hitPoint - transform.position;
 
 		// We should technically project the hitpoint as 2D vector onto the plane,
@@ -601,7 +576,7 @@ namespace DEngine::Editor::impl
 			default:
 				break;
 		}
-		DENGINE_DETAIL_UNREACHABLE();
+		DENGINE_IMPL_UNREACHABLE();
 		return {};
 	}
 
@@ -625,76 +600,85 @@ namespace DEngine::Editor::impl
 		bool pointerIsInside = widgetRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
 
 		// We don't want to do gizmo stuff if it was the secondary cursor button
-		if (pointerIsInside && pressed && widget.state == InternalViewportWidget::BehaviorState::Normal &&
-				pointerType == PointerType::Primary)
+		bool doGizmoStuff =
+			pointerIsInside &&
+			pressed &&
+			widget.state == InternalViewportWidget::BehaviorState::Normal &&
+			pointerType == PointerType::Primary;
+		if (doGizmoStuff)
 		{
 			bool hitGizmo = false;
 			// If we have selected an entity, and it has a Transform component,
 			// We want to see if we hit it's gizmo.
+			Entity ent = Entity::Invalid;
+			Transform const* transformPtr = nullptr;
 			if (widget.editorImpl->GetSelectedEntity().HasValue())
 			{
-				Entity const entity = widget.editorImpl->GetSelectedEntity().Value();
-				Transform const* transformPtr = scene.GetComponent<Transform>(entity);
-				if (transformPtr)
+				ent = widget.editorImpl->GetSelectedEntity().Value();
+				transformPtr = scene.GetComponent<Transform>(ent);
+			}
+			if (transformPtr)
+			{
+				Transform const& transform = *transformPtr;
+				auto const& hitTestOpt = impl::GizmoHitTest(
+					widget,
+					widgetRect,
+					pointerPos,
+					transform.position,
+					transform.rotation,
+					editorImpl.GetCurrentGizmoType());
+				if (hitTestOpt.HasValue())
 				{
-					Transform const& transform = *transformPtr;
-					auto const& hitTestOpt = impl::GizmoHitTest(
-						widget,
-						widgetRect,
-						pointerPos,
-						transform,
-						editorImpl.GetCurrentGizmoType());
-					if (hitTestOpt.HasValue())
-					{
-						auto const& hit = hitTestOpt.Value();
-						InternalViewportWidget::HoldingGizmoData holdingGizmoData = {};
-						holdingGizmoData.holdingPart = hit.part;
-						holdingGizmoData.initialPos = transform.position;
-						holdingGizmoData.initialRay = hit.ray;
-						holdingGizmoData.rotationOffset = hit.rotateOffset;
-						holdingGizmoData.pointerId = pointerId;
-						widget.holdingGizmoData = holdingGizmoData;
-						widget.state = InternalViewportWidget::BehaviorState::Gizmo;
-						hitGizmo = true;
-						return;
-					}
+					auto const& hit = hitTestOpt.Value();
+					InternalViewportWidget::HoldingGizmoData holdingGizmoData = {};
+					holdingGizmoData.holdingPart = hit.part;
+					holdingGizmoData.initialPos = transform.position;
+					holdingGizmoData.normalizedOffset = hit.normalizedOffset;
+					holdingGizmoData.rotationOffset = hit.rotateOffset;
+					holdingGizmoData.pointerId = pointerId;
+					widget.holdingGizmoData = holdingGizmoData;
+					widget.state = InternalViewportWidget::BehaviorState::Gizmo;
+					hitGizmo = true;
+					return;
 				}
+			}
+			// If we didn't hit a gizmo, we want to see if we hit any selectable colliders.
+			if (!hitGizmo)
+			{
+				Std::Opt<Std::Pair<f32, Entity>> hitEntity;
 
-				// If we didn't hit a gizmo, we want to see if we hit any selectable colliders.
-				if (!hitGizmo)
+				Math::Vec3 rayOrigin = widget.cam.position;
+				Math::Vec3 rayDir = widget.BuildRayDirection(widgetRect, pointerPos);
+				// Iterate over all physics components that also have a transform component
+				for (auto const& [entity, rb] : scene.GetAllComponents<Physics::Rigidbody2D>())
 				{
-					Std::Opt<Std::Pair<f32, Entity>> hitEntity;
-					Gizmo::Test_Ray ray = widget.BuildRay(widgetRect, pointerPos);
-					// Iterate over all physics components that also have a transform component
-					for (auto const& [entity, rb] : scene.GetAllComponents<Physics::Rigidbody2D>())
+					Transform const* transform = widget.editorImpl->scene->GetComponent<Transform>(entity);
+					if (transform)
 					{
-						Transform const* transform = widget.editorImpl->scene->GetComponent<Transform>(entity);
-						if (transform)
+						Math::Vec2 vertices[4] = {
+							{-0.5f, 0.5f },
+							{ 0.5f, 0.5f },
+							{ 0.5f, -0.5f },
+							{ -0.5f, -0.5f } };
+						Std::Opt<f32> distanceOpt = Intersect_Ray_PhysicsCollider(
+							widget,
+							{ vertices, 4 },
+							transform->position.AsVec2(),
+							transform->rotation,
+							rayOrigin,
+							rayDir);
+						if (distanceOpt.HasValue())
 						{
-							Math::Vec2 vertices[4] = {
-								{-0.5f, 0.5f },
-								{ 0.5f, 0.5f },
-								{ 0.5f, -0.5f },
-								{ -0.5f, -0.5f } };
-							Std::Opt<f32> distanceOpt = Intersect_Ray_PhysicsCollider(
-								widget,
-								{ vertices, 4 },
-								transform->position.AsVec2(),
-								transform->rotation,
-								ray);
-							if (distanceOpt.HasValue())
-							{
-								f32 newDist = distanceOpt.Value();
-								if (!hitEntity.HasValue() || newDist <= hitEntity.Value().a)
-									hitEntity = { newDist, entity };
-							}
+							f32 newDist = distanceOpt.Value();
+							if (!hitEntity.HasValue() || newDist <= hitEntity.Value().a)
+								hitEntity = { newDist, entity };
 						}
 					}
-					if (hitEntity.HasValue())
-					{
-						widget.editorImpl->SelectEntity(hitEntity.Value().b);
-						return;
-					}
+				}
+				if (hitEntity.HasValue())
+				{
+					widget.editorImpl->SelectEntity(hitEntity.Value().b);
+					return;
 				}
 			}
 		}
@@ -723,8 +707,7 @@ namespace DEngine::Editor::impl
 			widget.state = InternalViewportWidget::BehaviorState::Normal;
 			App::LockCursor(false);
 			return;
-		}
-		
+		}	
 	}
 
 	static void InternalViewportWidget_PointerMove(
@@ -741,35 +724,37 @@ namespace DEngine::Editor::impl
 		if (widget.state == InternalViewportWidget::BehaviorState::Gizmo)
 		{
 			DENGINE_DETAIL_ASSERT(widget.holdingGizmoData.HasValue());
+			Entity entity = {};
+			Transform* transformPtr = nullptr;
 			auto const& gizmoHoldingData = widget.holdingGizmoData.Value();
 			if (gizmoHoldingData.pointerId == pointerId && widget.editorImpl->GetSelectedEntity().HasValue())
 			{
-				Entity entity = widget.editorImpl->GetSelectedEntity().Value();
+				entity = widget.editorImpl->GetSelectedEntity().Value();
 				// First check if we have a transform
 				Scene& scene = widget.editorImpl->GetActiveScene();
-				Transform* transformPtr = scene.GetComponent<Transform>(entity);
-				if (transformPtr != nullptr)
-				{
-					Transform& transform = *transformPtr;
+				transformPtr = scene.GetComponent<Transform>(entity);
+			}
+			if (transformPtr != nullptr)
+			{
+				Transform& transform = *transformPtr;
 
-					GizmoType const currGizmo = widget.editorImpl->GetCurrentGizmoType();
-					if (currGizmo == GizmoType::Translate)
-					{
-						impl::TranslateAlongGizmoAxis(
-							widget,
-							widgetRect,
-							pointerPos,
-							transform);
-					}
-					else if (currGizmo == GizmoType::Rotate)
-					{
-						impl::Gizmo_HandleRotation(
-							widget,
-							widgetRect,
-							pointerPos,
-							gizmoHoldingData.rotationOffset,
-							transform);
-					}
+				GizmoType const currGizmo = widget.editorImpl->GetCurrentGizmoType();
+				if (currGizmo == GizmoType::Translate)
+				{
+					impl::TranslateAlongGizmoAxis(
+						widget,
+						widgetRect,
+						pointerPos,
+						transform);
+				}
+				else if (currGizmo == GizmoType::Rotate)
+				{
+					impl::Gizmo_HandleRotation(
+						widget,
+						widgetRect,
+						pointerPos,
+						gizmoHoldingData.rotationOffset,
+						transform);
 				}
 			}
 		}
@@ -787,25 +772,14 @@ namespace DEngine::Editor::impl
 using namespace DEngine;
 using namespace DEngine::Editor;
 
-[[nodiscard]] Gizmo::Test_Ray InternalViewportWidget::BuildRay(Gui::Rect widgetRect, Math::Vec2 pointerPos) const
-{
-	f32 aspectRatio = (f32)widgetRect.extent.width / (f32)widgetRect.extent.height;
-	Math::Mat4 projMat = GetProjectionMatrix(aspectRatio);
-
-	Gizmo::Test_Ray ray{};
-	ray.origin = cam.position;
-	Math::Vec3 vector = impl::DeprojectScreenspaceCoord(impl::GetNormalizedViewportCoord(pointerPos, widgetRect), projMat);
-	ray.direction = (vector - cam.position).GetNormalized();
-	return ray;
-}
-
-// target_size in pixels
+// Target_size in pixels
 [[nodiscard]] f32 Gizmo::ComputeScale(
 	Math::Mat4 const& worldTransform,
-	u32 targetSizePx,
 	Math::Mat4 const& projection,
 	Gui::Extent viewportSize) noexcept
 {
+	u32 smallestViewportExtent = Math::Min(viewportSize.width, viewportSize.height);
+	u32 targetSizePx = smallestViewportExtent * Gizmo::defaultGizmoSizeRelative;
 	f32 const pixelSize = 1.f / viewportSize.height;
 	Math::Vec4 zVec = { worldTransform.At(3, 0), worldTransform.At(3, 1), worldTransform.At(3, 2), worldTransform.At(3, 3) };
 	return targetSizePx * pixelSize * (projection * zVec).w;
@@ -833,43 +807,68 @@ InternalViewportWidget::~InternalViewportWidget()
 	editorImpl->viewportWidgets.erase(ptrIt);
 }
 
-Math::Mat4 InternalViewportWidget::GetViewMatrix() const noexcept
+Math::Mat4 InternalViewportWidget::BuildViewMatrix() const noexcept
 {
-	Math::Mat4 camMat = Math::LinTran3D::Rotate_Homo(cam.rotation);
-	Math::LinTran3D::SetTranslation(camMat, cam.position);
+	Math::Mat4 camMat = Math::LinAlg3D::Rotate_Homo(cam.rotation);
+	Math::LinAlg3D::SetTranslation(camMat, cam.position);
 	return camMat;
 }
 
-Math::Mat4 InternalViewportWidget::GetPerspectiveMatrix(f32 aspectRatio) const noexcept
+Math::Mat4 InternalViewportWidget::BuildPerspectiveMatrix(f32 aspectRatio) const noexcept
 {
-	return Math::LinTran3D::Perspective_RH_ZO(
+	return Math::LinAlg3D::Perspective_RH_ZO(
 		cam.verticalFov * Math::degToRad, 
 		aspectRatio, 
 		0.1f,
 		100.f);
 }
 
-Math::Mat4 InternalViewportWidget::GetProjectionMatrix(f32 aspectRatio) const noexcept
+Math::Mat4 InternalViewportWidget::BuildProjectionMatrix(f32 aspectRatio) const noexcept
 {
 	Math::Mat4 camMat = Math::Mat4::Identity();
 	camMat.At(0, 0) = -1;
 	//test.At(1, 1) = -1;
 	camMat.At(2, 2) = -1;
-	camMat = GetViewMatrix() * camMat;
+	camMat = BuildViewMatrix() * camMat;
 	camMat = camMat.GetInverse().Value();
-	return GetPerspectiveMatrix(aspectRatio) * camMat;
+	return BuildPerspectiveMatrix(aspectRatio) * camMat;
+}
+
+Math::Vec3 InternalViewportWidget::BuildRayDirection(
+	Gui::Rect widgetRect, 
+	Math::Vec2 pointerPos) const noexcept
+{
+	auto pointerNormPos = impl::GetNormalizedViewportCoord(pointerPos, widgetRect);
+
+	auto perspMat = BuildPerspectiveMatrix(widgetRect.extent.Aspect());
+
+	// This is our coordinates in Normalized Device Coordinates.
+	// We use the inverse perspective matrix to transform this into a real-world value,
+	// but with no camera transform applied.
+	auto normalizedCoordPos = pointerNormPos.AsVec4(1.f, 1.f);
+	auto perspMatInvOpt = perspMat.GetInverse();
+	DENGINE_DETAIL_ASSERT(perspMatInvOpt.HasValue());
+	auto const& perspMatInv = perspMatInvOpt.Value();
+	auto vector = perspMatInv * normalizedCoordPos;
+	for (auto& item : vector)
+		item /= vector.w;
+	vector.x *= -1.f;
+	vector.z *= -1.f;
+	auto vector2 = Math::LinAlg3D::Rotate(vector.AsVec3(), cam.rotation);
+	vector2 = vector2.GetNormalized();
+	return vector2;
 }
 
 void InternalViewportWidget::ApplyCameraRotation(Math::Vec2 input) noexcept
 {
 	cam.rotation = Math::UnitQuat::FromVector(Math::Vec3::Up(), -input.x) * cam.rotation;
 	// Limit rotation up and down
-	Math::Vec3 forward = Math::LinTran3D::ForwardVector(cam.rotation);
+	auto forward = Math::LinAlg3D::ForwardVector(cam.rotation);
 	f32 dot = Math::Vec3::Dot(forward, Math::Vec3::Up());
 	constexpr f32 upDownDotProductLimit = 0.9f;
 	if ((dot <= -upDownDotProductLimit && input.y < 0) || (dot >= upDownDotProductLimit && input.y > 0))
 		input.y = 0;
-	cam.rotation = Math::UnitQuat::FromVector(Math::LinTran3D::RightVector(cam.rotation), -input.y) * cam.rotation;
+	cam.rotation = Math::UnitQuat::FromVector(Math::LinAlg3D::RightVector(cam.rotation), -input.y) * cam.rotation;
 }
 
 void InternalViewportWidget::ApplyCameraMovement(Math::Vec3 move, f32 speed) noexcept
@@ -879,8 +878,8 @@ void InternalViewportWidget::ApplyCameraMovement(Math::Vec3 move, f32 speed) noe
 		if (move.MagnitudeSqrd() > 1.f)
 			move.Normalize();
 		Math::Vec3 moveVector{};
-		moveVector += Math::LinTran3D::ForwardVector(cam.rotation) * move.z;
-		moveVector += Math::LinTran3D::RightVector(cam.rotation) * -move.x;
+		moveVector += Math::LinAlg3D::ForwardVector(cam.rotation) * move.z;
+		moveVector += Math::LinAlg3D::RightVector(cam.rotation) * -move.x;
 		moveVector += Math::Vec3::Up() * move.y;
 
 		if (moveVector.MagnitudeSqrd() > 1.f)
@@ -1013,7 +1012,7 @@ namespace DEngine::Editor::impl
 			default:
 				break;
 		}
-		DENGINE_DETAIL_UNREACHABLE();
+		DENGINE_IMPL_UNREACHABLE();
 		return {};
 	}
 }
@@ -1032,7 +1031,7 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 	returnVal.height = currentExtent.height;
 
 	f32 aspectRatio = (f32)newExtent.width / (f32)newExtent.height;
-	Math::Mat4 projMat = GetProjectionMatrix(aspectRatio);
+	Math::Mat4 projMat = BuildProjectionMatrix(aspectRatio);
 
 	returnVal.transform = projMat;
 
@@ -1055,11 +1054,9 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 			gizmo.rotation = transform.rotation;
 
 			Math::Mat4 worldTransform = Math::Mat4::Identity();
-			Math::LinTran3D::SetTranslation(worldTransform, { transform.position.x, transform.position.y, 0.f });
-			u32 smallestViewportExtent = Math::Min(newExtent.width, newExtent.height);
+			Math::LinAlg3D::SetTranslation(worldTransform, { transform.position.x, transform.position.y, 0.f });
 			f32 scale = Gizmo::ComputeScale(
 				worldTransform,
-				u32(smallestViewportExtent * Gizmo::defaultGizmoSizeRelative),
 				projMat,
 				newExtent);
 			gizmo.scale = scale;
@@ -1082,8 +1079,8 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 
 			// We need to build a transform from the physics-body, not the Transform component?
 			Math::Mat4 worldTransform = Math::Mat4::Identity();
-			worldTransform = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation) * worldTransform;
-			Math::LinTran3D::SetTranslation(worldTransform, transform.position);
+			worldTransform = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation) * worldTransform;
+			Math::LinAlg3D::SetTranslation(worldTransform, transform.position);
 
 			for (uSize i = 0; i < 5; i++)
 			{

@@ -1,30 +1,22 @@
 #pragma once
 
+#include "Editor.hpp"
+#include "EditorImpl.hpp"
+
 #include <DEngine/Gui/StackLayout.hpp>
 #include <DEngine/Gui/Widget.hpp>
 #include <DEngine/Gui/Button.hpp>
 #include <DEngine/Gui/MenuBar.hpp>
-
-#include "Editor.hpp"
-#include "EditorImpl.hpp"
 
 #include <DEngine/Gfx/Gfx.hpp>
 
 #include <DEngine/Std/Utility.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
 
-#include <iostream>
-
 namespace DEngine::Editor
 {
 	namespace Gizmo
 	{
-		struct Test_Ray
-		{
-			Math::Vec3 origin = {};
-			Math::Vec3 direction = {};
-		};
-
 		enum class GizmoPart
 		{
 			ArrowX,
@@ -55,7 +47,7 @@ namespace DEngine::Editor
 
 		constexpr Arrow defaultArrow = impl::BuildDefaultArrow();
 
-		constexpr f32 defaultGizmoSizeRelative = 0.33f;
+		constexpr f32 defaultGizmoSizeRelative = 0.4f;
 		// Size is relative to the gizmo size
 		constexpr f32 defaultPlaneScaleRelative = 0.25f;
 		// Relative to the gizmo size
@@ -67,7 +59,6 @@ namespace DEngine::Editor
 		// target_size in pixels
 		[[nodiscard]] f32 ComputeScale(
 			Math::Mat4 const& worldTransform,
-			u32 targetSizePx,
 			Math::Mat4 const& projection,
 			Gui::Extent viewportSize) noexcept;
 	}
@@ -99,7 +90,7 @@ namespace DEngine::Editor
 		{
 			u8 pointerId;
 			Gizmo::GizmoPart holdingPart;
-			Gizmo::Test_Ray initialRay;
+			Math::Vec3 normalizedOffset;
 			Math::Vec3 initialPos;
 			// Current rotation offset from the pointer. In radians [-pi, pi]
 			f32 rotationOffset;
@@ -131,13 +122,10 @@ namespace DEngine::Editor
 
 		virtual ~InternalViewportWidget() override;
 
-		[[nodiscard]] Math::Mat4 GetViewMatrix() const noexcept;
-
-		[[nodiscard]] Math::Mat4 GetPerspectiveMatrix(f32 aspectRatio) const noexcept;
-
-		[[nodiscard]] Math::Mat4 GetProjectionMatrix(f32 aspectRatio) const noexcept;
-
-		[[nodiscard]] Gizmo::Test_Ray BuildRay(Gui::Rect widgetRect, Math::Vec2 pointerPos) const;
+		[[nodiscard]] Math::Mat4 BuildViewMatrix() const noexcept;
+		[[nodiscard]] Math::Mat4 BuildPerspectiveMatrix(f32 aspectRatio) const noexcept;
+		[[nodiscard]] Math::Mat4 BuildProjectionMatrix(f32 aspectRatio) const noexcept;
+		[[nodiscard]] Math::Vec3 BuildRayDirection(Gui::Rect widgetRect, Math::Vec2 pointerPos) const noexcept;
 
 		void ApplyCameraRotation(Math::Vec2 input) noexcept;
 

@@ -30,8 +30,6 @@ namespace DEngine::Gfx::Vk
 		GlobUtils const& globUtils,
 		ViewportUpdate updateData)
 	{
-		vk::Result vkResult{};
-
 		// We need to create this virtual viewport
 		renderTarget = InitializeGfxViewportRenderTarget(
 			globUtils,

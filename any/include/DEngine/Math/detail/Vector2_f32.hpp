@@ -27,6 +27,9 @@ namespace DEngine::Math
 		[[nodiscard]] Vector<2, f32> GetNormalized() const;
 		void Normalize();
 
+		// Returns this vector rotated 90 degrees around the Z axis.
+		// True means counterclockwise, false is clockwise.
+		[[nodiscard]] constexpr Vector<2, f32> GetRotated90(bool counterClock) const noexcept;
 		// Returns this vector rotated radians amount around the Z axis.
 		[[nodiscard]] Vector<2, f32> GetRotated(f32 radians) const noexcept;
 

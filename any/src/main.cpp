@@ -417,8 +417,8 @@ void DEngine::impl::SubmitRendering(
 
 		params.textureIDs.push_back(item.b);
 
-		Math::Mat4 transformMat = Math::LinTran3D::Translate(transform.position) *
-			Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation);
+		Math::Mat4 transformMat = Math::LinAlg3D::Translate(transform.position) *
+			Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation);
 		params.transforms.push_back(transformMat);
 	}
 

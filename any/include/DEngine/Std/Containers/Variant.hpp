@@ -66,7 +66,7 @@ namespace DEngine::Std
 		}
 
 		template<unsigned int i>
-		[[nodiscard]] auto Get() noexcept -> decltype(auto)
+		[[nodiscard]] decltype(auto) Get() noexcept
 		{
 			static_assert(i < sizeof...(Ts), "Tried to Get a Variant with an index out of bounds of the types.");
 			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);
@@ -74,7 +74,7 @@ namespace DEngine::Std
 		}
 
 		template<unsigned int i>
-		[[nodiscard]] auto Get() const noexcept -> decltype(auto)
+		[[nodiscard]] decltype(auto) Get() const noexcept
 		{
 			static_assert(i < sizeof...(Ts), "Tried to Get a Variant with an index out of bounds of the types.");
 			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);
@@ -82,14 +82,14 @@ namespace DEngine::Std
 		}
 
 		template<typename T>
-		[[nodiscard]] auto Get() noexcept -> decltype(auto)
+		[[nodiscard]] decltype(auto) Get() noexcept
 		{
 			constexpr unsigned int i = Trait::indexOf<T, Ts...>;
 			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);
 			return *reinterpret_cast<T*>(data);
 		}
 		template<typename T>
-		[[nodiscard]] auto Get() const noexcept -> decltype(auto)
+		[[nodiscard]] decltype(auto) Get() const noexcept
 		{
 			constexpr unsigned int i = Trait::indexOf<T, Ts...>;
 			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);

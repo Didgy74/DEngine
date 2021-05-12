@@ -114,7 +114,7 @@ namespace DEngine::Gui::impl
 			default:
 				break;
 		}
-		DENGINE_DETAIL_UNREACHABLE();
+		DENGINE_IMPL_UNREACHABLE();
 		return {};
 	}
 	void ButtonGroup_PointerPress(

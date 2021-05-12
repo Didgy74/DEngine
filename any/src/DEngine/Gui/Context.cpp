@@ -213,7 +213,7 @@ namespace DEngine::Gui::impl
 					return Std::nullOpt;
 				break;
 			default:
-				DENGINE_DETAIL_UNREACHABLE();
+				DENGINE_IMPL_UNREACHABLE();
 			}
 		}
 

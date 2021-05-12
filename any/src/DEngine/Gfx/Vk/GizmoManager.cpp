@@ -763,9 +763,10 @@ namespace DEngine::Gfx::Vk::impl
 
 		// Draw X arrow
 		{
-			Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
-			gizmoMatrix = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::Y, Math::pi / 2) * gizmoMatrix;
-			Math::LinTran3D::SetTranslation(gizmoMatrix, gizmo.position);
+			Math::Mat4 gizmoMatrix = Math::LinAlg3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
+			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Y, Math::pi / 2) * gizmoMatrix;
+			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, gizmo.rotation) * gizmoMatrix;
+			Math::LinAlg3D::SetTranslation(gizmoMatrix, gizmo.position);
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				gizmoManager.pipelineLayout,
@@ -791,9 +792,10 @@ namespace DEngine::Gfx::Vk::impl
 		}
 		// Draw Y arrow
 		{
-			Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
-			gizmoMatrix = Math::LinTran3D::Rotate_Homo(Math::ElementaryAxis::X, -Math::pi / 2) * gizmoMatrix;
-			Math::LinTran3D::SetTranslation(gizmoMatrix, gizmo.position);
+			Math::Mat4 gizmoMatrix = Math::LinAlg3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
+			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::X, -Math::pi / 2) * gizmoMatrix;
+			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, gizmo.rotation) * gizmoMatrix;
+			Math::LinAlg3D::SetTranslation(gizmoMatrix, gizmo.position);
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				gizmoManager.pipelineLayout,
@@ -821,11 +823,12 @@ namespace DEngine::Gfx::Vk::impl
 		{
 			globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, gizmoManager.quadPipeline);
 
-			Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.quadScale, gizmo.quadScale, gizmo.quadScale);
+			Math::Mat4 gizmoMatrix = Math::LinAlg3D::Scale_Homo(gizmo.quadScale, gizmo.quadScale, gizmo.quadScale);
+			Math::Vec3 preTranslation = Math::Vec3{ 1.f, 1.f, 0.f } * gizmo.quadOffset;
+			Math::LinAlg3D::SetTranslation(gizmoMatrix, preTranslation);
+			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, gizmo.rotation) * gizmoMatrix;
 			Math::Vec3 translation = gizmo.position;
-			translation += Math::Vec3{ 1.f, 1.f, 0.f } *gizmo.quadOffset;
-
-			Math::LinTran3D::SetTranslation(gizmoMatrix, translation);
+			gizmoMatrix = Math::LinAlg3D::Translate(translation) * gizmoMatrix;
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				gizmoManager.pipelineLayout,
@@ -871,8 +874,8 @@ namespace DEngine::Gfx::Vk::impl
 			{ (u32)descrSets.Size(), descrSets.Data() },
 			nullptr);
 
-		Math::Mat4 gizmoMatrix = Math::LinTran3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
-		Math::LinTran3D::SetTranslation(gizmoMatrix, gizmo.position);
+		Math::Mat4 gizmoMatrix = Math::LinAlg3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
+		Math::LinAlg3D::SetTranslation(gizmoMatrix, gizmo.position);
 		globUtils.device.cmdPushConstants(
 			cmdBuffer,
 			gizmoManager.pipelineLayout,
@@ -914,8 +917,6 @@ void Vk::GizmoManager::Initialize(
 	Std::Span<Math::Vec3 const> arrowMesh,
 	Std::Span<Math::Vec3 const> circleLineMesh)
 {
-	vk::Result vkResult = {};
-
 	impl::GizmoManager_InitializeArrowMesh(
 		manager,
 		device,
@@ -1076,7 +1077,7 @@ void Vk::GizmoManager::Gizmo_RecordDrawCalls(
 			break;
 
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 			break;
 	};
 }

@@ -23,7 +23,6 @@
 
 #include <vector>
 #include <string>
-#include <iostream>
 
 namespace DEngine::Editor
 {
@@ -321,11 +320,6 @@ namespace DEngine::Editor
 		gizmoBtnGroup->AddButton("Translate");
 		gizmoBtnGroup->AddButton("Rotate");
 		gizmoBtnGroup->AddButton("Scale");
-		gizmoBtnGroup->activeChangedCallback = [&editorImpl](Gui::ButtonGroup& widget, u32 newIndex)
-		{
-			DENGINE_DETAIL_ASSERT(newIndex < 3);
-			std::cout << newIndex << std::endl;
-		};
 
 		return Std::Box<Gui::Widget>{ menuBarA };
 	}

@@ -130,6 +130,7 @@ Math::Matrix<4, 4, f32> Math::LinearTransform3D::Rotate_Homo(ElementaryAxis axis
 			0, 0, 0, 1
 		} } };
 	default:
+		DENGINE_IMPL_UNREACHABLE();
 		return {};
 	};
 }

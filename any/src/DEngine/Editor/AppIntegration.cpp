@@ -156,7 +156,7 @@ void Editor::EditorImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursorT
 		appCursorType = App::CursorType::VerticalResize;
 		break;
 	default:
-		DENGINE_DETAIL_UNREACHABLE();
+		DENGINE_IMPL_UNREACHABLE();
 		break;
 	}
 	App::SetCursor((App::WindowID)id, appCursorType);
@@ -187,7 +187,7 @@ void Editor::EditorImpl::OpenSoftInput(
 		filter = App::SoftInputFilter::UnsignedInteger;
 		break;
 	default:
-		DENGINE_DETAIL_UNREACHABLE();
+		DENGINE_IMPL_UNREACHABLE();
 	}
 	App::OpenSoftInput(currentText, filter);
 }

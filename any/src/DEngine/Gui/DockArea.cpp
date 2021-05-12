@@ -27,7 +27,7 @@ namespace DEngine::Gui::impl
 		case DA_OuterLayoutGizmo::Left: return DA_InnerLayoutGizmo::Left;
 		case DA_OuterLayoutGizmo::Right: return DA_InnerLayoutGizmo::Right;
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 			return {};
 		}
 	}
@@ -725,7 +725,7 @@ namespace DEngine::Gui::impl
 			}
 			break;
 			default:
-				DENGINE_DETAIL_UNREACHABLE();
+				DENGINE_IMPL_UNREACHABLE();
 				break;
 		}
 		return returnVal;
@@ -813,7 +813,7 @@ namespace DEngine::Gui::impl
 				returnVal.position.y += layerRect.extent.height / 2 - gizmoSize / 2;
 				break;
 			default:
-				DENGINE_DETAIL_UNREACHABLE();
+				DENGINE_IMPL_UNREACHABLE();
 				break;
 		}
 		return returnVal;
@@ -886,7 +886,7 @@ namespace DEngine::Gui::impl
 			returnVal.position.x += gizmoSize;
 			break;
 		default:
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 			break;
 		}
 		return returnVal;
@@ -938,7 +938,7 @@ namespace DEngine::Gui::impl
 			case DA_InnerLayoutGizmo::Center:
 				break;
 			default:
-				DENGINE_DETAIL_UNREACHABLE();
+				DENGINE_IMPL_UNREACHABLE();
 				break;
 		}
 		return returnVal;
@@ -2105,7 +2105,7 @@ void DockArea::TouchEvent(
 		impl::DA_PointerMove(params);
 	}
 	else
-		DENGINE_DETAIL_UNREACHABLE();
+		DENGINE_IMPL_UNREACHABLE();
 }
 
 void DockArea::InputConnectionLost() 

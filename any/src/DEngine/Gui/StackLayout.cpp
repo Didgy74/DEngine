@@ -281,7 +281,7 @@ SizeHint StackLayout::GetSizeHint(
 		else if (this->direction == Direction::Vertical)
 			returnVal.expandX = true;
 		else
-			DENGINE_DETAIL_UNREACHABLE();
+			DENGINE_IMPL_UNREACHABLE();
 	}
 		
 	// Add padding
