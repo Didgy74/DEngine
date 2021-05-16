@@ -26,10 +26,11 @@ The following compilers have been tested and proven to work:
  - Clang x64 11.0
 
 ### Android
- - Android Studio v4.2
-   - SDK Platform v30 (Android 11.0)
-   - SDK Build Tools v30.0.3
-   - NDK 23.0.7272597
+- Device running 64-bit Android 8.1
+- Android Studio v4.2
+  - SDK Platform v30 (Android 11.0)
+  - SDK Build Tools v30.0.3
+  - NDK 23.0.7272597
  
 The following compilers have been tested and proven to work:
 - Clang ARMv8 64-bit 11.0
