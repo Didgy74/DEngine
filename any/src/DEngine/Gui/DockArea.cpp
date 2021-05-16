@@ -1273,7 +1273,7 @@ DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(Poin
 			newBehavior.pointerId = in.pointerId;
 			Math::Vec2 tabPos = { (f32)tabHit.Value().rect.position.x, (f32)tabHit.Value().rect.position.y };
 			newBehavior.pointerOffset = tabPos - in.pointerPos;
-			in.dockArea->stateData.Set(newBehavior);
+			in.dockArea->stateData = newBehavior;
 		}
 		else
 		{
@@ -1286,7 +1286,7 @@ DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(Poin
 				newBehavior.pointerId = in.pointerId;
 				Math::Vec2 temp = Math::Vec2{ (f32)in.layerRect.position.x, (f32)in.layerRect.position.y } - in.pointerPos;
 				newBehavior.pointerOffset = temp;
-				in.dockArea->stateData.Set(newBehavior);
+				in.dockArea->stateData = newBehavior;
 			}
 		}
 		
@@ -1400,7 +1400,7 @@ DA::Node::PointerPress_Result impl::DA_SplitNode::PointerPress(PointerPress_Para
 			newState.layerIndex = in.layerIndex;
 			newState.pointerId = in.pointerId;
 			newState.splitNode = this;
-			in.dockArea->stateData.Set(newState);
+			in.dockArea->stateData = newState;
 
 			result.eventConsumed = true;
 			return result;
@@ -1446,7 +1446,7 @@ void impl::DA_PointerPress(DA_PointerPress_Params const& in)
 		bool deleteGizmoHit = DA_CheckHitDeleteGizmo(backLayerRect, in.dockArea->gizmoSize, in.pointerPos);
 		if (!eventConsumed && deleteGizmoHit)
 		{
-			in.dockArea->stateData.Set(DA::State_Normal{});
+			in.dockArea->stateData = DA::State_Normal{};
 			eventConsumed = true;
 			in.dockArea->layers.erase(in.dockArea->layers.begin());
 		}
@@ -1454,7 +1454,7 @@ void impl::DA_PointerPress(DA_PointerPress_Params const& in)
 		auto gizmoHit = DA_CheckHitOuterLayoutGizmo(backLayerRect, in.dockArea->gizmoSize, in.pointerPos);
 		if (!eventConsumed && gizmoHit.HasValue())
 		{
-			in.dockArea->stateData.Set(DA::State_Normal{});
+			in.dockArea->stateData = DA::State_Normal{};
 			eventConsumed = true;
 
 			Std::Box<DA::Node> origFrontNode = Std::Move(in.dockArea->layers.front().root);
@@ -1516,17 +1516,17 @@ void impl::DA_PointerPress(DA_PointerPress_Params const& in)
 		if (auto movingState = in.dockArea->stateData.ToPtr<DA::State_Moving>())
 		{
 			if (movingState->pointerId == in.pointerId && !in.pointerPressed)
-				in.dockArea->stateData.Set(DA::State_Normal{});
+				in.dockArea->stateData = DA::State_Normal{};
 		}
 		else if (auto holdingTabState = in.dockArea->stateData.ToPtr<DA::State_HoldingTab>())
 		{
 			if (holdingTabState->pointerId == in.pointerId && !in.pointerPressed)
-				in.dockArea->stateData.Set(DA::State_Normal{});
+				in.dockArea->stateData = DA::State_Normal{};
 		}
 		else if (auto resizingSplitNodeState = in.dockArea->stateData.ToPtr<DA::State_ResizingSplitNode>())
 		{
 			if (resizingSplitNodeState->pointerId == in.pointerId && !in.pointerPressed)
-				in.dockArea->stateData.Set(DA::State_Normal{});
+				in.dockArea->stateData = DA::State_Normal{};
 		}
 	}
 }
@@ -1610,7 +1610,7 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateHoldingTab(Po
 			newBehavior.movingSplitNode = false;
 			newBehavior.pointerId = stateData.pointerId;
 			newBehavior.pointerOffset = stateData.pointerOffset;
-			in.dockArea->stateData.Set(newBehavior);
+			in.dockArea->stateData = newBehavior;
 		}
 	}
 
@@ -1875,7 +1875,6 @@ void impl::DA_PointerMove(DA_PointerMove_Params const& in)
 
 DockArea::DockArea()
 {
-	stateData.Set(State_Normal{});
 }
 
 void DockArea::AddWindow(

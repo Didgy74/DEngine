@@ -13,6 +13,7 @@ namespace DEngine::Gfx::Vk::impl
 	class BoxVkBuffer
 	{
 	public:
+		constexpr BoxVkBuffer() noexcept = default;
 		BoxVkBuffer(BoxVkBuffer const&) = delete;
 		BoxVkBuffer& operator=(BoxVkBuffer const&) = delete;
 
@@ -34,7 +35,8 @@ namespace DEngine::Gfx::Vk::impl
 	class BoxVkCmdPool
 	{
 	public:
-		BoxVkCmdPool(BoxVkCmdPool const&) = delete;
+		constexpr BoxVkCmdPool() noexcept = default;
+		constexpr BoxVkCmdPool(BoxVkCmdPool const&) = delete;
 		BoxVkCmdPool& operator=(BoxVkCmdPool const&) = delete;
 
 		vk::CommandPool handle = {};

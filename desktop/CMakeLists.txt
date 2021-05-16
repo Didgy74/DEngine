@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.18)
 
 project(dengine_desktop)
 
@@ -21,5 +21,6 @@ target_link_libraries(dengine
 		dengine_any
 		glfw)
 set_target_properties(dengine PROPERTIES 
-	CXX_STANDARD 17
+	CXX_STANDARD 20
 	CXX_EXTENSIONS OFF)
+#target_compile_options(dengine PUBLIC "-ftime-trace")

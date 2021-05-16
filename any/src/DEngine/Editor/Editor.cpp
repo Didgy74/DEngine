@@ -1,7 +1,7 @@
-#include "ViewportWidget.hpp"
-
 #include "Editor.hpp"
 #include "EditorImpl.hpp"
+
+#include "ViewportWidget.hpp"
 #include "ComponentWidgets.hpp"
 
 #include <DEngine/Gui/ButtonGroup.hpp>
@@ -17,7 +17,6 @@
 
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Utility.hpp>
-
 #include <DEngine/Math/Constant.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
 
@@ -41,10 +40,10 @@ namespace DEngine::Editor
 			this->direction = Direction::Vertical;
 
 			Gui::StackLayout* topElementLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-			this->AddWidget(Std::Box<Gui::Widget>{ topElementLayout });
+			this->AddWidget(Std::Box{ topElementLayout });
 
 			Gui::Button* newEntityButton = new Gui::Button;
-			topElementLayout->AddWidget(Std::Box<Gui::Widget>{ newEntityButton });
+			topElementLayout->AddWidget(Std::Box{ newEntityButton });
 			newEntityButton->text = "New";
 			newEntityButton->activatePfn = [this](
 				Gui::Button& btn)

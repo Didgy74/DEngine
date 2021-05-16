@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Trait.hpp>
 #include <DEngine/Std/Containers/Range.hpp>

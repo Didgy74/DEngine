@@ -5,6 +5,7 @@
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/Variant.hpp>
+#include <DEngine/Std/Containers/Str.hpp>
 
 #include <DEngine/Math/Vector.hpp>
 
@@ -76,7 +77,8 @@ namespace DEngine::Gui
 			State_Moving,
 			State_HoldingTab,
 			State_ResizingSplitNode>;
-		StateDataT stateData{};
+		StateDataT stateData = State_Normal{};
+		//StateDataT stateData = float{};
 
 		void AddWindow(
 			Std::Str title,

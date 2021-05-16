@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.19)
 
 set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "Don't build box2d unit tests.")
 set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "Don't build box2d testbed.")
@@ -77,8 +77,9 @@ target_sources(dengine_any
 	PUBLIC
 		${DENGINE_HEADERS})
 set_target_properties(dengine_any PROPERTIES 
-	CXX_STANDARD 17
+	CXX_STANDARD 20
 	CXX_EXTENSIONS OFF)
+#target_compile_options(dengine_any PUBLIC "-ftime-trace")
 
 option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ON)
 if (${DENGINE_ENABLE_ASSERT})

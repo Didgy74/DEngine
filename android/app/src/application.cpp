@@ -90,7 +90,7 @@ namespace DEngine::Application::detail
 			Data<Type::InputQueueCreated>,
 			Data<Type::VisibleAreaChanged>,
 			Data<Type::NewOrientation>>;
-		VariantType data{};
+		VariantType data = Data<Type::CharInput>{}; // Just set a default value
 	};
 
 	struct BackendData
@@ -175,7 +175,7 @@ namespace DEngine::Application::detail
 		CustomEvent newEvent = {};
 		CustomEvent::Data<CustomEvent::Type::NativeWindowCreated> data = {};
 		data.nativeWindow = window;
-		newEvent.data.Set(data);
+		newEvent.data = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
 		backendData.customEventQueue.push_back(newEvent);
@@ -188,7 +188,7 @@ namespace DEngine::Application::detail
 
 		CustomEvent newEvent = {};
 		CustomEvent::Data<CustomEvent::Type::NativeWindowDestroyed> data = {};
-		newEvent.data.Set(data);
+		newEvent.data = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
 		backendData.customEventQueue.push_back(newEvent);
@@ -202,7 +202,7 @@ namespace DEngine::Application::detail
 		CustomEvent newEvent = {};
 		CustomEvent::Data<CustomEvent::Type::InputQueueCreated> data = {};
 		data.inputQueue = queue;
-		newEvent.data.Set(data);
+		newEvent.data = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
 		backendData.customEventQueue.push_back(newEvent);
@@ -221,7 +221,7 @@ namespace DEngine::Application::detail
 
 		CustomEvent newEvent = {};
 		CustomEvent::Data<CustomEvent::Type::NewOrientation> data = {};
-		newEvent.data.Set(data);
+		newEvent.data = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
 		backendData.customEventQueue.push_back(newEvent);
@@ -305,7 +305,7 @@ extern "C"
 	CustomEvent newEvent = {};
 	CustomEvent::Data<CustomEvent::Type::CharInput> data = {};
 	data.charInput = utfValue;
-	newEvent.data.Set(data);
+	newEvent.data = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
@@ -325,7 +325,7 @@ extern "C"
 
 	CustomEvent newEvent = {};
 	CustomEvent::Data<CustomEvent::Type::CharEnter> data = {};
-	newEvent.data.Set(data);
+	newEvent.data = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
@@ -345,7 +345,7 @@ extern "C"
 
 	CustomEvent newEvent = {};
 	CustomEvent::Data<CustomEvent::Type::CharRemove> data = {};
-	newEvent.data.Set(data);
+	newEvent.data = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
@@ -378,7 +378,7 @@ extern "C"
 	data.offsetY = (i32)posY;
 	data.width = (u32)width;
 	data.height = (u32)height;
-	newEvent.data.Set(data);
+	newEvent.data = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
@@ -407,7 +407,7 @@ extern "C"
 	CustomEvent newEvent = {};
 	CustomEvent::Data<CustomEvent::Type::NewOrientation> data = {};
 	data.newOrientation = (uint8_t)newOrientation;
-	newEvent.data.Set(data);
+	newEvent.data = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
 	backendData.customEventQueue.push_back(newEvent);
@@ -638,9 +638,8 @@ namespace DEngine::Application::detail
 		{
 			if (callable.HasValue())
 				callable.Value()(event);
-			auto typeIndexOpt = event.data.GetIndex();
-			DENGINE_DETAIL_APPLICATION_ASSERT(typeIndexOpt.HasValue());
-			switch (typeIndexOpt.Value())
+			auto typeIndex = event.data.GetIndex();
+			switch (typeIndex)
 			{
 				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NativeWindowCreated>>:
 				{
@@ -794,9 +793,8 @@ bool Application::detail::Backend_Initialize() noexcept
 		ProcessCustomEvents(
 			[&nativeWindowSet, &inputQueueSet, &visibleAreaSet](CustomEvent const& event)
 			{
-				auto typeIndexOpt = event.data.GetIndex();
-				DENGINE_DETAIL_APPLICATION_ASSERT(typeIndexOpt.HasValue());
-				switch (typeIndexOpt.Value())
+				auto typeIndex = event.data.GetIndex();
+				switch (typeIndex)
 				{
 					case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::InputQueueCreated>>:
 						inputQueueSet = true;
