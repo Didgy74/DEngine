@@ -19,7 +19,7 @@ CollapsingHeader::CollapsingHeader(bool collapsed)
 	btn->type = Button::Type::Toggle;
 	btn->text = "Test";
 	
-	btn->activatePfn = [this](
+	btn->activateFn = [this](
 		Button& btn)
 	{
 		if (btn.GetToggled())
@@ -147,22 +147,24 @@ void CollapsingHeader::InputConnectionLost()
 	return mainStackLayout.InputConnectionLost();
 }
 
-void CollapsingHeader::CursorMove(
+bool CollapsingHeader::CursorMove(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	CursorMoveEvent event)
+	CursorMoveEvent event,
+	bool occluded)
 {
 	return mainStackLayout.CursorMove(
 		ctx,
 		windowId,
 		widgetRect,
 		visibleRect,
-		event);
+		event,
+		occluded);
 }
 
-void CollapsingHeader::CursorClick(
+bool CollapsingHeader::CursorPress(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
@@ -170,7 +172,7 @@ void CollapsingHeader::CursorClick(
 	Math::Vec2Int cursorPos,
 	CursorClickEvent event)
 {
-	return mainStackLayout.CursorClick(
+	return mainStackLayout.CursorPress(
 		ctx,
 		windowId,
 		widgetRect,
@@ -184,12 +186,14 @@ void CollapsingHeader::TouchEvent(
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event)
+	Gui::TouchEvent event,
+	bool occluded)
 {
 	return mainStackLayout.TouchEvent(
 		ctx,
 		windowId,
 		widgetRect,
 		visibleRect,
-		event);
+		event,
+		occluded);
 }

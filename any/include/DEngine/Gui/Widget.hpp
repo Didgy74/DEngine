@@ -42,27 +42,49 @@ namespace DEngine::Gui
 
 		virtual void InputConnectionLost() {}
 
-		virtual void CursorMove(
+		// Returns true if the widget occludes the cursor.
+		// That means widgets that are behind/under this one in terms of Z axis,
+		// should not react to this cursor-move for i.e highlights.
+		// 
+		// Transparent overlays should always return false.
+		//
+		// The change is reflected in the "occluded" parameter for all
+		// subsequent widget this event dispatch.
+		// 
+		// If the occluded parameter is already true,
+		// the return value should ordinarily be ignored.
+		//
+		// If the return value is true, it does NOT ordinarily mean
+		// you can end event dispatching early. That is to say
+		// this event should ordinarily always be passed to every widget
+		// in the hierarchy.
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			CursorMoveEvent event) {}
+			CursorMoveEvent event,
+			bool occluded) { return false; }
 
-		virtual void CursorClick(
+		// Return true if event has been consumed.
+		//
+		// This ordinarily means you can end event dispatching
+		// early.
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
-			CursorClickEvent event) {}
+			CursorClickEvent event) { return false; }
 
 		virtual void TouchEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			TouchEvent event) {}
+			TouchEvent event,
+			bool occluded) {}
 	};
 
 	inline Widget::~Widget() {}

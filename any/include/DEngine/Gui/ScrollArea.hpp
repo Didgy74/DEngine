@@ -3,6 +3,7 @@
 #include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
+#include <DEngine/Std/Containers/Variant.hpp>
 
 namespace DEngine::Gui
 {
@@ -11,17 +12,24 @@ namespace DEngine::Gui
 	public:
 		using ParentType = Widget;
 
-		u32 scrollBarCursorRelativePosY = 0;
-		mutable u32 scrollBarPos = 0;
-		u32 scrollBarThickness = 50;
-		enum class ScrollBarState
+		u32 scrollbarPos = 0;
+		u32 scrollbarThickness = 50;
+
+		struct ScrollbarState_Normal {};
+		struct ScrollbarState_Hovered
 		{
-			Normal,
-			Hovered,
-			Pressed
+			u8 pointerId;
 		};
-		ScrollBarState scrollBarState = ScrollBarState::Normal;
-		Std::Opt<u8> scrollBarTouchIndex;
+		struct ScrollbarState_Pressed
+		{
+			u8 pointerId;
+			f32 pointerRelativePosY;
+		};
+		using ScrollbarState_T = Std::Variant<
+			ScrollbarState_Normal,
+			ScrollbarState_Hovered,
+			ScrollbarState_Pressed>;
+		ScrollbarState_T scrollbarState = ScrollbarState_Normal{};
 
 		Std::Box<Widget> widget;
 
@@ -35,14 +43,15 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		virtual void CursorMove(
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			CursorMoveEvent event) override;
+			CursorMoveEvent event,
+			bool occluded) override;
 
-		virtual void CursorClick(
+		[[nodiscard]] virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -55,7 +64,8 @@ namespace DEngine::Gui
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override;
+			Gui::TouchEvent event,
+			bool occluded) override;
 
 		virtual void InputConnectionLost() override;
 

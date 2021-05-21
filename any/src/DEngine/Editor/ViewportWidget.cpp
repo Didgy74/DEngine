@@ -1,6 +1,11 @@
 #include "ViewportWidget.hpp"
 
+#include <DEngine/Editor/Joystick.hpp>
+
+#include <DEngine/Math/LinearTransform3D.hpp>
 #include <DEngine/Std/Trait.hpp>
+
+#include <DEngine/Gui/AnchorArea.hpp>
 
 namespace DEngine::Editor::impl
 {
@@ -230,8 +235,8 @@ namespace DEngine::Editor::impl
 		Math::Mat4 const& worldTransform) noexcept
 	{
 		Std::Opt<f32> result;
-		Math::Vec3 const vertex1 = Math::Vec3(worldTransform * Math::Vec4{ 0, 0, 0, 1 });
-		Math::Vec3 const vertex2 = Math::Vec3(worldTransform * Math::Vec4{ 0, 0, arrow.shaftLength, 1 });
+		Math::Vec3 const vertex1 = (worldTransform * Math::Vec4{ 0, 0, 0, 1 }).AsVec3();
+		Math::Vec3 const vertex2 = (worldTransform * Math::Vec4{ 0, 0, arrow.shaftLength, 1 }).AsVec3();
 		f32 const radius = 0.5f * arrow.shaftDiameter;
 
 		result = IntersectRayCylinder(
@@ -464,7 +469,7 @@ namespace DEngine::Editor::impl
 		{
 			Math::Vec2 tri[3] = { vertices[0], vertices[i], vertices[i + 1] };
 			for (uSize j = 0; j < 3; j += 1)
-				tri[j] = Math::Vec2(transMat * tri[j].AsVec4(0.f, 1.f));
+				tri[j] = (transMat * tri[j].AsVec4(0.f, 1.f)).AsVec2();
 
 			Std::Opt<f32> distance = impl::IntersectRayTri(
 				rayOrigin,
@@ -710,7 +715,7 @@ namespace DEngine::Editor::impl
 		}	
 	}
 
-	static void InternalViewportWidget_PointerMove(
+	static bool InternalViewportWidget_PointerMove(
 		InternalViewportWidget& widget,
 		Gui::Context& ctx,
 		Gui::WindowID windowId,
@@ -766,6 +771,8 @@ namespace DEngine::Editor::impl
 			Math::Vec2 amount = { (f32)cursorMove->positionDelta.x, (f32)-cursorMove->positionDelta.y };
 			widget.ApplyCameraRotation(amount * sensitivity * Math::degToRad);
 		}
+
+		return false;
 	}
 }
 
@@ -888,44 +895,6 @@ void InternalViewportWidget::ApplyCameraMovement(Math::Vec3 move, f32 speed) noe
 	}
 }
 
-Math::Vec2 InternalViewportWidget::GetLeftJoystickVec() const noexcept
-{
-	auto& joystick = joysticks[0];
-	if (joystick.isClicked || joystick.touchID.HasValue())
-	{
-		// Find vector between circle start position, and current position
-		// Then apply the logic
-		Math::Vec2Int relativeVector = joystick.currentPosition - joystick.originPosition;
-		if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelDeadZone))
-			return {};
-		Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
-		relativeVectorFloat.x /= joystickPixelRadius;
-		relativeVectorFloat.y /= joystickPixelRadius;
-
-		return relativeVectorFloat;
-	}
-	return {};
-}
-
-Math::Vec2 InternalViewportWidget::GetRightJoystickVec() const noexcept
-{
-	auto& joystick = joysticks[1];
-	if (joystick.isClicked || joystick.touchID.HasValue())
-	{
-		// Find vector between circle start position, and current position
-		// Then apply the logic
-		Math::Vec2Int relativeVector = joystick.currentPosition - joystick.originPosition;
-		if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelDeadZone))
-			return {};
-		Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
-		relativeVectorFloat.x /= joystickPixelRadius;
-		relativeVectorFloat.y /= joystickPixelRadius;
-
-		return relativeVectorFloat;
-	}
-	return {};
-}
-
 void InternalViewportWidget::TickTest(f32 deltaTime) noexcept
 {
 	if (!currentlyResizing && currentExtent != newExtent)
@@ -936,65 +905,6 @@ void InternalViewportWidget::TickTest(f32 deltaTime) noexcept
 	}
 	if (currentlyResizing)
 		extentCorrectTickCounter = 0;
-
-	// Handle camera movement
-	if (state == BehaviorState::FreeLooking)
-	{
-		f32 moveSpeed = 5.f;
-		Math::Vec3 moveVector{};
-		if (App::ButtonValue(App::Button::W))
-			moveVector.z += 1;
-		if (App::ButtonValue(App::Button::S))
-			moveVector.z -= 1;
-		if (App::ButtonValue(App::Button::D))
-			moveVector.x += 1;
-		if (App::ButtonValue(App::Button::A))
-			moveVector.x -= 1;
-		if (App::ButtonValue(App::Button::Space))
-			moveVector.y += 1;
-		if (App::ButtonValue(App::Button::LeftCtrl))
-			moveVector.y -= 1;
-		ApplyCameraMovement(moveVector, moveSpeed * deltaTime);
-	}
-
-	for (uSize i = 0; i < 2; i++)
-	{
-		auto& joystick = joysticks[i];
-		if (joystick.isClicked || joystick.touchID.HasValue())
-		{
-			// Find vector between circle start position, and current position
-			// Then apply the logic
-			Math::Vec2Int relativeVector = joystick.currentPosition - joystick.originPosition;
-			if (relativeVector.MagnitudeSqrd() <= Math::Sqrd(joystickPixelDeadZone))
-				continue;
-			Math::Vec2 relativeVectorFloat = { (f32)relativeVector.x, (f32)relativeVector.y };
-			relativeVectorFloat.x /= joystickPixelRadius;
-			relativeVectorFloat.y /= joystickPixelRadius;
-
-			if (i == 0)
-			{
-				f32 moveSpeed = 5.f;
-				ApplyCameraMovement({ relativeVectorFloat.x, 0.f, -relativeVectorFloat.y }, moveSpeed * deltaTime);
-			}
-			else
-			{
-				f32 sensitivity = 1.5f;
-				ApplyCameraRotation(Math::Vec2{ relativeVectorFloat.x, -relativeVectorFloat.y } *sensitivity * deltaTime);
-			}
-		}
-		else
-			joystick.currentPosition = joystick.originPosition;
-	}
-}
-
-// Pixel space
-void InternalViewportWidget::UpdateJoystickOrigin(Gui::Rect widgetRect) const noexcept
-{
-	joysticks[0].originPosition.x = widgetRect.position.x + joystickPixelRadius * 2;
-	joysticks[0].originPosition.y = widgetRect.position.y + widgetRect.extent.height - joystickPixelRadius * 2;
-
-	joysticks[1].originPosition.x = widgetRect.position.x + widgetRect.extent.width - joystickPixelRadius * 2;
-	joysticks[1].originPosition.y = widgetRect.position.y + widgetRect.extent.height - joystickPixelRadius * 2;
 }
 
 namespace DEngine::Editor::impl
@@ -1097,7 +1007,7 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 	return returnVal;
 }
 
-void InternalViewportWidget::CursorClick(
+bool InternalViewportWidget::CursorPress(
 	Gui::Context& ctx,
 	Gui::WindowID windowId,
 	Gui::Rect widgetRect,
@@ -1117,16 +1027,19 @@ void InternalViewportWidget::CursorClick(
 		impl::ToPointerType(event.button),
 		&event,
 		nullptr);
+
+	return false;
 }
 
-void InternalViewportWidget::CursorMove(
+bool InternalViewportWidget::CursorMove(
 	Gui::Context& ctx,
 	Gui::WindowID windowId,
 	Gui::Rect widgetRect,
 	Gui::Rect visibleRect,
-	Gui::CursorMoveEvent event)
+	Gui::CursorMoveEvent event,
+	bool occluded)
 {
-	impl::InternalViewportWidget_PointerMove(
+	return impl::InternalViewportWidget_PointerMove(
 		*this,
 		ctx,
 		windowId,
@@ -1143,7 +1056,8 @@ void InternalViewportWidget::TouchEvent(
 	Gui::WindowID windowId,
 	Gui::Rect widgetRect,
 	Gui::Rect visibleRect,
-	Gui::TouchEvent touch)
+	Gui::TouchEvent touch,
+	bool occluded)
 {
 	if (touch.type == Gui::TouchEventType::Down || touch.type == Gui::TouchEventType::Up)
 	{
@@ -1179,7 +1093,7 @@ void InternalViewportWidget::TouchEvent(
 
 Gui::SizeHint InternalViewportWidget::GetSizeHint(Gui::Context const& ctx) const
 {
-	Gui::SizeHint returnVal{};
+	Gui::SizeHint returnVal = {};
 	returnVal.preferred = { 450, 450 };
 	returnVal.expandX = true;
 	returnVal.expandY = true;
@@ -1193,13 +1107,12 @@ void InternalViewportWidget::Render(
 	Gui::Rect visibleRect,
 	Gui::DrawInfo& drawInfo) const
 {
-	UpdateJoystickOrigin(widgetRect);
 	isVisible = true;
 	currentlyResizing = newExtent != widgetRect.extent;
 	newExtent = widgetRect.extent;
 
 	// First draw the viewport.
-	Gfx::GuiDrawCmd drawCmd{};
+	Gfx::GuiDrawCmd drawCmd = {};
 	drawCmd.type = Gfx::GuiDrawCmd::Type::Viewport;
 	drawCmd.viewport.id = viewportId;
 	drawCmd.rectPosition.x = (f32)widgetRect.position.x / framebufferExtent.width;
@@ -1207,60 +1120,6 @@ void InternalViewportWidget::Render(
 	drawCmd.rectExtent.x = (f32)widgetRect.extent.width / framebufferExtent.width;
 	drawCmd.rectExtent.y = (f32)widgetRect.extent.height / framebufferExtent.height;
 	drawInfo.drawCmds->push_back(drawCmd);
-
-	// Draw a circle, start from the top, move clockwise
-	Gfx::GuiDrawCmd::MeshSpan circleMeshSpan{};
-	{
-		u32 circleVertexCount = 30;
-		circleMeshSpan.vertexOffset = (u32)drawInfo.vertices->size();
-		circleMeshSpan.indexOffset = (u32)drawInfo.indices->size();
-		circleMeshSpan.indexCount = circleVertexCount * 3;
-		// Create the vertices, we insert the middle vertex first.
-		drawInfo.vertices->push_back({});
-		for (u32 i = 0; i < circleVertexCount; i++)
-		{
-			Gfx::GuiVertex newVertex{};
-			f32 currentRadians = 2 * Math::pi / circleVertexCount * i;
-			newVertex.position.x += Math::Sin(currentRadians);
-			newVertex.position.y += Math::Cos(currentRadians);
-			drawInfo.vertices->push_back(newVertex);
-		}
-		// Build indices
-		for (u32 i = 0; i < circleVertexCount - 1; i++)
-		{
-			drawInfo.indices->push_back(i + 1);
-			drawInfo.indices->push_back(0);
-			drawInfo.indices->push_back(i + 2);
-		}
-		drawInfo.indices->push_back(circleVertexCount);
-		drawInfo.indices->push_back(0);
-		drawInfo.indices->push_back(1);
-	}
-	// Draw both joysticks using said circle mesh
-	for (auto const& joystick : joysticks)
-	{
-		{
-			Gfx::GuiDrawCmd cmd{};
-			cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-			cmd.filledMesh.color = { 0.f, 0.f, 0.f, 0.25f };
-			cmd.filledMesh.mesh = circleMeshSpan;
-			cmd.rectPosition.x = (f32)joystick.originPosition.x / framebufferExtent.width;
-			cmd.rectPosition.y = (f32)joystick.originPosition.y / framebufferExtent.height;
-			cmd.rectExtent.x = (f32)joystickPixelRadius * 2 / framebufferExtent.width;
-			cmd.rectExtent.y = (f32)joystickPixelRadius * 2 / framebufferExtent.height;
-			drawInfo.drawCmds->push_back(cmd);
-		}
-
-		Gfx::GuiDrawCmd cmd{};
-		cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-		cmd.filledMesh.color = { 1.f, 1.f, 1.f, 0.75f };
-		cmd.filledMesh.mesh = circleMeshSpan;
-		cmd.rectPosition.x = (f32)joystick.currentPosition.x / framebufferExtent.width;
-		cmd.rectPosition.y = (f32)joystick.currentPosition.y / framebufferExtent.height;
-		cmd.rectExtent.x = (f32)joystickPixelRadius / framebufferExtent.width;
-		cmd.rectExtent.y = (f32)joystickPixelRadius / framebufferExtent.height;
-		drawInfo.drawCmds->push_back(cmd);
-	}
 }
 
 ViewportWidget::ViewportWidget(EditorImpl& implData, Gfx::Context& ctx) :
@@ -1269,8 +1128,32 @@ ViewportWidget::ViewportWidget(EditorImpl& implData, Gfx::Context& ctx) :
 	// Generate top navigation bar
 	Gui::Button* settingsBtn = new Gui::Button;
 	settingsBtn->text = "Settings";
-	AddWidget(Std::Box<Gui::Widget>{ settingsBtn });
+	AddWidget(Std::Box{ settingsBtn });
 
+	Gui::AnchorArea* anchorArea = new Gui::AnchorArea;
+	AddWidget(Std::Box{ anchorArea });
+
+	Joystick* leftJoystick = new Joystick;
+	Gui::AnchorArea::Node leftJoystickNode = {};
+	leftJoystickNode.anchorX = Gui::AnchorArea::AnchorX::Left;
+	leftJoystickNode.anchorY = Gui::AnchorArea::AnchorY::Bottom;
+	leftJoystickNode.extent = { 150, 150 };
+	leftJoystickNode.widget = Std::Box{ leftJoystick };
+	anchorArea->nodes.push_back(Std::Move(leftJoystickNode));
+
+	/*
+	Joystick* rightJoystick = new Joystick;
+	Gui::AnchorArea::Node rightJoystickNode = {};
+	rightJoystickNode.anchorX = Gui::AnchorArea::AnchorX::Right;
+	rightJoystickNode.anchorY = Gui::AnchorArea::AnchorY::Bottom;
+	rightJoystickNode.extent = { 150, 150 };
+	rightJoystickNode.widget = Std::Box{ rightJoystick };
+	anchorArea->nodes.push_back(Std::Move(rightJoystickNode));
+	*/
+
+	// Background
 	InternalViewportWidget* viewport = new InternalViewportWidget(implData, ctx);
-	AddWidget(Std::Box<Gui::Widget>{ viewport });
+	Gui::AnchorArea::Node background = {};
+	background.widget = Std::Box{ viewport };
+	anchorArea->nodes.push_back(Std::Move(background));
 }

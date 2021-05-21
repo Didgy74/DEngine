@@ -53,7 +53,7 @@ namespace DEngine::Gui
 
 		virtual void InputConnectionLost() override;
 
-		virtual void CursorClick(
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -66,7 +66,8 @@ namespace DEngine::Gui
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent touch) override;
+			Gui::TouchEvent touch,
+			bool occluded) override;
 
 	protected:
 		Context* inputConnectionCtx = nullptr;

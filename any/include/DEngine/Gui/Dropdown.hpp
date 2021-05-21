@@ -30,7 +30,7 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		virtual void CursorClick(
+		[[nodiscard]] virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -43,7 +43,8 @@ namespace DEngine::Gui
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override;
+			Gui::TouchEvent event,
+			bool occluded) override;
 		
 	private:
 		Context* menuWidgetCtx = nullptr;

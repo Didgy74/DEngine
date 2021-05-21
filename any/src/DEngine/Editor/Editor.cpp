@@ -45,7 +45,7 @@ namespace DEngine::Editor
 			Gui::Button* newEntityButton = new Gui::Button;
 			topElementLayout->AddWidget(Std::Box{ newEntityButton });
 			newEntityButton->text = "New";
-			newEntityButton->activatePfn = [this](
+			newEntityButton->activateFn = [this](
 				Gui::Button& btn)
 			{
 				Entity newId = this->editorImpl->scene->NewEntity();
@@ -55,7 +55,7 @@ namespace DEngine::Editor
 			Gui::Button* entityDeleteButton = new Gui::Button;
 			topElementLayout->AddWidget(Std::Box<Gui::Widget>{ entityDeleteButton });
 			entityDeleteButton->text = "Delete";
-			entityDeleteButton->activatePfn = [this](
+			entityDeleteButton->activateFn = [this](
 				Gui::Button& btn)
 			{
 				if (!this->editorImpl->GetSelectedEntity().HasValue())
@@ -300,7 +300,7 @@ namespace DEngine::Editor
 		menuBarA->stackLayout.AddWidget(Std::Box<Gui::Widget>{ playButton });
 		playButton->text = "Play";
 		playButton->type = Gui::Button::Type::Toggle;
-		playButton->activatePfn = [&editorImpl](
+		playButton->activateFn = [&editorImpl](
 			Gui::Button& btn)
 		{
 			if (btn.GetToggled())
@@ -397,7 +397,10 @@ void Editor::Context::ProcessEvents()
 	}
 	if (App::TickCount() % 60 == 0)
 	{
-		implData.test_fpsText->String_Set(std::to_string(Time::Delta()).c_str());
+		std::string temp;
+		temp += std::to_string(1.f / Time::Delta()) + " - ";
+		temp += std::to_string(Time::Delta());
+		implData.test_fpsText->String_Set(temp.c_str());
 		implData.InvalidateRendering();
 	}
 	if (App::TickCount() % 10 == 0)

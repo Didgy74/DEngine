@@ -241,7 +241,8 @@ void Context::PushEvent(CursorClickEvent event)
 					SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
 					Rect widgetRect = { menu.rect.position, sizeHint.preferred };
 					Math::Vec2Int cursorPos = implData.cursorPosition - windowNode.data.rect.position;
-					menu.topLayout->CursorClick(
+					bool cursorOccluded = false;
+					menu.topLayout->CursorPress(
 						*this,
 						windowNode.id,
 						widgetRect,
@@ -259,7 +260,8 @@ void Context::PushEvent(CursorClickEvent event)
 
 		if (windowNode.data.topLayout && !bleh)
 		{
-			windowNode.data.topLayout->CursorClick(
+			bool cursorOccluded = false;
+			windowNode.data.topLayout->CursorPress(
 				*this,
 				windowNode.id,
 				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
@@ -298,12 +300,14 @@ void Context::PushEvent(CursorMoveEvent event)
 					SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
 					Rect widgetRect = { menu.rect.position, sizeHint.preferred };
 					Math::Vec2Int cursorPos = implData.cursorPosition - windowNode.data.rect.position;
+					bool cursorOccluded = false;
 					menu.topLayout->CursorMove(
 						*this,
 						windowNode.id,
 						widgetRect,
 						widgetRect,
-						modifiedEvent);
+						modifiedEvent,
+						cursorOccluded);
 					if (widgetRect.PointIsInside(cursorPos))
 					{
 						bleh = true;
@@ -315,12 +319,14 @@ void Context::PushEvent(CursorMoveEvent event)
 
 		if (windowNode.data.topLayout && !bleh)
 		{
+			bool cursorOccluded = false;
 			windowNode.data.topLayout->CursorMove(
 				*this,
 				windowNode.id,
 				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				modifiedEvent);
+				modifiedEvent,
+				cursorOccluded);
 		}
 
 		windowNode.menuAddRemoves.clear();
@@ -347,12 +353,14 @@ void Context::PushEvent(TouchEvent event)
 				{
 					SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
 					Rect widgetRect = { menu.rect.position, sizeHint.preferred };
+					bool cursorOccluded = false;
 					menu.topLayout->TouchEvent(
 						*this,
 						windowNode.id,
 						widgetRect,
 						widgetRect,
-						event);
+						event,
+						cursorOccluded);
 					if (widgetRect.PointIsInside(event.position) && event.type == TouchEventType::Down)
 					{
 						bleh = true;
@@ -364,12 +372,14 @@ void Context::PushEvent(TouchEvent event)
 
 		if (windowNode.data.topLayout && !bleh)
 		{
+			bool cursorOccluded = false;
 			windowNode.data.topLayout->TouchEvent(
 				*this,
 				windowNode.id,
 				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				event);
+				event,
+				cursorOccluded);
 		}
 
 		windowNode.menuAddRemoves.clear();

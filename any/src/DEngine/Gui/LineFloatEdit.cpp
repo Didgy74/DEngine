@@ -118,7 +118,7 @@ void LineFloatEdit::InputConnectionLost()
 	}
 }
 
-void LineFloatEdit::CursorClick(
+bool LineFloatEdit::CursorPress(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
@@ -140,6 +140,7 @@ void LineFloatEdit::CursorClick(
 			EndEditingSession();
 		}
 	}
+	return false;
 }
 
 void LineFloatEdit::TouchEvent(
@@ -147,7 +148,8 @@ void LineFloatEdit::TouchEvent(
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event)
+	Gui::TouchEvent event,
+	bool occluded)
 {
 	bool cursorIsInside = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
 

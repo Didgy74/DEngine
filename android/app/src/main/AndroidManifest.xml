@@ -10,7 +10,7 @@
 
     <application
         android:label="@string/app_name"
-        android:isGame="true"
+        android:isGame="false"
         android:theme="@android:style/Theme.NoTitleBar">
 
         <!-- Our activity is the built-in NativeActivity framework class.

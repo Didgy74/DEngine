@@ -66,7 +66,7 @@ void Dropdown::Render(
 		drawInfo);
 }
 
-void Dropdown::CursorClick(
+bool Dropdown::CursorPress(
 	Context& ctx, 
 	WindowID windowId, 
 	Rect widgetRect, 
@@ -90,6 +90,7 @@ void Dropdown::CursorClick(
 			windowId,
 			position);
 	}
+	return false;
 }
 
 void Dropdown::TouchEvent(
@@ -97,7 +98,8 @@ void Dropdown::TouchEvent(
 	WindowID windowId,
 	Rect widgetRect, 
 	Rect visibleRect,
-	Gui::TouchEvent event)
+	Gui::TouchEvent event,
+	bool occluded)
 {
 	if (event.id == 0)
 	{
@@ -144,7 +146,7 @@ void Dropdown::CreateDropdownMenu(
 			button->normalColor = button->hoverColor;
 		}
 
-		button->activatePfn = [this, i](
+		button->activateFn = [this, i](
 			Button& btn)
 		{
 			u32 previousSelectedItem = selectedItem;

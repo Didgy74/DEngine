@@ -13,9 +13,9 @@ android {
             cmake {
                 // version "3.19.1"
                 abiFilters 'armeabi-v7a', 'arm64-v8a'//, 'x86', 'x86_64'
+                arguments "-DCMAKE_VERBOSE_MAKEFILE=1"
             }
         }
-
         sourceSets {
             main {
                 assets.srcDirs "../../data"
@@ -29,6 +29,23 @@ android {
     externalNativeBuild {
         cmake {
             path 'CMakeLists.txt'
+
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+            ndk {
+                debuggable = true
+            }
+        }
+        debug {
+            ndk {
+                debuggable = true
+            }
+            debuggable = true
+            jniDebuggable = true
         }
     }
 }

@@ -48,14 +48,15 @@ namespace DEngine::Gui
 				Rect visibleRect,
 				DrawInfo& drawInfo) const override;
 
-			virtual void CursorMove(
+			virtual bool CursorMove(
 				Context& ctx,
 				WindowID windowId,
 				Rect widgetRect,
 				Rect visibleRect,
-				CursorMoveEvent event) override;
+				CursorMoveEvent event,
+				bool occluded) override;
 
-			virtual void CursorClick(
+			virtual bool CursorPress(
 				Context& ctx,
 				WindowID windowId,
 				Rect widgetRect,
@@ -68,7 +69,8 @@ namespace DEngine::Gui
 				WindowID windowId,
 				Rect widgetRect,
 				Rect visibleRect,
-				Gui::TouchEvent event) override;
+				Gui::TouchEvent event,
+				bool occluded) override;
 		};
 
 		class ActivatableButton : public Widget
@@ -93,20 +95,21 @@ namespace DEngine::Gui
 				Rect visibleRect,
 				DrawInfo& drawInfo) const override;
 
-			virtual void CursorClick(
+			virtual bool CursorPress(
 				Context& ctx,
 				WindowID windowId,
 				Rect widgetRect,
 				Rect visibleRect,
 				Math::Vec2Int cursorPos,
-				CursorClickEvent event) override;
+				CursorClickEvent even) override;
 
 			virtual void TouchEvent(
 				Context& ctx,
 				WindowID windowId,
 				Rect widgetRect,
 				Rect visibleRect,
-				Gui::TouchEvent event) override;
+				Gui::TouchEvent event,
+				bool occluded) override;
 		};
 
 		class ToggleButton : public Widget
@@ -133,7 +136,7 @@ namespace DEngine::Gui
 				Rect visibleRect,
 				DrawInfo& drawInfo) const override;
 
-			virtual void CursorClick(
+			virtual bool CursorPress(
 				Context& ctx,
 				WindowID windowId,
 				Rect widgetRect,
@@ -146,7 +149,8 @@ namespace DEngine::Gui
 				WindowID windowId,
 				Rect widgetRect,
 				Rect visibleRect,
-				Gui::TouchEvent event) override;
+				Gui::TouchEvent event,
+				bool occluded) override;
 		};
 
 	public:
@@ -206,14 +210,15 @@ namespace DEngine::Gui
 		virtual void CharRemoveEvent(
 			Context& ctx) override;
 
-		virtual void CursorMove(
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			CursorMoveEvent event) override;
+			CursorMoveEvent event,
+			bool occluded) override;
 
-		virtual void CursorClick(
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -226,6 +231,7 @@ namespace DEngine::Gui
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override;
+			Gui::TouchEvent event,
+			bool occluded) override;
 	};
 }

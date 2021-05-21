@@ -13,6 +13,9 @@ namespace DEngine::Gui::impl
 		T& layout,
 		Rect widgetRect,
 		Callable const& callable);
+
+	template<class T>
+	struct StackLayout_ItPair;
 }
 
 namespace DEngine::Gui
@@ -73,7 +76,7 @@ namespace DEngine::Gui
 
 		virtual void InputConnectionLost() override;
 
-		virtual void CursorClick(
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -81,19 +84,21 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
-		virtual void CursorMove(
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			CursorMoveEvent event) override;
+			CursorMoveEvent event,
+			bool occluded) override;
 
 		virtual void TouchEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override;
+			Gui::TouchEvent event,
+			bool occluded) override;
 
 	protected:
 		std::vector<Std::Box<Widget>> children;
@@ -118,8 +123,8 @@ namespace DEngine::Gui
 			};
 			Remove remove;
 		};
-		mutable std::vector<InsertRemoveJob> insertionJobs;
-		mutable bool currentlyIterating = false;
+		std::vector<InsertRemoveJob> insertionJobs;
+		bool currentlyIterating = false;
 
 		template<typename T, typename Callable>
 		friend void impl::StackLayout_IterateOverChildren(
@@ -127,5 +132,9 @@ namespace DEngine::Gui
 			T& layout,
 			Rect widgetRect,
 			Callable const& callable);
+
+		
+		friend impl::StackLayout_ItPair<StackLayout>;
+		friend impl::StackLayout_ItPair<StackLayout const>;
 	};
 }

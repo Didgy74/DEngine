@@ -2,8 +2,15 @@
 
 #include <DEngine/Gui/Widget.hpp>
 
+#include <DEngine/Std/Containers/Opt.hpp>
+
 #include <functional>
 #include <string>
+
+namespace DEngine::Gui::impl
+{
+	class BtnImpl;
+}
 
 namespace DEngine::Gui
 {
@@ -26,14 +33,6 @@ namespace DEngine::Gui
 		};
 		Type type = Type::Push;
 		
-		enum class State
-		{
-			Normal,
-			Hovered,
-			Pressed,
-			Toggled,
-		};
-		
 		Math::Vec4 normalColor{ 0.25f, 0.25f, 0.25f, 1.f };
 		Math::Vec4 normalTextColor = Math::Vec4::One();
 		Math::Vec4 toggledColor{ 0.4f, 0.4f, 0.4f, 1.f };
@@ -44,7 +43,7 @@ namespace DEngine::Gui
 		Math::Vec4 pressedTextColor = Math::Vec4::Zero();
 
 		using ActivateCallback = void(Button& btn);
-		std::function<ActivateCallback> activatePfn = nullptr;
+		std::function<ActivateCallback> activateFn = nullptr;
 
 		void SetToggled(bool toggled);
 		bool GetToggled() const;
@@ -59,33 +58,45 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		virtual void CursorClick(
+		[[nodiscard]] virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
-			CursorClickEvent event) override;
+			CursorClickEvent eventd) override;
 
-		virtual void CursorMove(
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			CursorMoveEvent event) override;
+			CursorMoveEvent event,
+			bool cursorOccluded) override;
 
 		virtual void TouchEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override;
+			Gui::TouchEvent event,
+			bool cursorOccluded) override;
 
 	private:
 		bool toggled = false;
+		enum class State
+		{
+			Normal,
+			Hovered,
+			Pressed,
+			Toggled,
+		};
 		State state = State::Normal;
+		Std::Opt<u8> pointerId;
 		
 		void Activate(
 			Context& ctx);
+
+		friend impl::BtnImpl;
 	};
 }

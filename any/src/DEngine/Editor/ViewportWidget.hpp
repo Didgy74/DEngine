@@ -8,10 +8,11 @@
 #include <DEngine/Gui/Button.hpp>
 #include <DEngine/Gui/MenuBar.hpp>
 
-#include <DEngine/Gfx/Gfx.hpp>
-
 #include <DEngine/Std/Utility.hpp>
-#include <DEngine/Math/LinearTransform3D.hpp>
+
+#include <DEngine/Math/Matrix.hpp>
+#include <DEngine/Math/UnitQuaternion.hpp>
+#include <DEngine/Math/Vector.hpp>
 
 namespace DEngine::Editor
 {
@@ -74,8 +75,8 @@ namespace DEngine::Editor
 
 		mutable bool isVisible = false;
 
-		Gui::Extent currentExtent{};
-		mutable Gui::Extent newExtent{};
+		Gui::Extent currentExtent = {};
+		mutable Gui::Extent newExtent = {};
 		mutable bool currentlyResizing = false;
 		u32 extentCorrectTickCounter = 0;
 
@@ -96,19 +97,6 @@ namespace DEngine::Editor
 			f32 rotationOffset;
 		};
 		Std::Opt<HoldingGizmoData> holdingGizmoData;
-
-
-		int joystickPixelRadius = 50;
-		int joystickPixelDeadZone = 10;
-		struct JoyStick
-		{
-			Std::Opt<u8> touchID{};
-			bool isClicked = false;
-			mutable Math::Vec2Int originPosition{};
-			Math::Vec2Int currentPosition{};
-		};
-		// 0 is left, 1 is right
-		JoyStick joysticks[2]{};
 
 		struct Camera
 		{
@@ -131,21 +119,14 @@ namespace DEngine::Editor
 
 		void ApplyCameraMovement(Math::Vec3 move, f32 speed) noexcept;
 
-		Math::Vec2 GetLeftJoystickVec() const noexcept;
-
-		Math::Vec2 GetRightJoystickVec() const noexcept;
-
 		void TickTest(f32 deltaTime) noexcept;
-
-		// Pixel space
-		void UpdateJoystickOrigin(Gui::Rect widgetRect) const noexcept;
 
 		Gfx::ViewportUpdate GetViewportUpdate(
 			Context const& editor,
 			std::vector<Math::Vec3>& lineVertices,
 			std::vector<Gfx::LineDrawCmd>& lineDrawCmds) const noexcept;
 
-		virtual void CursorClick(
+		virtual bool CursorPress(
 			Gui::Context& ctx,
 			Gui::WindowID windowId,
 			Gui::Rect widgetRect,
@@ -153,19 +134,21 @@ namespace DEngine::Editor
 			Math::Vec2Int cursorPos,
 			Gui::CursorClickEvent event) override;
 
-		virtual void CursorMove(
+		virtual bool CursorMove(
 			Gui::Context& ctx,
 			Gui::WindowID windowId,
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect,
-			Gui::CursorMoveEvent event) override;
+			Gui::CursorMoveEvent event,
+			bool occluded) override;
 
 		virtual void TouchEvent(
 			Gui::Context& ctx,
 			Gui::WindowID windowId,
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect,
-			Gui::TouchEvent touch) override;
+			Gui::TouchEvent touch,
+			bool occluded) override;
 
 		virtual Gui::SizeHint GetSizeHint(
 			Gui::Context const& ctx) const override;

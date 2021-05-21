@@ -191,17 +191,18 @@ namespace DEngine::Gui::impl
 	}
 }
 
-void ButtonGroup::CursorMove(
+bool ButtonGroup::CursorMove(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	CursorMoveEvent event)
+	CursorMoveEvent event,
+	bool occluded)
 {
-
+	return false;
 }
 
-void ButtonGroup::CursorClick(
+bool ButtonGroup::CursorPress(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
@@ -219,6 +220,8 @@ void ButtonGroup::CursorClick(
 		impl::ButtonGroup_ToPointerType(event.button),
 		{ (f32)cursorPos.x, (f32)cursorPos.y },
 		event.clicked);
+
+	return false;
 }
 
 void ButtonGroup::TouchEvent(
@@ -226,7 +229,8 @@ void ButtonGroup::TouchEvent(
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event)
+	Gui::TouchEvent event,
+	bool occluded)
 {
 	if (event.type == Gui::TouchEventType::Down || event.type == Gui::TouchEventType::Up)
 	{

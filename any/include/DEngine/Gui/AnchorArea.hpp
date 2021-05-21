@@ -1,30 +1,40 @@
 #pragma once
 
 #include <DEngine/Gui/Widget.hpp>
-#include <DEngine/Gui/StackLayout.hpp>
-#include <DEngine/Gui/Button.hpp>
-
 #include <DEngine/Std/Containers/Box.hpp>
-#include <DEngine/Std/Containers/Str.hpp>
 
-#include <functional>
+#include <vector>
 
 namespace DEngine::Gui
 {
-	class CollapsingHeader : public Widget
+	class AnchorArea : public Widget
 	{
 	public:
-		static constexpr Math::Vec4 fieldBackgroundColor = { 1.f, 1.f, 1.f, 0.25f };
+		AnchorArea();
 
-		CollapsingHeader(bool collapsed = true);
+		enum class AnchorX 
+		{
+			Left,
+			Center,
+			Right
+		};
 
-		using CollapseFn = void(bool collapsed);
-		std::function<CollapseFn> collapseCallback;
-		[[nodiscard]] StackLayout& GetChildStackLayout() noexcept { return *childStackLayoutPtr; }
-		[[nodiscard]] StackLayout const& GetChildStackLayout() const noexcept { return *childStackLayoutPtr; }
-		[[nodiscard]] bool IsCollapsed() const noexcept;
-		void SetCollapsed(bool value);
-		void SetHeaderText(Std::Str text);
+		enum class AnchorY
+		{
+			Top,
+			Center,
+			Bottom
+		};
+
+		struct Node
+		{
+			AnchorX anchorX;
+			AnchorY anchorY;
+			Extent extent;
+			Std::Box<Widget> widget;
+		};
+
+		std::vector<Node> nodes;
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
@@ -45,7 +55,7 @@ namespace DEngine::Gui
 
 		virtual void CharRemoveEvent(
 			Context& ctx) override;
-		
+
 		virtual void InputConnectionLost() override;
 
 		virtual bool CursorMove(
@@ -56,7 +66,7 @@ namespace DEngine::Gui
 			CursorMoveEvent event,
 			bool occluded) override;
 
-		[[nodiscard]] virtual bool CursorPress(
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -71,10 +81,5 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			Gui::TouchEvent event,
 			bool occluded) override;
-
-	private:
-		StackLayout mainStackLayout = StackLayout(StackLayout::Direction::Vertical);
-		Std::Box<StackLayout> childStackLayoutBox;
-		StackLayout* childStackLayoutPtr = nullptr;
 	};
 }

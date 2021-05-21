@@ -23,7 +23,7 @@ namespace DEngine::Gui
 		struct Layer
 		{
 			// This rect is relative to the DockArea widget's position.
-			Rect rect{};
+			Rect rect = {};
 			Std::Box<Node> root;
 		};
 		std::vector<Layer> layers;
@@ -31,7 +31,7 @@ namespace DEngine::Gui
 		u32 gizmoSize = 75;
 		u32 resizeHandleThickness = 50;
 		u32 resizeHandleLength = 75;
-		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.75f };
+		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.5f };
 		Math::Vec4 deleteLayerGizmoColor = { 1.f, 0.f, 0.f, 0.75f };
 		Math::Vec4 dockingHighlightColor = { 0.f, 0.5f, 1.f, 0.5f };
 
@@ -78,7 +78,6 @@ namespace DEngine::Gui
 			State_HoldingTab,
 			State_ResizingSplitNode>;
 		StateDataT stateData = State_Normal{};
-		//StateDataT stateData = float{};
 
 		void AddWindow(
 			Std::Str title,
@@ -95,14 +94,15 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		virtual void CursorMove(
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			CursorMoveEvent event) override;
+			CursorMoveEvent event,
+			bool occluded) override;
 
-		virtual void CursorClick(
+		[[nodiscard]] virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -115,7 +115,8 @@ namespace DEngine::Gui
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override;
+			Gui::TouchEvent event,
+			bool occluded) override;
 
 		virtual void InputConnectionLost() override;
 

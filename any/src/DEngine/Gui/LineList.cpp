@@ -65,7 +65,7 @@ SizeHint LineList::GetSizeHint(Context const& ctx) const
 	return returnVal;
 }
 
-void LineList::CursorClick(
+bool LineList::CursorPress(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
@@ -99,6 +99,7 @@ void LineList::CursorClick(
 			}
 		}
 	}
+	return false;
 }
 
 void LineList::TouchEvent(
@@ -106,7 +107,8 @@ void LineList::TouchEvent(
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event)
+	Gui::TouchEvent event,
+	bool occluded)
 {
 	if (event.type == TouchEventType::Up)
 	{

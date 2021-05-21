@@ -32,7 +32,6 @@ namespace DEngine::Gfx::Vk::NativeWinManImpl
 		SwapchainSettings temp{};
 		temp.compositeAlphaFlag = surfaceInfo.compositeAlphaToUse;
 
-
 		temp.extents = surfaceCaps.currentExtent;
 		if (surfaceCaps.currentTransform == vk::SurfaceTransformFlagBitsKHR::eRotate90 ||
 			surfaceCaps.currentTransform == vk::SurfaceTransformFlagBitsKHR::eRotate270)

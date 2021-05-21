@@ -26,7 +26,7 @@ namespace DEngine::Editor
 			this->AddWidget(Std::Box<Gui::Widget>{ button });
 			button->type = Gui::Button::Type::Toggle;
 			button->text = "Testing - Move";
-			button->activatePfn = [this, id, scene](
+			button->activateFn = [this, id, scene](
 				Gui::Button& btn)
 			{
 				if (btn.GetToggled())
