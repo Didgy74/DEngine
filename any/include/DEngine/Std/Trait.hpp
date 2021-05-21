@@ -7,21 +7,21 @@ namespace DEngine::Std::Trait::impl
 	template<class T, class... Us>
 	struct At_Impl<0, T, Us...> { using Type = T; };
 	template<unsigned int index, class T, class... Us>
-	struct At_Impl { using Type = class At_Impl<index - 1, Us...>::Type; };
+	struct At_Impl { using Type = typename At_Impl<index - 1, Us...>::Type; };
 	// This is just a wrapper to add the static_assert of the index against the parameter pack length.
 	template<unsigned int index, class... Ts>
 	struct At
 	{
 		static_assert(index < sizeof...(Ts), "Tried to index further than the parameter pack.");
-		using Type = class At_Impl<index, Ts...>::Type;
+		using Type = typename At_Impl<index, Ts...>::Type;
 	};
 
 	template<unsigned int index, unsigned int missingTypeCount, class Or, class... Ts>
 	struct AtOr;
 	template<unsigned int index, class Or, class... Ts>
-	struct AtOr<index, 0, Or, Ts...> { using Type = class At<index, Ts...>::Type; };
+	struct AtOr<index, 0, Or, Ts...> { using Type = typename At<index, Ts...>::Type; };
 	template<unsigned int index, unsigned int missingTypeCount, class Or, class... Ts>
-	struct AtOr { using Type = class AtOr<index, missingTypeCount - 1, Or, Ts..., Or>::Type; };
+	struct AtOr { using Type = typename AtOr<index, missingTypeCount - 1, Or, Ts..., Or>::Type; };
 
 	template<bool valueIn>
 	struct BoolValue { static constexpr bool value = valueIn; };
@@ -91,7 +91,7 @@ namespace DEngine::Std::Trait::impl
 	struct RemoveRef<T&&> { using Type = T; };
 
 	template<class T>
-	struct RemoveCVRef { using Type = class RemoveConst<class RemoveRef<T>::Type>::Type; };
+	struct RemoveCVRef { using Type = typename RemoveConst<typename RemoveRef<T>::Type>::Type; };
 }
 
 namespace DEngine::Std::Trait
