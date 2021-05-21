@@ -138,6 +138,7 @@ struct DA::Node
 				impl::DA_WindowNode const* windowNodePtr = nullptr;
 			};
 			Std::Opt<RemoveSplitNodeJob> removeSplitNodeJobOpt;
+			DockArea::State_Moving movingState = {};
 		};
 		Std::Opt<UndockJob> undockJobOpt;
 	};
@@ -1436,6 +1437,10 @@ bool impl::DA_PointerPress(DA_PointerPress_Params const& in)
 
 	bool eventConsumed = false;
 
+	if (!in.pointerPressed)
+	{
+		int i = 0;
+	}
 	
 	bool runBackLayerDockingTest = !eventConsumed;
 	// We only want to check for background docking if we unpressed.
@@ -1507,9 +1512,11 @@ bool impl::DA_PointerPress(DA_PointerPress_Params const& in)
 			params.windowId = in.windowId;
 
 			pPressResult = layerItem.rootNode.PointerPress(params);
-
-			if (params.layerRect.PointIsInside(params.pointerPos) && params.visibleRect.PointIsInside(params.pointerPos))
+			if (pPressResult.eventConsumed)
+			{
+				eventConsumed = true;
 				break;
+			}
 		}
 
 		if (auto dockJob = pPressResult.dockingJobOpt.ToPtr())
@@ -1624,13 +1631,14 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateHoldingTab(Po
 				undockingJob.removeSplitNodeJobOpt = removeSplitNodeJob;
 			}
 
-			returnVal.undockJobOpt = Std::Move(undockingJob);
-
 			DA::State_Moving newBehavior = {};
 			newBehavior.movingSplitNode = false;
 			newBehavior.pointerId = stateData.pointerId;
 			newBehavior.pointerOffset = stateData.pointerOffset;
-			in.dockArea->stateData = newBehavior;
+			//in.dockArea->stateData = newBehavior;
+			undockingJob.movingState = newBehavior;
+
+			returnVal.undockJobOpt = Std::Move(undockingJob);
 		}
 	}
 
@@ -1768,17 +1776,27 @@ DA::Node::PointerMove_Result impl::DA_SplitNode::PointerMove(PointerMove_Params 
 		}
 	}
 
-	PointerMove_Result result = {};
+	
 	auto childRects = DA_GetSplitNodeChildRects(in.nodeRect, split, dir);
 
 	PointerMove_Params params = in;
 	params.hasSplitNodeParent = true;
 	params.nodeRect = childRects[0];
 	params.pointerOccluded = in.pointerOccluded;
-	result = a->PointerMove(params);
+	PointerMove_Result resultA = a->PointerMove(params);
 	
 	params.nodeRect = childRects[1];
-	result = b->PointerMove(params);
+	PointerMove_Result resultB = b->PointerMove(params);
+
+	PointerMove_Result result = {};
+	result.pointerOccluded = resultA.pointerOccluded || resultB.pointerOccluded;
+	// Both results can't have a undocking job simultaneously.
+	DENGINE_IMPL_GUI_ASSERT(!(resultA.undockJobOpt.HasValue() && resultB.undockJobOpt.HasValue()));
+	if (resultA.undockJobOpt.HasValue())
+		result.undockJobOpt = Std::Move(resultA.undockJobOpt);
+	else if (resultB.undockJobOpt.HasValue())
+		result.undockJobOpt = Std::Move(resultB.undockJobOpt);
+
 	return result;
 }
 
@@ -1844,7 +1862,7 @@ bool impl::DA_PointerMove(DA_PointerMove_Params const& in)
 		params.visibleRect = in.visibleRect;
 		params.widgetPos = in.widgetRect.position;
 		params.windowId = in.windowId;
-		layerItem.rootNode.PointerMove(params);
+		result = layerItem.rootNode.PointerMove(params);
 
 		if (params.nodeRect.PointIsInside(in.pointerPos) && params.visibleRect.PointIsInside(in.pointerPos))
 			layerOccluded = true;
@@ -1860,6 +1878,9 @@ bool impl::DA_PointerMove(DA_PointerMove_Params const& in)
 				(DA_WindowNode const*)splitNodeRemoveJob->windowNodePtr);
 			DENGINE_IMPL_GUI_ASSERT(result);
 		}
+
+		// Update our new behavior state
+		in.dockArea->stateData = Std::Move(tabUndockingJob->movingState);
 
 		// We want to create a new front layer with a WindowNode, with this tab.
 		in.dockArea->layers.emplace(in.dockArea->layers.begin(), DockArea::Layer{});
