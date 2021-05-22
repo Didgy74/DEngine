@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DEngine/Std/Containers/impl/Assert.hpp>
+#include <DEngine/Std/Trait.hpp>
 
 namespace DEngine::Std
 {
@@ -15,16 +16,17 @@ namespace DEngine::Std
 		using ValueType = T;
 
 		Opt(NullOpt_T = nullOpt) noexcept;
-		Opt(Opt const&);
+		Opt(Opt const&) noexcept;
 		Opt(Opt&&) noexcept;
-		Opt(T const&);
-		Opt(T&&);
-		~Opt();
+		Opt(T const&) noexcept;
+		Opt(Trait::RemoveCVRef<T>&&) noexcept;
+		~Opt() noexcept;
 
-		Opt& operator=(Opt const&);
+		//Opt& operator=(NullOpt_T) noexcept;
+		Opt& operator=(Opt const&) noexcept;
 		Opt& operator=(Opt&&) noexcept;
-		Opt& operator=(T const&);
-		Opt& operator=(T&&) noexcept;
+		Opt& operator=(T const&) noexcept;
+		Opt& operator=(Trait::RemoveCVRef<T>&&) noexcept;
 
 		[[nodiscard]] bool HasValue() const noexcept;
 
@@ -34,22 +36,22 @@ namespace DEngine::Std
 		[[nodiscard]] T const* ToPtr() const noexcept;
 		[[nodiscard]] T* ToPtr() noexcept;
 
-	private:
+		void Clear() noexcept;
+
+	protected:
 		bool hasValue = false;
 		union
 		{
 			alignas(T) unsigned char unusedChar[sizeof(T)];
 			T value;
 		};
-
-		void Clear() noexcept;
 	};
 
 	template<typename T>
 	Opt<T>::Opt(NullOpt_T) noexcept {}
 
 	template<typename T>
-	Opt<T>::Opt(Opt const& other)
+	Opt<T>::Opt(Opt const& other) noexcept
 	{
 		if (other.hasValue)
 		{
@@ -72,27 +74,36 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	Opt<T>::Opt(T const& other) :
+	Opt<T>::Opt(T const& other) noexcept :
 		hasValue(true)
 	{
 		new(&value) T(other);
 	}
 
 	template<typename T>
-	Opt<T>::Opt(T&& other) :
+	Opt<T>::Opt(Trait::RemoveCVRef<T>&& other) noexcept :
 		hasValue(true)
 	{
 		new(&value) T(static_cast<T&&>(other));
 	}
 
 	template<typename T>
-	Opt<T>::~Opt()
+	Opt<T>::~Opt() noexcept
 	{
 		Clear();
 	}
 
+	/*
 	template<typename T>
-	Opt<T>& Opt<T>::operator=(Opt const& other)
+	Opt<T>& Opt<T>::operator=(NullOpt_T) noexcept
+	{
+		Clear();
+		return *this;
+	}
+	*/
+
+	template<typename T>
+	Opt<T>& Opt<T>::operator=(Opt const& other) noexcept
 	{
 		if (this == &other)
 			return *this;
@@ -134,7 +145,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	Opt<T>& Opt<T>::operator=(T const& right)
+	Opt<T>& Opt<T>::operator=(T const& right) noexcept
 	{
 		if (hasValue)
 			value = right;
@@ -147,7 +158,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	Opt<T>& Opt<T>::operator=(T&& right) noexcept
+	Opt<T>& Opt<T>::operator=(Trait::RemoveCVRef<T>&& right) noexcept
 	{
 		if (hasValue)
 			value = static_cast<T&&>(right);

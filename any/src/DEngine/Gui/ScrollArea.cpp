@@ -302,17 +302,13 @@ void ScrollArea::Render(
 
 	if (widget && !childVisibleRect.IsNothing())
 	{
-		drawInfo.PushScissor(childVisibleRect);
-
+		auto scopedScissor = DrawInfo::ScopedScissor(drawInfo, childVisibleRect);
 		widget->Render(
 			ctx,
 			framebufferExtent,
 			childRect,
 			childVisibleRect,
 			drawInfo);
-
-		// Add scissor remove drawcmd
-		drawInfo.PopScissor();
 	}
 
 	// Draw scrollbar

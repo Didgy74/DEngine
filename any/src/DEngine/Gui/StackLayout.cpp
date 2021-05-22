@@ -289,19 +289,20 @@ namespace DEngine::Gui::impl
 		Rect const& widgetRect,
 		Rect const& visibleRect,
 		Math::Vec2 pointerPos,
+		bool pointerPressed,
 		CursorClickEvent const& event)
 	{
 		auto innerRect = impl::BuildInnerRect(widgetRect, layout.padding);
 		
 		bool pointerInWidget = innerRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
-		if (!pointerInWidget)
+		if (pointerPressed && !pointerInWidget)
 			return false;
 
 		auto itPair = impl::BuildItPair(layout, ctx, innerRect);
 		for (auto const& itItem : itPair)
 		{
 			bool pointerInChild = itItem.childRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
-			if (!pointerInChild)
+			if (pointerPressed && !pointerInChild)
 				continue;
 			
 			bool eventConsumed = itItem.widget.CursorPress(
@@ -311,7 +312,7 @@ namespace DEngine::Gui::impl
 				visibleRect,
 				{ (i32)pointerPos.x, (i32)pointerPos.y },
 				event);
-			if (eventConsumed)
+			if (pointerPressed && eventConsumed)
 				return true;
 		}
 
@@ -591,6 +592,7 @@ bool StackLayout::CursorPress(
 		widgetRect,
 		visibleRect,
 		{ (f32)cursorPos.x, (f32)cursorPos.y },
+		event.clicked,
 		event);
 }
 

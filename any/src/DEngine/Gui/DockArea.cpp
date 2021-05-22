@@ -128,7 +128,7 @@ struct DA::Node
 	};
 	struct PointerMove_Result
 	{
-		bool pointerOccluded = false;
+		bool stopIterating = false;
 		struct UndockJob
 		{
 			impl::DA_WindowTab undockedTab;
@@ -947,6 +947,7 @@ namespace DEngine::Gui::impl
 		return returnVal;
 	}
 
+	static constexpr auto cursorPointerId = static_cast<u8>(-1);
 	struct DA_PointerPress_Params
 	{
 		Context* ctx = {};
@@ -1086,14 +1087,13 @@ void impl::DA_WindowNode::Render(
 
 	if (activeTab.widget)
 	{
-		drawInfo.PushScissor(contentRect);
+		auto scissor = DrawInfo::ScopedScissor(drawInfo, contentRect);
 		activeTab.widget->Render(
 			ctx,
 			framebufferExtent,
 			contentRect,
 			Rect::Intersection(contentRect, visibleRect),
 			drawInfo);
-		drawInfo.PopScissor();
 	}
 }
 
@@ -1303,7 +1303,7 @@ DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(Poin
 	contentRect.extent.height = in.nodeRect.extent.height - titlebarRect.extent.height;
 	if (!returnVal.eventConsumed && contentRect.PointIsInside(in.pointerPos) && tabs[selectedTab].widget)
 	{
-		if (in.pointerId == DA::cursorPointerID)
+		if (in.pointerId == cursorPointerId)
 		{
 			tabs[selectedTab].widget->CursorPress(
 				*in.ctx,
@@ -1436,11 +1436,6 @@ bool impl::DA_PointerPress(DA_PointerPress_Params const& in)
 		return false;
 
 	bool eventConsumed = false;
-
-	if (!in.pointerPressed)
-	{
-		int i = 0;
-	}
 	
 	bool runBackLayerDockingTest = !eventConsumed;
 	// We only want to check for background docking if we unpressed.
@@ -1571,7 +1566,7 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateNormal(Pointe
 	contentRect.extent.height = in.nodeRect.extent.height - titlebarRect.extent.height;
 	if (tabs[selectedTab].widget)
 	{
-		if (in.pointerId == DA::cursorPointerID)
+		if (in.pointerId == cursorPointerId)
 		{
 			tabs[selectedTab].widget->CursorMove(
 				*in.ctx,
@@ -1592,7 +1587,6 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateNormal(Pointe
 				*in.touchEvent,
 				in.pointerOccluded);
 		}
-		returnVal.pointerOccluded = true;
 	}
 
 	return returnVal;
@@ -1639,6 +1633,8 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateHoldingTab(Po
 			undockingJob.movingState = newBehavior;
 
 			returnVal.undockJobOpt = Std::Move(undockingJob);
+
+			returnVal.stopIterating = true;
 		}
 	}
 
@@ -1662,10 +1658,12 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateMoving(Pointe
 	{
 		if (in.layerIndex == 0)
 		{
+			// Move the window
 			Math::Vec2 temp = in.pointerPos;
 			temp -= { (f32)in.widgetPos.x, (f32)in.widgetPos.y };
 			temp += stateMoving.pointerOffset;
 			in.dockArea->layers[0].rect.position = { (i32)temp.x, (i32)temp.y };
+			returnVal.stopIterating = false;
 		}
 		else if (in.nodeRect.PointIsInside(in.pointerPos))
 		{
@@ -1673,7 +1671,7 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateMoving(Pointe
 			// we want to see if the mouse is hovering this node
 			// and display gizmo layouts if we are,
 			// then stop iterating through layers.
-			DA::State_Moving::HoveredWindow hoveredWindow{};
+			DA::State_Moving::HoveredWindow hoveredWindow = {};
 			hoveredWindow.layerIndex = in.layerIndex;
 			hoveredWindow.windowNode = this;
 
@@ -1690,6 +1688,7 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateMoving(Pointe
 			}
 			
 			stateMoving.hoveredWindowOpt = hoveredWindow;
+			returnVal.stopIterating = true;
 		}
 	}
 
@@ -1771,12 +1770,10 @@ DA::Node::PointerMove_Result impl::DA_SplitNode::PointerMove(PointerMove_Params 
 			split = Math::Clamp(normalizedPos, 0.1f, 0.9f);
 
 			PointerMove_Result result = {};
-			result.pointerOccluded = true;
 			return result;
 		}
 	}
 
-	
 	auto childRects = DA_GetSplitNodeChildRects(in.nodeRect, split, dir);
 
 	PointerMove_Params params = in;
@@ -1784,12 +1781,15 @@ DA::Node::PointerMove_Result impl::DA_SplitNode::PointerMove(PointerMove_Params 
 	params.nodeRect = childRects[0];
 	params.pointerOccluded = in.pointerOccluded;
 	PointerMove_Result resultA = a->PointerMove(params);
-	
+	if (resultA.stopIterating)
+		return resultA;
+
 	params.nodeRect = childRects[1];
 	PointerMove_Result resultB = b->PointerMove(params);
 
 	PointerMove_Result result = {};
-	result.pointerOccluded = resultA.pointerOccluded || resultB.pointerOccluded;
+	//result.pointerOccluded = resultA.pointerOccluded || resultB.pointerOccluded;
+	result.stopIterating = resultA.stopIterating || resultB.stopIterating;
 	// Both results can't have a undocking job simultaneously.
 	DENGINE_IMPL_GUI_ASSERT(!(resultA.undockJobOpt.HasValue() && resultB.undockJobOpt.HasValue()));
 	if (resultA.undockJobOpt.HasValue())
@@ -1835,13 +1835,12 @@ void impl::DA_SplitNode::CharRemoveEvent(Context& ctx)
 
 bool impl::DA_PointerMove(DA_PointerMove_Params const& in)
 {
-
 	bool pointerInside = in.widgetRect.PointIsInside(in.pointerPos) && in.visibleRect.PointIsInside(in.pointerPos);
-	if (!pointerInside)
-		return false;
+	//if (!pointerInside)
+		//return false;
 
-	// We're inside the widget, so we want to occlude the cursor.
-	bool returnVal = true;
+	// If we're inside the widget, we want to occlude the cursor.
+	bool returnVal = pointerInside;
 
 	DA::Node::PointerMove_Result result = {};
 	auto const layerItPair = impl::DA_GetLayerItPair(*in.dockArea, in.widgetRect);
@@ -1866,6 +1865,9 @@ bool impl::DA_PointerMove(DA_PointerMove_Params const& in)
 
 		if (params.nodeRect.PointIsInside(in.pointerPos) && params.visibleRect.PointIsInside(in.pointerPos))
 			layerOccluded = true;
+
+		if (result.stopIterating)
+			break;
 	}
 
 	if (auto tabUndockingJob = result.undockJobOpt.ToPtr())
@@ -1944,7 +1946,7 @@ void DockArea::AddWindow(
 SizeHint DockArea::GetSizeHint(
 	Context const& ctx) const
 {
-	SizeHint sizeHint{};
+	SizeHint sizeHint = {};
 	sizeHint.expandX = true;
 	sizeHint.expandY = true;
 	sizeHint.preferred = { 400, 400 };
@@ -1958,6 +1960,8 @@ void DockArea::Render(
 	Rect visibleRect,
 	DrawInfo& drawInfo) const 
 {
+	auto scopedScissor = DrawInfo::ScopedScissor(drawInfo, Rect::Intersection(widgetRect, visibleRect));
+
 	auto const layerItPair = impl::DA_GetLayerItPair(*this, widgetRect).Reverse();
 	for (auto const& layerItem : layerItPair)
 	{
@@ -2088,7 +2092,7 @@ bool DockArea::CursorPress(
 	params.ctx = &ctx;
 	params.cursorClickEvent = &event;
 	params.dockArea = this;
-	params.pointerId = DA::cursorPointerID;
+	params.pointerId = impl::cursorPointerId;
 	params.pointerPos = { (f32)cursorPos.x, (f32)cursorPos.y };
 	params.pointerPressed = event.clicked;
 	params.visibleRect = visibleRect;
@@ -2109,7 +2113,7 @@ bool DockArea::CursorMove(
 	params.ctx = &ctx;
 	params.cursorMoveEvent = &event;
 	params.dockArea = this;
-	params.pointerId = DockArea::cursorPointerID;
+	params.pointerId = impl::cursorPointerId;
 	params.pointerOccluded = occluded;
 	params.pointerPos = { (f32)event.position.x, (f32)event.position.y };
 	params.visibleRect = visibleRect;

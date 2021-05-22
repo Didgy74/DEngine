@@ -68,8 +68,8 @@ namespace DEngine::Gui
 
 		// Return true if event has been consumed.
 		//
-		// This ordinarily means you can end event dispatching
-		// early.
+		// You can end dispatching ONLY if the button is down-pressed.
+		// Unpressed button events should ordinarily be dispatched everywhere.
 		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,

@@ -35,8 +35,6 @@ namespace DEngine::Gui
 		Math::Vec4 deleteLayerGizmoColor = { 1.f, 0.f, 0.f, 0.75f };
 		Math::Vec4 dockingHighlightColor = { 0.f, 0.5f, 1.f, 0.5f };
 
-		static constexpr auto cursorPointerID = static_cast<u8>(-1);
-
 		struct State_Normal
 		{
 		};

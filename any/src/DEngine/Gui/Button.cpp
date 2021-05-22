@@ -39,34 +39,41 @@ public:
 		Math::Vec2 pointerPos,
 		bool pointerPressed)
 	{
-		bool pointerInWidget = widgetRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
-		if (!pointerInWidget)
+		bool pointerInside = widgetRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
+		if (pointerPressed && !pointerInside)
 			return false;
 
 		bool returnVal = true;
-		
-		if (pointerType == PointerType::Primary && pointerInWidget)
+
+		if (pointerType == PointerType::Primary)
 		{
-			if (pointerPressed)
+			if (pointerPressed && pointerInside)
 			{
 				widget.state = Button::State::Pressed;
 				widget.pointerId = pointerId;
 				return true;
 			}
-			else
+			else if (!pointerPressed && widget.state == Button::State::Pressed)
 			{
 				// We are in pressed state, we need to have a pointer id.
-				DENGINE_IMPL_GUI_ASSERT(widget.state != Button::State::Pressed || widget.pointerId.HasValue());
+				DENGINE_IMPL_GUI_ASSERT(widget.pointerId.HasValue());
 
-				if (widget.state == Button::State::Pressed)
+				if (widget.pointerId.Value() == pointerId)
 				{
-					// We are in pressed state, we need to have a pointer id.
-					DENGINE_IMPL_GUI_ASSERT(widget.pointerId.HasValue());
-					if (widget.pointerId.Value() == pointerId)
+					if (pointerInside)
 					{
+						// We are inside the widget, we were in pressed state,
+						// and we unpressed the pointerId that was pressing down.
 						widget.Activate(ctx);
 						widget.state = Button::State::Hovered;
+						widget.pointerId.Clear();
 						return true;
+					}
+					else
+					{
+						widget.state = Button::State::Normal;
+						widget.pointerId.Clear();
+						return false;
 					}
 				}
 			}
@@ -96,7 +103,16 @@ public:
 		if (pointerId == cursorPointerId && widget.state == Button::State::Hovered)
 		{
 			if (!pointerInsideWidget || (pointerInsideWidget && pointerOccluded))
+			{
 				widget.state = Button::State::Normal;
+				return returnVal;
+			}
+		}
+
+		if (pointerId == cursorPointerId && widget.state == Button::State::Normal && pointerInsideWidget)
+		{
+			widget.state = Button::State::Hovered;
+			return returnVal;
 		}
 
 		return true;
