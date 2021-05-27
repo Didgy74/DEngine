@@ -287,7 +287,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	App::WindowID mainWindow = App::CreateWindow(
 		"Main window",
-		{ 1000, 750 });
+		{ 1280, 800 });
 
 	auto gfxWsiConnection = new impl::GfxWsiConnection;
 	gfxWsiConnection->appWindowID = mainWindow;

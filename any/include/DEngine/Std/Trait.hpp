@@ -110,7 +110,7 @@ namespace DEngine::Std::Trait
 	template<class T, class ...Ts>
 	constexpr bool existsInPack = (impl::IsSame<T, Ts>::value || ...);
 
-	template<class T, class... Ts>
+	template<class T, class... Ts> requires (impl::IsSame<T, Ts>::value || ...)
 	constexpr unsigned int indexOf = impl::IndexOf<T, Ts...>::value;
 
 	template<class Base, class Derived>

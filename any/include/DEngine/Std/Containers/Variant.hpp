@@ -6,150 +6,158 @@
 
 namespace DEngine::Std
 {
+	/*
+	template<class T, unsigned int length>
+	struct TestArray { T data[length] = {}; };
+	using DestructorFn_T = void(*)(void*) noexcept;
+
+	template<class... Ts>
+	consteval void Test(TestArray<DestructorFn_T, sizeof...(Ts)>& in);
+
+	template<class T, class... Ts>
+	consteval void Test<T, Ts...>(TestArray<DestructorFn_T, sizeof...(Ts)>& in)
+	{
+		[](void* data) noexcept { reinterpret_cast<T*>(data)->~T(); };
+	}
+
+	template<class... Ts>
+	[[nodiscard]] consteval TestArray<DestructorFn_T, sizeof...(Ts)> Function(unsigned int index) noexcept
+	{
+		TestArray<DestructorFn_T, sizeof...(Ts)> var = {};
+	}
+	*/
+
+
+	// Using a moved-from Variant is UB.
 	template<class ...Ts>
 	class Variant
 	{
 	public:
 		template<class T>
 		static constexpr bool isInPack = (Trait::isSame<T, Ts> || ...);
-		template<class T>
+		template<class T> requires isInPack<T>
 		static constexpr unsigned int indexOf = Trait::indexOf<T, Ts...>;
 
 		constexpr Variant() noexcept = delete;
-		template<class T> requires isInPack<T>
-		constexpr Variant(T const& in) noexcept : tracker{ indexOf<T> }
+		Variant(Variant const&) noexcept = delete;
+		Variant(Variant&& in) noexcept : typeTracker{ in.typeTracker }
 		{
-			new(data) T(in);
-			SetDestructorPfn<T>();
+			DENGINE_IMPL_CONTAINERS_ASSERT(in.typeTracker != typeTracker_noValue);
+			in.moveConstrFn(this->data, in.data);
+			moveConstrFn = in.moveConstrFn;
+			destrFn = in.destrFn;
+			in.Clear();
 		}
-		~Variant() noexcept;
 
+		template<class T> requires isInPack<T>
+		constexpr Variant(T const& in) noexcept : typeTracker{ indexOf<T> }
+		{
+			new(this->data) T(in);
+			SetFunctions<T>();
+		}
+
+		~Variant() noexcept { Clear(); }
+
+		Variant& operator=(Variant const&) noexcept = delete;
+		Variant& operator=(Variant&&) noexcept = delete;
+		
 		template<class T> requires isInPack<T>
 		Variant& operator=(T const& in) noexcept
 		{
 			constexpr auto newTypeIndex = indexOf<T>;
-			if (newTypeIndex == tracker)
+			if (newTypeIndex == typeTracker)
 			{
-				*reinterpret_cast<T*>(data) = in;
+				*reinterpret_cast<T*>(this->data) = in;
 			}
 			else
 			{
 				Clear();
-				new(data) T(in);
-				SetDestructorPfn<T>();
-				tracker = newTypeIndex;
+				new(this->data) T(in);
+				SetFunctions<T>();
+				typeTracker = newTypeIndex;
 			}
 			return *this;
 		}
 
-		[[nodiscard]] constexpr unsigned int GetIndex() const noexcept;
-
-		/*
-		template<typename T>
-		void Set(Trait::RemoveCVRef<T>&& in) noexcept
+		[[nodiscard]] constexpr unsigned int GetIndex() const noexcept
 		{
-			using Type = typename Trait::RemoveCVRef<T>;
-			constexpr auto newTypeIndex = Trait::indexOf<Type, Ts...>;
-			if (newTypeIndex != tracker)
-			{
-				Clear();
-				new(data) Type(static_cast<Type&&>(in));
-			}
-			else
-			{
-				*reinterpret_cast<Type*>(data) = static_cast<Type&&>(in);
-			}
-			SetDestructorPfn<T>();
-
-			tracker = newTypeIndex;
-		}
-		*/
-
-		template<unsigned int i>
-		[[nodiscard]] decltype(auto) Get() noexcept
-		{
-			static_assert(i < sizeof...(Ts), "Tried to Get a Variant with an index out of bounds of the types.");
-			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);
-			return *reinterpret_cast<Trait::At<i, Ts...>*>(data);
+			return typeTracker;
 		}
 
-		template<unsigned int i>
-		[[nodiscard]] decltype(auto) Get() const noexcept
+		template<unsigned int i> requires (i < sizeof...(Ts))
+		decltype(auto) Get() noexcept
 		{
-			static_assert(i < sizeof...(Ts), "Tried to Get a Variant with an index out of bounds of the types.");
-			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);
-			return *reinterpret_cast<Trait::At<i, Ts...> const*>(data);
+			DENGINE_IMPL_CONTAINERS_ASSERT(typeTracker == i);
+			return *reinterpret_cast<Trait::At<i, Ts...>*>(this->data);
 		}
 
-		template<typename T>
-		[[nodiscard]] decltype(auto) Get() noexcept
+		template<unsigned int i> requires (i < sizeof...(Ts))
+		decltype(auto) Get() const noexcept
+		{
+			DENGINE_IMPL_CONTAINERS_ASSERT(typeTracker == i);
+			return *reinterpret_cast<Trait::At<i, Ts...> const*>(this->data);
+		}
+
+		template<typename T> requires isInPack<T>
+		decltype(auto) Get() noexcept
 		{
 			constexpr auto i = Trait::indexOf<T, Ts...>;
-			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);
-			return *reinterpret_cast<T*>(data);
+			DENGINE_IMPL_CONTAINERS_ASSERT(typeTracker == i);
+			return *reinterpret_cast<T*>(this->data);
 		}
-		template<typename T>
-		[[nodiscard]] decltype(auto) Get() const noexcept
+		template<typename T> requires isInPack<T>
+		decltype(auto) Get() const noexcept
 		{
 			constexpr auto i = Trait::indexOf<T, Ts...>;
-			DENGINE_IMPL_CONTAINERS_ASSERT(tracker == i);
-			return *reinterpret_cast<T const*>(data);
+			DENGINE_IMPL_CONTAINERS_ASSERT(typeTracker == i);
+			return *reinterpret_cast<T const*>(this->data);
 		}
-		template<typename T>
-		[[nodiscard]] bool IsA() const noexcept
+		template<typename T> requires isInPack<T>
+		bool IsA() const noexcept
 		{
-			return tracker == Trait::indexOf<T, Ts...>;
+			return typeTracker == Trait::indexOf<T, Ts...>;
 		}
-		template<typename T>
-		[[nodiscard]] T* ToPtr() noexcept
-		{
-			constexpr auto i = Trait::indexOf<T, Ts...>;
-			return tracker == i ? reinterpret_cast<T*>(data) : nullptr;
-		}
-		template<typename T>
-		[[nodiscard]] T const* ToPtr() const noexcept
+		template<typename T> requires isInPack<T>
+		T* ToPtr() noexcept
 		{
 			constexpr auto i = Trait::indexOf<T, Ts...>;
-			return tracker == i ? reinterpret_cast<T const*>(data) : nullptr;
+			return typeTracker == i ? reinterpret_cast<T*>(this->data) : nullptr;
+		}
+		template<typename T> requires isInPack<T>
+		T const* ToPtr() const noexcept
+		{
+			constexpr auto i = Trait::indexOf<T, Ts...>;
+			return typeTracker == i ? reinterpret_cast<T const*>(this->data) : nullptr;
 		}
 
-	private:
+	protected:
 		alignas(Trait::max<alignof(Ts)...>) unsigned char data[Trait::max<sizeof(Ts)...>];
-		unsigned int tracker;
-		using DestructorPFN = void(*)(void*) noexcept;
-		DestructorPFN destructorPFN;
+		static constexpr unsigned int typeTracker_noValue = (unsigned int)-1;
+		unsigned int typeTracker;
 
-		void Clear() noexcept;
+		using DestructorFn_T = void(*)(void*) noexcept;
+		DestructorFn_T destrFn = nullptr;
+		using MoveConstrFn_T = void(*)(void*, void*) noexcept;
+		MoveConstrFn_T moveConstrFn = nullptr;
+
+		void Clear() noexcept 
+		{
+			if (typeTracker != typeTracker_noValue)
+			{
+				DENGINE_IMPL_CONTAINERS_ASSERT(destrFn);
+				destrFn(this->data);
+
+				typeTracker = typeTracker_noValue;
+				destrFn = nullptr;
+				moveConstrFn = nullptr;
+			}
+		}
+
 		template<typename T>
-		constexpr void SetDestructorPfn() noexcept;
-	};
-}
-
-template<typename... Ts>
-DEngine::Std::Variant<Ts...>::~Variant() noexcept
-{
-	Clear();
-}
-
-template<typename... Ts>
-constexpr unsigned int DEngine::Std::Variant<Ts...>::GetIndex() const noexcept
-{
-	return tracker;
-}
-
-template<typename... Ts>
-void DEngine::Std::Variant<Ts...>::Clear() noexcept
-{
-	DENGINE_IMPL_CONTAINERS_ASSERT(destructorPFN);
-	destructorPFN(data);
-}
-
-template<typename ...Ts>
-template<typename T>
-constexpr void DEngine::Std::Variant<Ts...>::SetDestructorPfn() noexcept
-{
-	destructorPFN = [](void* data) noexcept 
-	{
-		reinterpret_cast<T*>(data)->~T(); 
+		constexpr void SetFunctions() noexcept
+		{
+			destrFn = [](void* data) noexcept { reinterpret_cast<T*>(data)->~T(); };
+			moveConstrFn = [](void* data, void* in) noexcept { new(data) T(static_cast<T&&>(*static_cast<T*>(in))); };
+		}
 	};
 }

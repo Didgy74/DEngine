@@ -1,5 +1,7 @@
 #include <DEngine/Gui/AnchorArea.hpp>
 
+#include <DEngine/Std/Trait.hpp>
+
 namespace DEngine::Gui::impl
 {
     [[nodiscard]] static Rect GetNodeRect(
@@ -52,7 +54,124 @@ namespace DEngine::Gui::impl
         return nodeRect;
     }
 
+    struct PointerMove_Pointer
+    {
+        Math::Vec2 pos;
+        bool occluded;
+    };
+    template<class T>
+    [[nodiscard]] static bool PointerMove(
+        AnchorArea& widget,
+        Context& ctx,
+        WindowID windowId,
+        Rect const& widgetRect,
+        Rect const& visibleRect,
+        PointerMove_Pointer const& pointer,
+        T const& event)
+    {
+        bool const pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+        
+        bool innerOccluded = false;
+        for (uSize i = 0; i < widget.nodes.size(); i += 1)
+        {
+            auto& node = widget.nodes[i];
+            DENGINE_IMPL_GUI_ASSERT(node.widget);
 
+            auto const nodeRect = impl::GetNodeRect(
+                { widget.nodes.data(), widget.nodes.size() },
+                widgetRect,
+                i);
+
+            bool newOccluded = false;
+            using Type = Std::Trait::RemoveCVRef<decltype(event)>;
+            if constexpr (Std::Trait::isSame<Type, CursorMoveEvent>)
+            {
+                newOccluded = node.widget->CursorMove(
+                    ctx,
+                    windowId,
+                    nodeRect,
+                    visibleRect,
+                    event,
+                    pointer.occluded || innerOccluded);
+            }
+            else if constexpr (Std::Trait::isSame<Type, TouchMoveEvent>)
+            {
+                newOccluded = node.widget->TouchMoveEvent(
+                    ctx,
+                    windowId,
+                    nodeRect,
+                    visibleRect,
+                    event,
+                    pointer.occluded || innerOccluded);
+            }
+
+            if (newOccluded)
+                innerOccluded = true;
+        }
+
+        return pointerInside;
+    }
+
+    struct PointerPress_Pointer
+    {
+        Math::Vec2 pos;
+        bool pressed;
+    };
+    
+    template<class T>
+    [[nodiscard]] static bool PointerPress(
+        AnchorArea& widget,
+        Context& ctx,
+        WindowID windowId,
+        Rect const& widgetRect,
+        Rect const& visibleRect,
+        PointerPress_Pointer const& pointer,
+        T const& event)
+    {
+        bool const pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+        if (!pointerInside && pointer.pressed)
+            return false;
+
+        for (uSize i = 0; i < widget.nodes.size(); i += 1)
+        {
+            auto& node = widget.nodes[i];
+            DENGINE_IMPL_GUI_ASSERT(node.widget);
+
+            auto const nodeRect = impl::GetNodeRect(
+                { widget.nodes.data(), widget.nodes.size() },
+                widgetRect,
+                i);
+
+            bool eventConsumed = false;
+            
+            using Type = Std::Trait::RemoveCVRef<decltype(event)>;
+            if constexpr (Std::Trait::isSame<Type, CursorClickEvent>)
+            {
+                eventConsumed = node.widget->CursorPress(
+                    ctx,
+                    windowId,
+                    nodeRect,
+                    visibleRect,
+                    { (i32)pointer.pos.x, (i32)pointer.pos.y },
+                    event);
+            }
+            else if constexpr (Std::Trait::isSame<Type, TouchPressEvent>)
+            {
+                
+                eventConsumed = node.widget->TouchPressEvent(
+                    ctx,
+                    windowId,
+                    nodeRect,
+                    visibleRect,
+                    event);
+            }
+
+            if (eventConsumed && pointer.pressed)
+                break;
+        }
+
+        return pointerInside;
+    }
 }
 
 using namespace DEngine;
@@ -86,7 +205,7 @@ void AnchorArea::Render(
         auto const& node = nodes[i];
         DENGINE_IMPL_GUI_ASSERT(node.widget);
 
-        auto nodeRect = impl::GetNodeRect(
+        auto const nodeRect = impl::GetNodeRect(
             { nodes.data(), nodes.size() },
             widgetRect,
             i);
@@ -126,26 +245,17 @@ bool AnchorArea::CursorMove(
     CursorMoveEvent event, 
     bool occluded)
 {
-    for (uSize i = 0; i < nodes.size(); i += 1)
-    {
-        auto& node = nodes[i];
-        DENGINE_IMPL_GUI_ASSERT(node.widget);
-
-        auto nodeRect = impl::GetNodeRect(
-            { nodes.data(), nodes.size() },
-            widgetRect,
-            i);
-
-        node.widget->CursorMove(
-            ctx,
-            windowId,
-            nodeRect,
-            visibleRect,
-            event,
-            occluded);
-    }
-
-    return false;
+    impl::PointerMove_Pointer pointer = {};
+    pointer.occluded = occluded;
+    pointer.pos = { (f32)event.position.x, (f32)event.position.y };
+    return impl::PointerMove(
+        *this,
+        ctx,
+        windowId,
+        widgetRect,
+        visibleRect,
+        pointer,
+        event);
 }
 
 bool AnchorArea::CursorPress(
@@ -156,42 +266,56 @@ bool AnchorArea::CursorPress(
     Math::Vec2Int cursorPos, 
     CursorClickEvent event)
 {
-    bool cursorIsInside = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
-    if (!cursorIsInside)
-        return false;
-
-    bool consumed = false;
-    for (uSize i = 0; i < nodes.size(); i += 1)
-    {
-        auto& node = nodes[i];
-        DENGINE_IMPL_GUI_ASSERT(node.widget);
-
-        auto nodeRect = impl::GetNodeRect(
-            { nodes.data(), nodes.size() },
-            widgetRect,
-            i);
-
-        consumed = node.widget->CursorPress(
-            ctx,
-            windowId,
-            nodeRect,
-            visibleRect,
-            cursorPos,
-            event);
-        if (consumed)
-            break;
-    }
-
-    // If we have a background, we want to consume the event always.
-    return consumed;
+    impl::PointerPress_Pointer pointer = {};
+    pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
+    pointer.pressed = event.clicked;
+    return impl::PointerPress(
+        *this,
+        ctx,
+        windowId,
+        widgetRect,
+        visibleRect,
+        pointer,
+        event);
 }
 
-void AnchorArea::TouchEvent(
-    Context& ctx, 
-    WindowID windowId, 
-    Rect widgetRect, 
-    Rect visibleRect, 
-    Gui::TouchEvent event,
+bool AnchorArea::TouchMoveEvent(
+    Context& ctx,
+    WindowID windowId,
+    Rect widgetRect,
+    Rect visibleRect,
+    Gui::TouchMoveEvent event,
     bool occluded)
 {
+    impl::PointerMove_Pointer pointer = {};
+    pointer.occluded = occluded;
+    pointer.pos = event.position;
+    return impl::PointerMove(
+        *this,
+        ctx,
+        windowId,
+        widgetRect,
+        visibleRect,
+        pointer,
+        event);
+}
+
+bool AnchorArea::TouchPressEvent(
+    Context& ctx,
+    WindowID windowId,
+    Rect widgetRect,
+    Rect visibleRect,
+    Gui::TouchPressEvent event)
+{
+    impl::PointerPress_Pointer pointer = {};
+    pointer.pos = event.position;
+    pointer.pressed = event.pressed;
+    return impl::PointerPress(
+        *this,
+        ctx,
+        windowId,
+        widgetRect,
+        visibleRect,
+        pointer,
+        event);
 }

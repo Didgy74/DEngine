@@ -53,17 +53,16 @@ namespace DEngine::Gui
 		bool clicked;
 	};
 
-	enum class TouchEventType
-	{
-		Unchanged,
-		Down,
-		Up,
-		Moved
-	};
-	struct TouchEvent
+	struct TouchPressEvent
 	{
 		u8 id;
-		TouchEventType type;
+		Math::Vec2 position;
+		bool pressed;
+	};
+
+	struct TouchMoveEvent
+	{
+		u8 id;
 		Math::Vec2 position;
 	};
 

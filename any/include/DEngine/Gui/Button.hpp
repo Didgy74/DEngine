@@ -74,13 +74,20 @@ namespace DEngine::Gui
 			CursorMoveEvent event,
 			bool cursorOccluded) override;
 
-		virtual void TouchEvent(
+		virtual bool TouchMoveEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event,
-			bool cursorOccluded) override;
+			Gui::TouchMoveEvent event,
+			bool occluded) override;
+
+		virtual bool TouchPressEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchPressEvent event) override;
 
 	private:
 		bool toggled = false;

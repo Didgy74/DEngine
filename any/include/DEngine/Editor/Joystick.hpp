@@ -21,13 +21,11 @@ namespace DEngine::Editor
 		Std::Opt<ActiveData> activeData = {};
 
 		// Returns a vector in range [-1, 1].
+		// Y axis points down!
 		[[nodiscard]] Math::Vec2 GetVector() const noexcept
 		{
 			if (activeData.HasValue())
-			{
-				auto const& temp = activeData.Value();
-				return { temp.currPos.x, -temp.currPos.y };
-			}
+				return activeData.Value().currPos;
 			return { 0.f, 0.f };
 		}
 
@@ -46,6 +44,21 @@ namespace DEngine::Editor
 			Gui::Rect visibleRect,
 			Gui::CursorMoveEvent event,
 			bool occluded) override;
+
+		virtual bool TouchMoveEvent(
+			Gui::Context& ctx,
+			Gui::WindowID windowId,
+			Gui::Rect widgetRect,
+			Gui::Rect visibleRect,
+			Gui::TouchMoveEvent event,
+			bool occluded) override;
+
+		virtual bool TouchPressEvent(
+			Gui::Context& ctx,
+			Gui::WindowID windowId,
+			Gui::Rect widgetRect,
+			Gui::Rect visibleRect,
+			Gui::TouchPressEvent event) override;
 
 		[[nodiscard]] virtual Gui::SizeHint GetSizeHint(
 			Gui::Context const& ctx) const override;

@@ -42,12 +42,13 @@ namespace DEngine::Gui
 
 		virtual void InputConnectionLost() {}
 
-		// Returns true if the widget occludes the cursor.
+
+		// Returns true if the widget occludes the move event point.
 		// That means widgets that are behind/under this one in terms of Z axis,
-		// should not react to this cursor-move for i.e highlights.
+		// should not react to this move event for i.e highlights.
 		// 
 		// Transparent overlays should always return false.
-		//
+		// 
 		// The change is reflected in the "occluded" parameter for all
 		// subsequent widget this event dispatch.
 		// 
@@ -68,8 +69,8 @@ namespace DEngine::Gui
 
 		// Return true if event has been consumed.
 		//
-		// You can end dispatching ONLY if the button is down-pressed.
-		// Unpressed button events should ordinarily be dispatched everywhere.
+		// You can end dispatching ONLY if the event is down-pressed.
+		// Unpressed events should ordinarily be dispatched everywhere.
 		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
@@ -78,13 +79,40 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) { return false; }
 
-		virtual void TouchEvent(
+		// Returns true if the widget occludes the move event point.
+		// That means widgets that are behind/under this one in terms of Z axis,
+		// should not react to this move event for i.e highlights.
+		// 
+		// Transparent overlays should always return false.
+		// 
+		// The change is reflected in the "occluded" parameter for all
+		// subsequent widget this event dispatch.
+		// 
+		// If the occluded parameter is already true,
+		// the return value should ordinarily be ignored.
+		//
+		// If the return value is true, it does NOT ordinarily mean
+		// you can end event dispatching early. That is to say
+		// this event should ordinarily always be passed to every widget
+		// in the hierarchy.
+		virtual bool TouchMoveEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			TouchEvent event,
-			bool occluded) {}
+			TouchMoveEvent event,
+			bool occluded) { return false; }
+
+		// Return true if event has been consumed.
+		//
+		// You can end dispatching ONLY if the event is down-pressed.
+		// Unpressed events should ordinarily be dispatched everywhere.
+		virtual bool TouchPressEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			TouchPressEvent event) { return false; }
 	};
 
 	inline Widget::~Widget() {}

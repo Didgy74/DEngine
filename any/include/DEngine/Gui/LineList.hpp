@@ -18,9 +18,17 @@ namespace DEngine::Gui
 		static constexpr u32 horizontalPadding = 20;
 
 		void RemoveLine(uSize index);
-
-		bool canSelect = false;
+		
 		Std::Opt<uSize> selectedLine;
+		struct PressedLine_T
+		{
+			u8 pointerId;
+			// This is null-opt if we pressed an area outside
+			// the possible lines. Meaning it should lead to
+			// a deselect of any currently selected line.
+			Std::Opt<uSize> lineIndex;
+		};
+		Std::Opt<PressedLine_T> currPressedLine;
 		std::vector<std::string> lines;
 
 		using Callback = std::function<void(LineList&)>;
@@ -35,7 +43,15 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		[[nodiscard]] virtual bool CursorPress(
+		virtual bool CursorMove(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			CursorMoveEvent event,
+			bool occluded) override;
+
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -43,12 +59,19 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
-		virtual void TouchEvent(
+		virtual bool TouchMoveEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event,
+			Gui::TouchMoveEvent event,
 			bool occluded) override;
+
+		virtual bool TouchPressEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchPressEvent event) override;
 	};
 }

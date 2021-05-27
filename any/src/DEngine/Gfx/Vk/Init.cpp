@@ -648,7 +648,7 @@ vk::RenderPass Vk::Init::CreateGuiRenderPass(
 	dependencies[1].dstStageMask = vk::PipelineStageFlagBits::eBottomOfPipe;
 
 	// Set up render pass
-	vk::RenderPassCreateInfo createInfo{};
+	vk::RenderPassCreateInfo createInfo = {};
 	createInfo.attachmentCount = 1;
 	createInfo.pAttachments = attachments;
 	createInfo.subpassCount = 1;

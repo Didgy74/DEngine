@@ -181,15 +181,30 @@ bool CollapsingHeader::CursorPress(
 		event);
 }
 
-void CollapsingHeader::TouchEvent(
+bool CollapsingHeader::TouchPressEvent(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event,
+	Gui::TouchPressEvent event)
+{
+	return mainStackLayout.TouchPressEvent(
+		ctx,
+		windowId,
+		widgetRect,
+		visibleRect,
+		event);
+}
+
+bool CollapsingHeader::TouchMoveEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchMoveEvent event,
 	bool occluded)
 {
-	return mainStackLayout.TouchEvent(
+	return mainStackLayout.TouchMoveEvent(
 		ctx,
 		windowId,
 		widgetRect,

@@ -236,6 +236,9 @@ namespace DEngine::Gui::impl
 			widgetRect);
 	}
 
+
+	// T needs to be either CursorMoveEvent or TouchMoveEvent.
+	template<class T>
 	[[nodiscard]] static bool PointerMove(
 		StackLayout& layout,
 		Context& ctx,
@@ -244,45 +247,43 @@ namespace DEngine::Gui::impl
 		Rect const& visibleRect,
 		Math::Vec2 pointerPos,
 		bool pointerOccluded,
-		CursorMoveEvent const& event)
+		T const& event)
 	{
 		auto innerRect = impl::BuildInnerRect(widgetRect, layout.padding);
 
 		auto itPair = impl::BuildItPair(layout, ctx, innerRect);
 		for (auto const& itItem : itPair)
 		{
-			itItem.widget.CursorMove(
-				ctx,
-				windowId,
-				itItem.childRect,
-				visibleRect,
-				event,
-				pointerOccluded);
+			if constexpr (Std::Trait::isSame<T, CursorMoveEvent>)
+			{
+				itItem.widget.CursorMove(
+					ctx,
+					windowId,
+					itItem.childRect,
+					visibleRect,
+					event,
+					pointerOccluded);
+			}
+			else if constexpr (Std::Trait::isSame<T, TouchMoveEvent>)
+			{
+				itItem.widget.TouchMoveEvent(
+					ctx,
+					windowId,
+					itItem.childRect,
+					visibleRect,
+					event,
+					pointerOccluded);
+			}
 		}
-
-		bool returnVal = false;
 
 		// If we're inside the inner rect, we want to occlude the pointer.
 		bool pointerInsideWidget = innerRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
-		if (pointerInsideWidget)
-			returnVal = true;
-
-		return returnVal;
+		return pointerInsideWidget;
 	}
 
-	enum class PointerType : u8 { Primary, Secondary };
-	[[nodiscard]] static PointerType ToPointerType(Gui::CursorButton in) noexcept
-	{
-		switch (in)
-		{
-			case Gui::CursorButton::Primary: return PointerType::Primary;
-			case Gui::CursorButton::Secondary: return PointerType::Secondary;
-			default: break;
-		}
-		DENGINE_IMPL_UNREACHABLE();
-		return {};
-	}
-	[[nodiscard]] static bool PointerPress(
+	// T must be either CursorClickEvent or TouchPressEvent
+	template<class T>
+	static bool PointerPress(
 		StackLayout& layout,
 		Context& ctx,
 		WindowID windowId,
@@ -290,7 +291,7 @@ namespace DEngine::Gui::impl
 		Rect const& visibleRect,
 		Math::Vec2 pointerPos,
 		bool pointerPressed,
-		CursorClickEvent const& event)
+		T const& event)
 	{
 		auto innerRect = impl::BuildInnerRect(widgetRect, layout.padding);
 		
@@ -305,13 +306,27 @@ namespace DEngine::Gui::impl
 			if (pointerPressed && !pointerInChild)
 				continue;
 			
-			bool eventConsumed = itItem.widget.CursorPress(
-				ctx,
-				windowId,
-				itItem.childRect,
-				visibleRect,
-				{ (i32)pointerPos.x, (i32)pointerPos.y },
-				event);
+			bool eventConsumed = false;
+			if constexpr (Std::Trait::isSame<T, CursorClickEvent>)
+			{
+				eventConsumed = itItem.widget.CursorPress(
+					ctx,
+					windowId,
+					itItem.childRect,
+					visibleRect,
+					{ (i32)pointerPos.x, (i32)pointerPos.y },
+					event);
+			}
+			else if constexpr (Std::Trait::isSame<T, TouchPressEvent>)
+			{
+				eventConsumed = itItem.widget.TouchPressEvent(
+					ctx,
+					windowId,
+					itItem.childRect,
+					visibleRect,
+					event);
+			}
+
 			if (pointerPressed && eventConsumed)
 				return true;
 		}
@@ -558,25 +573,6 @@ void StackLayout::InputConnectionLost()
 	}
 }
 
-bool StackLayout::CursorMove(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	CursorMoveEvent event,
-	bool cursorOccluded)
-{
-	return impl::PointerMove(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		{ (f32)event.position.x, (f32)event.position.y },
-		cursorOccluded,
-		event);
-}
-
 bool StackLayout::CursorPress(
 	Context& ctx,
 	WindowID windowId,
@@ -596,36 +592,58 @@ bool StackLayout::CursorPress(
 		event);
 }
 
-void StackLayout::TouchEvent(
+bool StackLayout::CursorMove(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event,
+	CursorMoveEvent event,
 	bool cursorOccluded)
 {
-	/*
-	ParentType::TouchEvent(
+	return impl::PointerMove(
+		*this,
 		ctx,
 		windowId,
 		widgetRect,
 		visibleRect,
-		event,
-		cursorOccluded);
+		{ (f32)event.position.x, (f32)event.position.y },
+		cursorOccluded,
+		event);
+}
 
-	impl::StackLayout_IterateOverChildren(
-		ctx,
+bool StackLayout::TouchPressEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchPressEvent event)
+{
+	return impl::PointerPress(
 		*this,
+		ctx,
+		windowId,
 		widgetRect,
-		[&ctx, windowId, visibleRect, event, cursorOccluded](Widget& child, Rect childRect)
-		{
-			child.TouchEvent(
-				ctx,
-				windowId,
-				childRect,
-				Rect::Intersection(childRect, visibleRect),
-				event,
-				cursorOccluded);
-		});
-		*/
+		visibleRect,
+		event.position,
+		event.pressed,
+		event);
+}
+
+bool StackLayout::TouchMoveEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchMoveEvent event,
+	bool occluded)
+{
+	return impl::PointerMove(
+		*this,
+		ctx,
+		windowId,
+		widgetRect,
+		visibleRect,
+		event.position,
+		occluded,
+		event);
 }

@@ -92,6 +92,14 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
+		virtual bool CursorPress(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Math::Vec2Int cursorPos,
+			CursorClickEvent event) override;
+
 		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
@@ -100,20 +108,19 @@ namespace DEngine::Gui
 			CursorMoveEvent event,
 			bool occluded) override;
 
-		[[nodiscard]] virtual bool CursorPress(
+		virtual bool TouchPressEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorClickEvent event) override;
+			Gui::TouchPressEvent event) override;
 
-		virtual void TouchEvent(
+		virtual bool TouchMoveEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event,
+			Gui::TouchMoveEvent event,
 			bool occluded) override;
 
 		virtual void InputConnectionLost() override;

@@ -334,7 +334,7 @@ void Context::PushEvent(CursorMoveEvent event)
 	}
 }
 
-void Context::PushEvent(TouchEvent event)
+void Context::PushEvent(TouchMoveEvent event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 	for (auto& windowNode : implData.windows)
@@ -354,17 +354,13 @@ void Context::PushEvent(TouchEvent event)
 					SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
 					Rect widgetRect = { menu.rect.position, sizeHint.preferred };
 					bool cursorOccluded = false;
-					menu.topLayout->TouchEvent(
+					menu.topLayout->TouchMoveEvent(
 						*this,
 						windowNode.id,
 						widgetRect,
 						widgetRect,
 						event,
 						cursorOccluded);
-					if (widgetRect.PointIsInside(event.position) && event.type == TouchEventType::Down)
-					{
-						bleh = true;
-					}
 				}
 			}
 			windowNode.pendingMenuDestroys.clear();
@@ -373,13 +369,64 @@ void Context::PushEvent(TouchEvent event)
 		if (windowNode.data.topLayout && !bleh)
 		{
 			bool cursorOccluded = false;
-			windowNode.data.topLayout->TouchEvent(
+			windowNode.data.topLayout->TouchMoveEvent(
 				*this,
 				windowNode.id,
 				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
 				event,
 				cursorOccluded);
+		}
+
+		windowNode.menuAddRemoves.clear();
+		windowNode.currentlyIterating = false;
+	}
+}
+
+
+void Context::PushEvent(TouchPressEvent event)
+{
+	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	for (auto& windowNode : implData.windows)
+	{
+		windowNode.currentlyIterating = true;
+
+		bool eventConsumed = false;
+		uSize menusLength = windowNode.test_Menus.size();
+		for (uSize n = 0; n < menusLength; n += 1)
+		{
+			Std::Opt<uSize> i = impl::GetModifiedMenuIndex(n, { windowNode.menuAddRemoves.data(), windowNode.menuAddRemoves.size() });
+			if (i.HasValue())
+			{
+				auto& menu = windowNode.test_Menus[i.Value()];
+				if (menu.topLayout)
+				{
+					SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
+
+					Rect widgetRect = { menu.rect.position, sizeHint.preferred };
+
+					eventConsumed = menu.topLayout->TouchPressEvent(
+						*this,
+						windowNode.id,
+						widgetRect,
+						widgetRect,
+						event);
+
+					if (eventConsumed && event.pressed)
+						break;
+				}
+			}
+			windowNode.pendingMenuDestroys.clear();
+		}
+
+		if (windowNode.data.topLayout && !(eventConsumed && event.pressed))
+		{
+			windowNode.data.topLayout->TouchPressEvent(
+				*this,
+				windowNode.id,
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				event);
 		}
 
 		windowNode.menuAddRemoves.clear();

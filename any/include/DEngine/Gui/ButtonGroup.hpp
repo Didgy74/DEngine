@@ -60,12 +60,19 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
-		virtual void TouchEvent(
+		virtual bool TouchMoveEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event,
+			Gui::TouchMoveEvent event,
 			bool occluded) override;
+
+		virtual bool TouchPressEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchPressEvent event) override;
 	};
 }

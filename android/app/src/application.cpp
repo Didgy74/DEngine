@@ -49,6 +49,7 @@ namespace DEngine::Application::detail
 			VisibleAreaChanged,
 			NewOrientation,
 		};
+		Type type;
 
 		template<Type>
 		struct Data {};
@@ -81,16 +82,18 @@ namespace DEngine::Application::detail
 			uint8_t newOrientation;
 		};
 
-		using VariantType = Std::Variant<
-			Data<Type::CharInput>,
-			Data<Type::CharRemove>,
-			Data<Type::CharEnter>,
-			Data<Type::NativeWindowCreated>,
-			Data<Type::NativeWindowDestroyed>,
-			Data<Type::InputQueueCreated>,
-			Data<Type::VisibleAreaChanged>,
-			Data<Type::NewOrientation>>;
-		VariantType data = Data<Type::CharInput>{}; // Just set a default value
+		union Data_T
+		{
+			Data<Type::CharInput> charInput;
+			Data<Type::CharRemove> charRemove;
+			Data<Type::CharEnter> charEnter;
+			Data<Type::NativeWindowCreated> nativeWindowCreated;
+			Data<Type::NativeWindowDestroyed> nativeWindowDestroyed;
+			Data<Type::InputQueueCreated> inputQueueCreated;
+			Data<Type::VisibleAreaChanged> visibleAreaChanged;
+			Data<Type::NewOrientation> newOrientation;
+		};
+		Data_T data;
 	};
 
 	struct BackendData
@@ -172,13 +175,14 @@ namespace DEngine::Application::detail
 		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
-		CustomEvent newEvent = {};
+		CustomEvent event = {};
+		event.type = CustomEvent::Type::NativeWindowCreated;
 		CustomEvent::Data<CustomEvent::Type::NativeWindowCreated> data = {};
 		data.nativeWindow = window;
-		newEvent.data = data;
+		event.data.nativeWindowCreated = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
-		backendData.customEventQueue.push_back(newEvent);
+		backendData.customEventQueue.push_back(event);
 	}
 
 	static void onNativeWindowDestroyed(ANativeActivity* activity, ANativeWindow* window)
@@ -186,12 +190,13 @@ namespace DEngine::Application::detail
 		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
-		CustomEvent newEvent = {};
+		CustomEvent event = {};
+		event.type = CustomEvent::Type::NativeWindowDestroyed;
 		CustomEvent::Data<CustomEvent::Type::NativeWindowDestroyed> data = {};
-		newEvent.data = data;
+		event.data.nativeWindowDestroyed = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
-		backendData.customEventQueue.push_back(newEvent);
+		backendData.customEventQueue.push_back(event);
 	}
 
 	static void onInputQueueCreated(ANativeActivity* activity, AInputQueue* queue)
@@ -199,13 +204,14 @@ namespace DEngine::Application::detail
 		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
-		CustomEvent newEvent = {};
+		CustomEvent event = {};
+		event.type = CustomEvent::Type::InputQueueCreated;
 		CustomEvent::Data<CustomEvent::Type::InputQueueCreated> data = {};
 		data.inputQueue = queue;
-		newEvent.data = data;
+		event.data.inputQueueCreated = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
-		backendData.customEventQueue.push_back(newEvent);
+		backendData.customEventQueue.push_back(event);
 	}
 
 	static void onInputQueueDestroyed(ANativeActivity* activity, AInputQueue* queue)
@@ -219,12 +225,13 @@ namespace DEngine::Application::detail
 
 		auto& backendData = *detail::pBackendData;
 
-		CustomEvent newEvent = {};
+		CustomEvent event = {};
+		event.type = CustomEvent::Type::NewOrientation;
 		CustomEvent::Data<CustomEvent::Type::NewOrientation> data = {};
-		newEvent.data = data;
+		event.data.newOrientation = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
-		backendData.customEventQueue.push_back(newEvent);
+		backendData.customEventQueue.push_back(event);
 	}
 }
 
@@ -302,13 +309,14 @@ extern "C"
 
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent = {};
+	CustomEvent event = {};
+	event.type = CustomEvent::Type::CharInput;
 	CustomEvent::Data<CustomEvent::Type::CharInput> data = {};
 	data.charInput = utfValue;
-	newEvent.data = data;
+	event.data.charInput = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
-	backendData.customEventQueue.push_back(newEvent);
+	backendData.customEventQueue.push_back(event);
 }
 
 extern "C"
@@ -323,12 +331,13 @@ extern "C"
 	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent = {};
+	CustomEvent event = {};
+	event.type = CustomEvent::Type::CharEnter;
 	CustomEvent::Data<CustomEvent::Type::CharEnter> data = {};
-	newEvent.data = data;
+	event.data.charEnter = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
-	backendData.customEventQueue.push_back(newEvent);
+	backendData.customEventQueue.push_back(event);
 }
 
 extern "C"
@@ -343,12 +352,13 @@ extern "C"
 	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent = {};
+	CustomEvent event = {};
+	event.type = CustomEvent::Type::CharRemove;
 	CustomEvent::Data<CustomEvent::Type::CharRemove> data = {};
-	newEvent.data = data;
+	event.data.charRemove = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
-	backendData.customEventQueue.push_back(newEvent);
+	backendData.customEventQueue.push_back(event);
 }
 
 // We do not use ANativeActivity's View in this implementation,
@@ -372,16 +382,17 @@ extern "C"
 	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent = {};
+	CustomEvent event = {};
+	event.type = CustomEvent::Type::VisibleAreaChanged;
 	CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged> data = {};
 	data.offsetX = (i32)posX;
 	data.offsetY = (i32)posY;
 	data.width = (u32)width;
 	data.height = (u32)height;
-	newEvent.data = data;
+	event.data.visibleAreaChanged = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
-	backendData.customEventQueue.push_back(newEvent);
+	backendData.customEventQueue.push_back(event);
 }
 
 /*
@@ -404,13 +415,14 @@ extern "C"
 	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent = {};
+	CustomEvent event = {};
+	event.type = CustomEvent::Type::NewOrientation;
 	CustomEvent::Data<CustomEvent::Type::NewOrientation> data = {};
 	data.newOrientation = (uint8_t)newOrientation;
-	newEvent.data = data;
+	event.data.newOrientation = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
-	backendData.customEventQueue.push_back(newEvent);
+	backendData.customEventQueue.push_back(event);
 }
 
 static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, int32_t source)
@@ -638,60 +650,60 @@ namespace DEngine::Application::detail
 		{
 			if (callable.HasValue())
 				callable.Value()(event);
-			auto typeIndex = event.data.GetIndex();
+			auto typeIndex = event.type;
 			switch (typeIndex)
 			{
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NativeWindowCreated>>:
+				case CustomEvent::Type::NativeWindowCreated:
 				{
-					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::NativeWindowCreated>>();
+					auto const& data = event.data.nativeWindowCreated;
 					HandleEvent_NativeWindowCreated(data.nativeWindow);
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NativeWindowDestroyed>>:
+				case CustomEvent::Type::NativeWindowDestroyed:
 				{
 					HandleEvent_NativeWindowDestroyed();
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::InputQueueCreated>>:
+				case CustomEvent::Type::InputQueueCreated:
 				{
-					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::InputQueueCreated>>();
+					auto const& data = event.data.inputQueueCreated;
 					HandleEvent_InputQueueCreated(data.inputQueue);
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged>>:
+				case CustomEvent::Type::VisibleAreaChanged:
 				{
-					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged>>();
+					auto const& data = event.data.visibleAreaChanged;
 					HandleEvent_VisibleAreaChanged(
 						{ data.offsetX, data.offsetY },
 						{ data.width, data.height });
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::CharInput>>:
+				case CustomEvent::Type::CharInput:
 				{
-					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::CharInput>>();
+					auto const& data = event.data.charInput;
 					detail::PushCharInput(data.charInput);
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::CharRemove>>:
+				case CustomEvent::Type::CharRemove:
 				{
 					detail::PushCharRemoveEvent();
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::CharEnter>>:
+				case CustomEvent::Type::CharEnter:
 				{
 					detail::PushCharEnterEvent();
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NewOrientation>>:
+				case CustomEvent::Type::NewOrientation:
 				{
-					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::NewOrientation>>();
+					auto const& data = event.data.newOrientation;
 					HandleEvent_Reorientation(data.newOrientation);
 					break;
 				}
@@ -793,16 +805,16 @@ bool Application::detail::Backend_Initialize() noexcept
 		ProcessCustomEvents(
 			[&nativeWindowSet, &inputQueueSet, &visibleAreaSet](CustomEvent const& event)
 			{
-				auto typeIndex = event.data.GetIndex();
+				auto typeIndex = event.type;
 				switch (typeIndex)
 				{
-					case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::InputQueueCreated>>:
+					case CustomEvent::Type::InputQueueCreated:
 						inputQueueSet = true;
 						break;
-					case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NativeWindowCreated>>:
+					case CustomEvent::Type::NativeWindowCreated:
 						nativeWindowSet = true;
 						break;
-					case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged>>:
+					case CustomEvent::Type::VisibleAreaChanged:
 						visibleAreaSet = true;
 						break;
 					default:

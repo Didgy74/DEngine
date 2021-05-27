@@ -57,13 +57,12 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
-		virtual void TouchEvent(
+		virtual bool TouchPressEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent touch,
-			bool occluded) override;
+			Gui::TouchPressEvent event) override;
 
 	protected:
 		Context* inputConnectionCtx = nullptr;

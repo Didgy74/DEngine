@@ -185,6 +185,7 @@ bool LineEdit::CursorPress(
 	return false;
 }
 
+/*
 void LineEdit::TouchEvent(
 	Context& ctx,
 	WindowID windowId,
@@ -223,6 +224,17 @@ void LineEdit::TouchEvent(
 		DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx == &ctx);
 		ClearInputConnection();
 	}
+}
+*/
+
+bool LineEdit::TouchPressEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchPressEvent event)
+{
+	return false;
 }
 
 void LineEdit::ClearInputConnection()

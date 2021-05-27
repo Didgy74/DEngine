@@ -65,7 +65,10 @@ public:
 						// We are inside the widget, we were in pressed state,
 						// and we unpressed the pointerId that was pressing down.
 						widget.Activate(ctx);
-						widget.state = Button::State::Hovered;
+						if (pointerId == cursorPointerId)
+							widget.state = Button::State::Hovered;
+						else
+							widget.state = Button::State::Normal;
 						widget.pointerId.Clear();
 						return true;
 					}
@@ -109,7 +112,7 @@ public:
 			}
 		}
 
-		if (pointerId == cursorPointerId && widget.state == Button::State::Normal && pointerInsideWidget)
+		if (!pointerOccluded && pointerId == cursorPointerId && widget.state == Button::State::Normal && pointerInsideWidget)
 		{
 			widget.state = Button::State::Hovered;
 			return returnVal;
@@ -248,34 +251,38 @@ bool Button::CursorMove(
 		cursorOccluded);
 }
 
-void Button::TouchEvent(
+bool Button::TouchPressEvent(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event,
-	bool cursorOccluded)
+	Gui::TouchPressEvent event)
 {
-	/*
-	if (event.id == 0)
-	{
-		bool temp = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
-		if (temp)
-		{
-			if (event.type == TouchEventType::Down)
-				state = State::Pressed;
-			else if (event.type == TouchEventType::Up)
-			{
-				if (state == State::Pressed)
-					Activate(
-						ctx);
-				state = State::Normal;
-			}
-		}
-		else
-		{
-			state = State::Normal;
-		}
-	}
-	*/
+	return impl::BtnImpl::PointerPress(
+		*this,
+		ctx,
+		widgetRect,
+		visibleRect,
+		event.id,
+		impl::PointerType::Primary,
+		event.position,
+		event.pressed);
+}
+
+bool Button::TouchMoveEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchMoveEvent event,
+	bool occluded)
+{
+	return impl::BtnImpl::PointerMove(
+		*this,
+		ctx,
+		widgetRect,
+		visibleRect,
+		event.id,
+		event.position,
+		occluded);
 }

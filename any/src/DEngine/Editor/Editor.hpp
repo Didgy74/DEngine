@@ -48,7 +48,7 @@ namespace DEngine::Editor
 			Gfx::Context* gfxCtx);
 
 
-	private:
+	protected:
 		Context() = default;
 
 		EditorImpl* implData = nullptr;

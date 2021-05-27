@@ -3,6 +3,8 @@
 #include "Editor.hpp"
 #include "EditorImpl.hpp"
 
+#include <DEngine/Editor/Joystick.hpp>
+
 #include <DEngine/Gui/StackLayout.hpp>
 #include <DEngine/Gui/Widget.hpp>
 #include <DEngine/Gui/Button.hpp>
@@ -67,8 +69,6 @@ namespace DEngine::Editor
 	class InternalViewportWidget : public Gui::Widget
 	{
 	public:
-		static constexpr u8 cursorPointerId = static_cast<u8>(-1);
-
 		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
 		Gfx::Context* gfxCtx = nullptr;
 		EditorImpl* editorImpl = nullptr;
@@ -119,7 +119,7 @@ namespace DEngine::Editor
 
 		void ApplyCameraMovement(Math::Vec3 move, f32 speed) noexcept;
 
-		void TickTest(f32 deltaTime) noexcept;
+		void Tick() noexcept;
 
 		Gfx::ViewportUpdate GetViewportUpdate(
 			Context const& editor,
@@ -142,12 +142,19 @@ namespace DEngine::Editor
 			Gui::CursorMoveEvent event,
 			bool occluded) override;
 
-		virtual void TouchEvent(
+		virtual bool TouchPressEvent(
 			Gui::Context& ctx,
 			Gui::WindowID windowId,
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect,
-			Gui::TouchEvent touch,
+			Gui::TouchPressEvent event) override;
+
+		virtual bool TouchMoveEvent(
+			Gui::Context& ctx,
+			Gui::WindowID windowId,
+			Gui::Rect widgetRect,
+			Gui::Rect visibleRect,
+			Gui::TouchMoveEvent event,
 			bool occluded) override;
 
 		virtual Gui::SizeHint GetSizeHint(
@@ -165,5 +172,15 @@ namespace DEngine::Editor
 	{
 	public:
 		ViewportWidget(EditorImpl& implData, Gfx::Context& ctx);
+		~ViewportWidget();
+
+		EditorImpl* editorImpl = nullptr;
+		InternalViewportWidget* viewport = nullptr;
+		Joystick* leftJoystick = nullptr;
+		Joystick* rightJoystick = nullptr;
+
+		f32 joystickMovementSpeed = 2.5f;
+
+		void Tick(float deltaTime) noexcept;
 	};
 }

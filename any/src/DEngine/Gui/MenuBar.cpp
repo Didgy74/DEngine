@@ -47,16 +47,16 @@ void MenuBar::AddSubmenuButton(
 	Std::Str title,
 	std::function<SubmenuActivateCallback> callback)
 {
-	MenuBar::Button* newButton = new MenuBar::Button(this, title, callback);
-	stackLayout.AddWidget(Std::Box<Widget>{ newButton });
+	auto newButton = new MenuBar::Button(this, title, callback);
+	stackLayout.AddWidget(Std::Box{ newButton });
 }
 
 void MenuBar::AddMenuButton(
 	Std::Str title,
 	std::function<ButtonActivateCallback> callback)
 {
-	MenuBar::ActivatableButton* newButton = new MenuBar::ActivatableButton(this, title, callback);
-	stackLayout.AddWidget(Std::Box<Widget>{ newButton });
+	auto newButton = new MenuBar::ActivatableButton(this, title, callback);
+	stackLayout.AddWidget(Std::Box{ newButton });
 }
 
 void MenuBar::AddToggleMenuButton(
@@ -64,7 +64,7 @@ void MenuBar::AddToggleMenuButton(
 	bool toggled, 
 	std::function<ToggleButtonActivateCallback> callback)
 {
-	MenuBar::ToggleButton* newButton = new MenuBar::ToggleButton(
+	auto newButton = new MenuBar::ToggleButton(
 		this,
 		title,
 		toggled,
@@ -161,6 +161,7 @@ bool MenuBar::CursorPress(
 		event);
 }
 
+/*
 void MenuBar::TouchEvent(
 	Context& ctx, 
 	WindowID windowId, 
@@ -190,6 +191,28 @@ void MenuBar::TouchEvent(
 		event,
 		occluded);
 }
+*/
+
+bool MenuBar::TouchMoveEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchMoveEvent event,
+	bool occluded)
+{
+	return false;
+}
+
+bool MenuBar::TouchPressEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchPressEvent event)
+{
+	return false;
+}
 
 MenuBar::Button::Button(
 	MenuBar* parentMenuBar, 
@@ -210,7 +233,7 @@ void MenuBar::Button::Clear(
 	
 	if (this->menuPtr)
 	{
-		MenuBar* ptr = dynamic_cast<MenuBar*>(this->menuPtr);
+		auto ptr = dynamic_cast<MenuBar*>(this->menuPtr);
 		if (ptr && ptr->activeButton)
 		{
 			ptr->ClearActiveButton(ctx, windowId);
@@ -321,6 +344,7 @@ bool MenuBar::Button::CursorPress(
 	return false;
 }
 
+/*
 void MenuBar::Button::TouchEvent(
 	Context& ctx, 
 	WindowID windowId, 
@@ -363,6 +387,28 @@ void MenuBar::Button::TouchEvent(
 				*newMenuBar);
 		}
 	}
+}
+*/
+
+bool MenuBar::Button::TouchMoveEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchMoveEvent event,
+	bool occluded)
+{
+	return false;
+}
+
+bool MenuBar::Button::TouchPressEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchPressEvent event)
+{
+	return false;
 }
 
 MenuBar::ActivatableButton::ActivatableButton(
@@ -432,6 +478,7 @@ bool MenuBar::ActivatableButton::CursorPress(
 	return false;
 }
 
+/*
 void MenuBar::ActivatableButton::TouchEvent(
 	Context& ctx,
 	WindowID windowId,
@@ -456,6 +503,28 @@ void MenuBar::ActivatableButton::TouchEvent(
 			}
 		}
 	}
+}
+*/
+
+bool MenuBar::ActivatableButton::TouchMoveEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchMoveEvent event,
+	bool occluded)
+{
+	return false;
+}
+
+bool MenuBar::ActivatableButton::TouchPressEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchPressEvent event)
+{
+	return false;
 }
 
 MenuBar::ToggleButton::ToggleButton(
@@ -535,6 +604,7 @@ bool MenuBar::ToggleButton::CursorPress(
 	return false;
 }
 
+/*
 void MenuBar::ToggleButton::TouchEvent(
 	Context& ctx, 
 	WindowID windowId,
@@ -561,4 +631,27 @@ void MenuBar::ToggleButton::TouchEvent(
 		}
 	}
 }
+*/
+
+bool MenuBar::ToggleButton::TouchMoveEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchMoveEvent event,
+	bool occluded)
+{
+	return false;
+}
+
+bool MenuBar::ToggleButton::TouchPressEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchPressEvent event)
+{
+	return false;
+}
+
 

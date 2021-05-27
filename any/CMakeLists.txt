@@ -78,6 +78,7 @@ target_link_libraries(dengine_any
 target_sources(dengine_any
 	PUBLIC
 		${DENGINE_HEADERS})
+target_compile_features(dengine_any PRIVATE cxx_std_20)
 set_target_properties(dengine_any PROPERTIES 
 	CXX_STANDARD 20
 	CXX_EXTENSIONS OFF)

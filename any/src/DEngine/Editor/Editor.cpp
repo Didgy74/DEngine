@@ -16,6 +16,7 @@
 #include <DEngine/Physics.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
+#include <DEngine/Std/Trait.hpp>
 #include <DEngine/Std/Utility.hpp>
 #include <DEngine/Math/Constant.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
@@ -53,7 +54,7 @@ namespace DEngine::Editor
 			};
 
 			Gui::Button* entityDeleteButton = new Gui::Button;
-			topElementLayout->AddWidget(Std::Box<Gui::Widget>{ entityDeleteButton });
+			topElementLayout->AddWidget(Std::Box{ entityDeleteButton });
 			entityDeleteButton->text = "Delete";
 			entityDeleteButton->activateFn = [this](
 				Gui::Button& btn)
@@ -75,7 +76,6 @@ namespace DEngine::Editor
 
 			entitiesList = new Gui::LineList();
 			entityListScrollArea->widget = Std::Box<Gui::Widget>{ entitiesList };
-			entitiesList->canSelect = true;
 			entitiesList->selectedLineChangedCallback = [this](
 				Gui::LineList& widget)
 			{
@@ -84,6 +84,8 @@ namespace DEngine::Editor
 					auto lineText = widget.lines[widget.selectedLine.Value()].c_str();
 					this->editorImpl->SelectEntity((Entity)std::atoi(lineText));
 				}
+				else
+					this->editorImpl->UnselectEntity();
 			};
 
 			auto entities = editorImpl->scene->GetEntities();
@@ -320,7 +322,7 @@ namespace DEngine::Editor
 		gizmoBtnGroup->AddButton("Rotate");
 		gizmoBtnGroup->AddButton("Scale");
 
-		return Std::Box<Gui::Widget>{ menuBarA };
+		return Std::Box{ menuBarA };
 	}
 }
 
@@ -349,19 +351,73 @@ Editor::Context Editor::Context::Create(
 	implData.dockArea->AddWindow(
 		"Entities",
 		{ 0.5f, 0.5f, 0.f, 1.f },
-		Std::Box<Gui::Widget>{ new EntityIdList(&implData) });
+		Std::Box{ new EntityIdList(&implData) });
 
 	implData.dockArea->AddWindow(
 		"Components",
 		{ 0.f, 0.5f, 0.5f, 1.f },
-		Std::Box<Gui::Widget>{ new ComponentList(&implData) });
+		Std::Box{ new ComponentList(&implData) });
 		
 	implData.dockArea->AddWindow(
 		"Viewport",
 		{ 0.5f, 0.f, 0.5f, 1.f },
-		Std::Box<Gui::Widget>{ new ViewportWidget(implData, *implData.gfxCtx) });
+		Std::Box{ new ViewportWidget(implData, *implData.gfxCtx) });
 	
 	return newCtx;
+}
+
+void Editor::EditorImpl::FlushQueuedEvents()
+{
+	for (auto const& event : queuedGuiEvents)
+	{
+		using EventT = Std::Trait::RemoveCVRef<decltype(event)>;
+
+		switch (event.GetIndex())
+		{
+			case EventT::indexOf<Gui::CharEnterEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CharEnterEvent>());
+				break;
+			case EventT::indexOf<Gui::CharEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CharEvent>());
+				break;
+			case EventT::indexOf<Gui::CharRemoveEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CharRemoveEvent>());
+				break;
+			case EventT::indexOf<Gui::CursorClickEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CursorClickEvent>());
+				break;
+			case EventT::indexOf<Gui::CursorMoveEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CursorMoveEvent>());
+				break;
+			case EventT::indexOf<Gui::TouchPressEvent>:
+				guiCtx->PushEvent(event.Get<Gui::TouchPressEvent>());
+				break;
+			case EventT::indexOf<Gui::TouchMoveEvent>:
+				guiCtx->PushEvent(event.Get<Gui::TouchMoveEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowCloseEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowCloseEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowCursorEnterEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowCursorEnterEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowMinimizeEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowMinimizeEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowMoveEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowMoveEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowResizeEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowResizeEvent>());
+				break;
+
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				break;
+		}
+		InvalidateRendering();
+	}
+	queuedGuiEvents.clear();
 }
 
 void Editor::Context::ProcessEvents()
@@ -371,34 +427,16 @@ void Editor::Context::ProcessEvents()
 	if (App::TickCount() == 1)
 		implData.InvalidateRendering();
 	
-	for (impl::GuiEvent const& event : implData.queuedGuiEvents)
-	{
-		switch (event.type)
-		{
-			case impl::GuiEvent::Type::CharEnterEvent: implData.guiCtx->PushEvent(event.charEnter); break;
-			case impl::GuiEvent::Type::CharEvent: implData.guiCtx->PushEvent(event.charEvent); break;
-			case impl::GuiEvent::Type::CharRemoveEvent: implData.guiCtx->PushEvent(event.charRemove); break;
-			case impl::GuiEvent::Type::CursorClickEvent: implData.guiCtx->PushEvent(event.cursorClick); break;
-			case impl::GuiEvent::Type::CursorMoveEvent: implData.guiCtx->PushEvent(event.cursorMove); break;
-			case impl::GuiEvent::Type::TouchEvent: implData.guiCtx->PushEvent(event.touch); break;
-			case impl::GuiEvent::Type::WindowCloseEvent: implData.guiCtx->PushEvent(event.windowClose); break;
-			case impl::GuiEvent::Type::WindowCursorEnterEvent: implData.guiCtx->PushEvent(event.windowCursorEnter); break;
-			case impl::GuiEvent::Type::WindowMinimizeEvent: implData.guiCtx->PushEvent(event.windowMinimize); break;
-			case impl::GuiEvent::Type::WindowMoveEvent: implData.guiCtx->PushEvent(event.windowMove); break;
-			case impl::GuiEvent::Type::WindowResizeEvent: implData.guiCtx->PushEvent(event.windowResize); break;
-		}
-		implData.InvalidateRendering();
-	}
-	implData.queuedGuiEvents.clear();
+	implData.FlushQueuedEvents();
 
 	for (auto viewportPtr : implData.viewportWidgets)
 	{
-		viewportPtr->TickTest(Time::Delta());
+		viewportPtr->Tick(Time::Delta());
 	}
 	if (App::TickCount() % 60 == 0)
 	{
 		std::string temp;
-		temp += std::to_string(1.f / Time::Delta()) + " - ";
+		//temp += std::to_string(1.f / Time::Delta()) + " - ";
 		temp += std::to_string(Time::Delta());
 		implData.test_fpsText->String_Set(temp.c_str());
 		implData.InvalidateRendering();
@@ -418,7 +456,7 @@ void Editor::Context::ProcessEvents()
 
 		for (auto viewportPtr : implData.viewportWidgets)
 		{
-			viewportPtr->isVisible = false;
+			viewportPtr->viewport->isVisible = false;
 		}
 
 		implData.vertices.clear();
@@ -433,8 +471,8 @@ void Editor::Context::ProcessEvents()
 
 		for (auto viewportPtr : implData.viewportWidgets)
 		{
-			if (viewportPtr->currentExtent == Gui::Extent{} && viewportPtr->newExtent != Gui::Extent{})
-				viewportPtr->currentExtent = viewportPtr->newExtent;
+			if (viewportPtr->viewport->currentExtent == Gui::Extent{} && viewportPtr->viewport->newExtent != Gui::Extent{})
+				viewportPtr->viewport->currentExtent = viewportPtr->viewport->newExtent;
 		}
 	}
 }
@@ -471,12 +509,12 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 	{
 		DENGINE_DETAIL_ASSERT(viewportWidgetPtr);
 		auto& viewportWidget = *viewportWidgetPtr;
-		if (viewportWidgetPtr->isVisible)
+		if (viewportWidgetPtr->viewport->isVisible)
 		{
-			DENGINE_DETAIL_ASSERT(viewportWidget.currentExtent.width > 0 && viewportWidget.currentExtent.height > 0);
-			DENGINE_DETAIL_ASSERT(viewportWidget.newExtent.width > 0 && viewportWidget.newExtent.height > 0);
+			DENGINE_DETAIL_ASSERT(viewportWidget.viewport->currentExtent.width > 0 && viewportWidget.viewport->currentExtent.height > 0);
+			DENGINE_DETAIL_ASSERT(viewportWidget.viewport->newExtent.width > 0 && viewportWidget.viewport->newExtent.height > 0);
 
-			Gfx::ViewportUpdate update = viewportWidget.GetViewportUpdate(
+			Gfx::ViewportUpdate update = viewportWidget.viewport->GetViewportUpdate(
 				*this,
 				returnVal.lineVertices,
 				returnVal.lineDrawCmds);

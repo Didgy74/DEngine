@@ -143,6 +143,7 @@ bool LineFloatEdit::CursorPress(
 	return false;
 }
 
+/*
 void LineFloatEdit::TouchEvent(
 	Context& ctx,
 	WindowID windowId,
@@ -163,6 +164,17 @@ void LineFloatEdit::TouchEvent(
 		DENGINE_IMPL_GUI_ASSERT(inputConnectionCtx == &ctx);
 		EndEditingSession();
 	}
+}
+*/
+
+bool LineFloatEdit::TouchPressEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchPressEvent event)
+{
+	return false;
 }
 
 void LineFloatEdit::EndEditingSession()

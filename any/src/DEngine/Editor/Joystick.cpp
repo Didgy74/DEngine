@@ -35,8 +35,8 @@ namespace DEngine::Editor::impl
 	}
 	[[nodiscard]] static bool Joystick_PointerPress(
 		Joystick& widget,
-		Gui::Rect widgetRect,
-		Gui::Rect visibleRect,
+		Gui::Rect const& widgetRect,
+		Gui::Rect const& visibleRect,
 		u8 pointerId,
 		PointerType pointerType,
 		Math::Vec2 pointerPos,
@@ -56,7 +56,7 @@ namespace DEngine::Editor::impl
 		}
 
 		bool pointerIsInside = widgetRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
-		if (!pointerIsInside)
+		if (!pointerIsInside && pressed)
 			return false;
 
 		// Calculate distance from center
@@ -78,7 +78,7 @@ namespace DEngine::Editor::impl
 
 	[[nodiscard]] static bool Joystick_PointerMove(
 		Joystick& widget,
-		Gui::Rect widgetRect,
+		Gui::Rect const& widgetRect,
 		u8 pointerId,
 		Math::Vec2 pointerPos)
 	{
@@ -128,6 +128,38 @@ bool Joystick::CursorMove(
 		widgetRect,
 		cursorPointerId,
 		{ (f32)event.position.x, (f32)event.position.y });
+}
+
+bool Joystick::TouchMoveEvent(
+	Gui::Context& ctx,
+	Gui::WindowID windowId,
+	Gui::Rect widgetRect,
+	Gui::Rect visibleRect,
+	Gui::TouchMoveEvent event,
+	bool occluded)
+{
+	return impl::Joystick_PointerMove(
+		*this,
+		widgetRect,
+		event.id,
+		event.position);
+}
+
+bool Joystick::TouchPressEvent(
+	Gui::Context& ctx,
+	Gui::WindowID windowId,
+	Gui::Rect widgetRect,
+	Gui::Rect visibleRect,
+	Gui::TouchPressEvent event)
+{
+	return impl::Joystick_PointerPress(
+		*this,
+		widgetRect,
+		visibleRect,
+		event.id,
+		impl::PointerType::Primary,
+		event.position,
+		event.pressed);
 }
 
 Gui::SizeHint Joystick::GetSizeHint(Gui::Context const& ctx) const
@@ -193,16 +225,13 @@ void Joystick::Render(
 
 	//Gfx::GuiDrawCmd cmd{};
 	Math::Vec2Int innerCirclePos = {};
-	if (activeData.HasValue())
-	{
-		Math::Vec2 currPos = activeData.Value().currPos;
-		// Translate from space [-1, 1] to [-outerDiameter, outerDiameter]
-		currPos *= outerDiameter / 2.f;
-		// Clamp length to inner-diameter
-		if (currPos.MagnitudeSqrd() >= Math::Sqrd(innerDiameter / 2.f))
-			currPos = currPos.GetNormalized() * (innerDiameter / 2.f);
-		innerCirclePos += { (i32)currPos.x, (i32)currPos.y };
-	}
+	Math::Vec2 currPos = GetVector();
+	// Translate from space [-1, 1] to [-outerDiameter, outerDiameter]
+	currPos *= outerDiameter / 2.f;
+	// Clamp length to inner-diameter
+	if (currPos.MagnitudeSqrd() >= Math::Sqrd(innerDiameter / 2.f))
+		currPos = currPos.GetNormalized() * (innerDiameter / 2.f);
+	innerCirclePos += { (i32)currPos.x, (i32)currPos.y };
 	innerCirclePos += widgetRect.position;
 	innerCirclePos += { (i32)outerDiameter / 2, (i32)outerDiameter / 2 };
 

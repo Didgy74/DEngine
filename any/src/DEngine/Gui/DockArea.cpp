@@ -89,7 +89,7 @@ struct DA::Node
 		bool occluded = {};
 
 		CursorClickEvent* cursorClickEvent = nullptr;
-		Gui::TouchEvent* touchEvent = nullptr;
+		Gui::TouchPressEvent* touchEvent = nullptr;
 	};
 	// Returns true if event was consumed
 	struct PointerPress_Result
@@ -124,7 +124,7 @@ struct DA::Node
 		bool pointerOccluded = {};
 		
 		CursorMoveEvent* cursorMoveEvent = nullptr;
-		Gui::TouchEvent* touchEvent = nullptr;
+		Gui::TouchMoveEvent* touchEvent = nullptr;
 	};
 	struct PointerMove_Result
 	{
@@ -961,7 +961,7 @@ namespace DEngine::Gui::impl
 		bool pointerPressed = {};
 
 		CursorClickEvent* cursorClickEvent = {};
-		TouchEvent* touchEvent = {};
+		Gui::TouchPressEvent* touchEvent = {};
 	};
 	static bool DA_PointerPress(DA_PointerPress_Params const& in);
 
@@ -978,7 +978,7 @@ namespace DEngine::Gui::impl
 		bool pointerOccluded = {};
 		
 		CursorMoveEvent* cursorMoveEvent = {};
-		TouchEvent* touchEvent = {};
+		Gui::TouchMoveEvent* touchEvent = {};
 	};
 	static bool DA_PointerMove(DA_PointerMove_Params const& in);
 }
@@ -1243,7 +1243,7 @@ DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(Poin
 {
 	PointerPress_Result returnVal = {};
 
-	if (!in.nodeRect.PointIsInside(in.pointerPos))
+	if (!in.nodeRect.PointIsInside(in.pointerPos) && in.pointerPressed)
 	{
 		returnVal.eventConsumed = false;
 		return returnVal;
@@ -1260,7 +1260,7 @@ DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(Poin
 	titlebarRect.extent.height = implData.textManager.lineheight;
 	
 	// Handle titlebar related behavior.
-	if (titlebarRect.PointIsInside(in.pointerPos))
+	if (titlebarRect.PointIsInside(in.pointerPos) && in.pointerPressed)
 	{
 		// Since we hit the titlebar, we want to consume the event.
 		returnVal.eventConsumed = true;
@@ -1293,19 +1293,21 @@ DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(Poin
 				in.dockArea->stateData = newBehavior;
 			}
 		}
-		
-		return returnVal;
 	}
 
 	// Handle content-area events.
 	Rect contentRect = in.nodeRect;
 	contentRect.position.y += titlebarRect.extent.height;
 	contentRect.extent.height = in.nodeRect.extent.height - titlebarRect.extent.height;
-	if (!returnVal.eventConsumed && contentRect.PointIsInside(in.pointerPos) && tabs[selectedTab].widget)
+	bool dispatchEvent = 
+		!in.pointerPressed || 
+		(in.pointerPressed && !returnVal.eventConsumed && contentRect.PointIsInside(in.pointerPos));
+	auto& tab = tabs[selectedTab];
+	if (tab.widget && dispatchEvent)
 	{
 		if (in.pointerId == cursorPointerId)
 		{
-			tabs[selectedTab].widget->CursorPress(
+			tab.widget->CursorPress(
 				*in.ctx,
 				in.windowId,
 				contentRect,
@@ -1315,13 +1317,12 @@ DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(Poin
 		}
 		else
 		{
-			tabs[selectedTab].widget->TouchEvent(
+			tab.widget->TouchPressEvent(
 				*in.ctx,
 				in.windowId,
 				contentRect,
 				Rect::Intersection(contentRect, in.visibleRect),
-				*in.touchEvent,
-				in.occluded);
+				*in.touchEvent);
 		}
 		returnVal.eventConsumed = true;
 		return returnVal;
@@ -1370,10 +1371,8 @@ DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress(PointerPress_Par
 	PointerPress_Result returnVal{};
 
 	bool cursorInside = in.nodeRect.PointIsInside(in.pointerPos) && in.visibleRect.PointIsInside(in.pointerPos);
-	if (!cursorInside)
-	{
+	if (!cursorInside && in.pointerPressed)
 		return returnVal;
-	}
 
 	if (in.dockArea->stateData.IsA<DA::State_Normal>())
 	{
@@ -1392,8 +1391,6 @@ DA::Node::PointerPress_Result impl::DA_SplitNode::PointerPress(PointerPress_Para
 	DENGINE_IMPL_GUI_ASSERT(a);
 	DENGINE_IMPL_GUI_ASSERT(b);
 
-	PointerPress_Result result = {};
-
 	if (in.dockArea->stateData.IsA<DA::State_Normal>())
 	{
 		auto resizeHandleRect = DA_GetSplitNodeResizeHandleRect(
@@ -1410,6 +1407,7 @@ DA::Node::PointerPress_Result impl::DA_SplitNode::PointerPress(PointerPress_Para
 			newState.splitNode = this;
 			in.dockArea->stateData = newState;
 
+			PointerPress_Result result = {};
 			result.eventConsumed = true;
 			return result;
 		}
@@ -1420,19 +1418,29 @@ DA::Node::PointerPress_Result impl::DA_SplitNode::PointerPress(PointerPress_Para
 	PointerPress_Params params = in;
 	params.hasSplitNodeParent = true;
 	params.nodeRect = childRects[0];
-	result = a->PointerPress(params);
-	if (result.eventConsumed)
-		return result;
+	PointerPress_Result resultA = a->PointerPress(params);
+	if (resultA.eventConsumed && in.pointerPressed)
+		return resultA;
 
 	params.nodeRect = childRects[1];
-	result = b->PointerPress(params);
+	PointerPress_Result resultB = b->PointerPress(params);
+
+	// We can't have 2 docking jobs simultaneously.
+	DENGINE_IMPL_GUI_ASSERT(!(resultA.dockingJobOpt.HasValue() && resultB.dockingJobOpt.HasValue()));
+	PointerPress_Result result = {};
+	result.eventConsumed = resultA.eventConsumed || resultB.eventConsumed;
+	if (resultA.dockingJobOpt.HasValue())
+		result.dockingJobOpt = resultA.dockingJobOpt;
+	else if (resultB.dockingJobOpt.HasValue())
+		result.dockingJobOpt = resultB.dockingJobOpt;
+
 	return result;
 }
 
 bool impl::DA_PointerPress(DA_PointerPress_Params const& in)
 {
 	bool pointerInside = in.widgetRect.PointIsInside(in.pointerPos) && in.visibleRect.PointIsInside(in.pointerPos);
-	if (!pointerInside)
+	if (!pointerInside && in.pointerPressed)
 		return false;
 
 	bool eventConsumed = false;
@@ -1507,7 +1515,7 @@ bool impl::DA_PointerPress(DA_PointerPress_Params const& in)
 			params.windowId = in.windowId;
 
 			pPressResult = layerItem.rootNode.PointerPress(params);
-			if (pPressResult.eventConsumed)
+			if (pPressResult.eventConsumed && in.pointerPressed)
 			{
 				eventConsumed = true;
 				break;
@@ -1550,7 +1558,7 @@ bool impl::DA_PointerPress(DA_PointerPress_Params const& in)
 
 	// We know the pointer was inside the DockArea as a whole, so we
 	// want to consume the press event.
-	return true;
+	return pointerInside;
 }
 
 DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateNormal(PointerMove_Params const& in)
@@ -1564,11 +1572,12 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateNormal(Pointe
 	Rect contentRect = in.nodeRect;
 	contentRect.position.y += titlebarRect.extent.height;
 	contentRect.extent.height = in.nodeRect.extent.height - titlebarRect.extent.height;
-	if (tabs[selectedTab].widget)
+	auto& tab = tabs[selectedTab];
+	if (tab.widget)
 	{
 		if (in.pointerId == cursorPointerId)
 		{
-			tabs[selectedTab].widget->CursorMove(
+			tab.widget->CursorMove(
 				*in.ctx,
 				in.windowId,
 				contentRect,
@@ -1579,7 +1588,7 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateNormal(Pointe
 		}
 		else
 		{
-			tabs[selectedTab].widget->TouchEvent(
+			tab.widget->TouchMoveEvent(
 				*in.ctx,
 				in.windowId,
 				contentRect,
@@ -2122,44 +2131,45 @@ bool DockArea::CursorMove(
 	return impl::DA_PointerMove(params);
 }
 
-void DockArea::TouchEvent(
+bool DockArea::TouchPressEvent(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event,
-	bool occluded) 
+	Gui::TouchPressEvent event)
 {
-	if (event.type == TouchEventType::Down || event.type == TouchEventType::Up)
-	{
-		impl::DA_PointerPress_Params params = {};
-		params.ctx = &ctx;
-		params.dockArea = this;
-		params.pointerId = event.id;
-		params.pointerPos = event.position;
-		params.pointerPressed = event.type == TouchEventType::Down;
-		params.touchEvent = &event;
-		params.visibleRect = visibleRect;
-		params.widgetRect = widgetRect;
-		params.windowId = windowId;
-		impl::DA_PointerPress(params);
-	}
-	else if (event.type == TouchEventType::Moved)
-	{
-		impl::DA_PointerMove_Params params = {};
-		params.ctx = &ctx;
-		params.dockArea = this;
-		params.pointerId = event.id;
-		params.pointerOccluded = occluded;
-		params.pointerPos = event.position;
-		params.touchEvent = &event;
-		params.visibleRect = visibleRect;
-		params.widgetRect = widgetRect;
-		params.windowId = windowId;
-		impl::DA_PointerMove(params);
-	}
-	else
-		DENGINE_IMPL_UNREACHABLE();
+	impl::DA_PointerPress_Params params = {};
+	params.ctx = &ctx;
+	params.dockArea = this;
+	params.pointerId = event.id;
+	params.pointerPos = event.position;
+	params.pointerPressed = event.pressed;
+	params.touchEvent = &event;
+	params.visibleRect = visibleRect;
+	params.widgetRect = widgetRect;
+	params.windowId = windowId;
+	return impl::DA_PointerPress(params);
+}
+
+bool DockArea::TouchMoveEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchMoveEvent event,
+	bool occluded)
+{
+	impl::DA_PointerMove_Params params = {};
+	params.ctx = &ctx;
+	params.dockArea = this;
+	params.pointerId = event.id;
+	params.pointerOccluded = occluded;
+	params.pointerPos = event.position;
+	params.touchEvent = &event;
+	params.visibleRect = visibleRect;
+	params.widgetRect = widgetRect;
+	params.windowId = windowId;
+	return impl::DA_PointerMove(params);
 }
 
 void DockArea::InputConnectionLost() 

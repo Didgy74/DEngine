@@ -224,26 +224,23 @@ bool ButtonGroup::CursorPress(
 	return false;
 }
 
-void ButtonGroup::TouchEvent(
+bool ButtonGroup::TouchPressEvent(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event,
+	Gui::TouchPressEvent event)
+{
+	return false;
+}
+
+bool ButtonGroup::TouchMoveEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchMoveEvent event,
 	bool occluded)
 {
-	if (event.type == Gui::TouchEventType::Down || event.type == Gui::TouchEventType::Up)
-	{
-		bool isDown = event.type == Gui::TouchEventType::Down;
-		impl::ButtonGroup_PointerPress(
-			*this,
-			ctx,
-			windowId,
-			widgetRect,
-			visibleRect,
-			event.id,
-			impl::ButtonGroup_PointerType::Primary,
-			event.position,
-			isDown);
-	}
+	return false;
 }

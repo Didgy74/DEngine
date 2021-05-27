@@ -23,10 +23,10 @@ namespace DEngine::Application::detail
 
 	struct WindowData
 	{
-		Math::Vec2Int position{};
-		Extent size{};
-		Math::Vec2Int visiblePosition{};
-		Extent visibleSize{};
+		Math::Vec2Int position = {};
+		Extent size = {};
+		Math::Vec2Int visiblePosition = {};
+		Extent visibleSize = {};
 
 		bool isMinimized = false;
 		bool shouldShutdown = false;

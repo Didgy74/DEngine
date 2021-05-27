@@ -36,7 +36,8 @@ namespace DEngine::Gui
 		void PushEvent(CharRemoveEvent);
 		void PushEvent(CursorClickEvent);
 		void PushEvent(CursorMoveEvent);
-		void PushEvent(TouchEvent);
+		void PushEvent(TouchMoveEvent);
+		void PushEvent(TouchPressEvent);
 		void PushEvent(WindowCloseEvent);
 		void PushEvent(WindowCursorEnterEvent);
 		void PushEvent(WindowMinimizeEvent);

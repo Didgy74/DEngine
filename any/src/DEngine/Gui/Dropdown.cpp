@@ -93,6 +93,7 @@ bool Dropdown::CursorPress(
 	return false;
 }
 
+/*
 void Dropdown::TouchEvent(
 	Context& ctx,
 	WindowID windowId,
@@ -119,6 +120,17 @@ void Dropdown::TouchEvent(
 				position);
 		}
 	}
+}
+*/
+
+bool Dropdown::TouchPressEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchPressEvent event)
+{
+	return false;
 }
 
 void Dropdown::CreateDropdownMenu(
