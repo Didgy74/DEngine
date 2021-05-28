@@ -232,74 +232,17 @@ namespace DEngine::Editor
 	static Std::Box<Gui::Widget> CreateNavigationBar(
 		EditorImpl& editorImpl)
 	{
-		// Menu button
-		Gui::MenuBar* menuBarA = new Gui::MenuBar(Gui::MenuBar::Direction::Horizontal);
-
-		menuBarA->stackLayout.spacing = 25;
-		
-		menuBarA->AddSubmenuButton(
-			"Submenu",
-			[&editorImpl](
-				Gui::MenuBar& newMenuBar)
-			{
-				newMenuBar.stackLayout.color = { 0.25f, 0.f, 0.25f, 1.f };
-				newMenuBar.stackLayout.spacing = 10;
-				newMenuBar.stackLayout.padding = 10;
-
-				
-				newMenuBar.AddToggleMenuButton(
-					"Entities",
-					editorImpl.entityIdList != nullptr,
-					[&editorImpl](
-						bool activated)
-					{
-						if (activated)
-						{
-							editorImpl.InvalidateRendering();
-							editorImpl.dockArea->AddWindow(
-								"Entities",
-								{ 0.5f, 0.5f, 0.f, 1.f },
-								Std::Box<Gui::Widget>{ new EntityIdList(&editorImpl) });
-						}
-					});
-
-				newMenuBar.AddToggleMenuButton(
-					"Components",
-					editorImpl.componentList != nullptr,
-					[&editorImpl](
-						bool activated)
-					{
-						if (activated)
-						{
-							editorImpl.InvalidateRendering();
-							editorImpl.dockArea->AddWindow(
-								"Components",
-								{ 0.f, 0.5f, 0.5f, 1.f },
-								Std::Box<Gui::Widget>{ new ComponentList(&editorImpl) });
-						}
-					});
-
-				newMenuBar.AddMenuButton(
-					"New viewport",
-					[&editorImpl]()
-					{
-						editorImpl.InvalidateRendering();
-						editorImpl.dockArea->AddWindow(
-							"Viewport",
-							{ 0.5f, 0.f, 0.5f, 1.f },
-							Std::Box<Gui::Widget>{ new ViewportWidget(editorImpl, *editorImpl.gfxCtx) });
-					});
-			});
+		auto stackLayout = new Gui::StackLayout();
 
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;
-		menuBarA->stackLayout.AddWidget(Std::Box<Gui::Widget>{ deltaText });
+		stackLayout->AddWidget(Std::Box{ deltaText });
 		editorImpl.test_fpsText = deltaText;
 		deltaText->String_Set("Child text");
 		
 
-		Gui::Button* playButton = new Gui::Button;
-		menuBarA->stackLayout.AddWidget(Std::Box<Gui::Widget>{ playButton });
+		auto playButton = new Gui::Button;
+		stackLayout->AddWidget(Std::Box{ playButton });
 		playButton->text = "Play";
 		playButton->type = Gui::Button::Type::Toggle;
 		playButton->activateFn = [&editorImpl](
@@ -317,12 +260,12 @@ namespace DEngine::Editor
 
 		Gui::ButtonGroup* gizmoBtnGroup = new Gui::ButtonGroup;
 		editorImpl.gizmoTypeBtnGroup = gizmoBtnGroup;
-		menuBarA->stackLayout.AddWidget(Std::Box<Gui::Widget>{ gizmoBtnGroup });
+		stackLayout->AddWidget(Std::Box{ gizmoBtnGroup });
 		gizmoBtnGroup->AddButton("Translate");
 		gizmoBtnGroup->AddButton("Rotate");
 		gizmoBtnGroup->AddButton("Scale");
 
-		return Std::Box{ menuBarA };
+		return Std::Box{ stackLayout };
 	}
 }
 

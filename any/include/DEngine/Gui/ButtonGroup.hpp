@@ -26,7 +26,7 @@ namespace DEngine::Gui
 			u8 buttonIndex = 0;
 			u8 pointerId = 0;
 		};
-		Std::Opt<HeldPointerData> heldPointerId;
+		Std::Opt<HeldPointerData> heldPointerData;
 
 		using ActiveChangedCallbackT = void(ButtonGroup& widget, u32 newIndex);
 		std::function<ActiveChangedCallbackT> activeChangedCallback;
@@ -52,7 +52,7 @@ namespace DEngine::Gui
 			CursorMoveEvent event,
 			bool occluded) override;
 
-		[[nodiscard]] virtual bool CursorPress(
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,

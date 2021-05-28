@@ -97,37 +97,57 @@ void ButtonGroup::Render(
 
 namespace DEngine::Gui::impl
 {
-	constexpr u8 ButtonGroup_cursorPointerId = (u8)-1;
-	enum class ButtonGroup_PointerType : u8
+	constexpr u8 cursorPointerId = (u8)-1;
+
+	[[nodiscard]] static bool PointerMove(
+		Rect const& widgetRect,
+		Rect const& visibleRect,
+		Math::Vec2 pointerPos) noexcept
+	{
+		bool pointerInside = widgetRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
+		return pointerInside;
+	}
+
+	enum class PointerType : u8
 	{
 		Primary,
 		Secondary,
 	};
-	[[nodiscard]] static constexpr ButtonGroup_PointerType ButtonGroup_ToPointerType(CursorButton in) noexcept
+	[[nodiscard]] static constexpr PointerType ToPointerType(CursorButton in) noexcept
 	{
 		switch (in)
 		{
 			case CursorButton::Primary:
-				return ButtonGroup_PointerType::Primary;
+				return PointerType::Primary;
 			case CursorButton::Secondary:
-				return ButtonGroup_PointerType::Secondary;
+				return PointerType::Secondary;
 			default:
 				break;
 		}
 		DENGINE_IMPL_UNREACHABLE();
 		return {};
 	}
-	void ButtonGroup_PointerPress(
+	struct PointerPress_Pointer
+	{
+		u8 id;
+		PointerType type;
+		Math::Vec2 pos;
+		bool pressed;
+	};
+	[[nodiscard]] static bool PointerPress(
 		ButtonGroup& widget,
 		Context& ctx,
-		WindowID windowId,
-		Rect widgetRect,
-		Rect visibleRect,
-		u8 pointerId,
-		ButtonGroup_PointerType pointerType,
-		Math::Vec2 pointerPos,
-		bool pressed)
+		Rect const& widgetRect,
+		Rect const& visibleRect,
+		PointerPress_Pointer const& pointer) noexcept
 	{
+		bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+		if (!pointerInside && pointer.pressed)
+			return false;
+
+		if (widget.heldPointerData.HasValue() && pointer.pressed)
+			return pointerInside;
+
 		DENGINE_IMPL_GUI_ASSERT(widget.activeIndex < widget.buttons.size());
 
 		impl::ImplData& implData = *(impl::ImplData*)ctx.Internal_ImplData();
@@ -144,6 +164,7 @@ namespace DEngine::Gui::impl
 			maxHeight = Math::Max(maxHeight, btnSizeHint.preferred.height);
 		}
 
+		Std::Opt<uSize> hoveredIndexOpt;
 		u32 horiOffset = 0;
 		for (u32 i = 0; i < sizeHints.size(); i += 1)
 		{
@@ -153,41 +174,45 @@ namespace DEngine::Gui::impl
 			btnRect.position.x += horiOffset;
 			btnRect.extent.width = sizeHint.preferred.width;
 			btnRect.extent.height = maxHeight;
-
-			bool a =
-				pressed &&
-				i != widget.activeIndex &&
-				btnRect.PointIsInside(pointerPos) &&
-				!widget.heldPointerId.HasValue();
-			if (a)
+			bool pointerInsideBtn = btnRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+			if (pointerInsideBtn)
 			{
-				ButtonGroup::HeldPointerData temp = {};
-				temp.buttonIndex = i;
-				temp.pointerId = pointerId;
-				widget.heldPointerId = temp;
+				hoveredIndexOpt = i;
+				break;
 			}
-
-			bool b =
-				!pressed &&
-				i != widget.activeIndex &&
-				btnRect.PointIsInside(pointerPos) &&
-				widget.heldPointerId.HasValue();
-			if (b)
-			{
-				auto heldPointer = widget.heldPointerId.Value();
-				if (heldPointer.buttonIndex == i && heldPointer.pointerId == pointerId)
-				{
-					widget.heldPointerId = Std::nullOpt;
-
-					// Change the active index
-					widget.activeIndex = i;
-					if (widget.activeChangedCallback)
-						widget.activeChangedCallback(widget, widget.activeIndex);
-				}
-			}
-
 			horiOffset += btnRect.extent.width;
 		}
+
+		if (hoveredIndexOpt.HasValue())
+		{
+			auto hoveredIndex = hoveredIndexOpt.Value();
+
+			if (widget.heldPointerData.HasValue())
+			{
+				auto const held = widget.heldPointerData.Value();
+				if (!pointer.pressed && held.pointerId == pointer.id && held.buttonIndex == hoveredIndex)
+				{
+					widget.heldPointerData = Std::nullOpt;
+					// Change the active index
+					widget.activeIndex = hoveredIndex;
+					if (widget.activeChangedCallback)
+						widget.activeChangedCallback(widget, widget.activeIndex);
+					return pointerInside;
+				}
+			}
+			else
+			{
+				if (pointer.pressed && hoveredIndex != widget.activeIndex)
+				{
+					ButtonGroup::HeldPointerData temp = {};
+					temp.buttonIndex = hoveredIndex;
+					temp.pointerId = pointer.id;
+					widget.heldPointerData = temp;
+					return pointerInside;
+				}
+			}
+		}
+		return pointerInside;
 	}
 }
 
@@ -199,7 +224,10 @@ bool ButtonGroup::CursorMove(
 	CursorMoveEvent event,
 	bool occluded)
 {
-	return false;
+	return impl::PointerMove(
+		widgetRect,
+		visibleRect,
+		{ (f32)event.position.x, (f32)event.position.y });
 }
 
 bool ButtonGroup::CursorPress(
@@ -210,28 +238,17 @@ bool ButtonGroup::CursorPress(
 	Math::Vec2Int cursorPos,
 	CursorClickEvent event)
 {
-	impl::ButtonGroup_PointerPress(
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
+	pointer.pressed = event.clicked;
+	pointer.type = impl::ToPointerType(event.button);
+	return impl::PointerPress(
 		*this,
 		ctx,
-		windowId,
 		widgetRect,
 		visibleRect,
-		impl::ButtonGroup_cursorPointerId,
-		impl::ButtonGroup_ToPointerType(event.button),
-		{ (f32)cursorPos.x, (f32)cursorPos.y },
-		event.clicked);
-
-	return false;
-}
-
-bool ButtonGroup::TouchPressEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchPressEvent event)
-{
-	return false;
+		pointer);
 }
 
 bool ButtonGroup::TouchMoveEvent(
@@ -242,5 +259,28 @@ bool ButtonGroup::TouchMoveEvent(
 	Gui::TouchMoveEvent event,
 	bool occluded)
 {
-	return false;
+	return impl::PointerMove(
+		widgetRect,
+		visibleRect,
+		event.position);
+}
+
+bool ButtonGroup::TouchPressEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchPressEvent event)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = event.id;
+	pointer.pos = event.position;
+	pointer.pressed = event.pressed;
+	pointer.type = impl::PointerType::Primary;
+	return impl::PointerPress(
+		*this,
+		ctx,
+		widgetRect,
+		visibleRect,
+		pointer);
 }

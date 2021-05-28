@@ -45,7 +45,7 @@ namespace DEngine::Editor
 	public:
 		Std::Box<Gui::Context> guiCtx;
 
-		[[nodiscard]] void FlushQueuedEvents();
+		void FlushQueuedEvents();
 
 		// Override app-interface methods
 		virtual void ButtonEvent(

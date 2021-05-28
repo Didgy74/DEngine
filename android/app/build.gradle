@@ -8,7 +8,7 @@ android {
         targetSdkVersion 30
         versionCode  1
         versionName  "0.1"
-        // ndkVersion "23.0.7272597" // e.g.,  ndkVersion '21.3.6528147'
+        ndkVersion "23.0.7272597" // e.g.,  ndkVersion '21.3.6528147'
         externalNativeBuild {
             cmake {
                 // version "3.19.1"

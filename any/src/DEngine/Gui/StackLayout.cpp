@@ -3,23 +3,15 @@
 
 #include <DEngine/Math/Common.hpp>
 
+#include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Std/Trait.hpp>
+#include <DEngine/Std/Utility.hpp>
+
+using namespace DEngine;
+using namespace DEngine::Gui;
 
 namespace DEngine::Gui::impl
 {
-	// Generates the rect for the inner StackLayout Rect with padding taken into account
-	[[nodiscard]] static Rect BuildInnerRect(
-		Rect const& widgetRect,
-		u32 padding) noexcept
-	{
-		Rect returnVal = widgetRect;
-		returnVal.position.x += padding;
-		returnVal.position.y += padding;
-		returnVal.extent.width -= padding;
-		returnVal.extent.height -= padding;
-		return returnVal;
-	}
-
 	static void BuildChildRects(
 		Std::Span<SizeHint const> sizeHints,
 		Rect rect,
@@ -101,28 +93,67 @@ namespace DEngine::Gui::impl
 			childPosDir += childExtentDir + spacing;
 		}
 	}
+}
 
-	template<class T>
-	struct StackLayout_ItPair;
+class impl::StackLayoutImpl
+{
+public:
+	// Gives you the modified index based on the insertion/remove jobs.
+	// Return nullOpt if this index was deleted.
+	[[nodiscard]] static Std::Opt<uSize> GetModifiedWidgetIndex(
+		Std::Span<StackLayout::InsertRemoveJob const> jobs,
+		uSize index) noexcept
+	{
+		uSize returnVal = index;
+		for (auto const& job : jobs)
+		{
+			switch (job.type)
+			{
+				case StackLayout::InsertRemoveJob::Type::Insert:
+				{
+					if (job.insert.index <= returnVal)
+						returnVal += 1;
+					break;
+				}
+				case StackLayout::InsertRemoveJob::Type::Remove:
+				{
+					if (job.remove.index == returnVal)
+						return Std::nullOpt;
+					else if (job.remove.index < returnVal)
+						returnVal -= 1;
+
+					break;
+				}
+				default:
+					DENGINE_IMPL_UNREACHABLE();
+					break;
+			}
+		}
+
+		return returnVal;
+	}
+
 	// DO NOT USE DIRECTLY!
 	template<class T>
-	struct StackLayout_It
+	struct ItPair;
+
+	// DO NOT USE DIRECTLY!
+	// T must be either "StackLayout" or "StackLayout const"
+	template<class T>
+	struct It
 	{
 		static constexpr bool isConst = Std::Trait::isConst<T>;
 
-		StackLayout_ItPair<T> const* itPair = nullptr;
+		ItPair<T> const* itPair = nullptr;
 		uSize index = 0;
+		uSize widgetIndex = 0;
 
-		[[nodiscard]] bool operator!=(StackLayout_It const& rhs) const noexcept
+		[[nodiscard]] bool operator!=(It const& rhs) const noexcept
 		{
 			return index != rhs.index;
 		}
 
-		StackLayout_It& operator++() noexcept
-		{
-			index += 1;
-			return *this;
-		}
+		It& operator++() noexcept;
 
 		struct Deref_T
 		{
@@ -134,47 +165,53 @@ namespace DEngine::Gui::impl
 	};
 
 	// DO NOT USE DIRECTLY!
+	// T must be either "StackLayout" or "StackLayout const"
 	template<class T>
-	struct StackLayout_ItPair
+	struct ItPair
 	{
 		static constexpr bool isConst = Std::Trait::isConst<T>;
 
 		T* layout = nullptr;
-
 		std::vector<Rect> childRects;
 
-		[[nodiscard]] StackLayout_It<T> begin() const noexcept
+		ItPair() noexcept = default;
+		ItPair(ItPair&& in) noexcept :
+			layout(in.layout),
+			childRects(Std::Move(in.childRects))
 		{
-			StackLayout_It<T> returnVal = {};
+			in.layout = nullptr;
+		}
+
+		[[nodiscard]] It<T> begin() const noexcept
+		{
+			It<T> returnVal = {};
 			returnVal.itPair = this;
 			returnVal.index = 0;
+			returnVal.widgetIndex = 0;
 			return returnVal;
 		}
 
-		[[nodiscard]] StackLayout_It<T> end() const noexcept
+		[[nodiscard]] It<T> end() const noexcept
 		{
-			StackLayout_It<T> returnVal = {};
+			It<T> returnVal = {};
 			returnVal.itPair = this;
 			returnVal.index = childRects.size();
 			return returnVal;
 		}
 
-		[[nodiscard]] decltype(auto) GetWidget(uSize index) const noexcept
-		{
-			return *layout->children[index];
-		}
-
 		// DO NOT USE DIRECTLY!
-		[[nodiscard]] static StackLayout_ItPair Create(
+		[[nodiscard]] static ItPair Create(
 			T& layout,
 			Context const& ctx,
 			Rect rect)
 		{
 			// Set the StackLayout's internal state to currently iterating
 			if constexpr (!isConst)
+			{
 				layout.currentlyIterating = true;
+			}
 
-			StackLayout_ItPair returnVal;
+			ItPair returnVal;
 			returnVal.layout = &layout;
 
 			uSize const childCount = (uSize)layout.children.size();
@@ -195,47 +232,95 @@ namespace DEngine::Gui::impl
 			return returnVal;
 		}
 
-		~StackLayout_ItPair() noexcept
+		~ItPair() noexcept
 		{
 			if constexpr (!isConst)
 			{
-				// Reset the "changed indices stuff"
-				layout->currentlyIterating = false;
-				layout->insertionJobs.clear();
+				if (layout)
+				{
+					// Reset the "changed indices stuff"
+					layout->currentlyIterating = false;
+					layout->insertionJobs.clear();
+				}
 			}
 		}
 	};
+};
 
-	template<class T>
-	typename StackLayout_It<T>::Deref_T StackLayout_It<T>::operator*() const noexcept
+template<class T>
+typename impl::StackLayoutImpl::It<T>::Deref_T impl::StackLayoutImpl::It<T>::operator*() const noexcept
+{
+	DENGINE_IMPL_GUI_ASSERT(index < itPair->childRects.size());
+	DENGINE_IMPL_GUI_ASSERT(widgetIndex < itPair->layout->children.size());
+	return Deref_T{
+		*itPair->layout->children[widgetIndex],
+		itPair->childRects[index] };
+}
+
+template<class T>
+impl::StackLayoutImpl::It<T>& impl::StackLayoutImpl::It<T>::operator++() noexcept
+{
+	while (index < itPair->childRects.size())
 	{
-		return Deref_T{
-			itPair->GetWidget(index),
-			itPair->childRects[index] };
+		index += 1;
+		if constexpr (isConst)
+		{
+			widgetIndex = index;
+			break;
+		}
+		else
+		{
+			StackLayout const& layout = *itPair->layout;
+			auto indexOpt = GetModifiedWidgetIndex(
+				{ layout.insertionJobs.data(), layout.insertionJobs.size() },
+				index);
+			if (indexOpt.HasValue())
+			{
+				widgetIndex = indexOpt.Value();
+				break;
+			}
+		}
 	}
 
-	[[nodiscard]] static StackLayout_ItPair<StackLayout> BuildItPair(
+	return *this;
+}
+
+namespace DEngine::Gui::impl
+{
+	// Generates the rect for the inner StackLayout Rect with padding taken into account
+	[[nodiscard]] static Rect BuildInnerRect(
+		Rect const& widgetRect,
+		u32 padding) noexcept
+	{
+		Rect returnVal = widgetRect;
+		returnVal.position.x += padding;
+		returnVal.position.y += padding;
+		returnVal.extent.width -= padding;
+		returnVal.extent.height -= padding;
+		return returnVal;
+	}
+
+	[[nodiscard]] static StackLayoutImpl::ItPair<StackLayout> BuildItPair(
 		StackLayout& layout,
 		Context const& ctx,
 		Rect widgetRect) noexcept
 	{
-		return StackLayout_ItPair<StackLayout>::Create(
+		return StackLayoutImpl::ItPair<StackLayout>::Create(
 			layout,
 			ctx,
 			widgetRect);
 	}
 
-	[[nodiscard]] static StackLayout_ItPair<StackLayout const> BuildItPair(
+	[[nodiscard]] static StackLayoutImpl::ItPair<StackLayout const> BuildItPair(
 		StackLayout const& layout,
 		Context const& ctx,
 		Rect widgetRect) noexcept
 	{
-		return StackLayout_ItPair<StackLayout const>::Create(
+		return StackLayoutImpl::ItPair<StackLayout const>::Create(
 			layout,
 			ctx,
 			widgetRect);
 	}
-
 
 	// T needs to be either CursorMoveEvent or TouchMoveEvent.
 	template<class T>
@@ -335,9 +420,6 @@ namespace DEngine::Gui::impl
 		return true;
 	}
 }
-
-using namespace DEngine;
-using namespace DEngine::Gui;
 
 StackLayout::~StackLayout()
 {

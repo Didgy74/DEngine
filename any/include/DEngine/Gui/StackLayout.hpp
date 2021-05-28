@@ -7,15 +7,7 @@
 
 namespace DEngine::Gui::impl
 {
-	template<typename T, typename Callable>
-	void StackLayout_IterateOverChildren(
-		Context const& ctx,
-		T& layout,
-		Rect widgetRect,
-		Callable const& callable);
-
-	template<class T>
-	struct StackLayout_ItPair;
+	class StackLayoutImpl;
 }
 
 namespace DEngine::Gui
@@ -132,16 +124,7 @@ namespace DEngine::Gui
 		};
 		std::vector<InsertRemoveJob> insertionJobs;
 		bool currentlyIterating = false;
-
-		template<typename T, typename Callable>
-		friend void impl::StackLayout_IterateOverChildren(
-			Context const& ctx,
-			T& layout,
-			Rect widgetRect,
-			Callable const& callable);
-
 		
-		friend impl::StackLayout_ItPair<StackLayout>;
-		friend impl::StackLayout_ItPair<StackLayout const>;
+		friend impl::StackLayoutImpl;
 	};
 }

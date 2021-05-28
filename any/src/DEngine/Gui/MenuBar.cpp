@@ -344,52 +344,6 @@ bool MenuBar::Button::CursorPress(
 	return false;
 }
 
-/*
-void MenuBar::Button::TouchEvent(
-	Context& ctx, 
-	WindowID windowId, 
-	Rect widgetRect,
-	Rect visibleRect, 
-	Gui::TouchEvent event,
-	bool occluded)
-{
-	if (event.type == TouchEventType::Down && event.id == 0)
-	{
-		bool cursorIsInside = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
-		if (!active && cursorIsInside)
-		{
-			if (parentMenuBar->activeButton)
-			{
-				parentMenuBar->ClearActiveButton(ctx, windowId);
-			}
-
-			active = true;
-			parentMenuBar->activeButton = this;
-			Gui::MenuBar* newMenuBar = new MenuBar(parentMenuBar, Direction::Vertical);
-			this->menuPtr = newMenuBar;
-			Math::Vec2Int menuPos = {};
-			if (parentMenuBar->GetDirection() == Direction::Horizontal)
-			{
-				menuPos.x = widgetRect.position.x;
-				menuPos.y = widgetRect.position.y + (i32)widgetRect.extent.height;
-			}
-			else
-			{
-				menuPos.x = widgetRect.position.x + (i32)widgetRect.extent.width;
-				menuPos.y = widgetRect.position.y;
-			}
-			ctx.Test_AddMenu(
-				windowId,
-				Std::Box{ newMenuBar },
-				{ menuPos, {} });
-
-			activateCallback(
-				*newMenuBar);
-		}
-	}
-}
-*/
-
 bool MenuBar::Button::TouchMoveEvent(
 	Context& ctx,
 	WindowID windowId,
