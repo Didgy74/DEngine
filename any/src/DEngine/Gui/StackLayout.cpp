@@ -580,23 +580,18 @@ void StackLayout::Render(
 	Rect visibleRect,
 	DrawInfo& drawInfo) const
 {
-	ParentType::Render(
-		ctx,
-		framebufferExtent,
-		widgetRect,
-		visibleRect,
-		drawInfo);
+	auto innerRect = impl::BuildInnerRect(widgetRect, padding);
 
-	if (Rect::Intersection(widgetRect, visibleRect).IsNothing())
+	if (Rect::Intersection(innerRect, visibleRect).IsNothing())
 		return;
 
 	// Only draw the quad of the layout if the alpha of the color is high enough to be visible.
 	if (color.w > 0.01f)
 	{
-		drawInfo.PushFilledQuad(widgetRect, color);
+		drawInfo.PushFilledQuad(innerRect, color);
 	}
 
-	auto itPair = impl::BuildItPair(*this, ctx, widgetRect);
+	auto itPair = impl::BuildItPair(*this, ctx, innerRect);
 	for (auto const& item : itPair)
 	{
 		Rect childVisibleRect = Rect::Intersection(item.childRect, visibleRect);

@@ -95,27 +95,26 @@ public:
 		Math::Vec2 pointerPos,
 		bool pointerOccluded)
 	{
-		bool returnVal = false;
-
-		bool pointerInsideWidget = widgetRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
-		if (pointerInsideWidget)
-			returnVal = true;
+		bool pointerInside = widgetRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
 
 		// If we are in hovered mode and cursor is either occluded or moved outside,
 		// we exit hover mode.
 		if (pointerId == cursorPointerId && widget.state == Button::State::Hovered)
 		{
-			if (!pointerInsideWidget || (pointerInsideWidget && pointerOccluded))
+			if (!pointerInside || (pointerInside && pointerOccluded))
 			{
 				widget.state = Button::State::Normal;
-				return returnVal;
+				return pointerInside;
 			}
 		}
 
-		if (!pointerOccluded && pointerId == cursorPointerId && widget.state == Button::State::Normal && pointerInsideWidget)
+		if (!pointerOccluded && pointerId == cursorPointerId && pointerInside)
 		{
-			widget.state = Button::State::Hovered;
-			return returnVal;
+			if (widget.state == Button::State::Normal || widget.state == Button::State::Toggled)
+			{
+				widget.state = Button::State::Hovered;
+				return pointerInside;
+			}
 		}
 
 		return true;
