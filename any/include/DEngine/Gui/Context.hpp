@@ -5,13 +5,46 @@
 #include <DEngine/Gui/DrawInfo.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
-#include <DEngine/Std/Containers/Str.hpp>
+#include <DEngine/Std/Containers/Span.hpp>
+
+#include <functional>
+#include <string>
+#include <vector>
+
 
 namespace DEngine::Gui
 {
-	class StackLayout; // TEMPORARY
+	class Context;
+
+	struct Test_Menu
+	{
+	public:
+		Math::Vec2Int pos = {};
+		u32 minimumWidth = 0;
+
+		struct Line
+		{
+			std::string title;
+			enum class Type : u8
+			{
+				Label,
+				Button,
+				Submenu
+			};
+			Type type;
+			std::function<void()> callback;
+			std::vector<Line> subLines;
+		};
+		std::vector<Line> lines;
+
+		void Render(
+			Context const& ctx,
+			Extent windowSize,
+			DrawInfo& drawInfo) const;
+	};
 
 	class Widget;
+	class StackLayout;
 
 	class Context
 	{
@@ -20,9 +53,9 @@ namespace DEngine::Gui
 			WindowHandler& windowHandler,
 			Gfx::Context* gfxCtx);
 		Context(Context&&) noexcept;
-		Context(Context const&) = delete;
+		Context(Context const&) noexcept = delete;
 
-		Context& operator=(Context const&) = delete;
+		Context& operator=(Context const&) noexcept = delete;
 		Context& operator=(Context&&) noexcept;
 
 		void Render(
@@ -31,34 +64,42 @@ namespace DEngine::Gui
 			std::vector<Gfx::GuiDrawCmd>& drawCmds,
 			std::vector<Gfx::NativeWindowUpdate>& windowUpdates) const;
 
-		void PushEvent(CharEnterEvent);
-		void PushEvent(CharEvent);
-		void PushEvent(CharRemoveEvent);
-		void PushEvent(CursorClickEvent);
-		void PushEvent(CursorMoveEvent);
-		void PushEvent(TouchMoveEvent);
-		void PushEvent(TouchPressEvent);
-		void PushEvent(WindowCloseEvent);
-		void PushEvent(WindowCursorEnterEvent);
-		void PushEvent(WindowMinimizeEvent);
-		void PushEvent(WindowMoveEvent);
-		void PushEvent(WindowResizeEvent);
+		void PushEvent(CharEnterEvent const&);
+		void PushEvent(CharEvent const&);
+		void PushEvent(CharRemoveEvent const&);
+		void PushEvent(CursorClickEvent const&);
+		void PushEvent(CursorMoveEvent const&);
+		void PushEvent(TouchMoveEvent const&);
+		void PushEvent(TouchPressEvent const&);
+		void PushEvent(WindowCloseEvent const&);
+		void PushEvent(WindowCursorEnterEvent const&);
+		void PushEvent(WindowMinimizeEvent const&);
+		void PushEvent(WindowMoveEvent const&);
+		void PushEvent(WindowResizeEvent const&);
+
+		void AdoptWindow(
+			WindowID id,
+			Math::Vec4 const& clearColor,
+			Rect const& windowRect,
+			Rect const& visibleRect,
+			Std::Box<Widget>&& widget);
 
 		void TakeInputConnection(
 			Widget& widget,
 			SoftInputFilter softInputFilter,
-			Std::Str currentText);
+			Std::Span<char const> currentText);
 
 		void ClearInputConnection(
 			Widget& widget);
 
 		WindowHandler& GetWindowHandler() const;
 
-		void Test_AddMenu(WindowID windowId, Std::Box<Widget>&& widget, Rect rect);
+		void Test_AddMenu(
+			WindowID windowId, 
+			Math::Vec2Int pos, 
+			u32 minimumWidth,
+			std::vector<Test_Menu::Line> lines);
 		void Test_DestroyMenu(WindowID windowId, Widget* widget);
-		
-		// TEMPORARY FIELDS
-		StackLayout* outerLayout = nullptr;
 
 		void* Internal_ImplData() const { return pImplData; }
 

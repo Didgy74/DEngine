@@ -7,6 +7,7 @@
 #include <DEngine/Gui/ButtonGroup.hpp>
 #include <DEngine/Gui/DockArea.hpp>
 #include <DEngine/Gui/LineList.hpp>
+#include <DEngine/Gui/MenuButton.hpp>
 #include <DEngine/Gui/ScrollArea.hpp>
 
 #include <DEngine/Application.hpp>
@@ -234,6 +235,10 @@ namespace DEngine::Editor
 	{
 		auto stackLayout = new Gui::StackLayout();
 
+		auto menuButton = new Gui::MenuButton;
+		stackLayout->AddWidget(Std::Box{ menuButton });
+		menuButton->title = "Menu";
+
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;
 		stackLayout->AddWidget(Std::Box{ deltaText });
@@ -278,34 +283,51 @@ Editor::Context Editor::Context::Create(
 
 	newCtx.implData = new EditorImpl;
 	EditorImpl& implData = *newCtx.implData;
-	implData.guiCtx = Std::Box{ new Gui::Context(Gui::Context::Create(implData, gfxCtx)) };
+	
 	implData.gfxCtx = gfxCtx;
 	implData.scene = scene;
 	App::InsertEventInterface(implData);
 
-	Gui::StackLayout* outmostLayout = implData.guiCtx->outerLayout;
+	auto outmostLayout = new Gui::StackLayout(Gui::StackLayout::Dir::Vertical);
 
 	outmostLayout->AddWidget(CreateNavigationBar(implData));
 
 	Gui::DockArea* dockArea = new Gui::DockArea;
 	implData.dockArea = dockArea;
-	outmostLayout->AddWidget(Std::Box<Gui::Widget>{ dockArea });
+	outmostLayout->AddWidget(Std::Box{ dockArea });
 
-	implData.dockArea->AddWindow(
+	dockArea->AddWindow(
 		"Entities",
 		{ 0.5f, 0.5f, 0.f, 1.f },
 		Std::Box{ new EntityIdList(&implData) });
 
-	implData.dockArea->AddWindow(
+	dockArea->AddWindow(
 		"Components",
 		{ 0.f, 0.5f, 0.5f, 1.f },
 		Std::Box{ new ComponentList(&implData) });
 		
-	implData.dockArea->AddWindow(
+	dockArea->AddWindow(
 		"Viewport",
 		{ 0.5f, 0.f, 0.5f, 1.f },
 		Std::Box{ new ViewportWidget(implData, *implData.gfxCtx) });
 	
+	Gui::WindowHandler& guiWinHandler = implData;
+	implData.guiCtx = Std::Box{ new Gui::Context(Gui::Context::Create(guiWinHandler, gfxCtx)) };
+
+	Math::Vec4 clearColor = { 0.f, 0.5f, 0.f, 1.f };
+	auto windowExtent = App::GetWindowSize(mainWindow);
+	auto windowPos = App::GetWindowPosition(mainWindow);
+	Gui::Rect windowRect = { windowPos, { windowExtent.width, windowExtent.height } };
+	auto visibleExtent = App::GetWindowVisibleSize(mainWindow);
+	auto visiblePos = App::GetWindowVisiblePosition(mainWindow);
+
+	implData.guiCtx->AdoptWindow(
+		(Gui::WindowID)mainWindow,
+		clearColor,
+		{ windowPos, { windowExtent.width, windowExtent.height } },
+		{ visiblePos, { visibleExtent.width, visibleExtent.height } },
+		Std::Box{ outmostLayout });
+
 	return newCtx;
 }
 

@@ -8,7 +8,6 @@
 #include <DEngine/Gui/StackLayout.hpp>
 #include <DEngine/Gui/Widget.hpp>
 #include <DEngine/Gui/Button.hpp>
-#include <DEngine/Gui/MenuBar.hpp>
 
 #include <DEngine/Std/Utility.hpp>
 

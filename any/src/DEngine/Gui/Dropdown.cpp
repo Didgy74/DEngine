@@ -29,7 +29,7 @@ SizeHint Dropdown::GetSizeHint(Context const& ctx) const
 
 	u32 lineHeight = implData.textManager.lineheight;
 
-	SizeHint returnVal{};
+	SizeHint returnVal = {};
 	returnVal.preferred.height = lineHeight;
 	returnVal.preferred.width = 25;
 
@@ -38,7 +38,9 @@ SizeHint Dropdown::GetSizeHint(Context const& ctx) const
 		SizeHint childSizeHint = impl::TextManager::GetSizeHint(
 			implData.textManager,
 			{ item.data(), item.size() });
-		returnVal.preferred.width = Math::Max(returnVal.preferred.width, childSizeHint.preferred.width);
+		returnVal.preferred.width = Math::Max(
+			returnVal.preferred.width, 
+			childSizeHint.preferred.width);
 	}
 	
 	return returnVal;
@@ -93,36 +95,6 @@ bool Dropdown::CursorPress(
 	return false;
 }
 
-/*
-void Dropdown::TouchEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect, 
-	Rect visibleRect,
-	Gui::TouchEvent event,
-	bool occluded)
-{
-	if (event.id == 0)
-	{
-		bool isInside = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
-		if (menuWidget != nullptr && event.type == TouchEventType::Up)
-		{
-			ClearDropdownMenu();
-		}
-		else if (isInside && event.type == TouchEventType::Up && menuWidget == nullptr)
-		{
-			Math::Vec2Int position = widgetRect.position;
-			position.y += widgetRect.extent.height;
-
-			CreateDropdownMenu(
-				ctx,
-				windowId,
-				position);
-		}
-	}
-}
-*/
-
 bool Dropdown::TouchPressEvent(
 	Context& ctx,
 	WindowID windowId,
@@ -138,54 +110,8 @@ void Dropdown::CreateDropdownMenu(
 	WindowID windowId, 
 	Math::Vec2Int menuPosition)
 {
-	StackLayout* layout = new StackLayout(StackLayout::Direction::Vertical);
-	layout->color = { 0.25f, 0.25f, 0.25f, 1.f };
-
-	menuWidgetCtx = &ctx;
-	menuWidgetWindowId = windowId;
-	menuWidget = layout;
-
-	for (u32 i = 0; i < items.size(); i += 1)
-	{
-		auto const& itemText = items[i];
-		Button* button = new Button;
-		layout->AddWidget(Std::Box<Widget>{ button });
-		button->text = itemText;
-
-		if (i == selectedItem)
-		{
-			// Highlight this one
-			button->normalColor = button->hoverColor;
-		}
-
-		button->activateFn = [this, i](
-			Button& btn)
-		{
-			u32 previousSelectedItem = selectedItem;
-			selectedItem = i;
-			ClearDropdownMenu();
-			if (i != previousSelectedItem)
-			{
-				// Call the callback
-				if (selectedItemChangedCallback)
-					selectedItemChangedCallback(*this);
-			}
-		};
-	}
-
-	ctx.Test_AddMenu(
-		windowId,
-		Std::Box<Widget>{ layout },
-		{ menuPosition, {} });
 }
 
 void Dropdown::ClearDropdownMenu()
 {
-	DENGINE_DETAIL_ASSERT(menuWidget);
-	menuWidgetCtx->Test_DestroyMenu(
-		menuWidgetWindowId,
-		menuWidget);
-	menuWidgetCtx = nullptr;
-	menuWidgetWindowId = {};
-	menuWidget = nullptr;
 }

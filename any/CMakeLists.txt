@@ -39,7 +39,7 @@ add_library(dengine_any STATIC
 		"src/DEngine/Gui/LineEdit.cpp"
 		"src/DEngine/Gui/LineFloatEdit.cpp"
 		"src/DEngine/Gui/LineList.cpp"
-		"src/DEngine/Gui/MenuBar.cpp"
+		"src/DEngine/Gui/MenuButton.cpp"
 		"src/DEngine/Gui/ScrollArea.cpp"
 		"src/DEngine/Gui/StackLayout.cpp"
 		"src/DEngine/Gui/Text.cpp"

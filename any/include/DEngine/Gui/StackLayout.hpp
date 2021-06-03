@@ -22,6 +22,7 @@ namespace DEngine::Gui
 			Horizontal,
 			Vertical,
 		};
+		using Dir = Direction;
 
 		StackLayout(Direction direction = Direction::Horizontal) : 
 			direction(direction)

@@ -64,7 +64,7 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
-			CursorClickEvent eventd) override;
+			CursorClickEvent event) override;
 
 		virtual bool CursorMove(
 			Context& ctx,
