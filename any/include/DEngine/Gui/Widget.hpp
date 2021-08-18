@@ -1,12 +1,12 @@
 #pragma once
 
-#include <DEngine/Gui/DrawInfo.hpp>
 #include <DEngine/Gui/Events.hpp>
 #include <DEngine/Gui/SizeHint.hpp>
 #include <DEngine/Gui/Utility.hpp>
 
 namespace DEngine::Gui
 {
+	class DrawInfo;
 	class Context;
 
 	class Widget

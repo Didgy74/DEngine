@@ -1,4 +1,5 @@
 #include <DEngine/Gui/ScrollArea.hpp>
+#include <DEngine/Gui/DrawInfo.hpp>
 
 #include <DEngine/Std/Trait.hpp>
 

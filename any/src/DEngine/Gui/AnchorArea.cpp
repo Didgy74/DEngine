@@ -1,5 +1,7 @@
 #include <DEngine/Gui/AnchorArea.hpp>
 
+#include <DEngine/Gui/DrawInfo.hpp>
+
 #include <DEngine/Std/Trait.hpp>
 
 namespace DEngine::Gui::impl

@@ -42,10 +42,11 @@ namespace DEngine::Application
 		Extent extents);
 	void DestroyWindow(WindowID) noexcept;
 	u32 GetWindowCount() noexcept;
-	Extent GetWindowSize(WindowID) noexcept;
-	Extent GetWindowVisibleSize(WindowID) noexcept;
+	Extent GetWindowExtent(WindowID) noexcept;
+	Extent GetWindowVisibleExtent(WindowID) noexcept;
 	Math::Vec2Int GetWindowPosition(WindowID) noexcept;
-	Math::Vec2Int GetWindowVisiblePosition(WindowID) noexcept;
+	// Gets the offset of the visible extent, relative to the window's position.
+	Math::Vec2Int GetWindowVisibleOffset(WindowID) noexcept;
 	bool GetWindowMinimized(WindowID) noexcept;
 	WindowEvents GetWindowEvents(WindowID) noexcept;
 	Std::StackVec<char const*, 5> RequiredVulkanInstanceExtensions() noexcept;

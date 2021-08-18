@@ -313,17 +313,18 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 		globUtils.guiRenderPass,
 		globUtils.DebugUtilsPtr());
 
-	GizmoManager::Initialize(
-		apiData.gizmoManager,
-		globUtils.inFlightCount,
-		globUtils.device,
-		globUtils.queues,
-		globUtils.vma,
-		globUtils.delQueue,
-		globUtils.DebugUtilsPtr(),
-		apiData,
-		{ initInfo.gizmoArrowMesh.data(), initInfo.gizmoArrowMesh.size() },
-		{ initInfo.gizmoCircleLineMesh.data(), initInfo.gizmoCircleLineMesh.size() });
+	GizmoManager::InitInfo gizmoManagerInfo = {};
+	gizmoManagerInfo.apiData = &apiData;
+	gizmoManagerInfo.arrowMesh = { initInfo.gizmoArrowMesh.data(), initInfo.gizmoArrowMesh.size() };
+	gizmoManagerInfo.arrowScaleMesh2d = { initInfo.gizmoArrowScaleMesh2d.data(), initInfo.gizmoArrowScaleMesh2d.size() };
+	gizmoManagerInfo.circleLineMesh = { initInfo.gizmoCircleLineMesh.data(), initInfo.gizmoCircleLineMesh.size() };
+	gizmoManagerInfo.debugUtils = globUtils.DebugUtilsPtr();
+	gizmoManagerInfo.delQueue = &globUtils.delQueue;
+	gizmoManagerInfo.device = &globUtils.device;
+	gizmoManagerInfo.inFlightCount = globUtils.inFlightCount;
+	gizmoManagerInfo.queues = &globUtils.queues;
+	gizmoManagerInfo.vma = &globUtils.vma;
+	GizmoManager::Initialize(apiData.gizmoManager, gizmoManagerInfo);
 
 	return true;
 }

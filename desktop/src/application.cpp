@@ -162,14 +162,15 @@ Application::WindowID Application::CreateWindow(
 	int widthX;
 	int heightY;
 	glfwGetWindowSize(rawHandle, &widthX, &heightY);
-	newNode.windowData.size = { (u32)widthX, (u32)heightY };
-	newNode.windowData.visiblePosition = {};
-	newNode.windowData.visibleSize = { (u32)widthX, (u32)heightY };
-	
+	newNode.windowData.extent = { (u32)widthX, (u32)heightY };
+
 	int windowPosX = 0;
 	int windowPosY = 0;
 	glfwGetWindowPos(rawHandle, &windowPosX, &windowPosY);
 	newNode.windowData.position = { (i32)windowPosX,(i32)windowPosY };
+
+	newNode.windowData.visibleOffset = {};
+	newNode.windowData.visibleExtent = newNode.windowData.extent;
 	
 	appData.windows.push_back(newNode);
 
@@ -240,10 +241,13 @@ static void Application::detail::Backend_GLFW_KeyboardKeyCallback(
 	int action, 
 	int mods)
 {
+	DENGINE_DETAIL_APPLICATION_ASSERT(pAppData);
+	auto& appData = *pAppData;
+
 	if (action == GLFW_PRESS)
-		detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), true);
+		detail::UpdateButton(appData, Backend_GLFW_KeyboardKeyToRawButton(key), true);
 	else if (action == GLFW_RELEASE)
-		detail::UpdateButton(Backend_GLFW_KeyboardKeyToRawButton(key), false);
+		detail::UpdateButton(appData, Backend_GLFW_KeyboardKeyToRawButton(key), false);
 }
 
 static void Application::detail::Backend_GLFW_CharCallback(
@@ -262,13 +266,16 @@ static void Application::detail::Backend_GLFW_MouseButtonCallback(
 	if (action != GLFW_PRESS && action != GLFW_RELEASE)
 		throw std::runtime_error("DEngine - Application: Encountered unexpected action value in GLFW mouse button press callback.");
 
+	DENGINE_DETAIL_APPLICATION_ASSERT(pAppData);
+	auto& appData = *pAppData;
+
 	bool wasPressed = false;
 	if (action == GLFW_PRESS)
 		wasPressed = true;
 	else if (action == GLFW_RELEASE)
 		wasPressed = false;
 
-	detail::UpdateButton(Backend_GLFW_MouseButtonToRawButton(button), wasPressed);
+	detail::UpdateButton(appData, Backend_GLFW_MouseButtonToRawButton(button), wasPressed);
 }
 
 static void Application::detail::Backend_GLFW_CursorPosCallback(
@@ -285,12 +292,19 @@ static void Application::detail::Backend_GLFW_CursorPosCallback(
 		Math::Vec2Int cursorDelta = newVirtualCursorPos - backendData.virtualCursorPos;
 		backendData.virtualCursorPos = newVirtualCursorPos;
 		CursorData cursorData = Cursor().Value();
-		detail::UpdateCursor(*GetWindowNode(window), cursorData.position - windowNode.windowData.position, cursorDelta);
+		detail::UpdateCursor(
+			appData,
+			window,
+			cursorData.position - windowNode.windowData.position, 
+			cursorDelta);
 	}
 	else
 	{
 		backendData.virtualCursorPos = { (i32)xpos, (i32)ypos };
-		detail::UpdateCursor(*GetWindowNode(window), { (i32)xpos, (i32)ypos });
+		detail::UpdateCursor(
+			appData,
+			window, 
+			{ (i32)xpos, (i32)ypos });
 	}
 }
 
@@ -323,8 +337,10 @@ static void Application::detail::Backend_GLFW_WindowPosCallback(
 	int xpos,
 	int ypos)
 {
+	auto& appData = *detail::pAppData;
+
 	if (xpos != -32000 && ypos != -32000)
-		detail::UpdateWindowPosition(window, { (i32)xpos, (i32)ypos });
+		detail::UpdateWindowPosition(appData, window, { (i32)xpos, (i32)ypos });
 }
 
 static void Application::detail::Backend_GLFW_WindowSizeCallback(
@@ -332,7 +348,8 @@ static void Application::detail::Backend_GLFW_WindowSizeCallback(
 	int width, 
 	int height)
 {
-	auto windowNodePtr = detail::GetWindowNode(window);
+	auto& appData = *detail::pAppData;
+	auto windowNodePtr = detail::GetWindowNode(appData, window);
 
 	if (width != 0 && height != 0)
 		detail::UpdateWindowSize(
@@ -364,7 +381,8 @@ static void Application::detail::Backend_GLFW_WindowFramebufferSizeCallback(
 static void Application::detail::Backend_GLFW_WindowCloseCallback(
 	GLFWwindow* window)
 {
-	AppData::WindowNode* windowNode = detail::GetWindowNode(window);
+	auto& appData = *detail::pAppData;
+	AppData::WindowNode* windowNode = detail::GetWindowNode(appData, window);
 	DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
 	detail::UpdateWindowClose(*windowNode);
 }
@@ -383,7 +401,8 @@ static void Application::detail::Backend_GLFW_WindowMinimizeCallback(
 	GLFWwindow* window, 
 	int iconified)
 {
-	AppData::WindowNode* windowNode = detail::GetWindowNode(window);
+	auto& appData = *detail::pAppData;
+	AppData::WindowNode* windowNode = detail::GetWindowNode(appData, window);
 	DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
 	detail::UpdateWindowMinimized(*windowNode, iconified);
 }

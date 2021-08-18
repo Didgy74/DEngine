@@ -1,4 +1,7 @@
 #include <DEngine/Gui/StackLayout.hpp>
+
+#include <DEngine/Gui/DrawInfo.hpp>
+
 #include <DEngine/Gui/impl/Assert.hpp>
 
 #include <DEngine/Math/Common.hpp>

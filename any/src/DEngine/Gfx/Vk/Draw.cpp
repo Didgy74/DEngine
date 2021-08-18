@@ -474,11 +474,11 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		Std::Span<GuiDrawCmd const> drawCmds;
 		if (!drawParams.guiDrawCmds.empty())
 		{
-			DENGINE_DETAIL_GFX_ASSERT(windowUpdate.drawCmdOffset + windowUpdate.drawCmdCount <= drawParams.guiDrawCmds.size());
+			DENGINE_DETAIL_GFX_ASSERT((u64)windowUpdate.drawCmdOffset + (u64)windowUpdate.drawCmdCount <= drawParams.guiDrawCmds.size());
 			drawCmds = { &drawParams.guiDrawCmds[windowUpdate.drawCmdOffset], windowUpdate.drawCmdCount };
 		}
 
-		vk::ResultValue<u32> acquireResult = device.acquireNextImageKHR(
+		auto const acquireResult = device.acquireNextImageKHR(
 			nativeWindow.windowData.swapchain,
 			std::numeric_limits<u64>::max(),
 			nativeWindow.windowData.swapchainImgReadySem,
@@ -509,7 +509,7 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	{
 		globUtils.device.endCommandBuffer(mainCmdBuffer);
 
-		vk::SubmitInfo submitInfo{};
+		vk::SubmitInfo submitInfo = {};
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &mainCmdBuffer;
 		submitInfo.pWaitDstStageMask = swapchainImageReadyStages.data();

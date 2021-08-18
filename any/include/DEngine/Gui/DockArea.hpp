@@ -2,6 +2,8 @@
 
 #include <DEngine/Gui/Widget.hpp>
 
+#include <DEngine/FixedWidthTypes.hpp>
+
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/Variant.hpp>
@@ -17,14 +19,15 @@ namespace DEngine::Gui
 	class DockArea : public Widget
 	{
 	public:
-		DockArea();
-		
-		struct Node;
+		struct NodeBase
+		{
+			virtual ~NodeBase() {}
+		};
 		struct Layer
 		{
 			// This rect is relative to the DockArea widget's position.
 			Rect rect = {};
-			Std::Box<Node> root;
+			Std::Box<NodeBase> root = nullptr;
 		};
 		std::vector<Layer> layers;
 
@@ -35,9 +38,7 @@ namespace DEngine::Gui
 		Math::Vec4 deleteLayerGizmoColor = { 1.f, 0.f, 0.f, 0.75f };
 		Math::Vec4 dockingHighlightColor = { 0.f, 0.5f, 1.f, 0.5f };
 
-		struct State_Normal
-		{
-		};
+		struct State_Normal {};
 		struct State_Moving
 		{
 			bool movingSplitNode;
@@ -76,6 +77,9 @@ namespace DEngine::Gui
 			State_HoldingTab,
 			State_ResizingSplitNode>;
 		StateDataT stateData = State_Normal{};
+
+	public:
+		DockArea();
 
 		void AddWindow(
 			Std::Str title,

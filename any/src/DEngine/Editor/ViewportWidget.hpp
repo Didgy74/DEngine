@@ -28,7 +28,7 @@ namespace DEngine::Editor
 
 		struct Arrow
 		{
-			f32 capSize = 0;
+			f32 capDiameter = 0;
 			f32 capLength = 0;
 			f32 shaftLength = 0;
 			f32 shaftDiameter = 0;
@@ -40,7 +40,7 @@ namespace DEngine::Editor
 			{
 				Arrow arrow = {};
 				arrow.capLength = 1 / 3.f;
-				arrow.capSize = 0.2f;
+				arrow.capDiameter = 0.2f;
 				arrow.shaftDiameter = 0.1f;
 				arrow.shaftLength = 2 / 3.f;
 				return arrow;
@@ -69,7 +69,6 @@ namespace DEngine::Editor
 	{
 	public:
 		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
-		Gfx::Context* gfxCtx = nullptr;
 		EditorImpl* editorImpl = nullptr;
 
 		mutable bool isVisible = false;
@@ -89,8 +88,12 @@ namespace DEngine::Editor
 		struct HoldingGizmoData
 		{
 			u8 pointerId;
+			GizmoType gizmoType;
 			Gizmo::GizmoPart holdingPart;
-			Math::Vec3 normalizedOffset;
+			Math::Vec3 normalizedOffsetGizmo;
+			// Contains the hit point compared to the position, in world space.
+			Math::Vec3 relativeHitPointObject;
+			Math::Vec2 initialObjectScale;
 			Math::Vec3 initialPos;
 			// Current rotation offset from the pointer. In radians [-pi, pi]
 			f32 rotationOffset;
@@ -103,9 +106,9 @@ namespace DEngine::Editor
 			Math::UnitQuat rotation = Math::UnitQuat::FromEulerAngles(0, 180.f, 0.f);
 			f32 verticalFov = 60.f;
 		};
-		Camera cam{};
+		Camera cam = {};
 
-		InternalViewportWidget(EditorImpl& implData, Gfx::Context& gfxCtxIn);
+		InternalViewportWidget(EditorImpl& implData);
 
 		virtual ~InternalViewportWidget() override;
 
@@ -170,7 +173,7 @@ namespace DEngine::Editor
 	class ViewportWidget : public Gui::StackLayout 
 	{
 	public:
-		ViewportWidget(EditorImpl& implData, Gfx::Context& ctx);
+		ViewportWidget(EditorImpl& implData);
 		~ViewportWidget();
 
 		EditorImpl* editorImpl = nullptr;

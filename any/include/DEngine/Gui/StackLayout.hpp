@@ -5,6 +5,8 @@
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Math/Vector.hpp>
 
+#include <vector>
+
 namespace DEngine::Gui::impl
 {
 	class StackLayoutImpl;

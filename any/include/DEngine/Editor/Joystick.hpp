@@ -3,6 +3,7 @@
 #include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Math/Vector.hpp>
 
 namespace DEngine::Editor
@@ -10,22 +11,20 @@ namespace DEngine::Editor
 	class Joystick : public Gui::Widget
 	{
 	public:
-		static constexpr u8 cursorPointerId = (u8)-1;
-
-		struct ActiveData
+		struct PressedData
 		{
 			u8 pointerId;
 			// Holds relative position [-1, 1] bound to a circle.
 			Math::Vec2 currPos = {};
 		};
-		Std::Opt<ActiveData> activeData = {};
+		Std::Opt<PressedData> pressedData = {};
 
 		// Returns a vector in range [-1, 1].
 		// Y axis points down!
 		[[nodiscard]] Math::Vec2 GetVector() const noexcept
 		{
-			if (activeData.HasValue())
-				return activeData.Value().currPos;
+			if (pressedData.HasValue())
+				return pressedData.Value().currPos;
 			return { 0.f, 0.f };
 		}
 

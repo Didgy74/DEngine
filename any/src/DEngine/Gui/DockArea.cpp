@@ -4,7 +4,6 @@
 
 #include "ImplData.hpp"
 
-#include <DEngine/Std/Containers/Array.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Utility.hpp>
 
@@ -22,13 +21,13 @@ namespace DEngine::Gui::impl
 	{
 		switch (in)
 		{
-		case DA_OuterLayoutGizmo::Top: return DA_InnerLayoutGizmo::Top;
-		case DA_OuterLayoutGizmo::Bottom: return DA_InnerLayoutGizmo::Bottom;
-		case DA_OuterLayoutGizmo::Left: return DA_InnerLayoutGizmo::Left;
-		case DA_OuterLayoutGizmo::Right: return DA_InnerLayoutGizmo::Right;
-		default:
-			DENGINE_IMPL_UNREACHABLE();
-			return {};
+			case DA_OuterLayoutGizmo::Top: return DA_InnerLayoutGizmo::Top;
+			case DA_OuterLayoutGizmo::Bottom: return DA_InnerLayoutGizmo::Bottom;
+			case DA_OuterLayoutGizmo::Left: return DA_InnerLayoutGizmo::Left;
+			case DA_OuterLayoutGizmo::Right: return DA_InnerLayoutGizmo::Right;
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				return {};
 		}
 	}
 	struct DA_WindowNode;
@@ -40,133 +39,143 @@ namespace DEngine::Gui::impl
 	};
 }
 
-struct DA::Node
-{
-	virtual void Render(
-		DA const* dockArea,
-		Context const& ctx,
-		Extent framebufferExtent,
-		Rect nodeRect,
-		Rect visibleRect,
-		DrawInfo& drawInfo) const = 0;
-
-	// Returns true if the requested node was found.
-	[[nodiscard]] virtual bool RenderLayoutGizmo(
-		Rect nodeRect,
-		u32 gizmoSize,
-		Math::Vec4 gizmoColor,
-		Node const* hoveredWindow,
-		bool ignoreCenter,
-		DrawInfo& drawInfo) const = 0;
-
-	[[nodiscard]] virtual bool RenderDockingHighlight(
-		Rect nodeRect,
-		Math::Vec4 highlightColor,
-		Node const* hoveredWindow,
-		impl::DA_InnerLayoutGizmo gizmo,
-		DrawInfo& drawInfo) const = 0;
-
-	// Returns true if successfully docked.
-	[[nodiscard]] virtual bool DockNewNode(
-		Node const* targetNode,
-		impl::DA_InnerLayoutGizmo gizmo,
-		Std::Box<Node>& insertNode) = 0;
-
-	struct PointerPress_Params
-	{
-		Context* ctx = {};
-		WindowID windowId = {};
-		DA* dockArea = {};
-		Rect nodeRect = {};
-		Rect visibleRect = {};
-		uSize layerIndex = {};
-		Rect layerRect = {};
-		bool hasSplitNodeParent = {};
-
-		u8 pointerId = {};
-		Math::Vec2 pointerPos = {};
-		bool pointerPressed = {};
-		bool occluded = {};
-
-		CursorClickEvent* cursorClickEvent = nullptr;
-		Gui::TouchPressEvent* touchEvent = nullptr;
-	};
-	// Returns true if event was consumed
-	struct PointerPress_Result
-	{
-		bool eventConsumed = false;
-		struct DockingJob
-		{
-			uSize layerIndex;
-			impl::DA_InnerLayoutGizmo gizmo;
-			impl::DA_WindowNode* targetNode;
-		};
-		Std::Opt<DockingJob> dockingJobOpt;
-	};
-	virtual PointerPress_Result PointerPress(PointerPress_Params const& in)
-	{
-		return {};
-	}
-
-	struct PointerMove_Params
-	{
-		Context* ctx = {};
-		WindowID windowId = {};
-		DA* dockArea = {};
-		Rect visibleRect = {};
-		uSize layerIndex = {};
-		Rect nodeRect = {};
-		Math::Vec2Int widgetPos = {};
-		bool hasSplitNodeParent = {};
-
-		u8 pointerId = {};
-		Math::Vec2 pointerPos = {};
-		bool pointerOccluded = {};
-		
-		CursorMoveEvent* cursorMoveEvent = nullptr;
-		Gui::TouchMoveEvent* touchEvent = nullptr;
-	};
-	struct PointerMove_Result
-	{
-		bool stopIterating = false;
-		struct UndockJob
-		{
-			impl::DA_WindowTab undockedTab;
-			struct RemoveSplitNodeJob
-			{
-				uSize layerIndex;
-				impl::DA_WindowNode const* windowNodePtr = nullptr;
-			};
-			Std::Opt<RemoveSplitNodeJob> removeSplitNodeJobOpt;
-			DockArea::State_Moving movingState = {};
-		};
-		Std::Opt<UndockJob> undockJobOpt;
-	};
-	// Returns true when we don't want to iterate anymore.
-	virtual PointerMove_Result PointerMove(PointerMove_Params const& in)
-	{
-		return {};
-	}
-
-	virtual void InputConnectionLost() {}
-
-	virtual void CharEnterEvent(
-		Context& ctx) {}
-	virtual void CharEvent(
-		Context& ctx,
-		u32 utfValue) {}
-	virtual void CharRemoveEvent(
-		Context& ctx) {}
-
-	virtual ~Node() {}
-};
-
 namespace DEngine::Gui::impl
 {
-	struct DA_WindowNode : public DA::Node
+	enum class NodeType : u8
+	{
+		Window,
+		Split
+	};
+
+	struct Node : public DA::NodeBase
+	{
+		[[nodiscard]] virtual NodeType GetNodeType() const = 0;
+
+		virtual void Render(
+			DA const* dockArea,
+			Context const& ctx,
+			Extent framebufferExtent,
+			Rect nodeRect,
+			Rect visibleRect,
+			DrawInfo& drawInfo) const = 0;
+
+		// Returns true if the requested node was found.
+		[[nodiscard]] virtual bool RenderLayoutGizmo(
+			Rect nodeRect,
+			u32 gizmoSize,
+			Math::Vec4 gizmoColor,
+			Node const* hoveredWindow,
+			bool ignoreCenter,
+			DrawInfo& drawInfo) const = 0;
+
+		[[nodiscard]] virtual bool RenderDockingHighlight(
+			Rect nodeRect,
+			Math::Vec4 highlightColor,
+			Node const* hoveredWindow,
+			impl::DA_InnerLayoutGizmo gizmo,
+			DrawInfo& drawInfo) const = 0;
+
+		// Returns true if successfully docked.
+		[[nodiscard]] virtual bool DockNewNode(
+			Node const* targetNode,
+			impl::DA_InnerLayoutGizmo gizmo,
+			Std::Box<Node>& insertNode) = 0;
+
+		struct PointerPress_Params
+		{
+			Context* ctx = {};
+			WindowID windowId = {};
+			DA* dockArea = {};
+			Rect nodeRect = {};
+			Rect visibleRect = {};
+			uSize layerIndex = {};
+			Rect layerRect = {};
+			bool hasSplitNodeParent = {};
+
+			u8 pointerId = {};
+			Math::Vec2 pointerPos = {};
+			bool pointerPressed = {};
+			bool occluded = {};
+
+			CursorClickEvent* cursorClickEvent = nullptr;
+			Gui::TouchPressEvent* touchEvent = nullptr;
+		};
+		// Returns true if event was consumed
+		struct PointerPress_Result
+		{
+			bool eventConsumed = false;
+			struct DockingJob
+			{
+				uSize layerIndex;
+				impl::DA_InnerLayoutGizmo gizmo;
+				impl::DA_WindowNode* targetNode;
+			};
+			Std::Opt<DockingJob> dockingJobOpt;
+		};
+		virtual PointerPress_Result PointerPress(PointerPress_Params const& in)
+		{
+			return {};
+		}
+
+		struct PointerMove_Params
+		{
+			Context* ctx = {};
+			WindowID windowId = {};
+			DA* dockArea = {};
+			Rect visibleRect = {};
+			uSize layerIndex = {};
+			Rect nodeRect = {};
+			Math::Vec2Int widgetPos = {};
+			bool hasSplitNodeParent = {};
+
+			u8 pointerId = {};
+			Math::Vec2 pointerPos = {};
+			bool pointerOccluded = {};
+
+			CursorMoveEvent* cursorMoveEvent = nullptr;
+			Gui::TouchMoveEvent* touchEvent = nullptr;
+		};
+		struct PointerMove_Result
+		{
+			bool stopIterating = false;
+			struct UndockJob
+			{
+				impl::DA_WindowTab undockedTab;
+				struct RemoveSplitNodeJob
+				{
+					uSize layerIndex;
+					impl::DA_WindowNode const* windowNodePtr = nullptr;
+				};
+				Std::Opt<RemoveSplitNodeJob> removeSplitNodeJobOpt;
+				DockArea::State_Moving movingState = {};
+			};
+			Std::Opt<UndockJob> undockJobOpt;
+		};
+		// Returns true when we don't want to iterate anymore.
+		virtual PointerMove_Result PointerMove(PointerMove_Params const& in)
+		{
+			return {};
+		}
+
+		virtual void InputConnectionLost() {}
+
+		virtual void CharEnterEvent(
+			Context& ctx) {}
+		virtual void CharEvent(
+			Context& ctx,
+			u32 utfValue) {}
+		virtual void CharRemoveEvent(
+			Context& ctx) {}
+
+		virtual ~Node() {}
+	};
+
+	struct DA_WindowNode : public Node
 	{
 		uSize selectedTab = 0;
 		std::vector<DA_WindowTab> tabs;
+
+		virtual NodeType GetNodeType() const override { return NodeType::Window; }
 
 		virtual void Render(
 			DA const* dockArea,
@@ -204,7 +213,7 @@ namespace DEngine::Gui::impl
 		[[nodiscard]] PointerMove_Result PointerMove_StateHoldingTab(PointerMove_Params const& in);
 		[[nodiscard]] PointerMove_Result PointerMove_StateMoving(PointerMove_Params const& in);
 		[[nodiscard]] virtual PointerMove_Result PointerMove(PointerMove_Params const& in) override;
-
+		
 		virtual void InputConnectionLost() override;
 		virtual void CharEnterEvent(
 			Context& ctx) override;
@@ -215,14 +224,16 @@ namespace DEngine::Gui::impl
 			Context& ctx) override;
 	};
 
-	struct DA_SplitNode : public DA::Node
+	struct DA_SplitNode : public Node
 	{
-		Std::Box<DA::Node> a;
-		Std::Box<DA::Node> b;
+		Std::Box<Node> a;
+		Std::Box<Node> b;
 		// In the range [0, 1]
 		f32 split = 0.5f;
 		enum class Direction : char { Horizontal, Vertical };
 		Direction dir;
+
+		virtual NodeType GetNodeType() const override { return NodeType::Split; }
 
 		virtual void Render(
 			DA const* dockArea,
@@ -308,10 +319,10 @@ namespace DEngine::Gui::impl
 	}
 
 	[[nodiscard]] static bool DA_DockNewNode(
-		Std::Box<DA::Node>& root,
-		DA::Node const* targetNode,
+		Std::Box<Node>& root,
+		Node const* targetNode,
 		impl::DA_InnerLayoutGizmo gizmo,
-		Std::Box<DA::Node>& insertNode)
+		Std::Box<Node>& insertNode)
 	{
 		using GizmoT = decltype(gizmo);
 
@@ -320,7 +331,7 @@ namespace DEngine::Gui::impl
 		{
 			returnVal = true;
 
-			Std::Box<DA::Node> origNode = Std::Move(root);
+			Std::Box<Node> origNode = Std::Move(root);
 			DA_SplitNode* newNode = new DA_SplitNode;
 			root = Std::Box{ newNode };
 			newNode->dir = gizmo == GizmoT::Top || gizmo == GizmoT::Bottom ?
@@ -340,14 +351,17 @@ namespace DEngine::Gui::impl
 		return returnVal;
 	}
 
+	// Returns true if successfully removed.
 	[[nodiscard]] static bool DA_RemoveSplitNode(
-		Std::Box<DA::Node>& root,
+		Std::Box<Node>& root,
 		DA_WindowNode const* target)
 	{
-		Std::Box<DA::Node> temp;
-		DA_SplitNode* splitNode = dynamic_cast<DA_SplitNode*>(root.Get());
-		if (splitNode == nullptr)
+		Std::Box<Node> temp;
+		auto const nodeType = root->GetNodeType();
+		if (nodeType != NodeType::Split)
 			return false;
+
+		DA_SplitNode* splitNode = static_cast<DA_SplitNode*>(root.Get());
 
 		if (splitNode->a == target)
 		{
@@ -398,9 +412,9 @@ namespace DEngine::Gui::impl
 		// DO NOT USE DIRECTLY
 		struct Result
 		{
-			using NodeT = Std::Trait::Cond<Std::Trait::isConst<T>, DA::Node const, DA::Node>;
+			using NodeT = Std::Trait::Cond<Std::Trait::isConst<T>, impl::Node const, impl::Node>;
 			NodeT& rootNode;
-			Rect layerRect{};
+			Rect layerRect = {};
 			uSize layerIndex = 0;
 		};
 		[[nodiscard]] Result operator*() const noexcept
@@ -414,8 +428,8 @@ namespace DEngine::Gui::impl
 
 			auto& layer = layers[actualIndex];
 			DENGINE_IMPL_GUI_ASSERT(layer.root);
-			Result returnVal{
-				*layer.root.Get(),
+			Result returnVal = {
+				*static_cast<typename Result::NodeT*>(layer.root.Get()),
 				layerRect,
 				actualIndex };
 
@@ -991,7 +1005,7 @@ bool impl::DA_WindowNode::DockNewNode(
 	if (targetNode != this)
 		return false;
 	DENGINE_DETAIL_ASSERT(gizmo == impl::DA_InnerLayoutGizmo::Center);
-	DENGINE_DETAIL_ASSERT(dynamic_cast<DA_WindowNode*>(insertNode.Get()));
+	DENGINE_DETAIL_ASSERT(insertNode->GetNodeType() == NodeType::Window);
 
 	Std::Box<Node> oldBox = Std::Move(insertNode);
 
@@ -1239,7 +1253,7 @@ bool impl::DA_SplitNode::RenderLayoutGizmo(
 	return windowFound;
 }
 
-DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(PointerPress_Params const& in)
+impl::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(PointerPress_Params const& in)
 {
 	PointerPress_Result returnVal = {};
 
@@ -1334,7 +1348,7 @@ DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(Poin
 	return returnVal;
 }
 
-DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateMoving(PointerPress_Params const& in)
+impl::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateMoving(PointerPress_Params const& in)
 {
 	PointerPress_Result returnVal = {};
 
@@ -1366,7 +1380,7 @@ DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateMoving(Poin
 	return returnVal;
 }
 
-DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress(PointerPress_Params const& in)
+impl::Node::PointerPress_Result impl::DA_WindowNode::PointerPress(PointerPress_Params const& in)
 {
 	PointerPress_Result returnVal{};
 
@@ -1386,7 +1400,7 @@ DA::Node::PointerPress_Result impl::DA_WindowNode::PointerPress(PointerPress_Par
 	return returnVal;
 }
 
-DA::Node::PointerPress_Result impl::DA_SplitNode::PointerPress(PointerPress_Params const& in)
+impl::Node::PointerPress_Result impl::DA_SplitNode::PointerPress(PointerPress_Params const& in)
 {
 	DENGINE_IMPL_GUI_ASSERT(a);
 	DENGINE_IMPL_GUI_ASSERT(b);
@@ -1480,27 +1494,32 @@ bool impl::DA_PointerPress(DA_PointerPress_Params const& in)
 			in.dockArea->stateData = DA::State_Normal{};
 			eventConsumed = true;
 
-			Std::Box<DA::Node> origFrontNode = Std::Move(in.dockArea->layers.front().root);
+			auto const tempPtr = in.dockArea->layers.front().root.Release();
+			Std::Box<Node> origFrontNode = Std::Box{ static_cast<Node*>(tempPtr) };
 			in.dockArea->layers.erase(in.dockArea->layers.begin());
 			auto& backLayer = in.dockArea->layers.back();
 
-			bool success = DA_DockNewNode(
-				backLayer.root,
-				backLayer.root.Get(),
+			// The function takes a Box<Node>, but we store a Box<NodeBase> for implementation hiding.
+			// So we need to move it into a temp Box and move it back when we're done.
+			Std::Box<Node> temp = Std::Box{ static_cast<Node*>(backLayer.root.Release()) };
+			[[maybe_unused]] bool success = DA_DockNewNode(
+				temp,
+				temp.Get(),
 				DA_ToInnerLayoutGizmo(gizmoHit.Value()),
 				origFrontNode);
 			DENGINE_IMPL_GUI_ASSERT(success);
+			backLayer.root = Std::Move(temp);
 		}
 	}
 
 	if (!eventConsumed)
 	{
 		// Iterate over each layer and dispatch the event to each one.
-		DA::Node::PointerPress_Result pPressResult = {};
+		impl::Node::PointerPress_Result pPressResult = {};
 		auto const layerItPair = impl::DA_GetLayerItPair(*in.dockArea, in.widgetRect);
 		for (auto const& layerItem : layerItPair)
 		{
-			DA::Node::PointerPress_Params params = {};
+			impl::Node::PointerPress_Params params = {};
 			params.ctx = in.ctx;
 			params.cursorClickEvent = in.cursorClickEvent;
 			params.dockArea = in.dockArea;
@@ -1526,15 +1545,22 @@ bool impl::DA_PointerPress(DA_PointerPress_Params const& in)
 		{
 			// We can't dock in the front-most node, it's one we're docking!
 			DENGINE_IMPL_GUI_ASSERT(dockJob->layerIndex > 0);
-			Std::Box<DA::Node> origFrontNode = Std::Move(in.dockArea->layers.front().root);
+
+			auto const tempPtr = in.dockArea->layers.front().root.Release();
+			Std::Box<Node> origFrontNode = Std::Box{ static_cast<Node*>(tempPtr) };
 			auto& layer = in.dockArea->layers[dockJob->layerIndex];
-			bool success = DA_DockNewNode(
-				layer.root,
+
+			// The function takes a Box<Node>, but we store a Box<NodeBase> for implementation hiding.
+			// So we need to move it into a temp Box and move it back when we're done.
+			Std::Box<Node> temp = Std::Box{ static_cast<Node*>(layer.root.Release()) };
+			[[maybe_unused]] bool success = DA_DockNewNode(
+				temp,
 				dockJob->targetNode,
 				dockJob->gizmo,
 				origFrontNode);
 			DENGINE_IMPL_GUI_ASSERT(success);
 			DENGINE_IMPL_GUI_ASSERT(!origFrontNode.Get());
+			layer.root = Std::Move(temp);
 			in.dockArea->layers.erase(in.dockArea->layers.begin());
 		}
 
@@ -1561,7 +1587,7 @@ bool impl::DA_PointerPress(DA_PointerPress_Params const& in)
 	return pointerInside;
 }
 
-DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateNormal(PointerMove_Params const& in)
+impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateNormal(PointerMove_Params const& in)
 {
 	PointerMove_Result returnVal = {};
 
@@ -1601,7 +1627,7 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateNormal(Pointe
 	return returnVal;
 }
 
-DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateHoldingTab(PointerMove_Params const& in)
+impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateHoldingTab(PointerMove_Params const& in)
 {
 	DENGINE_IMPL_GUI_ASSERT(in.dockArea->stateData.IsA<DA::State_HoldingTab>());
 
@@ -1650,7 +1676,7 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateHoldingTab(Po
 	return returnVal;
 }
 
-DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateMoving(PointerMove_Params const& in)
+impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateMoving(PointerMove_Params const& in)
 {
 	PointerMove_Result returnVal = {};
 
@@ -1704,7 +1730,7 @@ DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateMoving(Pointe
 	return returnVal;
 }
 
-DA::Node::PointerMove_Result impl::DA_WindowNode::PointerMove(PointerMove_Params const& in)
+impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove(PointerMove_Params const& in)
 {
 	PointerMove_Result returnVal = {};
 
@@ -1759,7 +1785,7 @@ void impl::DA_WindowNode::CharRemoveEvent(Context& ctx)
 		tab.widget->CharRemoveEvent(ctx);
 }
 
-DA::Node::PointerMove_Result impl::DA_SplitNode::PointerMove(PointerMove_Params const& in)
+impl::Node::PointerMove_Result impl::DA_SplitNode::PointerMove(PointerMove_Params const& in)
 {
 	DENGINE_IMPL_GUI_ASSERT(a);
 	DENGINE_IMPL_GUI_ASSERT(b);
@@ -1845,18 +1871,16 @@ void impl::DA_SplitNode::CharRemoveEvent(Context& ctx)
 bool impl::DA_PointerMove(DA_PointerMove_Params const& in)
 {
 	bool pointerInside = in.widgetRect.PointIsInside(in.pointerPos) && in.visibleRect.PointIsInside(in.pointerPos);
-	//if (!pointerInside)
-		//return false;
 
 	// If we're inside the widget, we want to occlude the cursor.
 	bool returnVal = pointerInside;
 
-	DA::Node::PointerMove_Result result = {};
+	impl::Node::PointerMove_Result result = {};
 	auto const layerItPair = impl::DA_GetLayerItPair(*in.dockArea, in.widgetRect);
 	bool layerOccluded = false;
 	for (auto const& layerItem : layerItPair)
 	{
-		DA::Node::PointerMove_Params params = {};
+		impl::Node::PointerMove_Params params = {};
 		params.ctx = in.ctx;
 		params.cursorMoveEvent = in.cursorMoveEvent;
 		params.dockArea = in.dockArea;
@@ -1884,10 +1908,15 @@ bool impl::DA_PointerMove(DA_PointerMove_Params const& in)
 		if (auto splitNodeRemoveJob = tabUndockingJob->removeSplitNodeJobOpt.ToPtr())
 		{
 			auto& layer = in.dockArea->layers[splitNodeRemoveJob->layerIndex];
-			bool result = DA_RemoveSplitNode(
-				layer.root,
+
+			// The function takes a Box<Node>, but we store a Box<NodeBase> for implementation hiding.
+			// So we need to move it into a temp Box and move it back when we're done.
+			Std::Box<Node> temp = Std::Box{ static_cast<Node*>(layer.root.Release()) };
+			[[maybe_unused]] bool result = DA_RemoveSplitNode(
+				temp,
 				(DA_WindowNode const*)splitNodeRemoveJob->windowNodePtr);
 			DENGINE_IMPL_GUI_ASSERT(result);
+			layer.root = Std::Move(temp);
 		}
 
 		// Update our new behavior state
@@ -2040,10 +2069,11 @@ void DockArea::Render(
 			if (auto highlight = hoveredWindow->gizmoHighlightOpt.ToPtr())
 			{
 				auto const& layer = layers[hoveredWindow->layerIndex];
-				bool nodeFound = layer.root->RenderDockingHighlight(
+				auto const& root = *static_cast<impl::Node const*>(layer.root.Get());
+				bool nodeFound = root.RenderDockingHighlight(
 					impl::DA_GetLayerRect(layers, widgetRect, hoveredWindow->layerIndex),
 					dockingHighlightColor,
-					static_cast<DA::Node const*>(hoveredWindow->windowNode),
+					static_cast<impl::Node const*>(hoveredWindow->windowNode),
 					(impl::DA_InnerLayoutGizmo)*highlight,
 					drawInfo);
 				DENGINE_IMPL_GUI_ASSERT(nodeFound);
@@ -2077,11 +2107,12 @@ void DockArea::Render(
 		if (auto hoveredWindow = stateMoving->hoveredWindowOpt.ToPtr())
 		{
 			auto const& layer = layers[hoveredWindow->layerIndex];
-			bool nodeFound = layer.root->RenderLayoutGizmo(
+			auto const& root = *static_cast<impl::Node const*>(layer.root.Get());
+			bool nodeFound = root.RenderLayoutGizmo(
 				impl::DA_GetLayerRect(layers, widgetRect, hoveredWindow->layerIndex),
 				gizmoSize,
 				resizeHandleColor,
-				static_cast<DA::Node const*>(hoveredWindow->windowNode),
+				static_cast<impl::Node const*>(hoveredWindow->windowNode),
 				stateMoving->movingSplitNode, // ignore center
 				drawInfo);
 			DENGINE_IMPL_GUI_ASSERT(nodeFound);

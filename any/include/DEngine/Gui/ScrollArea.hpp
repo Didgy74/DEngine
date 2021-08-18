@@ -15,7 +15,11 @@ namespace DEngine::Gui
 		u32 currScrollbarPos = 0;
 		u32 scrollbarThickness = 50;
 
-		struct ScrollbarState_Normal {};
+		struct ScrollbarState_Normal
+		{
+			ScrollbarState_Normal() = default;
+			ScrollbarState_Normal(ScrollbarState_Normal const&) = default;
+		};
 		struct ScrollbarState_Hovered
 		{
 			u8 pointerId;

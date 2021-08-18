@@ -81,8 +81,7 @@ namespace DEngine::Gui::impl
 		WindowID id;
 		WindowData data;
 
-		// The first element is the front-most one.
-		Std::Opt<Test_Menu> test_Menu = {};
+		Std::Box<Layer> frontmostLayer = {};
 	};
 
 	struct ImplData
@@ -96,7 +95,7 @@ namespace DEngine::Gui::impl
 
 		std::vector<WindowNode> windows;
 
-		Math::Vec2Int cursorPosition{};
+		Math::Vec2Int cursorPosition = {};
 
 		TextManager textManager;
 	};

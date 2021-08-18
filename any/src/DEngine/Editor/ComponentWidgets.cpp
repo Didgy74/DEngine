@@ -199,7 +199,7 @@ RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 		bodyTypeDropdown->items.push_back("Dynamic"); // Rigidbody2D::Type::Dynamic = 0
 		bodyTypeDropdown->items.push_back("Static"); // Rigidbody2D::Type::Static = 0
 		bodyTypeDropdown->selectedItem = (u32)Physics::Rigidbody2D::Type::Dynamic;
-		bodyTypeDropdown->selectedItemChangedCallback = [&editorImpl](
+		bodyTypeDropdown->selectionChangedCallback = [&editorImpl](
 			Gui::Dropdown& dropdown)
 		{
 			// Update the box2D body

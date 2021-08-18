@@ -5,17 +5,54 @@
 #include <DEngine/Std/Utility.hpp>
 
 #include <iostream>
-#include <cstring>
 #include <chrono>
 
 namespace DEngine::Application::detail
 {
 	AppData* pAppData = nullptr;
 	static constexpr bool IsValid(Button in) noexcept;
+
+	static void FlushQueuedEventCallbacks(AppData& appData);
 }
 
 using namespace DEngine;
 using namespace DEngine::Application;
+using namespace DEngine::Application::detail;
+
+static void Application::detail::FlushQueuedEventCallbacks(AppData& appData)
+{
+	for (auto const& job : appData.queuedEventCallbacks)
+	{
+		using Type = EventCallbackJob::Type;
+		switch (job.type)
+		{
+			case Type::Button:
+			{
+				job.ptr->ButtonEvent(job.button.btn, job.button.state);
+				break;
+			}
+			case Type::CursorMove:
+			{
+				job.ptr->CursorMove(job.cursorMove.pos, job.cursorMove.delta);
+				break;
+			}
+			case Type::Touch:
+			{
+				job.ptr->TouchEvent(job.touch.id, job.touch.type, { job.touch.x, job.touch.y });
+				break;
+			}
+			case Type::WindowMove:
+			{
+				job.ptr->WindowMove(job.windowMove.window, job.windowMove.position);
+				break;
+			}
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				break;
+		}
+	}
+	appData.queuedEventCallbacks.clear();
+}
 
 void Application::DestroyWindow(WindowID id) noexcept
 {
@@ -24,7 +61,7 @@ void Application::DestroyWindow(WindowID id) noexcept
 		appData.windows.begin(),
 		appData.windows.end(),
 		[id](detail::AppData::WindowNode const& val) -> bool {
-			return id== val.id; });
+			return id == val.id; });
 	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	
 	detail::Backend_DestroyWindow(*windowNodeIt);
@@ -38,15 +75,16 @@ u32 Application::GetWindowCount() noexcept
 	return (u32)appData.windows.size();
 }
 
-Extent Application::GetWindowSize(WindowID window) noexcept
+Extent Application::GetWindowExtent(WindowID window) noexcept
 {
-	auto const windowNodePtr = detail::GetWindowNode(window);
+	auto const& appData = *detail::pAppData;
+	auto const windowNodePtr = detail::GetWindowNode(appData, window);
 	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
 	auto const& windowNode = *windowNodePtr;
-	return windowNode.windowData.size;
+	return windowNode.windowData.extent;
 }
 
-Extent Application::GetWindowVisibleSize(WindowID window) noexcept
+Extent Application::GetWindowVisibleExtent(WindowID window) noexcept
 {
 	auto const& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -55,7 +93,7 @@ Extent Application::GetWindowVisibleSize(WindowID window) noexcept
 		[window](auto const& val) -> bool { return window == val.id; });
 	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	auto const& windowNode = *windowNodeIt;
-	return windowNode.windowData.visibleSize;
+	return windowNode.windowData.visibleExtent;
 }
 
 Math::Vec2Int Application::GetWindowPosition(WindowID window) noexcept
@@ -71,7 +109,7 @@ Math::Vec2Int Application::GetWindowPosition(WindowID window) noexcept
 	return windowNode.windowData.position;
 }
 
-Math::Vec2Int Application::GetWindowVisiblePosition(WindowID window) noexcept
+Math::Vec2Int Application::GetWindowVisibleOffset(WindowID window) noexcept
 {
 	auto const& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
@@ -81,7 +119,7 @@ Math::Vec2Int Application::GetWindowVisiblePosition(WindowID window) noexcept
 			return window == val.id; });
 	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	auto const& windowNode = *windowNodeIt;
-	return windowNode.windowData.visiblePosition;
+	return windowNode.windowData.visibleOffset;
 }
 
 bool Application::GetWindowMinimized(WindowID window) noexcept
@@ -128,13 +166,11 @@ bool Application::ButtonValue(Button input) noexcept
 }
 
 void Application::detail::UpdateButton(
-	Button button, 
+	AppData& appData,
+	Button button,
 	bool pressed)
 {
 	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(button));
-
-	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
-	auto& appData = *detail::pAppData;
 
 	appData.buttonValues[(int)button] = pressed;
 	appData.buttonEvents[(int)button] = pressed ? KeyEventType::Pressed : KeyEventType::Unpressed;
@@ -148,18 +184,18 @@ void Application::detail::UpdateButton(
 		appData.buttonHeldStart[(int)button] = std::chrono::high_resolution_clock::time_point();
 	}
 
-	for (EventInterface* eventCallback : appData.eventCallbacks)
-		eventCallback->ButtonEvent(button, pressed);
+	for (auto const& registeredCallback : appData.registeredEventCallbacks)
+	{
+		EventCallbackJob job = {};
+		job.type = EventCallbackJob::Type::Button;
+		job.ptr = registeredCallback;
 
-	if (appData.buttonEvents[(int)button] == KeyEventType::Pressed && (button == Button::Backspace || button == Button::Delete))
-	{
-		for (EventInterface* eventCallback : appData.eventCallbacks)
-			eventCallback->CharRemoveEvent();
-	}
-	else if (appData.buttonEvents[(int)button] == KeyEventType::Pressed && button == Button::Enter)
-	{
-		for (EventInterface* eventCallback : appData.eventCallbacks)
-			eventCallback->CharEnterEvent();
+		EventCallbackJob::ButtonEvent event = {};
+		event.btn = button;
+		event.state = pressed;
+		job.button = event;
+
+		appData.queuedEventCallbacks.push_back(job);
 	}
 }
 
@@ -170,7 +206,7 @@ void Application::detail::PushCharInput(u32 charValue)
 
 	appData.charInputs.push_back(charValue);
 
-	for (EventInterface* eventCallback : appData.eventCallbacks)
+	for (EventInterface* eventCallback : appData.registeredEventCallbacks)
 		eventCallback->CharEvent(charValue);
 }
 
@@ -178,7 +214,7 @@ void DEngine::Application::detail::PushCharEnterEvent()
 {
 	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
-	for (EventInterface* eventCallback : appData.eventCallbacks)
+	for (EventInterface* eventCallback : appData.registeredEventCallbacks)
 		eventCallback->CharEnterEvent();
 }
 
@@ -186,7 +222,7 @@ void Application::detail::PushCharRemoveEvent()
 {
 	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
-	for (EventInterface* eventCallback : appData.eventCallbacks)
+	for (EventInterface* eventCallback : appData.registeredEventCallbacks)
 		eventCallback->CharRemoveEvent();
 }
 
@@ -290,6 +326,8 @@ void Application::detail::ProcessEvents()
 		if (appData.touchInputs[i].eventType != TouchEventType::Up)
 			appData.touchInputs[i].duration = std::chrono::duration<f32>(appData.currentNow - appData.touchInputStartTime[i]).count();
 	}
+	// Flush queued event callbacks.
+	detail::FlushQueuedEventCallbacks(appData);
 
 	appData.tickCount += 1;
 }
@@ -299,26 +337,56 @@ void Application::detail::SetLogCallback(LogCallback callback)
 	detail::pAppData->logCallback = callback;
 }
 
-Application::detail::AppData::WindowNode* DEngine::Application::detail::GetWindowNode(WindowID id)
+AppData::WindowNode* Application::detail::GetWindowNode(
+	AppData& appData,
+	WindowID id)
 {
-	auto& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
-		[id](AppData::WindowNode const& val) -> bool { return val.id == id; });
+		[id](auto const& val) -> bool { return val.id == id; });
 	if (windowNodeIt == appData.windows.end())
 		return nullptr;
 	else
 		return &(*windowNodeIt);
 }
 
-Application::detail::AppData::WindowNode* DEngine::Application::detail::GetWindowNode(void* platformHandle)
+AppData::WindowNode const* Application::detail::GetWindowNode(
+	AppData const& appData,
+	WindowID id)
 {
-	auto& appData = *detail::pAppData;
 	auto windowNodeIt = Std::FindIf(
 		appData.windows.begin(),
 		appData.windows.end(),
-		[platformHandle](AppData::WindowNode const& val) -> bool { return val.platformHandle == platformHandle; });
+		[id](auto const& val) -> bool { return val.id == id; });
+	if (windowNodeIt == appData.windows.end())
+		return nullptr;
+	else
+		return &(*windowNodeIt);
+}
+
+AppData::WindowNode* Application::detail::GetWindowNode(
+	AppData& appData,
+	void* platformHandle)
+{
+	auto windowNodeIt = Std::FindIf(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[platformHandle](auto const& val) -> bool { return val.platformHandle == platformHandle; });
+	if (windowNodeIt == appData.windows.end())
+		return nullptr;
+	else
+		return &(*windowNodeIt);
+}
+
+AppData::WindowNode const* Application::detail::GetWindowNode(
+	AppData const& appData,
+	void* platformHandle)
+{
+	auto windowNodeIt = Std::FindIf(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[platformHandle](auto const& val) -> bool { return val.platformHandle == platformHandle; });
 	if (windowNodeIt == appData.windows.end())
 		return nullptr;
 	else
@@ -328,31 +396,41 @@ Application::detail::AppData::WindowNode* DEngine::Application::detail::GetWindo
 void Application::detail::UpdateWindowSize(
 	AppData::WindowNode& windowNode,
 	Extent newSize,
-	Math::Vec2Int visiblePos,
-	Extent visibleSize)
+	Math::Vec2Int visibleOffset,
+	Extent visibleExtent)
 {
-	windowNode.windowData.size = newSize;
-	windowNode.windowData.visiblePosition = visiblePos;
-	windowNode.windowData.visibleSize = visibleSize;
+	windowNode.windowData.extent = newSize;
+	windowNode.windowData.visibleOffset = visibleOffset;
+	windowNode.windowData.visibleExtent = visibleExtent;
 	windowNode.events.resize = true;
-	for (EventInterface* eventCallback : pAppData->eventCallbacks)
-		eventCallback->WindowResize(windowNode.id, newSize, visiblePos, visibleSize);
+	for (EventInterface* eventCallback : pAppData->registeredEventCallbacks)
+		eventCallback->WindowResize(windowNode.id, newSize, visibleOffset, visibleExtent);
 }
 
 void Application::detail::UpdateWindowPosition(
+	AppData& appData,
 	void* platformHandle, 
 	Math::Vec2Int newPosition)
 {
-	auto& windowNode = *Std::FindIf(
-		pAppData->windows.begin(),
-		pAppData->windows.end(),
-		[platformHandle](AppData::WindowNode const& val) -> bool {
-			return val.platformHandle == platformHandle; });
+	auto windowNodePtr = GetWindowNode(appData, platformHandle);
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
 
 	windowNode.windowData.position = newPosition;
 	windowNode.events.move = true;
-	for (EventInterface* eventCallback : pAppData->eventCallbacks)
-		eventCallback->WindowMove(windowNode.id, newPosition);
+
+	for (auto const& eventCallback : appData.registeredEventCallbacks)
+	{
+		using T = EventCallbackJob;
+		T job = {};
+		job.ptr = eventCallback;
+		job.type = T::Type::WindowMove;
+		T::WindowMoveEvent event = {};
+		event.position = newPosition;
+		event.window = windowNode.id;
+		job.windowMove = event;
+		appData.queuedEventCallbacks.push_back(job);
+	}
 }
 
 void Application::detail::UpdateWindowFocus(
@@ -370,7 +448,7 @@ void Application::detail::UpdateWindowFocus(
 		windowNode.events.focus = true;
 	else
 		windowNode.events.unfocus = true;
-	for (EventInterface* eventCallback : pAppData->eventCallbacks)
+	for (EventInterface* eventCallback : pAppData->registeredEventCallbacks)
 		eventCallback->WindowFocus(windowNode.id, focused);
 }
 
@@ -385,7 +463,7 @@ void Application::detail::UpdateWindowMinimized(
 		windowNode.events.minimize = true;
 	else
 		windowNode.events.restore = true;
-	for (EventInterface* eventCallback : appData.eventCallbacks)
+	for (EventInterface* eventCallback : appData.registeredEventCallbacks)
 		eventCallback->WindowMinimize(windowNode.id, minimized);
 }
 
@@ -395,7 +473,7 @@ void Application::detail::UpdateWindowClose(
 	auto& appData = *detail::pAppData;
 
 	windowNode.windowData.shouldShutdown = true;
-	for (EventInterface* eventCallback : appData.eventCallbacks)
+	for (EventInterface* eventCallback : appData.registeredEventCallbacks)
 		eventCallback->WindowClose(windowNode.id);
 }
 
@@ -415,7 +493,7 @@ void Application::detail::UpdateWindowCursorEnter(
 		windowNode.events.cursorEnter = true;
 	else
 		windowNode.events.cursorExit = true;
-	for (EventInterface* eventCallback : pAppData->eventCallbacks)
+	for (EventInterface* eventCallback : pAppData->registeredEventCallbacks)
 		eventCallback->WindowCursorEnter(windowNode.id, entered);
 }
 
@@ -427,52 +505,129 @@ void Application::detail::UpdateOrientation(Orientation newOrient)
 	appData.orientationEvent = true;
 }
 
+namespace DEngine::Application::detail
+{
+	static void UpdateCursor(
+		AppData& appData,
+		AppData::WindowNode& windowNode,
+		Math::Vec2Int pos,
+		Math::Vec2Int delta)
+	{
+		Math::Vec2Int newPosition = {
+			pos.x + windowNode.windowData.position.x,
+			pos.y + windowNode.windowData.position.y };
+
+		DENGINE_DETAIL_APPLICATION_ASSERT(appData.cursorOpt.HasValue());
+		CursorData& cursorData = appData.cursorOpt.Value();
+		cursorData.position = newPosition;
+		cursorData.positionDelta += delta;
+
+		for (auto const eventCallback : appData.registeredEventCallbacks)
+		{
+			EventCallbackJob job = {};
+			job.type = EventCallbackJob::Type::CursorMove;
+			job.ptr = eventCallback;
+			EventCallbackJob::CursorMoveEvent event = {};
+			event.pos = cursorData.position;
+			event.delta = cursorData.positionDelta;
+			job.cursorMove = event;
+			appData.queuedEventCallbacks.push_back(job);
+		}
+	}
+
+	static void UpdateCursor(
+		AppData& appData,
+		AppData::WindowNode& windowNode,
+		Math::Vec2Int pos)
+	{
+		Math::Vec2Int newPosition = {
+			pos.x + windowNode.windowData.position.x,
+			pos.y + windowNode.windowData.position.y };
+
+		DENGINE_DETAIL_APPLICATION_ASSERT(appData.cursorOpt.HasValue());
+		CursorData& cursorData = appData.cursorOpt.Value();
+
+		Math::Vec2Int delta = newPosition - cursorData.position;
+
+		return UpdateCursor(
+			appData,
+			windowNode,
+			pos,
+			delta);
+	}
+}
+
 void Application::detail::UpdateCursor(
-	AppData::WindowNode const& windowNode,
+	AppData& appData,
+	WindowID id,
 	Math::Vec2Int pos,
 	Math::Vec2Int delta)
 {
-	Math::Vec2Int newPosition = {
-		pos.x + windowNode.windowData.position.x,
-		pos.y + windowNode.windowData.position.y };
-
-	CursorData& cursorData = pAppData->cursorOpt.Value();
-	cursorData.position = newPosition;
-	cursorData.positionDelta += delta;
-	
-	for (EventInterface* eventCallback : pAppData->eventCallbacks)
-		eventCallback->CursorMove(cursorData.position, delta);
+	auto windowNodePtr = GetWindowNode(appData, id);
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+	return UpdateCursor(
+		appData,
+		windowNode,
+		pos,
+		delta);
 }
 
 void Application::detail::UpdateCursor(
-	AppData::WindowNode const& windowNode,
+	AppData& appData,
+	WindowID id,
 	Math::Vec2Int pos)
 {
-	Math::Vec2Int newPosition = {
-		pos.x + windowNode.windowData.position.x,
-		pos.y + windowNode.windowData.position.y };
-
-	DENGINE_DETAIL_APPLICATION_ASSERT(pAppData->cursorOpt.HasValue());
-	CursorData& cursorData = pAppData->cursorOpt.Value();
-
-	Math::Vec2Int positionDelta = newPosition - cursorData.position;
-
-	cursorData.positionDelta = positionDelta;
-	cursorData.position = newPosition;
-
-	for (EventInterface* eventCallback : pAppData->eventCallbacks)
-		eventCallback->CursorMove(cursorData.position, positionDelta);
+	auto windowNodePtr = GetWindowNode(appData, id);
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+	return UpdateCursor(
+		appData,
+		windowNode,
+		pos);
 }
 
-void Application::detail::UpdateTouchInput(TouchEventType type, u8 id, f32 x, f32 y)
+void Application::detail::UpdateCursor(
+	AppData& appData,
+	void* platformHandle,
+	Math::Vec2Int pos,
+	Math::Vec2Int delta)
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(type != TouchEventType::Unchanged);
-	auto& appData = *detail::pAppData;
+	auto windowNodePtr = GetWindowNode(appData, platformHandle);
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+	return UpdateCursor(
+		appData,
+		windowNode,
+		pos,
+		delta);
+}
 
+void Application::detail::UpdateCursor(
+	AppData& appData,
+	void* platformHandle,
+	Math::Vec2Int pos)
+{
+	auto windowNodePtr = GetWindowNode(appData, platformHandle);
+	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+	return UpdateCursor(
+		appData,
+		windowNode,
+		pos);
+}
+
+void Application::detail::UpdateTouchInput(
+	AppData& appData,
+	TouchEventType type, 
+	u8 id, 
+	f32 x, 
+	f32 y)
+{
 	if (type == TouchEventType::Down)
 	{
 		DENGINE_DETAIL_APPLICATION_ASSERT(appData.touchInputs.CanPushBack());
-		TouchInput newValue{};
+		TouchInput newValue = {};
 		newValue.eventType = TouchEventType::Down;
 		newValue.id = id;
 		newValue.x = x;
@@ -495,8 +650,19 @@ void Application::detail::UpdateTouchInput(TouchEventType type, u8 id, f32 x, f3
 		}
 	}
 
-	for (EventInterface* eventCallback : pAppData->eventCallbacks)
-		eventCallback->TouchEvent(id, type, { x, y });
+	for (auto const eventCallback : appData.registeredEventCallbacks)
+	{
+		EventCallbackJob job = {};
+		job.type = EventCallbackJob::Type::Touch;
+		job.ptr = eventCallback;
+		EventCallbackJob::TouchEvent event = {};
+		event.id = id;
+		event.type = type;
+		event.x = x;
+		event.y = y;
+		job.touch = event;
+		appData.queuedEventCallbacks.push_back(job);
+	}
 }
 
 Std::Opt<Application::GamepadState> Application::GetGamepad()
@@ -517,15 +683,15 @@ void Application::Log(char const* msg)
 
 void Application::InsertEventInterface(EventInterface& in)
 {
-	detail::pAppData->eventCallbacks.push_back(&in);
+	detail::pAppData->registeredEventCallbacks.push_back(&in);
 }
 
 void Application::RemoveEventInterface(EventInterface& in)
 {
 	auto callbackIt = Std::FindIf(
-		detail::pAppData->eventCallbacks.begin(),
-		detail::pAppData->eventCallbacks.end(),
+		detail::pAppData->registeredEventCallbacks.begin(),
+		detail::pAppData->registeredEventCallbacks.end(),
 		[&in](EventInterface* const val) -> bool {
 			return val == &in; });
-	detail::pAppData->eventCallbacks.erase(callbackIt);
+	detail::pAppData->registeredEventCallbacks.erase(callbackIt);
 }

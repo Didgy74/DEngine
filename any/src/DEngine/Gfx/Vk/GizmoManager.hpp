@@ -28,6 +28,10 @@ namespace DEngine::Gfx::Vk
 		VmaAllocation circleVtxAlloc = {};
 		u32 circleVtxCount = 0;
 
+		vk::Buffer scaleArrow2d_VtxBuffer = {};
+		VmaAllocation scaleArrow2d_VtxAlloc = {};
+		u32 scaleArrow2d_VtxCount = 0;
+
 		vk::PipelineLayout pipelineLayout = {};
 		vk::Pipeline arrowPipeline = {};
 		vk::Pipeline quadPipeline = {};
@@ -40,17 +44,20 @@ namespace DEngine::Gfx::Vk
 		uSize lineVtxBufferCapacity = 0;
 		Std::Span<u8> lineVtxBufferMappedMem = {};
 
-		static void Initialize(
-			GizmoManager& manager,
-			u8 inFlightCount,
-			DeviceDispatch const& device,
-			QueueData const& queues,
-			VmaAllocator const& vma,
-			DeletionQueue const& delQueue,
-			DebugUtilsDispatch const* debugUtils,
-			APIData const& apiData,
-			Std::Span<Math::Vec3 const> arrowMesh,
-			Std::Span<Math::Vec3 const> circleLineMesh);
+		struct InitInfo
+		{
+			u8 inFlightCount;
+			DeviceDispatch const* device;
+			QueueData const* queues;
+			VmaAllocator const* vma;
+			DeletionQueue const* delQueue;
+			DebugUtilsDispatch const* debugUtils;
+			APIData const* apiData;
+			Std::Span<Math::Vec3 const> arrowMesh;
+			Std::Span<Math::Vec3 const> circleLineMesh;
+			Std::Span<Math::Vec3 const> arrowScaleMesh2d;
+		};
+		static void Initialize(GizmoManager& manager, InitInfo const& initInfo);
 
 		static void UpdateLineVtxBuffer(
 			GizmoManager& manager,

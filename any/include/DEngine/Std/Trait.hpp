@@ -26,9 +26,6 @@ namespace DEngine::Std::Trait::impl
 	template<bool valueIn>
 	struct BoolValue { static constexpr bool value = valueIn; };
 
-	template<class T, class... Ts>
-	struct Front { using Type = T; };
-
 	template<bool expr, class T, class U>
 	struct Conditional;
 	template<class T, class U>
@@ -114,7 +111,7 @@ namespace DEngine::Std::Trait
 	constexpr unsigned int indexOf = impl::IndexOf<T, Ts...>::value;
 
 	template<class Base, class Derived>
-	static constexpr bool isBaseOf = __is_base_of(Base, Derived);
+	constexpr bool isBaseOf = __is_base_of(Base, Derived);
 
 	template<class T>
 	constexpr bool isConst = impl::IsConst<T>::value;

@@ -155,4 +155,14 @@ namespace DEngine::Math
 	{
 		return Vector<3, f32>{ lhs * rhs.x, lhs * rhs.y, lhs * rhs.z };
 	}
+
+	constexpr Vector<3, f32> Cross(Vector<3, f32> const& lhs, Vector<3, f32> const& rhs) noexcept
+	{
+		return Vector<3, f32>::Cross(lhs, rhs);
+	}
+
+	constexpr f32 Dot(Vector<3, f32> const& lhs, Vector<3, f32> const& rhs) noexcept
+	{
+		return Vector<3, f32>::Dot(lhs, rhs);
+	}
 }

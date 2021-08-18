@@ -1,5 +1,7 @@
 #include <DEngine/Gui/CollapsingHeader.hpp>
 
+#include <DEngine/Gui/DrawInfo.hpp>
+
 #include <DEngine/Std/Utility.hpp>
 
 using namespace DEngine;

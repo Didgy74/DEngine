@@ -54,6 +54,8 @@ namespace DEngine::Editor
 		EditorImpl* implData = nullptr;
 	};
 
-	std::vector<Math::Vec3> BuildGizmoArrowMesh();
-	std::vector<Math::Vec3> BuildGizmoTorusMesh();
+	[[nodiscard]] std::vector<Math::Vec3> BuildGizmoArrowMesh3D();
+	[[nodiscard]] std::vector<Math::Vec3> BuildGizmoTranslateArrowMesh2D();
+	[[nodiscard]] std::vector<Math::Vec3> BuildGizmoTorusMesh2D();
+	[[nodiscard]] std::vector<Math::Vec3> BuildGizmoScaleArrowMesh2D();
 }

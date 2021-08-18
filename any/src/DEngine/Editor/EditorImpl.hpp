@@ -1,9 +1,10 @@
 #pragma once
 
-#include <DEngine/Gui/Context.hpp>
-#include <DEngine/Gui/Text.hpp>
-#include <DEngine/Gui/DockArea.hpp>
 #include <DEngine/Gui/ButtonGroup.hpp>
+#include <DEngine/Gui/Context.hpp>
+#include <DEngine/Gui/DockArea.hpp>
+#include <DEngine/Gui/MenuButton.hpp>
+#include <DEngine/Gui/Text.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
@@ -109,6 +110,7 @@ namespace DEngine::Editor
 		
 		EntityIdList* entityIdList = nullptr;
 		ComponentList* componentList = nullptr;
+		Gui::MenuButton* viewMenuButton = nullptr;
 		Gui::DockArea* dockArea = nullptr;
 		Gui::ButtonGroup* gizmoTypeBtnGroup = nullptr;
 		std::vector<ViewportWidget*> viewportWidgets;

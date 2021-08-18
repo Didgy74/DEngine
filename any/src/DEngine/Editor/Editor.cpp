@@ -27,17 +27,25 @@
 
 namespace DEngine::Editor
 {
+	enum class FileMenuEnum
+	{
+		Entities,
+		Components,
+		NewViewport,
+		COUNT
+	};
+
 	class EntityIdList : public Gui::StackLayout
 	{
 	public:
 		Gui::LineList* entitiesList = nullptr;
 		EditorImpl* editorImpl = nullptr;
 
-		EntityIdList(EditorImpl* editorImpl) :
-			editorImpl(editorImpl)
+		EntityIdList(EditorImpl& editorImpl) :
+			editorImpl(&editorImpl)
 		{
-			DENGINE_DETAIL_ASSERT(!editorImpl->entityIdList);
-			editorImpl->entityIdList = this;
+			DENGINE_DETAIL_ASSERT(!editorImpl.entityIdList);
+			editorImpl.entityIdList = this;
 
 			this->direction = Direction::Vertical;
 
@@ -89,12 +97,12 @@ namespace DEngine::Editor
 					this->editorImpl->UnselectEntity();
 			};
 
-			auto entities = editorImpl->scene->GetEntities();
+			auto entities = editorImpl.scene->GetEntities();
 			for (uSize i = 0; i < entities.Size(); i += 1)
 			{
 				Entity entityId = entities[i];
 				AddEntityToList(entityId);
-				if (editorImpl->GetSelectedEntity().HasValue() && entityId == editorImpl->GetSelectedEntity().Value())
+				if (editorImpl.GetSelectedEntity().HasValue() && entityId == editorImpl.GetSelectedEntity().Value())
 				{
 					entitiesList->selectedLine = i;
 				}
@@ -105,6 +113,11 @@ namespace DEngine::Editor
 		{
 			DENGINE_DETAIL_ASSERT(editorImpl->entityIdList == this);
 			editorImpl->entityIdList = nullptr;
+
+			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Entities].data;
+			DENGINE_DETAIL_ASSERT(submenuLine.IsA<Gui::MenuButton::LineButton>());
+			auto& lineButton = submenuLine.Get<Gui::MenuButton::LineButton>();
+			lineButton.toggled = false;
 		}
 
 		void AddEntityToList(Entity id)
@@ -152,8 +165,8 @@ namespace DEngine::Editor
 		SpriteRenderer2DWidget* spriteRendererWidget = nullptr;
 		RigidbodyWidget* box2DWidget = nullptr;
 
-		ComponentList(EditorImpl* inEditorImpl) :
-			editorImpl(inEditorImpl)
+		ComponentList(EditorImpl& inEditorImpl) :
+			editorImpl(&inEditorImpl)
 		{
 			DENGINE_DETAIL_ASSERT(!editorImpl->componentList);
 			editorImpl->componentList = this;
@@ -174,6 +187,11 @@ namespace DEngine::Editor
 		{
 			DENGINE_DETAIL_ASSERT(editorImpl->componentList == this);
 			editorImpl->componentList = nullptr;
+
+			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Components].data;
+			DENGINE_DETAIL_ASSERT(submenuLine.IsA<Gui::MenuButton::LineButton>());
+			auto& lineButton = submenuLine.Get<Gui::MenuButton::LineButton>();
+			lineButton.toggled = false;
 		}
 
 		void EntitySelected(Entity id)
@@ -181,16 +199,16 @@ namespace DEngine::Editor
 			outerLayout->ClearChildren();
 			
 			moveWidget = new MoveWidget(editorImpl->scene, id);
-			outerLayout->AddWidget(Std::Box<Gui::Widget>{ moveWidget });
+			outerLayout->AddWidget(Std::Box{ moveWidget });
 
 			transformWidget = new TransformWidget(*editorImpl);
-			outerLayout->AddWidget(Std::Box<Gui::Widget>{ transformWidget });
+			outerLayout->AddWidget(Std::Box{ transformWidget });
 
 			spriteRendererWidget = new SpriteRenderer2DWidget(*editorImpl);
-			outerLayout->AddWidget(Std::Box<Gui::Widget>{ spriteRendererWidget });
+			outerLayout->AddWidget(Std::Box{ spriteRendererWidget });
 
 			box2DWidget = new RigidbodyWidget(*editorImpl);
-			outerLayout->AddWidget(Std::Box<Gui::Widget>{ box2DWidget });
+			outerLayout->AddWidget(Std::Box{ box2DWidget });
 		}
 
 		void Tick(Scene const& scene, Entity id)
@@ -205,7 +223,7 @@ namespace DEngine::Editor::detail
 {
 	struct Gfx_App_Connection : public Gfx::WsiInterface
 	{
-		App::WindowID appWindowID{};
+		App::WindowID appWindowID = {};
 
 		// Return type is VkResult
 		//
@@ -230,14 +248,71 @@ using namespace DEngine;
 
 namespace DEngine::Editor
 {
-	static Std::Box<Gui::Widget> CreateNavigationBar(
+	[[nodiscard]] static Std::Box<Gui::Widget> CreateNavigationBar(
 		EditorImpl& editorImpl)
 	{
-		auto stackLayout = new Gui::StackLayout();
+		auto stackLayout = new Gui::StackLayout;
 
 		auto menuButton = new Gui::MenuButton;
+		editorImpl.viewMenuButton = menuButton;
 		stackLayout->AddWidget(Std::Box{ menuButton });
+		menuButton->submenu.lines.resize((int)FileMenuEnum::COUNT);
 		menuButton->title = "Menu";
+		{
+			// Create button for Entities window
+			Gui::MenuButton::LineButton btn = {};
+			btn.toggled = true;
+			btn.togglable = true;
+			btn.callback = [&editorImpl](Gui::MenuButton::LineButton& btn) {
+				if (btn.toggled)
+				{
+					editorImpl.dockArea->AddWindow(
+						"Entities",
+						{ 0.5f, 0.5f, 0.f, 1.f },
+						Std::Box{ new EntityIdList(editorImpl) });
+				}
+
+				btn.toggled = true;
+			};
+			Gui::MenuButton::Line line = { Std::Move(btn) };
+			line.title = "Entities";
+			menuButton->submenu.lines[(int)FileMenuEnum::Entities] = Std::Move(line);
+		}
+		{
+			// Create button for Components window
+			Gui::MenuButton::LineButton btn = {};
+			btn.toggled = true;
+			btn.togglable = true;
+			btn.callback = [&editorImpl](Gui::MenuButton::LineButton& btn) {
+				if (btn.toggled)
+				{
+					editorImpl.dockArea->AddWindow(
+						"Components",
+						{ 0.f, 0.5f, 0.5f, 1.f },
+						Std::Box{ new ComponentList(editorImpl) });
+				}
+				btn.toggled = true;
+			};
+			Gui::MenuButton::Line line = { Std::Move(btn) };
+			line.title = "Components";
+			menuButton->submenu.lines[(int)FileMenuEnum::Components] = Std::Move(line);
+		}
+		{
+			// Create button for adding viewport
+			Gui::MenuButton::LineButton btn = {};
+			btn.toggled = false;
+			btn.togglable = false;
+			btn.callback = [&editorImpl](Gui::MenuButton::LineButton& btn) {
+				editorImpl.dockArea->AddWindow(
+					"Viewport",
+					{ 0.5f, 0.f, 0.5f, 1.f },
+					Std::Box{ new ViewportWidget(editorImpl) });
+			};
+			Gui::MenuButton::Line line = { Std::Move(btn) };
+			line.title = "New viewport";
+			menuButton->submenu.lines[(int)FileMenuEnum::NewViewport] = Std::Move(line);
+		}
+
 
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;
@@ -299,33 +374,32 @@ Editor::Context Editor::Context::Create(
 	dockArea->AddWindow(
 		"Entities",
 		{ 0.5f, 0.5f, 0.f, 1.f },
-		Std::Box{ new EntityIdList(&implData) });
+		Std::Box{ new EntityIdList(implData) });
 
 	dockArea->AddWindow(
 		"Components",
 		{ 0.f, 0.5f, 0.5f, 1.f },
-		Std::Box{ new ComponentList(&implData) });
+		Std::Box{ new ComponentList(implData) });
 		
 	dockArea->AddWindow(
 		"Viewport",
 		{ 0.5f, 0.f, 0.5f, 1.f },
-		Std::Box{ new ViewportWidget(implData, *implData.gfxCtx) });
+		Std::Box{ new ViewportWidget(implData) });
 	
 	Gui::WindowHandler& guiWinHandler = implData;
 	implData.guiCtx = Std::Box{ new Gui::Context(Gui::Context::Create(guiWinHandler, gfxCtx)) };
 
 	Math::Vec4 clearColor = { 0.f, 0.5f, 0.f, 1.f };
-	auto windowExtent = App::GetWindowSize(mainWindow);
+	auto windowExtent = App::GetWindowExtent(mainWindow);
 	auto windowPos = App::GetWindowPosition(mainWindow);
-	Gui::Rect windowRect = { windowPos, { windowExtent.width, windowExtent.height } };
-	auto visibleExtent = App::GetWindowVisibleSize(mainWindow);
-	auto visiblePos = App::GetWindowVisiblePosition(mainWindow);
+	auto visibleExtent = App::GetWindowVisibleExtent(mainWindow);
+	auto visibleOffset = App::GetWindowVisibleOffset(mainWindow);
 
 	implData.guiCtx->AdoptWindow(
 		(Gui::WindowID)mainWindow,
 		clearColor,
 		{ windowPos, { windowExtent.width, windowExtent.height } },
-		{ visiblePos, { visibleExtent.width, visibleExtent.height } },
+		{ windowPos + visibleOffset, { visibleExtent.width, visibleExtent.height } },
 		Std::Box{ outmostLayout });
 
 	return newCtx;
@@ -571,12 +645,12 @@ void Editor::EditorImpl::StopSimulating()
 	tempScene.Clear();
 }
 
-std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh()
+std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh3D()
 {
-	Gizmo::Arrow arrow = Editor::Gizmo::defaultArrow;
+	auto const arrow = Gizmo::defaultArrow;
 
 	f32 arrowShaftRadius = arrow.shaftDiameter / 2.f;
-	f32 arrowCapRadius = arrow.capSize / 2.f;
+	f32 arrowCapRadius = arrow.capDiameter / 2.f;
 
 	u32 subdivisions = 4;
 	// We need atleast 2 subdivisons so we can atleast get a diamond
@@ -590,13 +664,13 @@ std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh()
 		f32 currentRadiansB = 2 * Math::pi / baseCircleTriangleCount * ((i + 1) % baseCircleTriangleCount);
 		
 		{
-			Math::Vec3 shaftBaseVertA{};
+			Math::Vec3 shaftBaseVertA = {};
 			shaftBaseVertA.x = Math::Sin(currentRadiansA);
 			shaftBaseVertA.x *= arrowShaftRadius;
 			shaftBaseVertA.y = Math::Cos(currentRadiansA);
 			shaftBaseVertA.y *= arrowShaftRadius;
 
-			Math::Vec3 shaftBaseVertB{};
+			Math::Vec3 shaftBaseVertB = {};
 			shaftBaseVertB.x = Math::Sin(currentRadiansB);
 			shaftBaseVertB.x *= arrowShaftRadius;
 			shaftBaseVertB.y = Math::Cos(currentRadiansB);
@@ -621,14 +695,14 @@ std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh()
 			vertices.push_back(shaftTopVertB);
 
 			// Append walls to build base of cap
-			Math::Vec3 capBaseVertA{};
+			Math::Vec3 capBaseVertA = {};
 			capBaseVertA.x = Math::Sin(currentRadiansA);
 			capBaseVertA.x *= arrowCapRadius;
 			capBaseVertA.y = Math::Cos(currentRadiansA);
 			capBaseVertA.y *= arrowCapRadius;
 			capBaseVertA.z = arrow.shaftLength;
 
-			Math::Vec3 capBaseVertB{};
+			Math::Vec3 capBaseVertB = {};
 			capBaseVertB.x = Math::Sin(currentRadiansB);
 			capBaseVertB.x *= arrowCapRadius;
 			capBaseVertB.y = Math::Cos(currentRadiansB);
@@ -644,7 +718,7 @@ std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh()
 			vertices.push_back(capBaseVertB);
 
 			// Connect cap base to arrow head
-			Math::Vec3 arrowHeadMidVert{};
+			Math::Vec3 arrowHeadMidVert = {};
 			arrowHeadMidVert.z = arrow.shaftLength + arrow.capLength;
 
 			vertices.push_back(capBaseVertA);
@@ -656,7 +730,49 @@ std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh()
 	return vertices;
 }
 
-std::vector<Math::Vec3> Editor::BuildGizmoTorusMesh()
+std::vector<Math::Vec3> Editor::BuildGizmoTranslateArrowMesh2D()
+{
+	std::vector<Math::Vec3> vertices;
+
+	// Make quad for the base
+	constexpr auto arrow = Gizmo::defaultArrow;
+
+	Math::Vec3 bleh = {};
+
+	bleh.x = 0.f;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = 0.f;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+
+	bleh.x = 0.f;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+
+	bleh.x = arrow.shaftLength;
+	bleh.y = arrow.capDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.capDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength + arrow.capLength;
+	bleh.y = 0.f;
+	vertices.push_back(bleh);
+
+	return vertices;
+}
+
+std::vector<Math::Vec3> Editor::BuildGizmoTorusMesh2D()
 {
 	std::vector<Math::Vec3> vertices;
 
@@ -671,21 +787,73 @@ std::vector<Math::Vec3> Editor::BuildGizmoTorusMesh()
 		f32 radianB = 2 * Math::pi / outerCount * (i + 1);
 
 		Math::Vec3 temp = { Math::Cos(radianA), Math::Sin(radianA), 0.f };
-		Math::Vec3 a = temp * (outerRadius + innerRadius);
-		Math::Vec3 b = temp * (outerRadius - innerRadius);
+		auto a = temp * (outerRadius + innerRadius);
+		auto b = temp * (outerRadius - innerRadius);
 
 		temp = { Math::Cos(radianB), Math::Sin(radianB), 0.f };
-		Math::Vec3 c = temp * (outerRadius + innerRadius);
+		auto c = temp * (outerRadius + innerRadius);
 
 		vertices.push_back(a);
 		vertices.push_back(b);
 		vertices.push_back(c);
 
-		Math::Vec3 d = temp * (outerRadius - innerRadius);
+		auto d = temp * (outerRadius - innerRadius);
 		vertices.push_back(b);
 		vertices.push_back(c);
 		vertices.push_back(d);
 	}
+
+	return vertices;
+}
+
+std::vector<Math::Vec3> Editor::BuildGizmoScaleArrowMesh2D()
+{
+	std::vector<Math::Vec3> vertices;
+
+	// Make quad for the base
+	constexpr auto arrow = Gizmo::defaultArrow;
+
+	Math::Vec3 bleh = {};
+
+	bleh.x = 0.f;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = 0.f;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+
+	bleh.x = 0.f;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+
+	bleh.x = arrow.shaftLength;
+	bleh.y = arrow.capLength / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.capLength / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength + arrow.capLength;
+	bleh.y = -arrow.capLength / 2.f;
+	vertices.push_back(bleh);
+
+	bleh.x = arrow.shaftLength;
+	bleh.y = arrow.capLength / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength + arrow.capLength;
+	bleh.y = -arrow.capLength / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength + arrow.capLength;
+	bleh.y = arrow.capLength / 2.f;
+	vertices.push_back(bleh);
 
 	return vertices;
 }

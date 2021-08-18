@@ -53,6 +53,9 @@ namespace DEngine::Math
 		[[nodiscard]] constexpr bool operator!=(Vector<3, f32> const& rhs) const noexcept;
 	};
 
+	[[nodiscard]] constexpr Vector<3, f32> Cross(Vector<3, f32> const& lhs, Vector<3, f32> const& rhs) noexcept;
+	[[nodiscard]] constexpr f32 Dot(Vector<3, f32> const& lhs, Vector<3, f32> const& rhs) noexcept;
+
 	static_assert(sizeof(Vector<3, f32>) == sizeof(f32[3]), "Size of Vec3 is not as expected.");
 	static_assert(alignof(Vector<3, f32>) == alignof(f32[3]), "Alignment of Vec3 is not as expected.");
 }

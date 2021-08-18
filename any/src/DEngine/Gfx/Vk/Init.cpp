@@ -564,23 +564,23 @@ vk::RenderPass Vk::Init::BuildMainGfxRenderPass(
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colorAttachRef;
 
+	// This graphics framebuffer is rendered into, and the sampled from into the GUI rendering pass.
 	vk::SubpassDependency dependencies[2] = {};
 	dependencies[0].dependencyFlags = vk::DependencyFlags();
 	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependencies[0].dstSubpass = 0;
 	dependencies[0].srcAccessMask = vk::AccessFlagBits::eShaderRead;
-	dependencies[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 	dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eFragmentShader;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 	dependencies[0].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
 	dependencies[1].dependencyFlags = vk::DependencyFlags();
 	dependencies[1].srcSubpass = 0;
-	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
 	dependencies[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
-	dependencies[1].dstAccessMask = vk::AccessFlagBits::eShaderRead;
 	dependencies[1].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].dstAccessMask = vk::AccessFlagBits::eShaderRead;
 	dependencies[1].dstStageMask = vk::PipelineStageFlagBits::eFragmentShader;
-	
 
 	vk::RenderPassCreateInfo rpInfo = {};
 	rpInfo.attachmentCount = 1;
@@ -621,7 +621,7 @@ vk::RenderPass Vk::Init::CreateGuiRenderPass(
 	vk::AttachmentDescription attachments[1] = { colorAttachment };
 
 	// We want to render into the GUI in subpass 0.
-	vk::AttachmentReference colorAttachmentRef{};
+	vk::AttachmentReference colorAttachmentRef = {};
 	colorAttachmentRef.attachment = 0;
 	colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
 
@@ -630,21 +630,23 @@ vk::RenderPass Vk::Init::CreateGuiRenderPass(
 	subpassDescription.colorAttachmentCount = 1;
 	subpassDescription.pColorAttachments = &colorAttachmentRef;
 
+	// The framebuffer is the swapchain image. It gets rendered to as color-attachment, and then
+	// it is presented to surface.
 	vk::SubpassDependency dependencies[2] = {};
 	dependencies[0].dependencyFlags = vk::DependencyFlags();
 	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependencies[0].dstSubpass = 0;
-	dependencies[0].srcAccessMask = vk::AccessFlagBits::eMemoryRead;
-	dependencies[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+	dependencies[0].srcAccessMask = vk::AccessFlagBits::eNoneKHR;
 	dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eTopOfPipe;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 	dependencies[0].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
 	dependencies[1].dependencyFlags = vk::DependencyFlags();
 	dependencies[1].srcSubpass = 0;
-	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
 	dependencies[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
-	dependencies[1].dstAccessMask = vk::AccessFlagBits::eMemoryRead;
 	dependencies[1].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].dstAccessMask = vk::AccessFlagBits::eMemoryRead;
 	dependencies[1].dstStageMask = vk::PipelineStageFlagBits::eBottomOfPipe;
 
 	// Set up render pass

@@ -3,21 +3,10 @@
 #include <DEngine/Math/Constant.hpp>
 #include <DEngine/Math/Trigonometric.hpp>
 
+#include <DEngine/Gui/DrawInfo.hpp>
+
 namespace DEngine::Editor::impl
 {
-	enum class PointerType : u8 { Primary, Secondary };
-	[[nodiscard]] static PointerType ToPointerType(Gui::CursorButton in) noexcept
-	{
-		switch (in)
-		{
-			case Gui::CursorButton::Primary: return PointerType::Primary;
-			case Gui::CursorButton::Secondary: return PointerType::Secondary;
-			default: break;
-		}
-		DENGINE_IMPL_UNREACHABLE();
-		return {};
-	}
-
 	[[nodiscard]] static Math::Vec2 GetNormalizedVec(
 		Gui::Rect widgetRect,
 		Math::Vec2 pointerPos) noexcept
@@ -33,45 +22,73 @@ namespace DEngine::Editor::impl
 
 		return relativeVec;
 	}
+
+	static constexpr u8 cursorPointerId = (u8)-1;
+
+	enum class PointerType : u8 { Primary, Secondary };
+	[[nodiscard]] static PointerType ToPointerType(Gui::CursorButton in) noexcept
+	{
+		switch (in)
+		{
+			case Gui::CursorButton::Primary: return PointerType::Primary;
+			case Gui::CursorButton::Secondary: return PointerType::Secondary;
+			default: break;
+		}
+		DENGINE_IMPL_UNREACHABLE();
+		return {};
+	}
+
+	struct PointerPress_Pointer
+	{
+		u8 id;
+		PointerType type;
+		Math::Vec2 pos;
+		bool pressed;
+	};
+
 	[[nodiscard]] static bool Joystick_PointerPress(
 		Joystick& widget,
 		Gui::Rect const& widgetRect,
 		Gui::Rect const& visibleRect,
-		u8 pointerId,
-		PointerType pointerType,
-		Math::Vec2 pointerPos,
-		bool pressed)
+		PointerPress_Pointer const& pointer)
 	{
-		if (pointerType != PointerType::Primary)
+		if (pointer.pressed && widget.pressedData.HasValue())
 			return false;
 
-		if (pressed && widget.activeData.HasValue())
+		if (pointer.type != PointerType::Primary)
 			return false;
 
-		if (!pressed && widget.activeData.HasValue() && widget.activeData.Value().pointerId == pointerId)
+		if (widget.pressedData.HasValue())
 		{
-			// Disactivate the thing
-			widget.activeData = Std::nullOpt;
-			return false;
+			auto const activeData = widget.pressedData.Value();
+			if (activeData.pointerId == pointer.id && !pointer.pressed)
+			{
+				// Disactivate the thing
+				widget.pressedData = Std::nullOpt;
+				return false;
+			}
 		}
 
-		bool pointerIsInside = widgetRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
-		if (!pointerIsInside && pressed)
+		if (!pointer.pressed)
+			return false;
+
+		bool pointerIsInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+		if (!pointerIsInside && pointer.pressed)
 			return false;
 
 		// Calculate distance from center
 		auto outerRadius = Math::Min(widgetRect.extent.width, widgetRect.extent.height) / 2;
 		auto widgetCenter = widgetRect.position + Math::Vec2Int{ (i32)outerRadius, (i32)outerRadius };
 
-		auto relativeVec = pointerPos - Math::Vec2{ (f32)widgetCenter.x, (f32)widgetCenter.y };
+		auto relativeVec = pointer.pos - Math::Vec2{ (f32)widgetCenter.x, (f32)widgetCenter.y };
 		if (relativeVec.MagnitudeSqrd() > Math::Sqrd(outerRadius))
 			return false;
 
-		Joystick::ActiveData newData = {};
-		newData.pointerId = pointerId;
-		newData.currPos = GetNormalizedVec(widgetRect, pointerPos);
+		Joystick::PressedData newData = {};
+		newData.pointerId = pointer.id;
+		newData.currPos = GetNormalizedVec(widgetRect, pointer.pos);
 
-		widget.activeData = newData;
+		widget.pressedData = newData;
 
 		return true;
 	}
@@ -82,9 +99,9 @@ namespace DEngine::Editor::impl
 		u8 pointerId,
 		Math::Vec2 pointerPos)
 	{
-		if (!widget.activeData.HasValue())
+		if (!widget.pressedData.HasValue())
 			return false;
-		auto& activeData = widget.activeData.Value();
+		auto& activeData = widget.pressedData.Value();
 		if (activeData.pointerId != pointerId)
 			return false;
 
@@ -105,14 +122,17 @@ bool Joystick::CursorPress(
 	Math::Vec2Int cursorPos,
 	Gui::CursorClickEvent event)
 {
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
+	pointer.pressed = event.clicked;
+	pointer.type = impl::ToPointerType(event.button);
+
 	return impl::Joystick_PointerPress(
 		*this,
 		widgetRect,
 		visibleRect,
-		cursorPointerId,
-		impl::ToPointerType(event.button),
-		{ (f32)cursorPos.x, (f32)cursorPos.y },
-		event.clicked);
+		pointer);
 }
 
 bool Joystick::CursorMove(
@@ -126,7 +146,7 @@ bool Joystick::CursorMove(
 	return impl::Joystick_PointerMove(
 		*this,
 		widgetRect,
-		cursorPointerId,
+		impl::cursorPointerId,
 		{ (f32)event.position.x, (f32)event.position.y });
 }
 
@@ -152,14 +172,17 @@ bool Joystick::TouchPressEvent(
 	Gui::Rect visibleRect,
 	Gui::TouchPressEvent event)
 {
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = event.id;
+	pointer.pos = event.position;
+	pointer.pressed = event.pressed;
+	pointer.type = impl::PointerType::Primary;
+
 	return impl::Joystick_PointerPress(
 		*this,
 		widgetRect,
 		visibleRect,
-		event.id,
-		impl::PointerType::Primary,
-		event.position,
-		event.pressed);
+		pointer);
 }
 
 Gui::SizeHint Joystick::GetSizeHint(Gui::Context const& ctx) const

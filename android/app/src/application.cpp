@@ -427,6 +427,8 @@ extern "C"
 
 static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, int32_t source)
 {
+	auto& appData = *pAppData;
+
 	bool handled = false;
 
 	if (source == AINPUT_SOURCE_MOUSE)
@@ -448,25 +450,22 @@ static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, in
 		{
 			f32 x = AMotionEvent_getX(event, index);
 			f32 y = AMotionEvent_getY(event, index);
-			AppData::WindowNode* windowNode = detail::GetWindowNode(detail::pBackendData->currentWindow.Value());
-			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
-			detail::UpdateCursor(*windowNode, { (int32_t)x, (int32_t)y });
+			detail::UpdateCursor(
+				appData,
+				detail::pBackendData->currentWindow.Value(),
+				{ (int32_t)x, (int32_t)y });
 			handled = true;
 			return handled;
 		}
 		else if (action == AMOTION_EVENT_ACTION_DOWN)
 		{
-			AppData::WindowNode* windowNode = detail::GetWindowNode(detail::pBackendData->currentWindow.Value());
-			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
-			detail::UpdateButton(Button::LeftMouse, true);
+			detail::UpdateButton(appData, Button::LeftMouse, true);
 			handled = true;
 			return handled;
 		}
 		else if (action == AMOTION_EVENT_ACTION_UP)
 		{
-			AppData::WindowNode* windowNode = detail::GetWindowNode(detail::pBackendData->currentWindow.Value());
-			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
-			detail::UpdateButton(Button::LeftMouse, false);
+			detail::UpdateButton(appData, Button::LeftMouse, false);
 			handled = true;
 			return handled;
 		}
@@ -488,7 +487,7 @@ static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, in
 				f32 x = AMotionEvent_getX(event, index);
 				f32 y = AMotionEvent_getY(event, index);
 				i32 id = AMotionEvent_getPointerId(event, index);
-				detail::UpdateTouchInput(TouchEventType::Down, (u8)id, x, y);
+				detail::UpdateTouchInput(appData, TouchEventType::Down, (u8)id, x, y);
 				handled = true;
 				break;
 			}
@@ -501,7 +500,7 @@ static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, in
 					f32 x = AMotionEvent_getX(event, i);
 					f32 y = AMotionEvent_getY(event, i);
 					i32 id = AMotionEvent_getPointerId(event, i);
-					detail::UpdateTouchInput(TouchEventType::Moved, (u8)id, x, y);
+					detail::UpdateTouchInput(appData, TouchEventType::Moved, (u8)id, x, y);
 				}
 				handled = true;
 				break;
@@ -513,7 +512,7 @@ static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, in
 				f32 x = AMotionEvent_getX(event, index);
 				f32 y = AMotionEvent_getY(event, index);
 				i32 id = AMotionEvent_getPointerId(event, index);
-				detail::UpdateTouchInput(TouchEventType::Up, (u8)id, x, y);
+				detail::UpdateTouchInput(appData, TouchEventType::Up, (u8)id, x, y);
 				handled = true;
 				break;
 			}
@@ -574,7 +573,7 @@ namespace DEngine::Application::detail
 		// Need to maximize the window
 		if (backendData.currentWindow.HasValue())
 		{
-			AppData::WindowNode* windowNode = detail::GetWindowNode(backendData.currentWindow.Value());
+			AppData::WindowNode* windowNode = detail::GetWindowNode(appData, backendData.currentWindow.Value());
 			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
 			detail::UpdateWindowMinimized(*windowNode, false);
 			windowNode->platformHandle = backendData.nativeWindow;
@@ -589,7 +588,7 @@ namespace DEngine::Application::detail
 		// We need to minimize the window
 		if (backendData.currentWindow.HasValue())
 		{
-			AppData::WindowNode* windowNode = detail::GetWindowNode(backendData.currentWindow.Value());
+			AppData::WindowNode* windowNode = detail::GetWindowNode(appData, backendData.currentWindow.Value());
 			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
 			detail::UpdateWindowMinimized(*windowNode, true);
 			windowNode->platformHandle = nullptr;
@@ -610,13 +609,15 @@ namespace DEngine::Application::detail
 		Math::Vec2Int offset,
 		Extent extent)
 	{
+		auto& appData = *detail::pAppData;
+
 		auto& backendData = *detail::pBackendData;
 		backendData.visibleAreaOffset = offset;
 		backendData.visibleAreaExtent = extent;
 
 		if (backendData.currentWindow.HasValue())
 		{
-			auto windowNodePtr = detail::GetWindowNode(backendData.currentWindow.Value());
+			auto windowNodePtr = detail::GetWindowNode(appData, backendData.currentWindow.Value());
 
 			auto windowWidth = (uint32_t)ANativeWindow_getWidth(backendData.nativeWindow);
 			auto windowHeight = (uint32_t)ANativeWindow_getHeight(backendData.nativeWindow);
@@ -878,10 +879,10 @@ Application::WindowID Application::CreateWindow(
 
 	int width = ANativeWindow_getWidth(backendData.nativeWindow);
 	int height = ANativeWindow_getHeight(backendData.nativeWindow);
-	newNode.windowData.size.width = (u32)width;
-	newNode.windowData.size.height = (u32)height;
-	newNode.windowData.visiblePosition = backendData.visibleAreaOffset;
-	newNode.windowData.visibleSize = backendData.visibleAreaExtent;
+	newNode.windowData.extent.width = (u32)width;
+	newNode.windowData.extent.height = (u32)height;
+	newNode.windowData.visibleOffset = backendData.visibleAreaOffset;
+	newNode.windowData.visibleExtent = backendData.visibleAreaExtent;
 	newNode.platformHandle = backendData.nativeWindow;
 
 	appData.windows.push_back(newNode);

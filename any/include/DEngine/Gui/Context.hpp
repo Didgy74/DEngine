@@ -11,40 +11,10 @@
 #include <string>
 #include <vector>
 
-
 namespace DEngine::Gui
 {
-	class Context;
-
-	struct Test_Menu
-	{
-	public:
-		Math::Vec2Int pos = {};
-		u32 minimumWidth = 0;
-
-		struct Line
-		{
-			std::string title;
-			enum class Type : u8
-			{
-				Label,
-				Button,
-				Submenu
-			};
-			Type type;
-			std::function<void()> callback;
-			std::vector<Line> subLines;
-		};
-		std::vector<Line> lines;
-
-		void Render(
-			Context const& ctx,
-			Extent windowSize,
-			DrawInfo& drawInfo) const;
-	};
-
 	class Widget;
-	class StackLayout;
+	class Layer;
 
 	class Context
 	{
@@ -94,12 +64,9 @@ namespace DEngine::Gui
 
 		WindowHandler& GetWindowHandler() const;
 
-		void Test_AddMenu(
-			WindowID windowId, 
-			Math::Vec2Int pos, 
-			u32 minimumWidth,
-			std::vector<Test_Menu::Line> lines);
-		void Test_DestroyMenu(WindowID windowId, Widget* widget);
+		void SetFrontmostLayer(
+			WindowID windowId,
+			Std::Box<Layer>&& layer);
 
 		void* Internal_ImplData() const { return pImplData; }
 

@@ -163,9 +163,9 @@ Math::Matrix<4, 4, f32> Math::LinearTransform3D::LookAt_LH(
 	Vector<3, f32> const& forward,
 	Vector<3, f32> const& upVector)
 {
-	Vector<3, f32> zAxis = (forward - position).GetNormalized();
-	Vector<3, f32> xAxis = Vector<3, f32>::Cross(upVector, zAxis).GetNormalized();
-	Vector<3, f32> yAxis = Vector<3, f32>::Cross(zAxis, xAxis);
+	auto const zAxis = (forward - position).GetNormalized();
+	auto const xAxis = Cross(upVector, zAxis).GetNormalized();
+	auto const yAxis = Cross(zAxis, xAxis);
 	return Mat4
 	{ { {
 		xAxis.x, yAxis.x, zAxis.x, 0,
@@ -180,15 +180,15 @@ Math::Matrix<4, 4, f32> Math::LinearTransform3D::LookAt_RH(
 	Vector<3, f32> const& forward,
 	Vector<3, f32> const& upVector)
 {
-	Vector<3, f32> zAxis = (position - forward).GetNormalized();
-	Vector<3, f32> xAxis = Vector<3, f32>::Cross(upVector, zAxis).GetNormalized();
-	Vector<3, f32> yAxis = Vector<3, f32>::Cross(zAxis, xAxis);
+	auto const zAxis = (position - forward).GetNormalized();
+	auto const xAxis = Cross(upVector, zAxis).GetNormalized();
+	auto const yAxis = Cross(zAxis, xAxis);
 	return Mat4
 	{ { {
 		xAxis.x, yAxis.x, zAxis.x, 0,
 		xAxis.y, yAxis.y, zAxis.y, 0,
 		xAxis.z, yAxis.z, zAxis.z, 0,
-		-Vector<3, f32>::Dot(xAxis, position), -Vector<3, f32>::Dot(yAxis, position), -Vector<3, f32>::Dot(zAxis, position), 1
+		-Dot(xAxis, position), -Dot(yAxis, position), -Dot(zAxis, position), 1
 	} } };
 }
 

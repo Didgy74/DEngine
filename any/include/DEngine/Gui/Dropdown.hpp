@@ -2,8 +2,11 @@
 
 #include <DEngine/Gui/Widget.hpp>
 
+#include <DEngine/Std/Containers/Opt.hpp>
+
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace DEngine::Gui
 {
@@ -14,8 +17,10 @@ namespace DEngine::Gui
 
 		std::vector<std::string> items;
 
+		Std::Opt<u8> heldPointerId;
+
 		using SelectionChangedCallback = void(Dropdown&);
-		std::function<SelectionChangedCallback> selectedItemChangedCallback;
+		std::function<SelectionChangedCallback> selectionChangedCallback;
 
 		Dropdown();
 		virtual ~Dropdown() override;
@@ -44,15 +49,5 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchPressEvent event) override;
-	private:
-		Context* menuWidgetCtx = nullptr;
-		WindowID menuWidgetWindowId{};
-		Widget* menuWidget = nullptr;
-
-		void CreateDropdownMenu(
-			Context& ctx,
-			WindowID windowId,
-			Math::Vec2Int menuPosition);
-		void ClearDropdownMenu();
 	};
 }

@@ -3,6 +3,9 @@
 #include <DEngine/Std/Containers/impl/Assert.hpp>
 #include <DEngine/Std/Trait.hpp>
 
+namespace DEngine::Std::impl { struct OptPlacementNewTag {}; }
+constexpr void* operator new(decltype(sizeof(int)) size, void* data, DEngine::Std::impl::OptPlacementNewTag) noexcept { return data; }
+
 namespace DEngine::Std
 {
 	enum class NullOpt_T : char;
@@ -22,7 +25,6 @@ namespace DEngine::Std
 		Opt(Trait::RemoveCVRef<T>&&) noexcept;
 		~Opt() noexcept;
 
-		//Opt& operator=(NullOpt_T) noexcept;
 		Opt& operator=(Opt const&) noexcept;
 		Opt& operator=(Opt&&) noexcept;
 		Opt& operator=(T const&) noexcept;
@@ -55,7 +57,7 @@ namespace DEngine::Std
 	{
 		if (other.hasValue)
 		{
-			new(&value) T(other.Value());
+			new(&value, impl::OptPlacementNewTag{}) T(other.Value());
 			hasValue = true;
 		}
 	}
@@ -66,7 +68,7 @@ namespace DEngine::Std
 		Clear();
 		if (other.hasValue)
 		{
-			new(&value) T(static_cast<T&&>(other.Value()));
+			new(&value, impl::OptPlacementNewTag{}) T(static_cast<T&&>(other.Value()));
 			hasValue = true;
 
 			other.Clear();
@@ -77,14 +79,14 @@ namespace DEngine::Std
 	Opt<T>::Opt(T const& other) noexcept :
 		hasValue(true)
 	{
-		new(&value) T(other);
+		new(&value, impl::OptPlacementNewTag{}) T(other);
 	}
 
 	template<typename T>
 	Opt<T>::Opt(Trait::RemoveCVRef<T>&& other) noexcept :
 		hasValue(true)
 	{
-		new(&value) T(static_cast<T&&>(other));
+		new(&value, impl::OptPlacementNewTag{}) T(static_cast<T&&>(other));
 	}
 
 	template<typename T>
@@ -92,15 +94,6 @@ namespace DEngine::Std
 	{
 		Clear();
 	}
-
-	/*
-	template<typename T>
-	Opt<T>& Opt<T>::operator=(NullOpt_T) noexcept
-	{
-		Clear();
-		return *this;
-	}
-	*/
 
 	template<typename T>
 	Opt<T>& Opt<T>::operator=(Opt const& other) noexcept
@@ -113,7 +106,7 @@ namespace DEngine::Std
 			if (hasValue)
 				value = other.value;
 			else
-				new(&value) T(other.value);
+				new(&value, impl::OptPlacementNewTag{}) T(other.value);
 		}
 		else
 			Clear();
@@ -134,7 +127,7 @@ namespace DEngine::Std
 			if (hasValue)
 				value = static_cast<T&&>(other.value);
 			else
-				new(&value) T(static_cast<T&&>(other.value));
+				new(&value, impl::OptPlacementNewTag{}) T(static_cast<T&&>(other.value));
 		}
 		else
 			Clear();
@@ -151,7 +144,7 @@ namespace DEngine::Std
 			value = right;
 		else
 		{
-			new(&value) T(right);
+			new(&value, impl::OptPlacementNewTag{}) T(right);
 			hasValue = true;
 		}
 		return *this;
@@ -164,7 +157,7 @@ namespace DEngine::Std
 			value = static_cast<T&&>(right);
 		else
 		{
-			new(&value) T(static_cast<T&&>(right));
+			new(&value, impl::OptPlacementNewTag{}) T(static_cast<T&&>(right));
 			hasValue = true;
 		}
 		return *this;

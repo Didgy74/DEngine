@@ -114,8 +114,9 @@ namespace DEngine::impl
 		rendererInitInfo.texAssetInterface = &textureAssetConnection;
 		rendererInitInfo.optional_logger = &logger;
 		rendererInitInfo.requiredVkInstanceExtensions = requiredVkInstanceExtensions;
-		rendererInitInfo.gizmoArrowMesh = Editor::BuildGizmoArrowMesh();
-		rendererInitInfo.gizmoCircleLineMesh = Editor::BuildGizmoTorusMesh();
+		rendererInitInfo.gizmoArrowMesh = Editor::BuildGizmoTranslateArrowMesh2D();
+		rendererInitInfo.gizmoCircleLineMesh = Editor::BuildGizmoTorusMesh2D();
+		rendererInitInfo.gizmoArrowScaleMesh2d = Editor::BuildGizmoScaleArrowMesh2D();
 		Std::Opt<Gfx::Context> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
 		if (!rendererDataOpt.HasValue())
 		{
@@ -419,7 +420,8 @@ void DEngine::impl::SubmitRendering(
 		params.textureIDs.push_back(item.b);
 
 		Math::Mat4 transformMat = Math::LinAlg3D::Translate(transform.position) *
-			Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation);
+			Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation) *
+			Math::LinAlg3D::Scale_Homo(transform.scale.AsVec3(1.f));
 		params.transforms.push_back(transformMat);
 	}
 

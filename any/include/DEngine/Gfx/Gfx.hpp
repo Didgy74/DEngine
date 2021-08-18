@@ -180,6 +180,7 @@ namespace DEngine::Gfx
 
 		std::vector<Math::Vec3> gizmoArrowMesh;
 		std::vector<Math::Vec3> gizmoCircleLineMesh;
+		std::vector<Math::Vec3> gizmoArrowScaleMesh2d;
 	};
 
 	class LogInterface
