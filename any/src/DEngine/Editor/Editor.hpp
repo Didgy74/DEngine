@@ -11,6 +11,12 @@
 
 namespace DEngine::Editor
 {
+	namespace Settings
+	{
+		constexpr auto inputFieldPrecision = 3;
+		constexpr auto defaultTextMargin = 15;
+	}
+
 	struct DrawInfo
 	{
 		std::vector<u32> indices;

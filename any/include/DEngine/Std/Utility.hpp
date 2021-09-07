@@ -2,8 +2,8 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Trait.hpp>
-#include <DEngine/Std/Containers/Range.hpp>
 #include <DEngine/Std/Containers/Str.hpp>
+#include <DEngine/Std/Containers/Range.hpp>
 
 namespace DEngine::Std
 {

@@ -2,53 +2,108 @@
 
 #include "EditorImpl.hpp"
 
+#include "Editor.hpp"
+
+#include <sstream>
+
 using namespace DEngine;
 using namespace DEngine::Editor;
+using namespace DEngine::Gui;
+
+MoveWidget::MoveWidget(EditorImpl const& editorImpl)
+{
+	title = "PlayerMove";
+	titleMargin = Settings::defaultTextMargin;
+
+	this->collapseFn = [&editorImpl](CollapsingHeader& widget)
+	{
+		// Confirm we have a selected entity, since the widget is alive we must have one.
+		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+		auto entity = editorImpl.GetSelectedEntity().Value();
+		if (!widget.collapsed)
+		{
+			// Confirm we have no component atm.
+			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<Move>(entity));
+
+			// Add the component
+			Move component = {};
+			editorImpl.scene->AddComponent(entity, component);
+		}
+		else
+		{
+			// Confirm we have transform component atm
+			DENGINE_DETAIL_ASSERT(editorImpl.scene->GetComponent<Move>(entity));
+			// Remove the component
+			editorImpl.scene->DeleteComponent<Move>(entity);
+		}
+	};
+
+	DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+	auto entity = editorImpl.GetSelectedEntity().Value();
+	if (editorImpl.scene->GetComponent<Transform>(entity))
+	{
+		this->collapsed = false;
+	}
+	else
+	{
+		this->collapsed = true;
+	}
+}
 
 TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 {
-	this->SetHeaderText("Transform");
+	title = "Transform";
+	titleMargin = Settings::defaultTextMargin;
 
-	Gui::StackLayout& mainLayout = this->GetChildStackLayout();
+	auto innerStackLayout = new StackLayout(StackLayout::Dir::Vertical);
+	this->child = Std::Box{ innerStackLayout };
+	innerStackLayout->spacing = 10;
+
 	// Create the horizontal position stuff layout
-	Gui::StackLayout* positionLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-	mainLayout.AddWidget(Std::Box<Widget>{ positionLayout });
+	auto positionLayout = new StackLayout(StackLayout::Dir::Horizontal);
+	innerStackLayout->AddWidget(Std::Box{ positionLayout });
 	positionLayout->spacing = 10;
 
 	// Create the Position:
-	Gui::Text* positionText = new Gui::Text;
-	positionLayout->AddWidget(Std::Box<Gui::Widget>{ positionText });
-	positionText->String_Set("Position:");
+	auto positionLabel = new Gui::Text;
+	positionLabel->margin = Settings::defaultTextMargin;
+	positionLayout->AddWidget(Std::Box{ positionLabel });
+	positionLabel->String_Set("P:");
+	positionLabel->margin = Settings::defaultTextMargin;
 
 	// Create the Position input fields
 	for (uSize i = 0; i < 3; i += 1)
 	{
 		auto& inputField = this->positionInputFields[i];
-		inputField = new Gui::LineEdit;
-		positionLayout->AddWidget(Std::Box<Gui::Widget>{ inputField });
-		inputField->type = Gui::LineEdit::Type::Float;
-		inputField->textChangedPfn = [i, &editorImpl](Gui::LineEdit& widget)
+		inputField = new LineEdit;
+		positionLayout->AddWidget(Std::Box{ inputField });
+		inputField->margin = Settings::defaultTextMargin;
+		inputField->type = LineEdit::Type::Float;
+		inputField->textChangedFn = [i, &editorImpl](LineEdit& widget)
 		{
 			DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 			auto entity = editorImpl.GetSelectedEntity().Value();
 			auto componentPtr = editorImpl.scene->GetComponent<Transform>(entity);
 			DENGINE_DETAIL_ASSERT(componentPtr);
 			auto& component = *componentPtr;
+
 			component.position[i] = std::stof(widget.text.c_str());
 		};
 	}
 
-	Gui::StackLayout* rotationLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-	mainLayout.AddWidget(Std::Box<Widget>{ rotationLayout });
+	auto rotationLayout = new StackLayout(StackLayout::Dir::Horizontal);
+	innerStackLayout->AddWidget(Std::Box{ rotationLayout });
 	rotationLayout->spacing = 10;
 
-	Gui::Text* rotationLabel = new Gui::Text();
-	rotationLayout->AddWidget(Std::Box<Gui::Widget>{ rotationLabel });
-	rotationLabel->String_Set("Rotation:");
+	auto rotationLabel = new Text;
+	rotationLayout->AddWidget(Std::Box{ rotationLabel });
+	rotationLabel->String_Set("R:");
+	rotationLabel->margin = Settings::defaultTextMargin;
 
-	rotationInput = new Gui::LineEdit;
-	rotationLayout->AddWidget(Std::Box<Gui::Widget>{ rotationInput });
-	rotationInput->textChangedPfn = [&editorImpl](Gui::LineEdit& widget)
+	rotationInput = new LineEdit;
+	rotationLayout->AddWidget(Std::Box{ rotationInput });
+	rotationInput->margin = Settings::defaultTextMargin;
+	rotationInput->textChangedFn = [&editorImpl](LineEdit& widget)
 	{
 		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 		auto entity = editorImpl.GetSelectedEntity().Value();
@@ -58,12 +113,43 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 		component.rotation = std::stof(widget.text.c_str());
 	};
 
-	this->collapseCallback = [this, &editorImpl](bool collapsed)
+	// Create the horizontal scale stuff layout
+	auto* scaleLayout = new StackLayout(StackLayout::Dir::Horizontal);
+	innerStackLayout->AddWidget(Std::Box{ scaleLayout });
+	scaleLayout->spacing = 10;
+
+	// Create the Scale:
+	auto scaleText = new Text;
+	scaleLayout->AddWidget(Std::Box{ scaleText });
+	scaleText->String_Set("S:");
+	scaleText->margin = Settings::defaultTextMargin;
+
+	// Create the scale input fields
+	for (uSize i = 0; i < 2; i += 1)
+	{
+		auto& inputField = this->scaleInputFields[i];
+		inputField = new LineEdit;
+		scaleLayout->AddWidget(Std::Box{ inputField });
+		inputField->margin = Settings::defaultTextMargin;
+		inputField->type = LineEdit::Type::Float;
+		inputField->textChangedFn = [i, &editorImpl](LineEdit& widget)
+		{
+			DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
+			auto entity = editorImpl.GetSelectedEntity().Value();
+			auto componentPtr = editorImpl.scene->GetComponent<Transform>(entity);
+			DENGINE_DETAIL_ASSERT(componentPtr);
+			auto& component = *componentPtr;
+
+			component.scale[i] = std::stof(widget.text.c_str());
+		};
+	}
+
+	this->collapseFn = [&editorImpl](CollapsingHeader& widget)
 	{
 		// Confirm we have a selected entity, since the widget is alive we must have one.
 		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 		auto entity = editorImpl.GetSelectedEntity().Value();
-		if (collapsed)
+		if (!widget.collapsed)
 		{
 			// Confirm we have no component atm.
 			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<Transform>(entity));
@@ -72,7 +158,8 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 			Transform component{};
 			editorImpl.scene->AddComponent(entity, component);
 
-			Update(*editorImpl.scene->GetComponent<Transform>(entity));
+			auto& cast = static_cast<TransformWidget&>(widget);
+			cast.Update(*editorImpl.scene->GetComponent<Transform>(entity));
 		}
 		else
 		{
@@ -87,12 +174,12 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 	auto entity = editorImpl.GetSelectedEntity().Value();
 	if (auto componentPtr = editorImpl.scene->GetComponent<Transform>(entity))
 	{
-		this->SetCollapsed(false);
+		this->collapsed = false;
 		Update(*componentPtr);
 	}
 	else
 	{
-		this->SetCollapsed(true);
+		this->collapsed = true;
 	}
 }
 
@@ -101,34 +188,62 @@ void TransformWidget::Update(Transform const& component)
 	for (uSize i = 0; i < 3; i += 1)
 	{
 		if (!positionInputFields[i]->CurrentlyBeingEdited())
-			positionInputFields[i]->text = std::to_string(component.position[i]).c_str();
+		{
+			auto& widget = *positionInputFields[i];
+			std::ostringstream out;
+			out.precision(Settings::inputFieldPrecision);
+			out << std::fixed << component.position[i];
+			widget.text = out.str();
+		}
 	}
 
 	if (!rotationInput->CurrentlyBeingEdited())
-		rotationInput->text = std::to_string(component.rotation).c_str();
+	{
+		auto& widget = *rotationInput;
+		std::ostringstream out;
+		out.precision(Settings::inputFieldPrecision);
+		out << std::fixed << component.rotation;
+		widget.text = out.str();
+	}
+
+	for (uSize i = 0; i < 2; i += 1)
+	{
+		if (!scaleInputFields[i]->CurrentlyBeingEdited())
+		{
+			auto& widget = *scaleInputFields[i];
+			std::ostringstream out;
+			out.precision(Settings::inputFieldPrecision);
+			out << std::fixed << component.scale[i];
+			widget.text = out.str();
+		}
+	}
 }
 
 SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 {
-	this->SetHeaderText("SpriteRender2D");
+	this->title = "SpriteRender2D";
+	this->titleMargin = Settings::defaultTextMargin;
 
-	Gui::StackLayout& mainLayout = this->GetChildStackLayout();
+	auto innerStackLayout = new StackLayout(StackLayout::Dir::Vertical);
+	this->child = Std::Box{ innerStackLayout };
 
 	// Create the horizontal position stuff layout
-	Gui::StackLayout* textureIdLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-	mainLayout.AddWidget(Std::Box<Widget>{ textureIdLayout });
+	auto textureIdLayout = new StackLayout(StackLayout::Dir::Horizontal);
+	innerStackLayout->AddWidget(Std::Box{ textureIdLayout });
 	textureIdLayout->spacing = 10;
 
 	// Create the Position: text
-	Gui::Text* textureIDLabel = new Gui::Text;
-	textureIdLayout->AddWidget(Std::Box<Gui::Widget>{ textureIDLabel });
+	auto textureIDLabel = new Text;
+	textureIdLayout->AddWidget(Std::Box{ textureIDLabel });
 	textureIDLabel->String_Set("Texture ID:");
+	textureIDLabel->margin = Editor::Settings::defaultTextMargin;
 
 	// Create the Position input field
-	textureIdInput = new Gui::LineEdit;
-	textureIdLayout->AddWidget(Std::Box<Gui::Widget>{ textureIdInput });
-	textureIdInput->type = Gui::LineEdit::Type::Integer;
-	textureIdInput->textChangedPfn = [&editorImpl](Gui::LineEdit& widget)
+	textureIdInput = new LineEdit;
+	textureIdLayout->AddWidget(Std::Box{ textureIdInput });
+	textureIdInput->margin = Settings::defaultTextMargin;
+	textureIdInput->type = LineEdit::Type::Integer;
+	textureIdInput->textChangedFn = [&editorImpl](LineEdit& widget)
 	{
 		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 		auto entity = editorImpl.GetSelectedEntity().Value();
@@ -138,12 +253,12 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 		component = (Gfx::TextureID)std::stoi(widget.text.c_str());
 	};
 
-	this->collapseCallback = [&editorImpl](bool collapsed)
+	this->collapseFn = [&editorImpl](CollapsingHeader& widget)
 	{
 		// Confirm we have a selected entity, since the widget is alive we must have one.
 		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 		auto entity = editorImpl.GetSelectedEntity().Value();
-		if (collapsed)
+		if (!widget.collapsed)
 		{
 			// Confirm we have no component atm.
 			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<Gfx::TextureID>(entity));
@@ -165,42 +280,45 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 	auto entity = editorImpl.GetSelectedEntity().Value();
 	if (auto componentPtr = editorImpl.scene->GetComponent<Gfx::TextureID>(entity))
 	{
-		this->SetCollapsed(false);
+		this->collapsed = false;
 		Update(*componentPtr);
 	}
 	else
 	{
-		this->SetCollapsed(true);
+		this->collapsed = true;
 	}
 }
 
 void SpriteRenderer2DWidget::Update(Gfx::TextureID const& component)
 {
 	if (!textureIdInput->CurrentlyBeingEdited())
-		textureIdInput->text = std::to_string((unsigned int)component).c_str();
+		textureIdInput->text = std::to_string((unsigned int)component);
 }
 
 RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 {
-	this->SetHeaderText("Rigidbody2D");
+	this->title = "Rigidbody2D";
+	this->titleMargin = Settings::defaultTextMargin;
 
-	Gui::StackLayout& mainLayout = this->GetChildStackLayout();
+	auto innerStackLayout = new StackLayout(StackLayout::Dir::Vertical);
+	this->child = Std::Box{ innerStackLayout };
 
 	{
-		Gui::StackLayout* bodyTypeLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-		mainLayout.AddWidget(Std::Box<Widget>{ bodyTypeLayout });
+		auto bodyTypeLayout = new StackLayout(StackLayout::Dir::Horizontal);
+		innerStackLayout->AddWidget(Std::Box{ bodyTypeLayout });
 		
-		Gui::Text* bodyTypeLabel = new Gui::Text;
-		bodyTypeLayout->AddWidget(Std::Box<Widget>{ bodyTypeLabel });
-		bodyTypeLabel->String_Set("Type");
+		auto bodyTypeLabel = new Text;
+		bodyTypeLayout->AddWidget(Std::Box{ bodyTypeLabel });
+		bodyTypeLabel->String_Set("Type:");
+		bodyTypeLabel->margin = Settings::defaultTextMargin;
 		
-		Gui::Dropdown* bodyTypeDropdown = new Gui::Dropdown;
-		bodyTypeLayout->AddWidget(Std::Box<Widget>{ bodyTypeDropdown });
+		bodyTypeDropdown = new Dropdown;
+		bodyTypeLayout->AddWidget(Std::Box{ bodyTypeDropdown });
+		bodyTypeDropdown->textMargin = Settings::defaultTextMargin;
 		bodyTypeDropdown->items.push_back("Dynamic"); // Rigidbody2D::Type::Dynamic = 0
 		bodyTypeDropdown->items.push_back("Static"); // Rigidbody2D::Type::Static = 0
 		bodyTypeDropdown->selectedItem = (u32)Physics::Rigidbody2D::Type::Dynamic;
-		bodyTypeDropdown->selectionChangedCallback = [&editorImpl](
-			Gui::Dropdown& dropdown)
+		bodyTypeDropdown->selectionChangedCallback = [&editorImpl](Dropdown& dropdown)
 		{
 			// Update the box2D body
 			DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
@@ -212,23 +330,12 @@ RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 		};
 	}
 
-	{
-		Gui::Text* debugLabel = new Gui::Text;
-		mainLayout.AddWidget(Std::Box<Gui::Widget>{ debugLabel });
-		debugLabel->String_Set("Debug:");
-	}
-
-	{
-		debug_VelocityLabel = new Gui::Text;
-		mainLayout.AddWidget(Std::Box<Gui::Widget>{ debug_VelocityLabel });
-	}
-
-	this->collapseCallback = [this, &editorImpl](bool collapsed)
+	this->collapseFn = [&editorImpl](CollapsingHeader& widget)
 	{
 		// Confirm we have a selected entity, since the widget is alive we must have one.
 		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 		auto entity = editorImpl.GetSelectedEntity().Value();
-		if (collapsed)
+		if (!widget.collapsed)
 		{
 			// Confirm we have no rigidbody component atm.
 			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity));
@@ -236,11 +343,11 @@ RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 			Physics::Rigidbody2D newComponent = {};
 
 			editorImpl.scene->AddComponent(entity, newComponent);
-			Update(*editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity));
+			auto& cast = static_cast<RigidbodyWidget&>(widget);
+			cast.Update(*editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity));
 		}
 		else
 		{
-		
 			editorImpl.scene->DeleteComponent<Physics::Rigidbody2D>(entity);
 		}
 	};
@@ -249,12 +356,12 @@ RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 	auto entity = editorImpl.GetSelectedEntity().Value();
 	if (auto componentPtr = editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity))
 	{
-		this->SetCollapsed(false);
+		this->collapsed = false;
 		Update(*componentPtr);
 	}
 	else
 	{
-		this->SetCollapsed(true);
+		this->collapsed = true;
 	}
 }
 

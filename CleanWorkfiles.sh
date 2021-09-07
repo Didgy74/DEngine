@@ -1,8 +1,8 @@
 ﻿#!/bin/bash
 
-#Android Studio stuff
+# Android Studio stuff
 rm android/android.iml
-rm android/local.properties
+# rm android/local.properties
 rm --recursive android/.gradle
 rm --recursive android/.idea
 rm android/app/app.iml

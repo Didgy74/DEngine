@@ -4,7 +4,6 @@
 
 #include "ImplData.hpp"
 
-#include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Utility.hpp>
 
 // We have a shorthand for DockArea called DA in this file.
@@ -547,13 +546,15 @@ namespace DEngine::Gui::impl
 		Std::Span<T> tabs;
 		Math::Vec2Int widgetPos;
 		u32 tabHeight;
+		u32 textMargin;
 		u32 horizontalOffset = 0;
 		uSize currentIndex;
 
 		struct Result
 		{
 			T& tab;
-			Rect rect;
+			Rect rectOuter;
+			Rect textRect;
 			uSize index;
 		};
 		Result operator*() noexcept
@@ -561,18 +562,26 @@ namespace DEngine::Gui::impl
 			auto& tab = tabs[currentIndex];
 			auto& implData = *static_cast<impl::ImplData*>(ctx->Internal_ImplData());
 			
-			SizeHint tabSizeHint = impl::TextManager::GetSizeHint(
+			auto const tabSizeHint = impl::TextManager::GetSizeHint(
 				implData.textManager, 
 				{ tab.title.data(), tab.title.size() });
+
 			Rect tabRect = {};
 			tabRect.position = widgetPos;
 			tabRect.position.x += horizontalOffset;
-			tabRect.extent.width = tabSizeHint.preferred.width;
-			tabRect.extent.height = tabHeight;
+			tabRect.extent.width = tabSizeHint.preferred.width + (textMargin * 2);
+			tabRect.extent.height = tabHeight + (textMargin * 2);
 
-			Result returnVal{
+			Rect textRect = tabRect;
+			textRect.position.x += textMargin;
+			textRect.position.y += textMargin;
+			textRect.extent.width -= textMargin * 2;
+			textRect.extent.height -= textMargin * 2;
+
+			Result returnVal = {
 				tabs[currentIndex],
 				tabRect,
+				textRect,
 				currentIndex};
 
 			horizontalOffset += tabRect.extent.width;
@@ -600,6 +609,7 @@ namespace DEngine::Gui::impl
 		Context const* ctx = nullptr;
 		Std::Span<T> tabs;
 		Math::Vec2Int widgetPos;
+		u32 textMargin;
 
 		[[nodiscard]] DA_TabIt<T> begin() const noexcept
 		{
@@ -610,6 +620,7 @@ namespace DEngine::Gui::impl
 			returnVal.currentIndex = 0;
 			returnVal.tabHeight = implData.textManager.lineheight;
 			returnVal.tabs = tabs;
+			returnVal.textMargin = textMargin;
 			returnVal.widgetPos = widgetPos;
 			return returnVal;
 		}
@@ -623,6 +634,7 @@ namespace DEngine::Gui::impl
 			returnVal.currentIndex = tabs.Size();
 			returnVal.tabHeight = implData.textManager.lineheight;
 			returnVal.tabs = tabs;
+			returnVal.textMargin = textMargin;
 			returnVal.widgetPos = widgetPos;
 			return returnVal;
 		}
@@ -631,11 +643,13 @@ namespace DEngine::Gui::impl
 	[[nodiscard]] static DA_TabItPair<DA_WindowTab> DA_GetTabItPair(
 		Context const& ctx,
 		Std::Span<DA_WindowTab> tabs,
+		u32 textMargin,
 		Math::Vec2Int widgetPos) noexcept
 	{
 		DA_TabItPair<DA_WindowTab> returnVal = {};
 		returnVal.ctx = &ctx;
 		returnVal.tabs = tabs;
+		returnVal.textMargin = textMargin;
 		returnVal.widgetPos = widgetPos;
 		return returnVal;
 	}
@@ -643,11 +657,13 @@ namespace DEngine::Gui::impl
 	[[nodiscard]] static DA_TabItPair<DA_WindowTab const> DA_GetTabItPair(
 		Context const& ctx,
 		Std::Span<DA_WindowTab const> tabs,
+		u32 textMargin,
 		Math::Vec2Int widgetPos) noexcept
 	{
 		DA_TabItPair<DA_WindowTab const> returnVal = {};
 		returnVal.ctx = &ctx;
 		returnVal.tabs = tabs;
+		returnVal.textMargin = textMargin;
 		returnVal.widgetPos = widgetPos;
 		return returnVal;
 	}
@@ -655,11 +671,13 @@ namespace DEngine::Gui::impl
 	[[nodiscard]] static DA_TabItPair<DA_WindowTab const> DA_GetTabItPair(
 		Context const& ctx,
 		std::vector<DA_WindowTab> const& tabs,
+		u32 textMargin,
 		Math::Vec2Int widgetPos) noexcept 
 	{
 		return DA_GetTabItPair(
 			ctx, 
-			{ tabs.data(), tabs.size() }, 
+			{ tabs.data(), tabs.size() },
+			textMargin,
 			widgetPos);
 	}
 
@@ -671,18 +689,19 @@ namespace DEngine::Gui::impl
 	[[nodiscard]] Std::Opt<DA_TabHit> DA_CheckHitTab(
 		Context const& ctx,
 		Std::Span<DA_WindowTab const> tabs,
+		u32 textMargin,
 		Math::Vec2Int widgetPos,
 		Math::Vec2 point)
 	{
 		Std::Opt<DA_TabHit> returnVal = {};
-		auto const& tabItPair = DA_GetTabItPair(ctx, tabs, widgetPos);
+		auto const& tabItPair = DA_GetTabItPair(ctx, tabs, textMargin, widgetPos);
 		for (auto const& tab : tabItPair)
 		{
-			if (tab.rect.PointIsInside(point))
+			if (tab.rectOuter.PointIsInside(point))
 			{
 				DA_TabHit hit = {};
 				hit.index = tab.index;
-				hit.rect = tab.rect;
+				hit.rect = tab.rectOuter;
 				returnVal = hit;
 				break;
 			}
@@ -693,12 +712,14 @@ namespace DEngine::Gui::impl
 	[[nodiscard]] Std::Opt<DA_TabHit> DA_CheckHitTab(
 		Context const& ctx,
 		std::vector<DA_WindowTab> const& tabs,
+		u32 textMargin,
 		Math::Vec2Int widgetPos,
 		Math::Vec2 point)
 	{
 		return DA_CheckHitTab(
 			ctx,
 			{ tabs.data(), tabs.size() },
+			textMargin,
 			widgetPos,
 			point);
 	}
@@ -1054,12 +1075,14 @@ void impl::DA_WindowNode::Render(
 
 	Rect titlebarRect = nodeRect;
 	titlebarRect.extent.height = implData.textManager.lineheight;
+	titlebarRect.extent.height += dockArea->tabTextMargin * 2;
 	// Render the titlebar background
 	drawInfo.PushFilledQuad(titlebarRect, activeTab.color);
 
 	auto const tabItPair = DA_GetTabItPair(
 		ctx,
 		{ tabs.data(), tabs.size() },
+		dockArea->tabTextMargin,
 		nodeRect.position);
 	for (auto const& tabItem : tabItPair)
 	{
@@ -1069,11 +1092,11 @@ void impl::DA_WindowNode::Render(
 			tabColor *= 0.75f;
 			tabColor.w = 1.f;
 		}
-		drawInfo.PushFilledQuad(tabItem.rect, tabColor);
+		drawInfo.PushFilledQuad(tabItem.rectOuter, tabColor);
 
 		if (tabItem.index == selectedTab)
 		{
-			drawInfo.PushFilledQuad(tabItem.rect, { 1.f, 1.f, 1.f, 0.1f });
+			drawInfo.PushFilledQuad(tabItem.rectOuter, { 1.f, 1.f, 1.f, 0.1f });
 		}
 
 		Math::Vec4 textColor = { 1.f, 1.f, 1.f, 1.f };
@@ -1087,7 +1110,7 @@ void impl::DA_WindowNode::Render(
 			implData.textManager,
 			{ tabItem.tab.title.data(), tabItem.tab.title.size() },
 			textColor,
-			tabItem.rect,
+			tabItem.textRect,
 			drawInfo);
 	}
 
@@ -1272,7 +1295,8 @@ impl::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(Po
 
 	Rect titlebarRect = in.nodeRect;
 	titlebarRect.extent.height = implData.textManager.lineheight;
-	
+	titlebarRect.extent.height += in.dockArea->tabTextMargin * 2;
+
 	// Handle titlebar related behavior.
 	if (titlebarRect.PointIsInside(in.pointerPos) && in.pointerPressed)
 	{
@@ -1280,7 +1304,12 @@ impl::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(Po
 		returnVal.eventConsumed = true;
 
 		// If we only have one tab, we just want to go into moving-state even if we hit a tab.
-		Std::Opt<DA_TabHit> tabHit = DA_CheckHitTab(*in.ctx, tabs, titlebarRect.position, in.pointerPos);
+		Std::Opt<DA_TabHit> tabHit = DA_CheckHitTab(
+			*in.ctx,
+			tabs,
+			in.dockArea->tabTextMargin,
+			titlebarRect.position,
+			in.pointerPos);
 		if (tabHit.HasValue() && (tabs.size() > 1 || in.hasSplitNodeParent))
 		{
 			selectedTab = tabHit.Value().index;
@@ -1593,7 +1622,7 @@ impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateNormal(Poin
 
 	auto& implData = *static_cast<impl::ImplData*>(in.ctx->Internal_ImplData());
 	Rect titlebarRect = in.nodeRect;
-	titlebarRect.extent.height = implData.textManager.lineheight;
+	titlebarRect.extent.height = implData.textManager.lineheight + (in.dockArea->tabTextMargin * 2);
 
 	Rect contentRect = in.nodeRect;
 	contentRect.position.y += titlebarRect.extent.height;

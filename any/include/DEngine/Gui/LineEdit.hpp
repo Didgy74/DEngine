@@ -2,8 +2,12 @@
 
 #include <DEngine/Gui/Widget.hpp>
 
+#include <DEngine/Std/Containers/Opt.hpp>
+
 #include <functional>
 #include <string>
+
+namespace DEngine::Gui::impl { struct LineEditImpl; }
 
 namespace DEngine::Gui
 {
@@ -19,14 +23,16 @@ namespace DEngine::Gui
 		Type type = Type::Float;
 
 		Math::Vec4 backgroundColor = { 0.25f, 0.25f, 0.25f, 1.f };
+		u32 margin = 0;
 
-		std::function<void(LineEdit& widget)> textChangedPfn = nullptr;
+		using TextChangedFn = void(LineEdit& widget);
+		std::function<TextChangedFn> textChangedFn = nullptr;
 
 		std::string text;
 
 		virtual ~LineEdit();
 
-		[[nodiscard]] bool CurrentlyBeingEdited() const;
+		[[nodiscard]] constexpr bool CurrentlyBeingEdited() const;
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(Context const& ctx) const override;
 
@@ -65,8 +71,15 @@ namespace DEngine::Gui
 			Gui::TouchPressEvent event) override;
 
 	protected:
+		// Holds the pointer ID if the widget is currently pressed.
+		Std::Opt<u8> pointerId;
+
 		Context* inputConnectionCtx = nullptr;
 
 		void ClearInputConnection();
+
+		friend impl::LineEditImpl;
 	};
+
+	constexpr bool LineEdit::CurrentlyBeingEdited() const { return inputConnectionCtx; }
 }

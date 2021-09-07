@@ -272,7 +272,7 @@ namespace DEngine::impl
 	template<typename T>
 	constexpr unsigned long long GetTypeID() noexcept
 	{
-		return Hash(GetPrettyFunctionString<T>());
+		return Hash(InitTestPipeline<T>());
 	}
 }
  */

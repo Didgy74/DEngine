@@ -8,31 +8,25 @@
 #include <string>
 #include <vector>
 
+namespace DEngine::Gui::impl { class LineListImpl; }
+
 namespace DEngine::Gui
 {
 	class LineList : public Widget
 	{
 	public:
-		static constexpr Math::Vec4 highlightColor = { 1.f, 1.f, 1.f, 0.5f };
-		static constexpr Math::Vec4 alternatingLineColor = { 0.f, 0.f, 0.f, 0.1f };
-		static constexpr u32 horizontalPadding = 20;
+		static constexpr Math::Vec4 highlightOverlayColor = { 1.f, 1.f, 1.f, 0.5f };
+		static constexpr Math::Vec4 hoverOverlayColor = { 1.f, 1.f, 1.f, 0.25f };
+		static constexpr Math::Vec4 alternatingLineOverlayColor = {0.f, 0.f, 0.f, 0.1f };
 
 		void RemoveLine(uSize index);
 		
 		Std::Opt<uSize> selectedLine;
-		struct PressedLine_T
-		{
-			u8 pointerId;
-			// This is null-opt if we pressed an area outside
-			// the possible lines. Meaning it should lead to
-			// a deselect of any currently selected line.
-			Std::Opt<uSize> lineIndex;
-		};
-		Std::Opt<PressedLine_T> currPressedLine;
 		std::vector<std::string> lines;
+		u32 textMargin = 0;
 
 		using Callback = std::function<void(LineList&)>;
-		Callback selectedLineChangedCallback = nullptr;
+		Callback selectedLineChangedFn = nullptr;
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(Context const& ctx) const override;
 	
@@ -73,5 +67,19 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchPressEvent event) override;
+
+	protected:
+		friend impl::LineListImpl;
+
+		struct PressedLine_T
+		{
+			u8 pointerId;
+			// This is null-opt if we pressed an area outside
+			// the possible lines. Meaning it should lead to
+			// a deselect of any currently selected line.
+			Std::Opt<uSize> lineIndex;
+		};
+		Std::Opt<PressedLine_T> currPressedLine;
+		Std::Opt<uSize> lineCursorHover;
 	};
 }

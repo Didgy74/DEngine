@@ -8,26 +8,24 @@
 #include <string>
 #include <functional>
 
+namespace DEngine::Gui::impl { struct LineFloatEditImpl; }
+
 namespace DEngine::Gui
 {
 	class LineFloatEdit : public Widget
 	{
 	public:
-		f64 currentValue = 0.0;
-
-		std::string text;
-
-		u8 decimalPoints = 3;
-
 		static constexpr f64 defaultMin = Std::Limits<f64>::lowest;
 		static constexpr f64 defaultMax = Std::Limits<f64>::highest;
 		f64 min = defaultMin;
 		f64 max = defaultMax;
 
-		using TextChangedCallbackT = void(LineFloatEdit& widget, f64 newValue);
-		std::function<TextChangedCallbackT> valueChangedCallback;
+		using TextChangedFnT = void(LineFloatEdit& widget, f64 newValue);
+		std::function<TextChangedFnT> valueChangedFn;
 
 		Math::Vec4 backgroundColor = { 0.0f, 0.0f, 0.0f, 0.25f };
+
+		[[nodiscard]] inline bool CurrentlyBeingEdited() const noexcept { return inputConnectionCtx; }
 
 		virtual ~LineFloatEdit() override;
 
@@ -69,10 +67,16 @@ namespace DEngine::Gui
 			Gui::TouchPressEvent event) override;
 
 	protected:
+		Std::Opt<u8> pointerId;
 		Context* inputConnectionCtx = nullptr;
+		std::string text = "0.0";
+		f64 currentValue = 0.0;
+		u8 decimalPoints = 3;
 
 		void EndEditingSession();
 		void StartInputConnection(Context& ctx);
 		void ClearInputConnection();
+
+		friend impl::LineFloatEditImpl;
 	};
 }

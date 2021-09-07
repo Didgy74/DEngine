@@ -565,7 +565,7 @@ namespace DEngine::Editor::impl
 
 				// Find the point we hit relative to the gizmo.
 				// Then scale it down to make it normalized [-1, 1]
-				returnVal.normalizedHitPoint_Gizmo = gizmoPosition - hitPoint;
+				returnVal.normalizedHitPoint_Gizmo = hitPoint - gizmoPosition;
 				returnVal.normalizedHitPoint_Gizmo *= 1.f / scale;
 
 
@@ -1348,11 +1348,6 @@ ViewportWidget::ViewportWidget(EditorImpl& implData) :
 	editorImpl(&implData)
 {
 	implData.viewportWidgets.push_back(this);
-
-	// Generate top navigation bar
-	Gui::Button* settingsBtn = new Gui::Button;
-	settingsBtn->text = "Settings";
-	AddWidget(Std::Box{ settingsBtn });
 
 	Gui::AnchorArea* anchorArea = new Gui::AnchorArea;
 	AddWidget(Std::Box{ anchorArea });

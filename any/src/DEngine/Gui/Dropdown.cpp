@@ -5,31 +5,43 @@
 #include <DEngine/Gui/Context.hpp>
 #include <DEngine/Gui/StackLayout.hpp>
 
-#include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Utility.hpp>
 
 #include "ImplData.hpp"
-
-#include <DEngine/Math/Common.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
 
 namespace DEngine::Gui::impl
 {
+	enum class PointerType : u8 { Primary, Secondary };
+	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
+	{
+		switch (in)
+		{
+			case CursorButton::Primary: return PointerType::Primary;
+			case CursorButton::Secondary: return PointerType::Secondary;
+			default: break;
+		}
+		DENGINE_IMPL_UNREACHABLE();
+		return {};
+	}
+
+	constexpr u8 cursorPointerId = (u8)-1;
+
 	class DropdownLayer : public Layer
 	{
 	public:
 		Dropdown* dropdownWidget = nullptr;
 
-		Math::Vec2Int pos;
-		std::vector<std::string> lines;
+		Math::Vec2Int pos = {};
 		struct PressedLine
 		{
 			u8 pointerId;
 			uSize index;
 		};
 		Std::Opt<PressedLine> pressedLine;
+		Std::Opt<uSize> hoveredByCursorIndex;
 
 		virtual void Render(
 			Context const& ctx,
@@ -66,7 +78,6 @@ namespace DEngine::Gui::impl
 	{
 		auto layer = Std::Box{ new DropdownLayer };
 		layer->dropdownWidget = &widget;
-		layer->lines = widget.items;
 		layer->pos = widgetRect.position;
 		layer->pos.y += widgetRect.extent.height;
 
@@ -75,31 +86,35 @@ namespace DEngine::Gui::impl
 			Std::Move(layer));
 	}
 
-	[[nodiscard]] static Rect DropdownLayer_BuildRect(
+	[[nodiscard]] static Rect DropdownLayer_BuildOuterRect(
 		DropdownLayer const& widget,
 		Context const& ctx,
 		Rect const& usableRect)
 	{
+		auto const& dropdownWidget = *widget.dropdownWidget;
+
 		auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 
-		auto const lineheight = implData.textManager.lineheight;
+		auto const textHeight = implData.textManager.lineheight;
+		auto const lineHeight = textHeight + (dropdownWidget.textMargin * 2);
 
 		Rect widgetRect = {};
 		widgetRect.position = widget.pos;
-		widgetRect.extent.height = lineheight * widget.lines.size();
-
+		widgetRect.extent.height = lineHeight * dropdownWidget.items.size();
 		// Calculate width of widget.
 		widgetRect.extent.width = 0;
-		for (auto const& subLine : widget.lines)
+		for (auto const& line : dropdownWidget.items)
 		{
 			auto const sizeHint = impl::TextManager::GetSizeHint(
 				implData.textManager,
-				{ subLine.data(), subLine.size() });
+				{ line.data(), line.size() });
 
 			widgetRect.extent.width = Math::Max(
 				widgetRect.extent.width,
 				sizeHint.preferred.width);
 		}
+		// Add margin to widget.
+		widgetRect.extent.width += widget.dropdownWidget->textMargin * 2;
 
 		// Adjust the position of the widget.
 		widgetRect.position.y = Math::Max(
@@ -112,27 +127,30 @@ namespace DEngine::Gui::impl
 		return widgetRect;
 	}
 
-	enum class PointerType : u8 { Primary, Secondary };
-	[[nodiscard]] static PointerType ToPointerType(Gui::CursorButton in) noexcept
+	[[nodiscard]] static Std::Opt<uSize> DropdownLayer_CheckLineHit(
+		Math::Vec2Int rectPos,
+		u32 rectWidth,
+		uSize lineCount,
+		u32 lineHeight,
+		Math::Vec2 pointerPos)
 	{
-		switch (in)
+		Std::Opt<uSize> lineHit;
+		for (uSize i = 0; i < lineCount; i++)
 		{
-			case Gui::CursorButton::Primary: return PointerType::Primary;
-			case Gui::CursorButton::Secondary: return PointerType::Secondary;
-			default: break;
+			Rect lineRect = {};
+			lineRect.position = rectPos;
+			lineRect.position.y += lineHeight * i;
+			lineRect.extent.width = rectWidth;
+			lineRect.extent.height = lineHeight;
+
+			if (lineRect.PointIsInside(pointerPos))
+			{
+				lineHit = i;
+				break;
+			}
 		}
-		DENGINE_IMPL_UNREACHABLE();
-		return {};
+		return lineHit;
 	}
-
-	constexpr u8 cursorPointerId = (u8)-1;
-
-	struct PointerMove_Pointer
-	{
-		u8 id;
-		Math::Vec2 pos;
-		bool occluded;
-	};
 
 	struct PointerPress_Pointer
 	{
@@ -142,6 +160,81 @@ namespace DEngine::Gui::impl
 		bool pressed;
 	};
 
+	[[nodiscard]] static Layer::Press_Return DropdownLayer_PointerPress(
+		DropdownLayer& widget,
+		Context& ctx,
+		Rect const& usableRect,
+		PointerPress_Pointer const& pointer)
+	{
+		auto& dropdownWidget = *widget.dropdownWidget;
+		auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+		auto const textHeight = implData.textManager.lineheight;
+
+		auto const widgetRectOuter = DropdownLayer_BuildOuterRect(
+			widget,
+			ctx,
+			usableRect);
+		auto const pointerInsideOuter = widgetRectOuter.PointIsInside(pointer.pos);
+
+		Layer::Press_Return returnVal = {};
+		returnVal.eventConsumed = pointerInsideOuter;
+		returnVal.destroy = !pointerInsideOuter;
+
+		if (pointer.type != PointerType::Primary)
+		{
+			return returnVal;
+		}
+
+		// Figure out if we hit a line
+		auto lineHit = DropdownLayer_CheckLineHit(
+			widgetRectOuter.position,
+			widgetRectOuter.extent.width,
+			dropdownWidget.items.size(),
+			textHeight + (dropdownWidget.textMargin * 2),
+			pointer.pos);
+
+		if (widget.pressedLine.HasValue())
+		{
+			auto const pressedLine = widget.pressedLine.Value();
+			if (pressedLine.pointerId == pointer.id)
+			{
+				if (!pointer.pressed)
+					widget.pressedLine = Std::nullOpt;
+
+				if (lineHit.HasValue() &&
+					lineHit.Value() == pressedLine.index &&
+					!pointer.pressed)
+				{
+					dropdownWidget.selectedItem = pressedLine.index;
+
+					if (dropdownWidget.selectionChangedCallback)
+						dropdownWidget.selectionChangedCallback(dropdownWidget);
+
+					returnVal.destroy = true;
+				}
+			}
+		}
+		else
+		{
+			if (pointerInsideOuter && pointer.pressed && lineHit.HasValue())
+			{
+				DropdownLayer::PressedLine newPressedLine = {};
+				newPressedLine.pointerId = pointer.id;
+				newPressedLine.index = lineHit.Value();
+				widget.pressedLine = newPressedLine;
+			}
+		}
+
+		return returnVal;
+	}
+
+	struct PointerMove_Pointer
+	{
+		u8 id;
+		Math::Vec2 pos;
+		bool occluded;
+	};
+
 	[[nodiscard]] bool DropdownLayer_PointerMove(
 		DropdownLayer& widget,
 		Context& ctx,
@@ -149,90 +242,93 @@ namespace DEngine::Gui::impl
 		Rect const& usableRect,
 		PointerMove_Pointer const& pointer)
 	{
+		auto& dropdownWidget = *widget.dropdownWidget;
+		auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+		auto const textHeight = implData.textManager.lineheight;
+
 		auto const intersection = Rect::Intersection(windowRect, usableRect);
 
-		auto const widgetRect = DropdownLayer_BuildRect(
+		auto const widgetRectOuter = DropdownLayer_BuildOuterRect(
 			widget,
 			ctx,
 			intersection);
 
-		return widgetRect.PointIsInside(pointer.pos);
+		auto const pointerInsideOuter = widgetRectOuter.PointIsInside(pointer.pos);
+
+		if (pointer.id == cursorPointerId)
+		{
+			// Figure out if we hit a line
+			auto lineHit = DropdownLayer_CheckLineHit(
+				widgetRectOuter.position,
+				widgetRectOuter.extent.width,
+				dropdownWidget.items.size(),
+				textHeight + (dropdownWidget.textMargin * 2),
+				pointer.pos);
+
+			widget.hoveredByCursorIndex = lineHit;
+		}
+
+		return pointerInsideOuter;
 	}
 
-	[[nodiscard]] static Layer::Press_Return DropdownLayer_PointerPress(
-		DropdownLayer& widget,
+	[[nodiscard]] static Rect Dropdown_BuildTextRect(
+		Rect const& widgetRect,
+		u32 textMargin) noexcept
+	{
+		Rect returnVal = widgetRect;
+		returnVal.position.x += textMargin;
+		returnVal.position.y += textMargin;
+		returnVal.extent.width -= textMargin * 2;
+		returnVal.extent.height -= textMargin * 2;
+		return returnVal;
+	}
+}
+
+class [[maybe_unused]] impl::DropdownImpl
+{
+public:
+	[[nodiscard]] static bool Dropdown_PointerPress(
+		Dropdown& widget,
 		Context& ctx,
-		Rect const& usableRect,
+		WindowID windowId,
+		Rect const& widgetRect,
+		Rect const& visibleRect,
 		PointerPress_Pointer const& pointer)
 	{
-		auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+		auto const pointerInside =
+			widgetRect.PointIsInside(pointer.pos) &&
+			visibleRect.PointIsInside(pointer.pos);
+		if (pointer.pressed && !pointerInside)
+			return false;
 
-		auto const lineheight = implData.textManager.lineheight;
-
-		auto const widgetRect = DropdownLayer_BuildRect(
-			widget,
-			ctx,
-			usableRect);
-
-		bool const pointerInside = widgetRect.PointIsInside(pointer.pos);
-		if (!pointerInside && pointer.pressed)
-		{
-			widget.pressedLine = Std::nullOpt;
-
-			Layer::Press_Return returnVal = {};
-			returnVal.eventConsumed = false;
-			returnVal.destroy = true;
-			return returnVal;
-		}
-
+		// If our pointer-type is not primary, we don't want to do anything,
+		// Just consume the event if it's inside the widget and move on.
 		if (pointer.type != PointerType::Primary)
-		{
-			Layer::Press_Return returnVal = {};
-			returnVal.eventConsumed = pointerInside;
-			returnVal.destroy = !pointerInside;
-			return returnVal;
-		}
-		
-		if (pointerInside)
-		{
-			uSize indexHit = (pointer.pos.y - widgetRect.position.y) / lineheight;
+			return pointerInside;
 
-			if (widget.pressedLine.HasValue())
+		// We can now trust pointer.type == Primary
+		if (widget.heldPointerId.HasValue())
+		{
+			auto const heldPointerId = widget.heldPointerId.Value();
+			if (!pointer.pressed)
+				widget.heldPointerId = Std::nullOpt;
+
+			if (heldPointerId == pointer.id && pointerInside && !pointer.pressed)
 			{
-				auto const pressedLine = widget.pressedLine.Value();
-
-				if (!pointer.pressed && pressedLine.index == indexHit && pressedLine.pointerId == pointer.id)
-				{
-					widget.pressedLine = Std::nullOpt;
-					widget.dropdownWidget->selectedItem = indexHit;
-					if (widget.dropdownWidget->selectionChangedCallback)
-						widget.dropdownWidget->selectionChangedCallback(*widget.dropdownWidget);
-
-					Layer::Press_Return returnVal = {};
-					returnVal.eventConsumed = true;
-					returnVal.destroy = true;
-					return returnVal;
-				}
+				// Now we open the dropdown menu
+				CreateDropdownLayer(widget, ctx, windowId, widgetRect);
 			}
-			else
+		}
+		else
+		{
+			if (pointerInside && pointer.pressed)
 			{
-				if (pointer.pressed)
-				{
-					DropdownLayer::PressedLine newPressedLine = {};
-					newPressedLine.index = indexHit;
-					newPressedLine.pointerId = pointer.id;
-
-					widget.pressedLine = newPressedLine;
-
-					Layer::Press_Return returnVal = {};
-					returnVal.eventConsumed = true;
-					returnVal.destroy = false;
-					return returnVal;
-				}
+				widget.heldPointerId = pointer.id;
 			}
 		}
 
-		return {};
+		// We are inside the button, so we always want to consume the event.
+		return pointerInside;
 	}
 
 	[[nodiscard]] static bool Dropdown_PointerMove(
@@ -243,52 +339,13 @@ namespace DEngine::Gui::impl
 		Rect const& visibleRect,
 		PointerMove_Pointer const& pointer)
 	{
-		bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
-		
+		auto pointerInside =
+			widgetRect.PointIsInside(pointer.pos) &&
+			visibleRect.PointIsInside(pointer.pos);
+
 		return pointerInside;
 	}
-
-	[[nodiscard]] static bool Dropdown_PointerPress(
-		Dropdown& widget,
-		Context& ctx,
-		WindowID windowId,
-		Rect const& widgetRect,
-		Rect const& visibleRect,
-		PointerPress_Pointer const& pointer)
-	{
-		bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
-		if (pointer.pressed && !pointerInside)
-			return false;
-
-		// If our pointer-type is not primary, we don't want to do anything,
-		// Just consume the event if it's inside the widget and move on.
-		if (pointer.type != PointerType::Primary)
-		{
-			return pointerInside;
-		}
-
-		// We can now trust pointer.type == Primary
-		if (widget.heldPointerId.HasValue() && widget.heldPointerId.Value() == pointer.id && !pointer.pressed)
-		{
-			widget.heldPointerId = Std::nullOpt;
-			if (pointerInside)
-			{
-				// Now we open the dropdown menu
-				CreateDropdownLayer(widget, ctx, windowId, widgetRect);
-			}
-			return pointerInside;
-		}
-
-		if (pointerInside && !widget.heldPointerId.HasValue() && pointer.pressed)
-		{
-			widget.heldPointerId = pointer.id;
-			return true;
-		}
-
-		// We are inside the button, so we always want to consume the event.
-		return pointerInside;
-	}
-}
+};
 
 void impl::DropdownLayer::Render(
 	Context const& ctx,
@@ -297,31 +354,44 @@ void impl::DropdownLayer::Render(
 	DrawInfo& drawInfo) const
 {
 	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-
-	auto const lineheight = implData.textManager.lineheight;
+	auto const textHeight = implData.textManager.lineheight;
 
 	auto const intersectionRect = Rect::Intersection(windowRect, usableRect);
 
-	auto const widgetRect = DropdownLayer_BuildRect(
+	auto const widgetRectOuter = DropdownLayer_BuildOuterRect(
 		*this,
 		ctx,
 		intersectionRect);
 
-	drawInfo.PushFilledQuad(widgetRect, { 0.25f, 0.25f, 0.25f, 1.f });
-	for (uSize i = 0; i < lines.size(); i += 1)
-	{
-		auto const& line = lines[i];
+	drawInfo.PushFilledQuad(widgetRectOuter, { 0.3f, 0.3f, 0.3f, 1.f });
 
-		auto lineRect = widgetRect;
-		lineRect.position.y += lineheight * i;
-		lineRect.extent.height = lineheight;
+	for (uSize i = 0; i < dropdownWidget->items.size(); i += 1)
+	{
+		auto const& line = dropdownWidget->items[i];
+
+		// The height of one line is the textheight + the spacing below it.
+		auto const lineHeight = textHeight + (dropdownWidget->textMargin * 2);
+
+		auto lineRect = widgetRectOuter;
+		lineRect.position.y += lineHeight * i;
+		lineRect.extent.height = lineHeight;
+		if (hoveredByCursorIndex.HasValue() && hoveredByCursorIndex.Value() == i)
+		{
+			drawInfo.PushFilledQuad(lineRect, { 0.4f, 0.4f, 0.4f, 1.f });
+		}
+
+		auto textRect = lineRect;
+		textRect.position.x += dropdownWidget->textMargin;
+		textRect.position.y += dropdownWidget->textMargin;
+		textRect.extent.width -= dropdownWidget->textMargin * 2;
+		textRect.extent.height -= dropdownWidget->textMargin * 2;
 
 		Math::Vec4 textColor = { 1.f, 1.f, 1.f, 1.f };
 		impl::TextManager::RenderText(
 			implData.textManager,
 			{ line.data(), line.size() },
 			textColor,
-			lineRect,
+			textRect,
 			drawInfo);
 	}
 }
@@ -399,24 +469,23 @@ Dropdown::~Dropdown()
 
 SizeHint Dropdown::GetSizeHint(Context const& ctx) const
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 
-	u32 lineHeight = implData.textManager.lineheight;
+	auto const textHeight = implData.textManager.lineheight;
 
 	SizeHint returnVal = {};
-	returnVal.preferred.height = lineHeight;
-	returnVal.preferred.width = 25;
-
+	returnVal.preferred.height = textHeight + (textMargin * 2);
 	for (auto& item : items)
 	{
-		SizeHint childSizeHint = impl::TextManager::GetSizeHint(
+		auto const childSizeHint = impl::TextManager::GetSizeHint(
 			implData.textManager,
 			{ item.data(), item.size() });
 		returnVal.preferred.width = Math::Max(
-			returnVal.preferred.width, 
+			returnVal.preferred.width,
 			childSizeHint.preferred.width);
 	}
-	
+	returnVal.preferred.width += textMargin * 2;
+
 	return returnVal;
 }
 
@@ -432,13 +501,16 @@ void Dropdown::Render(
 	drawInfo.PushFilledQuad(
 		widgetRect,
 		{ 0.f, 0.f, 0.f, 0.25f });
+
 	auto const& string = items[selectedItem];
-	
+
+	auto const textRect = impl::Dropdown_BuildTextRect(widgetRect, textMargin);
+
 	impl::TextManager::RenderText(
 		implData.textManager,
 		{ string.data(), string.size() },
 		{ 1.f, 1.f, 1.f, 1.f },
-		widgetRect,
+		textRect,
 		drawInfo);
 }
 
@@ -456,7 +528,29 @@ bool Dropdown::CursorPress(
 	pointer.pressed = event.clicked;
 	pointer.type = impl::ToPointerType(event.button);
 
-	return impl::Dropdown_PointerPress(
+	return impl::DropdownImpl::Dropdown_PointerPress(
+		*this,
+		ctx,
+		windowId,
+		widgetRect,
+		visibleRect,
+		pointer);
+}
+
+bool Dropdown::CursorMove(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	CursorMoveEvent event,
+	bool cursorOccluded)
+{
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)event.position.x, (f32)event.position.y };
+	pointer.occluded = cursorOccluded;
+
+	return impl::DropdownImpl::Dropdown_PointerMove(
 		*this,
 		ctx,
 		windowId,
@@ -478,7 +572,29 @@ bool Dropdown::TouchPressEvent(
 	pointer.pressed = event.pressed;
 	pointer.type = impl::PointerType::Primary;
 
-	return impl::Dropdown_PointerPress(
+	return impl::DropdownImpl::Dropdown_PointerPress(
+		*this,
+		ctx,
+		windowId,
+		widgetRect,
+		visibleRect,
+		pointer);
+}
+
+bool Dropdown::TouchMoveEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchMoveEvent event,
+	bool occluded)
+{
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = event.id;
+	pointer.pos = event.position;
+	pointer.occluded = occluded;
+
+	return impl::DropdownImpl::Dropdown_PointerMove(
 		*this,
 		ctx,
 		windowId,

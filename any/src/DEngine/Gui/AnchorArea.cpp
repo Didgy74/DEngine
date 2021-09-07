@@ -2,8 +2,6 @@
 
 #include <DEngine/Gui/DrawInfo.hpp>
 
-#include <DEngine/Std/Trait.hpp>
-
 namespace DEngine::Gui::impl
 {
     [[nodiscard]] static Rect GetNodeRect(

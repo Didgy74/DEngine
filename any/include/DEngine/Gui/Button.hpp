@@ -22,9 +22,10 @@ namespace DEngine::Gui
 		using ParentType = Widget;
 
 		Button();
-		virtual ~Button() {}
+		virtual ~Button() override {}
 
 		std::string text;
+		u32 textMargin = 0;
 		
 		enum class Type
 		{
@@ -33,7 +34,7 @@ namespace DEngine::Gui
 		};
 		Type type = Type::Push;
 		
-		Math::Vec4 normalColor{ 0.25f, 0.25f, 0.25f, 1.f };
+		Math::Vec4 normalColor{ 0.33f, 0.33f, 0.33f, 1.f };
 		Math::Vec4 normalTextColor = Math::Vec4::One();
 		Math::Vec4 toggledColor{ 0.4f, 0.4f, 0.4f, 1.f };
 		Math::Vec4 toggledTextColor = Math::Vec4::One();
@@ -46,7 +47,7 @@ namespace DEngine::Gui
 		std::function<ActivateCallback> activateFn = nullptr;
 
 		void SetToggled(bool toggled);
-		bool GetToggled() const;
+		[[nodiscard]] bool GetToggled() const;
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
@@ -58,7 +59,7 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		[[nodiscard]] virtual bool CursorPress(
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -89,7 +90,7 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			Gui::TouchPressEvent event) override;
 
-	private:
+	protected:
 		bool toggled = false;
 		enum class State
 		{

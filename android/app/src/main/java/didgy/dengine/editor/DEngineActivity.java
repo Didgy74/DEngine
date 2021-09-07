@@ -2,7 +2,6 @@ package didgy.dengine.editor;
 
 import android.app.NativeActivity;
 import android.content.Context;
-import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.text.Editable;
@@ -11,7 +10,6 @@ import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.util.Log;
-import android.view.InputQueue;
 import android.view.KeyEvent;
 import android.view.SurfaceHolder;
 import android.view.View;

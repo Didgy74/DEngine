@@ -244,10 +244,19 @@ static void Application::detail::Backend_GLFW_KeyboardKeyCallback(
 	DENGINE_DETAIL_APPLICATION_ASSERT(pAppData);
 	auto& appData = *pAppData;
 
-	if (action == GLFW_PRESS)
-		detail::UpdateButton(appData, Backend_GLFW_KeyboardKeyToRawButton(key), true);
-	else if (action == GLFW_RELEASE)
-		detail::UpdateButton(appData, Backend_GLFW_KeyboardKeyToRawButton(key), false);
+	auto button = Backend_GLFW_KeyboardKeyToRawButton(key);
+
+	auto pressValue = action == GLFW_PRESS;
+
+	detail::UpdateButton(appData, button, pressValue);
+
+	if (pressValue)
+	{
+		if (button == Button::Backspace)
+			detail::PushCharRemoveEvent();
+		else if (button == Button::Enter)
+			detail::PushCharEnterEvent();
+	}
 }
 
 static void Application::detail::Backend_GLFW_CharCallback(

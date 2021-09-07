@@ -8,16 +8,18 @@
 #include <string>
 #include <vector>
 
+namespace DEngine::Gui::impl { class DropdownImpl; }
+
 namespace DEngine::Gui
 {
 	class Dropdown : public Widget
 	{
 	public:
+		u32 textMargin = 0;
+
 		u32 selectedItem = 0;
 
 		std::vector<std::string> items;
-
-		Std::Opt<u8> heldPointerId;
 
 		using SelectionChangedCallback = void(Dropdown&);
 		std::function<SelectionChangedCallback> selectionChangedCallback;
@@ -35,6 +37,7 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
+
 		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
@@ -43,11 +46,32 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
+		virtual bool CursorMove(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			CursorMoveEvent event,
+			bool cursorOccluded) override;
+
 		virtual bool TouchPressEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchPressEvent event) override;
+
+		virtual bool TouchMoveEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchMoveEvent event,
+			bool occluded) override;
+
+	private:
+		friend impl::DropdownImpl;
+
+		Std::Opt<u8> heldPointerId;
 	};
 }

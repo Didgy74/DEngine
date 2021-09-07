@@ -422,7 +422,7 @@ namespace DEngine::Gfx::Vk::impl
 		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eG;
 		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eB;
 		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eA;
-		colorBlendAttachment.blendEnable = false;
+		colorBlendAttachment.blendEnable = true;
 		colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd;
 		colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
 		colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
@@ -776,6 +776,8 @@ namespace DEngine::Gfx::Vk::impl
 		manager.lineVtxBufferMappedMem = { (u8*)vmaAllocInfo.pMappedData, (uSize)vtxBufferInfo.size };
 	}
 
+	constexpr f32 gizmoTransparency = 0.8f;
+
 	static void GizmoManager_RecordTranslateGizmoDrawCalls(
 		GlobUtils const& globUtils,
 		GizmoManager const& gizmoManager,
@@ -810,7 +812,7 @@ namespace DEngine::Gfx::Vk::impl
 				0,
 				sizeof(gizmoMatrix),
 				&gizmoMatrix);
-			Math::Vec4 color = { 1.f, 0.f, 0.f, 1.f };
+			Math::Vec4 color = { 1.f, 0.f, 0.f, gizmoTransparency };
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				gizmoManager.pipelineLayout,
@@ -839,7 +841,7 @@ namespace DEngine::Gfx::Vk::impl
 				0,
 				sizeof(gizmoMatrix),
 				&gizmoMatrix);
-			Math::Vec4 color = { 0.f, 1.f, 0.f, 1.f };
+			Math::Vec4 color = { 0.f, 1.f, 0.f, gizmoTransparency };
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				gizmoManager.pipelineLayout,
@@ -872,7 +874,7 @@ namespace DEngine::Gfx::Vk::impl
 				0,
 				sizeof(gizmoMatrix),
 				&gizmoMatrix);
-			Math::Vec4 color = { 1.f, 1.f, 0.f, 0.75f };
+			Math::Vec4 color = { 1.f, 1.f, 0.f, gizmoTransparency };
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				gizmoManager.pipelineLayout,
@@ -919,7 +921,7 @@ namespace DEngine::Gfx::Vk::impl
 			0,
 			sizeof(gizmoMatrix),
 			&gizmoMatrix);
-		Math::Vec4 color = { 0.f, 0.f, 1.f, 1.f };
+		Math::Vec4 color = { 0.f, 0.f, 1.f, gizmoTransparency };
 		globUtils.device.cmdPushConstants(
 			cmdBuffer,
 			gizmoManager.pipelineLayout,
@@ -971,7 +973,7 @@ namespace DEngine::Gfx::Vk::impl
 				sizeof(gizmoMatrix),
 				&gizmoMatrix);
 
-			Math::Vec4 color = { 1.f, 0.f, 0.f, 1.f };
+			Math::Vec4 color = { 1.f, 0.f, 0.f, gizmoTransparency };
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				manager.pipelineLayout,
@@ -1002,7 +1004,7 @@ namespace DEngine::Gfx::Vk::impl
 				sizeof(gizmoMatrix),
 				&gizmoMatrix);
 
-			Math::Vec4 color = { 0.f, 1.f, 0.f, 1.f };
+			Math::Vec4 color = { 0.f, 1.f, 0.f, gizmoTransparency };
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				manager.pipelineLayout,
@@ -1036,7 +1038,7 @@ namespace DEngine::Gfx::Vk::impl
 				0,
 				sizeof(gizmoMatrix),
 				&gizmoMatrix);
-			Math::Vec4 color = { 1.f, 1.f, 0.f, 0.75f };
+			Math::Vec4 color = { 1.f, 1.f, 0.f, gizmoTransparency };
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				manager.pipelineLayout,

@@ -1,15 +1,20 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.10)
 
 set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "Don't build box2d unit tests.")
 set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "Don't build box2d testbed.")
 set(BOX2D_BUILD_DOCS OFF CACHE BOOL "Don't build box2d documentation.")
-set(CMAKE_DISABLE_FIND_PACKAGE_ZLIB ON)
 project(dengine_any)
 
 find_package(Threads REQUIRED)
 
 add_subdirectory(external/box2d box2d)
 add_subdirectory(external/Texas Texas)
+
+set(CMAKE_DISABLE_FIND_PACKAGE_ZLIB TRUE)
+set(CMAKE_DISABLE_FIND_PACKAGE_BZip2 TRUE)
+set(CMAKE_DISABLE_FIND_PACKAGE_PNG TRUE)
+set(CMAKE_DISABLE_FIND_PACKAGE_HarfBuzz TRUE)
+set(CMAKE_DISABLE_FIND_PACKAGE_BrotliDec TRUE)
 add_subdirectory(external/freetype freetype)
 add_subdirectory(external/Vulkan-Headers Vulkan-Headers)
 

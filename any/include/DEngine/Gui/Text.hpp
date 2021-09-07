@@ -15,6 +15,7 @@ namespace DEngine::Gui
 		using ParentType = Widget;
 
 		Math::Vec4 color = Math::Vec4::One();
+		u32 margin = 0;
 		
 		virtual ~Text() override {}
 

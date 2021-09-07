@@ -6,10 +6,12 @@
 
 // This implements a placement-new operator without having to include <new> or <cstddef>
 namespace DEngine::Std::impl { struct VariantPlacementNewTag {}; }
-constexpr void* operator new(decltype(sizeof(int)) size, void* data, DEngine::Std::impl::VariantPlacementNewTag) noexcept
+constexpr void* operator new(decltype(sizeof(int)) size, void* ptr, DEngine::Std::impl::VariantPlacementNewTag) noexcept
 {
-	return data; 
+	return ptr; 
 }
+
+constexpr void operator delete(void* ptr, DEngine::Std::impl::VariantPlacementNewTag) noexcept {}
 
 namespace DEngine::Std
 {
@@ -54,8 +56,14 @@ namespace DEngine::Std
 			new(data, impl::VariantPlacementNewTag{}) T(in);
 			SetFunctions<T>();
 		}
+		template<class T> requires isInPack<T>
+		constexpr Variant(T&& in) noexcept : typeTracker{ indexOf<T> }
+		{
+			new(data, impl::VariantPlacementNewTag{}) T(static_cast<T&&>(in));
+			SetFunctions<T>();
+		}
 
-		constexpr ~Variant() noexcept;
+		~Variant() noexcept;
 
 		Variant& operator=(Variant const&) noexcept = delete;
 		Variant& operator=(Variant&&) noexcept;
@@ -81,28 +89,28 @@ namespace DEngine::Std
 		[[nodiscard]] constexpr unsigned int GetIndex() const noexcept;
 
 		template<unsigned int i> requires (i < sizeof...(Ts))
-		[[nodiscard]] decltype(auto) Get() noexcept
+		decltype(auto) Get() noexcept
 		{
 			DENGINE_IMPL_CONTAINERS_ASSERT(typeTracker == i);
 			return *reinterpret_cast<Trait::At<i, Ts...>*>(data);
 		}
 
 		template<unsigned int i> requires (i < sizeof...(Ts))
-		[[nodiscard]] decltype(auto) Get() const noexcept
+		decltype(auto) Get() const noexcept
 		{
 			DENGINE_IMPL_CONTAINERS_ASSERT(typeTracker == i);
 			return *reinterpret_cast<Trait::At<i, Ts...> const*>(data);
 		}
 
 		template<typename T> requires isInPack<T>
-		[[nodiscard]] decltype(auto) Get() noexcept
+		decltype(auto) Get() noexcept
 		{
 			constexpr auto i = Trait::indexOf<T, Ts...>;
 			DENGINE_IMPL_CONTAINERS_ASSERT(typeTracker == i);
 			return *reinterpret_cast<T*>(data);
 		}
 		template<typename T> requires isInPack<T>
-		[[nodiscard]] decltype(auto) Get() const noexcept
+		decltype(auto) Get() const noexcept
 		{
 			constexpr auto i = Trait::indexOf<T, Ts...>;
 			DENGINE_IMPL_CONTAINERS_ASSERT(typeTracker == i);
@@ -161,7 +169,7 @@ namespace DEngine::Std
 	}
 
 	template<class ...Ts>
-	constexpr Variant<Ts...>::~Variant() noexcept { Clear(); }
+	Variant<Ts...>::~Variant() noexcept { Clear(); }
 
 	template<class ...Ts>
 	Variant<Ts...>& Variant<Ts...>::operator=(Variant&& other) noexcept

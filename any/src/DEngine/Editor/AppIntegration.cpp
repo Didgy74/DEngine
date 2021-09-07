@@ -19,11 +19,6 @@ void Editor::EditorImpl::ButtonEvent(
 
 		queuedGuiEvents.emplace_back(event);
 	}
-	else if (button == App::Button::Enter)
-	{
-		Gui::CharEnterEvent event = {};
-		queuedGuiEvents.emplace_back(event);
-	}
 }
 
 void Editor::EditorImpl::CharEnterEvent()

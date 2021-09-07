@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+namespace DEngine::Gui::impl { struct MenuButtonImpl; }
+
 namespace DEngine::Gui
 {
 	class MenuButton : public Widget
@@ -26,6 +28,7 @@ namespace DEngine::Gui
 				u8 pointerId = 0;
 			};
 			Std::Opt<PressedLine> pressedLine;
+			Std::Opt<uSize> hoveredLineCursor;
 		};
 		struct LineButton
 		{
@@ -47,11 +50,16 @@ namespace DEngine::Gui
 		};
 
 		std::string title;
-		Std::Opt<u8> pointerId;
-		
-		Submenu submenu;
 
-		void Test(Context& ctx, WindowID windowId, Rect widgetRect);
+		Submenu submenu;
+		u32 spacing = 0;
+		u32 margin = 0;
+		struct Colors
+		{
+			Math::Vec4 normal = { 0.f, 0.f, 0.f, 0.f };
+			Math::Vec4 active = { 0.25f, 0.25f, 0.25f, 1.f };
+		};
+		Colors colors = {};
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
@@ -77,5 +85,12 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchPressEvent event) override;
+
+	private:
+		// Determines whether the button is currently pressed and should be showing the submenu.
+		bool active = false;
+		Std::Opt<u8> pointerId;
+
+		friend impl::MenuButtonImpl;
 	};
 }

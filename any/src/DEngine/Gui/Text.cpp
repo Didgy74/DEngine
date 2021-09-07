@@ -41,6 +41,9 @@ SizeHint Text::GetSizeHint(
 			implData.textManager,
 			{ text.data(), text.size() });
 
+		cachedSizeHint.preferred.width += margin * 2;
+		cachedSizeHint.preferred.height += margin * 2;
+
 		invalidated = false;
 	}
 	return cachedSizeHint;
@@ -55,10 +58,16 @@ void Text::Render(
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
 
+	auto textRectInner = widgetRect;
+	textRectInner.position.x += margin;
+	textRectInner.position.y += margin;
+	textRectInner.extent.width -= margin * 2;
+	textRectInner.extent.height -= margin * 2;
+
 	impl::TextManager::RenderText(
 		implData.textManager,
 		{ text.data(), text.length() },
 		this->color,
-		widgetRect,
+		textRectInner,
 		drawInfo);
 }

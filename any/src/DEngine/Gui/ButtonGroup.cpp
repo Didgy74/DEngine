@@ -38,9 +38,10 @@ SizeHint ButtonGroup::GetSizeHint(Context const& ctx) const
 	{
 		DENGINE_IMPL_GUI_ASSERT(!btn.title.empty());
 		SizeHint btnSizeHint = impl::TextManager::GetSizeHint(textManager, { btn.title.data(), btn.title.size() });
-		returnVal.preferred.width += btnSizeHint.preferred.width;
+		returnVal.preferred.width += btnSizeHint.preferred.width + (margin * 2);
 		returnVal.preferred.height = Math::Max(returnVal.preferred.height, btnSizeHint.preferred.height);
 	}
+	returnVal.preferred.height = margin * 2;
 
 	return returnVal;
 }
@@ -64,6 +65,8 @@ void ButtonGroup::Render(
 	{
 		DENGINE_IMPL_GUI_ASSERT(!btn.title.empty());
 		SizeHint btnSizeHint = impl::TextManager::GetSizeHint(textManager, { btn.title.data(), btn.title.size() });
+		btnSizeHint.preferred.width += (margin * 2);
+		btnSizeHint.preferred.height += (margin * 2);
 		sizeHints.push_back(btnSizeHint);
 		maxHeight = Math::Max(maxHeight, btnSizeHint.preferred.height);
 	}
@@ -78,17 +81,23 @@ void ButtonGroup::Render(
 		btnRect.extent.width = sizeHint.preferred.width;
 		btnRect.extent.height = maxHeight;
 
-		Math::Vec4 color = { 0.25f, 0.25f, 0.25f, 1.f };
+		Math::Vec4 color = { 0.3f, 0.3f, 0.3f, 1.f };
 		if (i == activeIndex)
-			color = { 0.5f, 0.5f, 0.5f, 1.f };
+			color = { 0.6f, 0.6f, 0.6f, 1.f };
 		drawInfo.PushFilledQuad(btnRect, color);
+
+		auto textRect = btnRect;
+		textRect.position.x += margin;
+		textRect.position.y += margin;
+		textRect.extent.width -= margin * 2;
+		textRect.extent.height -= margin * 2;
 
 		auto const& title = buttons[i].title;
 		impl::TextManager::RenderText(
 			textManager,
 			{ title.data(), title.size() },
 			{ 1.f, 1.f, 1.f, 1.f },
-			btnRect,
+			textRect,
 			drawInfo);
 
 		horiOffset += btnRect.extent.width;

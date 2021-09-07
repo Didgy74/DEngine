@@ -516,7 +516,7 @@ void impl::TextManager::Initialize(
 	if (ftError != FT_Err_Ok)
 		throw std::runtime_error("DEngine - Editor: Unable to initialize FreeType");
 
-	App::FileInputStream fontFile("data/gui/arial.ttf");
+	App::FileInputStream fontFile("data/gui/Roboto-Regular.ttf");
 	if (!fontFile.IsOpen())
 		throw std::runtime_error("DEngine - Editor: Unable to open font file.");
 	fontFile.Seek(0, App::FileInputStream::SeekOrigin::End);
@@ -574,7 +574,7 @@ void impl::TextManager::RenderText(
 			Math::Vec2Int glyphPos = penPos;
 			glyphPos += glyphData.posOffset;
 
-			Gfx::GuiDrawCmd cmd;
+			Gfx::GuiDrawCmd cmd = {};
 			cmd.type = Gfx::GuiDrawCmd::Type::TextGlyph;
 			cmd.textGlyph.utfValue = glyphChar;
 			cmd.textGlyph.color = color;
@@ -594,7 +594,7 @@ SizeHint impl::TextManager::GetSizeHint(
 	TextManager& manager,
 	Std::Span<char const> str)
 {
-	SizeHint returnVar{};
+	SizeHint returnVar = {};
 	returnVar.preferred.height = manager.lineheight;
 	
 	// Iterate over the string, find the bounding box width

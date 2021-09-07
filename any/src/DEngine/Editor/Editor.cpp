@@ -4,23 +4,10 @@
 #include "ViewportWidget.hpp"
 #include "ComponentWidgets.hpp"
 
-#include <DEngine/Gui/ButtonGroup.hpp>
-#include <DEngine/Gui/DockArea.hpp>
 #include <DEngine/Gui/LineList.hpp>
-#include <DEngine/Gui/MenuButton.hpp>
 #include <DEngine/Gui/ScrollArea.hpp>
 
-#include <DEngine/Application.hpp>
-#include <DEngine/Gfx/Gfx.hpp>
 #include <DEngine/Time.hpp>
-
-#include <DEngine/Physics.hpp>
-
-#include <DEngine/Std/Containers/Box.hpp>
-#include <DEngine/Std/Trait.hpp>
-#include <DEngine/Std/Utility.hpp>
-#include <DEngine/Math/Constant.hpp>
-#include <DEngine/Math/LinearTransform3D.hpp>
 
 #include <vector>
 #include <string>
@@ -50,11 +37,13 @@ namespace DEngine::Editor
 			this->direction = Direction::Vertical;
 
 			Gui::StackLayout* topElementLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
+			topElementLayout->spacing = 30;
 			this->AddWidget(Std::Box{ topElementLayout });
 
 			Gui::Button* newEntityButton = new Gui::Button;
 			topElementLayout->AddWidget(Std::Box{ newEntityButton });
 			newEntityButton->text = "New";
+			newEntityButton->textMargin = Editor::Settings::defaultTextMargin;
 			newEntityButton->activateFn = [this](
 				Gui::Button& btn)
 			{
@@ -65,6 +54,7 @@ namespace DEngine::Editor
 			Gui::Button* entityDeleteButton = new Gui::Button;
 			topElementLayout->AddWidget(Std::Box{ entityDeleteButton });
 			entityDeleteButton->text = "Delete";
+			entityDeleteButton->textMargin = Editor::Settings::defaultTextMargin;
 			entityDeleteButton->activateFn = [this](
 				Gui::Button& btn)
 			{
@@ -85,7 +75,8 @@ namespace DEngine::Editor
 
 			entitiesList = new Gui::LineList();
 			entityListScrollArea->widget = Std::Box<Gui::Widget>{ entitiesList };
-			entitiesList->selectedLineChangedCallback = [this](
+			entitiesList->textMargin = Settings::defaultTextMargin;
+			entitiesList->selectedLineChangedFn = [this](
 				Gui::LineList& widget)
 			{
 				if (widget.selectedLine.HasValue())
@@ -109,7 +100,7 @@ namespace DEngine::Editor
 			}
 		}
 
-		virtual ~EntityIdList()
+		virtual ~EntityIdList() override
 		{
 			DENGINE_DETAIL_ASSERT(editorImpl->entityIdList == this);
 			editorImpl->entityIdList = nullptr;
@@ -183,7 +174,7 @@ namespace DEngine::Editor
 			}
 		}
 
-		virtual ~ComponentList()
+		virtual ~ComponentList() override
 		{
 			DENGINE_DETAIL_ASSERT(editorImpl->componentList == this);
 			editorImpl->componentList = nullptr;
@@ -197,8 +188,8 @@ namespace DEngine::Editor
 		void EntitySelected(Entity id)
 		{
 			outerLayout->ClearChildren();
-			
-			moveWidget = new MoveWidget(editorImpl->scene, id);
+
+			moveWidget = new MoveWidget(*editorImpl);
 			outerLayout->AddWidget(Std::Box{ moveWidget });
 
 			transformWidget = new TransformWidget(*editorImpl);
@@ -251,10 +242,13 @@ namespace DEngine::Editor
 	[[nodiscard]] static Std::Box<Gui::Widget> CreateNavigationBar(
 		EditorImpl& editorImpl)
 	{
-		auto stackLayout = new Gui::StackLayout;
+		auto stackLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
+		stackLayout->spacing = Editor::Settings::defaultTextMargin;
 
 		auto menuButton = new Gui::MenuButton;
 		editorImpl.viewMenuButton = menuButton;
+		menuButton->spacing = Editor::Settings::defaultTextMargin;
+		menuButton->margin = Editor::Settings::defaultTextMargin;
 		stackLayout->AddWidget(Std::Box{ menuButton });
 		menuButton->submenu.lines.resize((int)FileMenuEnum::COUNT);
 		menuButton->title = "Menu";
@@ -271,7 +265,6 @@ namespace DEngine::Editor
 						{ 0.5f, 0.5f, 0.f, 1.f },
 						Std::Box{ new EntityIdList(editorImpl) });
 				}
-
 				btn.toggled = true;
 			};
 			Gui::MenuButton::Line line = { Std::Move(btn) };
@@ -313,20 +306,19 @@ namespace DEngine::Editor
 			menuButton->submenu.lines[(int)FileMenuEnum::NewViewport] = Std::Move(line);
 		}
 
-
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;
 		stackLayout->AddWidget(Std::Box{ deltaText });
 		editorImpl.test_fpsText = deltaText;
+		deltaText->margin = Editor::Settings::defaultTextMargin;
 		deltaText->String_Set("Child text");
-		
 
 		auto playButton = new Gui::Button;
 		stackLayout->AddWidget(Std::Box{ playButton });
 		playButton->text = "Play";
+		playButton->textMargin = Editor::Settings::defaultTextMargin;
 		playButton->type = Gui::Button::Type::Toggle;
-		playButton->activateFn = [&editorImpl](
-			Gui::Button& btn)
+		playButton->activateFn = [&editorImpl](Gui::Button& btn)
 		{
 			if (btn.GetToggled())
 			{
@@ -341,6 +333,7 @@ namespace DEngine::Editor
 		Gui::ButtonGroup* gizmoBtnGroup = new Gui::ButtonGroup;
 		editorImpl.gizmoTypeBtnGroup = gizmoBtnGroup;
 		stackLayout->AddWidget(Std::Box{ gizmoBtnGroup });
+		gizmoBtnGroup->margin = Editor::Settings::defaultTextMargin;
 		gizmoBtnGroup->AddButton("Translate");
 		gizmoBtnGroup->AddButton("Rotate");
 		gizmoBtnGroup->AddButton("Scale");
@@ -370,6 +363,7 @@ Editor::Context Editor::Context::Create(
 	Gui::DockArea* dockArea = new Gui::DockArea;
 	implData.dockArea = dockArea;
 	outmostLayout->AddWidget(Std::Box{ dockArea });
+	dockArea->tabTextMargin = Editor::Settings::defaultTextMargin;
 
 	dockArea->AddWindow(
 		"Entities",
@@ -389,12 +383,11 @@ Editor::Context Editor::Context::Create(
 	Gui::WindowHandler& guiWinHandler = implData;
 	implData.guiCtx = Std::Box{ new Gui::Context(Gui::Context::Create(guiWinHandler, gfxCtx)) };
 
-	Math::Vec4 clearColor = { 0.f, 0.5f, 0.f, 1.f };
+	Math::Vec4 clearColor = { 0.f, 0.0f, 0.f, 1.f };
 	auto windowExtent = App::GetWindowExtent(mainWindow);
 	auto windowPos = App::GetWindowPosition(mainWindow);
 	auto visibleExtent = App::GetWindowVisibleExtent(mainWindow);
 	auto visibleOffset = App::GetWindowVisibleOffset(mainWindow);
-
 	implData.guiCtx->AdoptWindow(
 		(Gui::WindowID)mainWindow,
 		clearColor,

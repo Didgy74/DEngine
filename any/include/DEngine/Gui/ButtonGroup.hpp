@@ -28,6 +28,8 @@ namespace DEngine::Gui
 		};
 		Std::Opt<HeldPointerData> heldPointerData;
 
+		u32 margin = 0;
+
 		using ActiveChangedCallbackT = void(ButtonGroup& widget, u32 newIndex);
 		std::function<ActiveChangedCallbackT> activeChangedCallback;
 

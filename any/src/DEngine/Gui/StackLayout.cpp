@@ -298,8 +298,8 @@ namespace DEngine::Gui::impl
 		Rect returnVal = widgetRect;
 		returnVal.position.x += padding;
 		returnVal.position.y += padding;
-		returnVal.extent.width -= padding;
-		returnVal.extent.height -= padding;
+		returnVal.extent.width -= padding * 2;
+		returnVal.extent.height -= padding * 2;
 		return returnVal;
 	}
 

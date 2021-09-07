@@ -5,9 +5,13 @@
 #include <DEngine/Gui/Button.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
+#include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/Str.hpp>
 
 #include <functional>
+#include <string>
+
+namespace DEngine::Gui::impl { struct CH_Impl; }
 
 namespace DEngine::Gui
 {
@@ -16,15 +20,15 @@ namespace DEngine::Gui
 	public:
 		static constexpr Math::Vec4 fieldBackgroundColor = { 1.f, 1.f, 1.f, 0.25f };
 
-		CollapsingHeader(bool collapsed = true);
+		CollapsingHeader();
 
-		using CollapseFn = void(bool collapsed);
-		std::function<CollapseFn> collapseCallback;
-		[[nodiscard]] StackLayout& GetChildStackLayout() noexcept { return *childStackLayoutPtr; }
-		[[nodiscard]] StackLayout const& GetChildStackLayout() const noexcept { return *childStackLayoutPtr; }
-		[[nodiscard]] bool IsCollapsed() const noexcept;
-		void SetCollapsed(bool value);
-		void SetHeaderText(Std::Str text);
+		Std::Box<Widget> child;
+		bool collapsed = true;
+		std::string title = "Title";
+		u32 titleMargin = 0;
+
+		using CollapseFnT = void(CollapsingHeader& widget);
+		std::function<CollapseFnT> collapseFn;
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
@@ -79,9 +83,10 @@ namespace DEngine::Gui
 			Gui::TouchMoveEvent event,
 			bool occluded) override;
 
-	private:
-		StackLayout mainStackLayout = StackLayout(StackLayout::Direction::Vertical);
-		Std::Box<StackLayout> childStackLayoutBox;
-		StackLayout* childStackLayoutPtr = nullptr;
+	protected:
+		friend impl::CH_Impl;
+
+		Std::Opt<u8> headerPointerId;
+		bool hoveredByCursor = false;
 	};
 }

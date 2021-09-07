@@ -34,6 +34,7 @@ namespace DEngine::Gui
 		u32 gizmoSize = 75;
 		u32 resizeHandleThickness = 50;
 		u32 resizeHandleLength = 75;
+		u32 tabTextMargin = 0;
 		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.5f };
 		Math::Vec4 deleteLayerGizmoColor = { 1.f, 0.f, 0.f, 0.75f };
 		Math::Vec4 dockingHighlightColor = { 0.f, 0.5f, 1.f, 0.5f };
@@ -60,7 +61,7 @@ namespace DEngine::Gui
 		struct State_HoldingTab
 		{
 			// This is a impl::DA_WindowNode type
-			void const* windowBeingHeld = nullptr;
+			void const* windowBeingHeld;
 			u8 pointerId;
 			// Pointer offset relative to tab origin
 			Math::Vec2 pointerOffset;
@@ -68,7 +69,7 @@ namespace DEngine::Gui
 		struct State_ResizingSplitNode
 		{
 			uSize layerIndex;
-			void const* splitNode = nullptr;
+			void const* splitNode;
 			u8 pointerId;
 		};
 		using StateDataT = Std::Variant<

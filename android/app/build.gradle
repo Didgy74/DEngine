@@ -1,19 +1,18 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 30
+    compileSdkVersion 31
     defaultConfig {
         applicationId  "didgy.dengine.editor"
         minSdkVersion 27
-        targetSdkVersion 30
+        targetSdkVersion 31
         versionCode  1
         versionName  "0.1"
-        ndkVersion "23.0.7272597" // e.g.,  ndkVersion '21.3.6528147'
+        //ndkVersion "23.0.7599858" // e.g.,  ndkVersion '21.3.6528147'
         externalNativeBuild {
             cmake {
                 // version "3.19.1"
                 abiFilters 'armeabi-v7a', 'arm64-v8a'//, 'x86', 'x86_64'
-                arguments "-DCMAKE_VERBOSE_MAKEFILE=1"
             }
         }
         sourceSets {

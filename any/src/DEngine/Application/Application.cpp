@@ -1,7 +1,6 @@
 #include <DEngine/detail/Application.hpp>
 #include <DEngine/detail/AppAssert.hpp>
 
-#include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Utility.hpp>
 
 #include <iostream>
@@ -29,6 +28,21 @@ static void Application::detail::FlushQueuedEventCallbacks(AppData& appData)
 			case Type::Button:
 			{
 				job.ptr->ButtonEvent(job.button.btn, job.button.state);
+				break;
+			}
+			case Type::Char:
+			{
+				job.ptr->CharEvent(job.charEvent.utfValue);
+				break;
+			}
+			case Type::CharEnter:
+			{
+				job.ptr->CharEnterEvent();
+				break;
+			}
+			case Type::CharRemove:
+			{
+				job.ptr->CharRemoveEvent();
 				break;
 			}
 			case Type::CursorMove:
@@ -206,24 +220,54 @@ void Application::detail::PushCharInput(u32 charValue)
 
 	appData.charInputs.push_back(charValue);
 
-	for (EventInterface* eventCallback : appData.registeredEventCallbacks)
-		eventCallback->CharEvent(charValue);
+	for (auto const& registeredCallback : appData.registeredEventCallbacks)
+	{
+		EventCallbackJob job = {};
+		job.type = EventCallbackJob::Type::Char;
+		job.ptr = registeredCallback;
+
+		EventCallbackJob::CharEvent event = {};
+		event.utfValue = (u8)charValue;
+		job.charEvent = event;
+
+		appData.queuedEventCallbacks.push_back(job);
+	}
 }
 
 void DEngine::Application::detail::PushCharEnterEvent()
 {
 	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
-	for (EventInterface* eventCallback : appData.registeredEventCallbacks)
-		eventCallback->CharEnterEvent();
+
+	for (auto const& registeredCallback : appData.registeredEventCallbacks)
+	{
+		EventCallbackJob job = {};
+		job.type = EventCallbackJob::Type::CharEnter;
+		job.ptr = registeredCallback;
+
+		EventCallbackJob::CharEnterEvent event = {};
+		job.charEnter = event;
+
+		appData.queuedEventCallbacks.push_back(job);
+	}
 }
 
 void Application::detail::PushCharRemoveEvent()
 {
 	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
-	for (EventInterface* eventCallback : appData.registeredEventCallbacks)
-		eventCallback->CharRemoveEvent();
+
+	for (auto const& registeredCallback : appData.registeredEventCallbacks)
+	{
+		EventCallbackJob job = {};
+		job.type = EventCallbackJob::Type::CharRemove;
+		job.ptr = registeredCallback;
+
+		EventCallbackJob::CharRemoveEvent event = {};
+		job.charRemove = event;
+
+		appData.queuedEventCallbacks.push_back(job);
+	}
 }
 
 Application::KeyEventType Application::ButtonEvent(Button input) noexcept

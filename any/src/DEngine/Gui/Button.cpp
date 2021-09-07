@@ -6,12 +6,12 @@
 namespace DEngine::Gui::impl
 {
 	enum class PointerType : u8 { Primary, Secondary };
-	[[nodiscard]] static PointerType ToPointerType(Gui::CursorButton in) noexcept
+	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
 	{
 		switch (in)
 		{
-			case Gui::CursorButton::Primary: return PointerType::Primary;
-			case Gui::CursorButton::Secondary: return PointerType::Secondary;
+			case CursorButton::Primary: return PointerType::Primary;
+			case CursorButton::Secondary: return PointerType::Secondary;
 			default: break;
 		}
 		DENGINE_IMPL_UNREACHABLE();
@@ -26,7 +26,7 @@ namespace DEngine::Gui::impl
 using namespace DEngine;
 using namespace DEngine::Gui;
 
-class impl::BtnImpl 
+class [[maybe_unused]] impl::BtnImpl
 {
 public:
 	[[nodiscard]] static bool PointerPress(
@@ -158,9 +158,14 @@ SizeHint Button::GetSizeHint(
 	Context const& ctx) const
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-	return impl::TextManager::GetSizeHint(
+	auto returnVal = impl::TextManager::GetSizeHint(
 		implData.textManager,
 		{ text.data(), text.size() });
+
+	returnVal.preferred.width += textMargin * 2;
+	returnVal.preferred.height += textMargin * 2;
+
+	return returnVal;
 }
 
 void Button::Render(
@@ -172,6 +177,7 @@ void Button::Render(
 {
 	Math::Vec4 currentColor = {};
 	Math::Vec4 currentTextColor = {};
+
 	if (state == State::Normal && toggled)
 	{
 		currentColor = toggledColor;
@@ -201,15 +207,21 @@ void Button::Render(
 				break;
 		}
 	}
-
 	drawInfo.PushFilledQuad(widgetRect, currentColor);
 
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+
+	auto textRect = widgetRect;
+	textRect.position.x += textMargin;
+	textRect.position.y += textMargin;
+	textRect.extent.width -= textMargin * 2;
+	textRect.extent.height -= textMargin * 2;
+
 	impl::TextManager::RenderText(
 		implData.textManager,
 		{ text.data(), text.length() },
 		currentTextColor,
-		widgetRect,
+		textRect,
 		drawInfo);
 }
 
