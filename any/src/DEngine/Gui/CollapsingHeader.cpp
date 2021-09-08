@@ -227,7 +227,7 @@ public:
 			}
 		}
 
-		auto pointerOccluded =
+		auto const pointerOccluded =
 			widgetRect.PointIsInside(params.pointerPos) &&
 			visibleRect.PointIsInside(params.pointerPos);
 		return pointerOccluded;
@@ -332,7 +332,9 @@ void CollapsingHeader::Render(
 			headerRect,
 			widgetRect.extent.height);
 
-		drawInfo.PushFilledQuad(childRect, {1.f, 1.f, 1.f, 0.3f });
+		auto scissorGuard = DrawInfo::ScopedScissor(drawInfo, childRect);
+
+		drawInfo.PushFilledQuad(childRect, { 1.f, 1.f, 1.f, 0.3f });
 
 		child->Render(
 			ctx,

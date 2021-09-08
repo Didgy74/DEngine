@@ -44,6 +44,7 @@ namespace DEngine::Gui
 		[[nodiscard]] constexpr bool operator!=(Extent const&) const noexcept;
 	};
 
+	// Represents a rectangle in UI space. Includes position and extent.
 	struct Rect
 	{
 		Math::Vec2Int position = {};

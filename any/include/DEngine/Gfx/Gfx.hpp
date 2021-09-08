@@ -155,10 +155,11 @@ namespace DEngine::Gfx
 
 	struct DrawParams
 	{
-		// Scene specific stuff
+		// Scene specific stuff, this is WIP
 		std::vector<TextureID> textureIDs;
 		std::vector<Math::Mat4> transforms;
 
+		// This is decent generic stuff
 		std::vector<LineDrawCmd> lineDrawCmds;
 		std::vector<Math::Vec3> lineVertices;
 

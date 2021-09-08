@@ -18,7 +18,6 @@ namespace DEngine::Gui
 	class CollapsingHeader : public Widget
 	{
 	public:
-		static constexpr Math::Vec4 fieldBackgroundColor = { 1.f, 1.f, 1.f, 0.25f };
 
 		CollapsingHeader();
 

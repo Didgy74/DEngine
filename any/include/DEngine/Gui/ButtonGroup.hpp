@@ -4,6 +4,7 @@
 #include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/Std/Containers/Opt.hpp>
+#include <DEngine/Math/Vector.hpp>
 
 #include <vector>
 #include <string>
@@ -11,22 +12,21 @@
 
 namespace DEngine::Gui
 {
+	namespace impl { struct BtnGroupImpl; }
+
 	class ButtonGroup : public Widget
 	{
 	public:
+		static constexpr Math::Vec4 inactiveColor = { 0.3f, 0.3f, 0.3f, 1.f };
+		static constexpr Math::Vec4 hoveredColor = { 0.4f, 0.4f, 0.4f, 1.f };
+		static constexpr Math::Vec4 activeColor = { 0.6f, 0.6f, 0.6f, 1.f };
+
 		u32 activeIndex = 0;
 		struct InternalButton
 		{
 			std::string title;
 		};
 		std::vector<InternalButton> buttons;
-
-		struct HeldPointerData
-		{
-			u8 buttonIndex = 0;
-			u8 pointerId = 0;
-		};
-		Std::Opt<HeldPointerData> heldPointerData;
 
 		u32 margin = 0;
 
@@ -76,5 +76,16 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Gui::TouchPressEvent event) override;
+
+	protected:
+		struct HeldPointerData
+		{
+			uSize buttonIndex = 0;
+			u8 pointerId = 0;
+		};
+		Std::Opt<HeldPointerData> heldPointerData;
+		Std::Opt<uSize> cursorHoverIndex;
+
+		friend impl::BtnGroupImpl;
 	};
 }

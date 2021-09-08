@@ -266,6 +266,9 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 			// Add the component
 			Gfx::TextureID component{};
 			editorImpl.scene->AddComponent(entity, component);
+
+			auto& cast = static_cast<SpriteRenderer2DWidget&>(widget);
+			cast.Update(*editorImpl.scene->GetComponent<Gfx::TextureID>(entity));
 		}
 		else
 		{
