@@ -1,23 +1,27 @@
-#!/bin/bash
+﻿#!/bin/bash
 
 # Android Studio stuff
 rm android/android.iml
-rm android/local.properties
-rm -r android/.gradle
-rm -r android/.idea
+# rm android/local.properties
+rm --recursive android/.gradle
+rm --recursive android/.idea
 rm android/app/app.iml
-rm -r android/app/build
-rm -r android/app/out
-rm -r android/app/.cxx
+rm --recursive android/app/build
+rm --recursive android/app/out
+rm --recursive android/app/.cxx
 
 # VSCode stuff
-rm -r .vscode
-rm -r build
+rm --recursive .vscode
+rm --recursive build
 
 # Visual Studio stuff
-rm -r .vs
-rm -r out
-rm -r any/out
-rm -r desktop/out
+rm --recursive .vs
+rm --recursive out
+rm --recursive any/out
+rm --recursive desktop/out
 
 # rm CMakeSettings.json
+
+# CLion stuff
+rm --recursive .idea
+rm --recursive desktop/cmake-build-debug

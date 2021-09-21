@@ -4,6 +4,64 @@
 
 #include "ImplData.hpp"
 
+namespace DEngine::Gui::impl
+{
+	enum class PointerType : u8 { Primary, Secondary };
+	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
+	{
+		switch (in)
+		{
+			case CursorButton::Primary: return PointerType::Primary;
+			case CursorButton::Secondary: return PointerType::Secondary;
+			default: break;
+		}
+		DENGINE_IMPL_UNREACHABLE();
+		return {};
+	}
+
+	constexpr u8 cursorPointerId = ~static_cast<u8>(0);
+
+	struct PointerPress_Params
+	{
+		Context* ctx = {};
+		WindowID windowId = {};
+		LineFloatEdit* widget = {};
+		Rect widgetRect = {};
+		Rect visibleRect = {};
+
+		u8 pointerId = {};
+		Math::Vec2 pointerPos = {};
+		bool pointerPressed = {};
+		PointerType pointerType = {};
+	};
+}
+
+struct DEngine::Gui::impl::LineFloatEditImpl
+{
+public:
+	[[nodiscard]] static bool PointerPressed(PointerPress_Params const& in) noexcept
+	{
+		auto pointerInside = in.widgetRect.PointIsInside(in.pointerPos) &&
+			in.visibleRect.PointIsInside(in.pointerPos);
+
+		// The field is currently being held.
+		if (in.widget->pointerId.HasValue())
+		{
+			auto const& pointerId = in.widget->pointerId.Value();
+
+		}
+		else
+		{
+			if (pointerInside && in.pointerType == PointerType::Primary)
+			{
+				in.widget->pointerId = in.pointerId;
+			}
+		}
+
+		return pointerInside;
+	}
+};
+
 using namespace DEngine;
 using namespace DEngine::Gui;
 
@@ -84,8 +142,8 @@ void LineFloatEdit::CharEvent(
 				if (newValue >= min && newValue <= max && newValue != currentValue)
 				{
 					currentValue = newValue;
-					if (valueChangedCallback)
-						valueChangedCallback(*this, newValue);
+					if (valueChangedFn)
+						valueChangedFn(*this, newValue);
 				}
 			}
 		}
@@ -103,8 +161,8 @@ void LineFloatEdit::CharRemoveEvent(Context& ctx)
 			if (newValue >= min && newValue <= max && newValue != currentValue)
 			{
 				currentValue = newValue;
-				if (valueChangedCallback)
-					valueChangedCallback(*this, newValue);
+				if (valueChangedFn)
+					valueChangedFn(*this, newValue);
 			}
 		}
 	}
@@ -118,7 +176,7 @@ void LineFloatEdit::InputConnectionLost()
 	}
 }
 
-void LineFloatEdit::CursorClick(
+bool LineFloatEdit::CursorPress(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
@@ -126,41 +184,35 @@ void LineFloatEdit::CursorClick(
 	Math::Vec2Int cursorPos,
 	CursorClickEvent event)
 {
-	if (event.button == CursorButton::Primary)
-	{
-		bool cursorIsInside = widgetRect.PointIsInside(cursorPos);
+	impl::PointerPress_Params params = {};
+	params.ctx = &ctx;
+	params.windowId = windowId;
+	params.widget = this;
+	params.widgetRect = widgetRect;
+	params.visibleRect = visibleRect;
+	params.pointerId = impl::cursorPointerId;
+	params.pointerPos = { (f32)cursorPos.x, (f32)cursorPos.y };
+	params.pointerPressed = event.clicked;
+	params.pointerType = impl::ToPointerType(event.button);
 
-		if (cursorIsInside && event.clicked && !inputConnectionCtx)
-		{
-			StartInputConnection(ctx);
-		}
-		else if (!cursorIsInside && event.clicked && inputConnectionCtx)
-		{
-			DENGINE_IMPL_GUI_ASSERT(inputConnectionCtx == &ctx);
-			EndEditingSession();
-		}
-	}
+	return impl::LineFloatEditImpl::PointerPressed(params);
 }
 
-void LineFloatEdit::TouchEvent(
+bool LineFloatEdit::TouchPressEvent(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event)
+	Gui::TouchPressEvent event)
 {
-	bool cursorIsInside = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
+	impl::PointerPress_Params params = {};
+	params.ctx = &ctx;
+	params.pointerId = event.id;
+	params.pointerPos = event.position;
+	params.pointerPressed = event.pressed;
+	params.pointerType = impl::PointerType::Primary;
 
-	if (event.id == 0 && event.type == TouchEventType::Down && cursorIsInside && !inputConnectionCtx)
-	{
-		StartInputConnection(ctx);
-	}
-	
-	if (event.id == 0 && event.type == TouchEventType::Down && !cursorIsInside && inputConnectionCtx)
-	{
-		DENGINE_IMPL_GUI_ASSERT(inputConnectionCtx == &ctx);
-		EndEditingSession();
-	}
+	return impl::LineFloatEditImpl::PointerPressed(params);
 }
 
 void LineFloatEdit::EndEditingSession()
@@ -219,8 +271,8 @@ void LineFloatEdit::EndEditingSession()
 	if (currentValue != newValue)
 	{
 		currentValue = newValue;
-		if (valueChangedCallback)
-			valueChangedCallback(*this, newValue);
+		if (valueChangedFn)
+			valueChangedFn(*this, newValue);
 	}
 
 	ClearInputConnection();

@@ -3,15 +3,17 @@
 #include "Editor.hpp"
 #include "EditorImpl.hpp"
 
+#include <DEngine/Editor/Joystick.hpp>
+
 #include <DEngine/Gui/StackLayout.hpp>
 #include <DEngine/Gui/Widget.hpp>
 #include <DEngine/Gui/Button.hpp>
-#include <DEngine/Gui/MenuBar.hpp>
-
-#include <DEngine/Gfx/Gfx.hpp>
 
 #include <DEngine/Std/Utility.hpp>
-#include <DEngine/Math/LinearTransform3D.hpp>
+
+#include <DEngine/Math/Matrix.hpp>
+#include <DEngine/Math/UnitQuaternion.hpp>
+#include <DEngine/Math/Vector.hpp>
 
 namespace DEngine::Editor
 {
@@ -26,7 +28,7 @@ namespace DEngine::Editor
 
 		struct Arrow
 		{
-			f32 capSize = 0;
+			f32 capDiameter = 0;
 			f32 capLength = 0;
 			f32 shaftLength = 0;
 			f32 shaftDiameter = 0;
@@ -38,7 +40,7 @@ namespace DEngine::Editor
 			{
 				Arrow arrow = {};
 				arrow.capLength = 1 / 3.f;
-				arrow.capSize = 0.2f;
+				arrow.capDiameter = 0.2f;
 				arrow.shaftDiameter = 0.1f;
 				arrow.shaftLength = 2 / 3.f;
 				return arrow;
@@ -66,16 +68,13 @@ namespace DEngine::Editor
 	class InternalViewportWidget : public Gui::Widget
 	{
 	public:
-		static constexpr u8 cursorPointerId = static_cast<u8>(-1);
-
 		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
-		Gfx::Context* gfxCtx = nullptr;
 		EditorImpl* editorImpl = nullptr;
 
 		mutable bool isVisible = false;
 
-		Gui::Extent currentExtent{};
-		mutable Gui::Extent newExtent{};
+		Gui::Extent currentExtent = {};
+		mutable Gui::Extent newExtent = {};
 		mutable bool currentlyResizing = false;
 		u32 extentCorrectTickCounter = 0;
 
@@ -89,26 +88,17 @@ namespace DEngine::Editor
 		struct HoldingGizmoData
 		{
 			u8 pointerId;
+			GizmoType gizmoType;
 			Gizmo::GizmoPart holdingPart;
-			Math::Vec3 normalizedOffset;
+			Math::Vec3 normalizedOffsetGizmo;
+			// Contains the hit point compared to the position, in world space.
+			Math::Vec3 relativeHitPointObject;
+			Math::Vec2 initialObjectScale;
 			Math::Vec3 initialPos;
 			// Current rotation offset from the pointer. In radians [-pi, pi]
 			f32 rotationOffset;
 		};
 		Std::Opt<HoldingGizmoData> holdingGizmoData;
-
-
-		int joystickPixelRadius = 50;
-		int joystickPixelDeadZone = 10;
-		struct JoyStick
-		{
-			Std::Opt<u8> touchID{};
-			bool isClicked = false;
-			mutable Math::Vec2Int originPosition{};
-			Math::Vec2Int currentPosition{};
-		};
-		// 0 is left, 1 is right
-		JoyStick joysticks[2]{};
 
 		struct Camera
 		{
@@ -116,9 +106,9 @@ namespace DEngine::Editor
 			Math::UnitQuat rotation = Math::UnitQuat::FromEulerAngles(0, 180.f, 0.f);
 			f32 verticalFov = 60.f;
 		};
-		Camera cam{};
+		Camera cam = {};
 
-		InternalViewportWidget(EditorImpl& implData, Gfx::Context& gfxCtxIn);
+		InternalViewportWidget(EditorImpl& implData);
 
 		virtual ~InternalViewportWidget() override;
 
@@ -131,21 +121,14 @@ namespace DEngine::Editor
 
 		void ApplyCameraMovement(Math::Vec3 move, f32 speed) noexcept;
 
-		Math::Vec2 GetLeftJoystickVec() const noexcept;
-
-		Math::Vec2 GetRightJoystickVec() const noexcept;
-
-		void TickTest(f32 deltaTime) noexcept;
-
-		// Pixel space
-		void UpdateJoystickOrigin(Gui::Rect widgetRect) const noexcept;
+		void Tick() noexcept;
 
 		Gfx::ViewportUpdate GetViewportUpdate(
 			Context const& editor,
 			std::vector<Math::Vec3>& lineVertices,
 			std::vector<Gfx::LineDrawCmd>& lineDrawCmds) const noexcept;
 
-		virtual void CursorClick(
+		virtual bool CursorPress(
 			Gui::Context& ctx,
 			Gui::WindowID windowId,
 			Gui::Rect widgetRect,
@@ -153,19 +136,28 @@ namespace DEngine::Editor
 			Math::Vec2Int cursorPos,
 			Gui::CursorClickEvent event) override;
 
-		virtual void CursorMove(
+		virtual bool CursorMove(
 			Gui::Context& ctx,
 			Gui::WindowID windowId,
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect,
-			Gui::CursorMoveEvent event) override;
+			Gui::CursorMoveEvent event,
+			bool occluded) override;
 
-		virtual void TouchEvent(
+		virtual bool TouchPressEvent(
 			Gui::Context& ctx,
 			Gui::WindowID windowId,
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect,
-			Gui::TouchEvent touch) override;
+			Gui::TouchPressEvent event) override;
+
+		virtual bool TouchMoveEvent(
+			Gui::Context& ctx,
+			Gui::WindowID windowId,
+			Gui::Rect widgetRect,
+			Gui::Rect visibleRect,
+			Gui::TouchMoveEvent event,
+			bool occluded) override;
 
 		virtual Gui::SizeHint GetSizeHint(
 			Gui::Context const& ctx) const override;
@@ -181,6 +173,16 @@ namespace DEngine::Editor
 	class ViewportWidget : public Gui::StackLayout 
 	{
 	public:
-		ViewportWidget(EditorImpl& implData, Gfx::Context& ctx);
+		ViewportWidget(EditorImpl& implData);
+		~ViewportWidget();
+
+		EditorImpl* editorImpl = nullptr;
+		InternalViewportWidget* viewport = nullptr;
+		Joystick* leftJoystick = nullptr;
+		Joystick* rightJoystick = nullptr;
+
+		f32 joystickMovementSpeed = 2.5f;
+
+		void Tick(float deltaTime) noexcept;
 	};
 }

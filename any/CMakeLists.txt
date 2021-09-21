@@ -3,13 +3,18 @@ cmake_minimum_required(VERSION 3.10)
 set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "Don't build box2d unit tests.")
 set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "Don't build box2d testbed.")
 set(BOX2D_BUILD_DOCS OFF CACHE BOOL "Don't build box2d documentation.")
-set(CMAKE_DISABLE_FIND_PACKAGE_ZLIB ON)
 project(dengine_any)
 
 find_package(Threads REQUIRED)
 
 add_subdirectory(external/box2d box2d)
 add_subdirectory(external/Texas Texas)
+
+set(CMAKE_DISABLE_FIND_PACKAGE_ZLIB TRUE)
+set(CMAKE_DISABLE_FIND_PACKAGE_BZip2 TRUE)
+set(CMAKE_DISABLE_FIND_PACKAGE_PNG TRUE)
+set(CMAKE_DISABLE_FIND_PACKAGE_HarfBuzz TRUE)
+set(CMAKE_DISABLE_FIND_PACKAGE_BrotliDec TRUE)
 add_subdirectory(external/freetype freetype)
 add_subdirectory(external/Vulkan-Headers Vulkan-Headers)
 
@@ -23,10 +28,12 @@ add_library(dengine_any STATIC
 		"src/DEngine/Scene.cpp"
 		"src/DEngine/Std.cpp"
 		"src/DEngine/Editor/AppIntegration.cpp"
-		"src/DEngine/Editor/Editor.cpp"
 		"src/DEngine/Editor/ComponentWidgets.cpp"
+		"src/DEngine/Editor/Editor.cpp"
+		"src/DEngine/Editor/Joystick.cpp"
 		"src/DEngine/Editor/ViewportWidget.cpp"
 		"src/DEngine/FrameAllocator.cpp"
+		"src/DEngine/Gui/AnchorArea.cpp"
 		"src/DEngine/Gui/Button.cpp"
 		"src/DEngine/Gui/ButtonGroup.cpp"
 		"src/DEngine/Gui/CollapsingHeader.cpp"
@@ -37,7 +44,7 @@ add_library(dengine_any STATIC
 		"src/DEngine/Gui/LineEdit.cpp"
 		"src/DEngine/Gui/LineFloatEdit.cpp"
 		"src/DEngine/Gui/LineList.cpp"
-		"src/DEngine/Gui/MenuBar.cpp"
+		"src/DEngine/Gui/MenuButton.cpp"
 		"src/DEngine/Gui/ScrollArea.cpp"
 		"src/DEngine/Gui/StackLayout.cpp"
 		"src/DEngine/Gui/Text.cpp"
@@ -76,9 +83,11 @@ target_link_libraries(dengine_any
 target_sources(dengine_any
 	PUBLIC
 		${DENGINE_HEADERS})
+target_compile_features(dengine_any PRIVATE cxx_std_20)
 set_target_properties(dengine_any PROPERTIES 
-	CXX_STANDARD 17
+	CXX_STANDARD 20
 	CXX_EXTENSIONS OFF)
+#target_compile_options(dengine_any PUBLIC "-ftime-trace")
 
 option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ON)
 if (${DENGINE_ENABLE_ASSERT})

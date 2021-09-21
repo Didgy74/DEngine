@@ -1,24 +1,45 @@
 #pragma once
 
 #include <DEngine/Std/Containers/impl/Assert.hpp>
-#include <DEngine/Std/Utility.hpp>
+#include <DEngine/Std/Trait.hpp>
 
 namespace DEngine::Std
 {
-	template<typename T>
+	template<class T>
 	class Box
 	{
 	public:
+		template<class U>
+		friend class Box;
+
 		using ValueType = T;
 
-		Box() noexcept;
+		constexpr Box() noexcept;
+		constexpr Box(decltype(nullptr)) noexcept;
 		Box(Box const&) = delete;
-		Box(Box&&) noexcept;
+		constexpr Box(Box&&) noexcept;
+		template<class U> requires Trait::isBaseOf<T, U>
+		constexpr Box(Box<U>&& in) noexcept : data(in.data)
+		{
+			in.data = nullptr;
+		}
 		explicit Box(T* ptr) noexcept;
+
 		~Box();
 
 		Box& operator=(Box const&) = delete;
 		Box& operator=(Box&&) noexcept;
+		template<class U> requires Trait::isBaseOf<T, U>
+		constexpr Box& operator=(Box<U>&& in) noexcept
+		{
+			Clear();
+			data = in.data;
+			in.data = nullptr;
+
+			return *this;
+		}
+		Box& operator=(decltype(nullptr)) noexcept;
+
 
 		[[nodiscard]] T* Get() noexcept;
 		[[nodiscard]] T const* Get() const noexcept;
@@ -43,13 +64,19 @@ namespace DEngine::Std
 	};
 
 	template<typename T>
-	inline Box<T>::Box() noexcept :
+	constexpr Box<T>::Box() noexcept :
 		data(nullptr)
 	{
 	}
 
 	template<typename T>
-	inline Box<T>::Box(Box&& other) noexcept :
+	constexpr Box<T>::Box(decltype(nullptr)) noexcept : data(nullptr)
+	{
+
+	}
+
+	template<typename T>
+	constexpr Box<T>::Box(Box&& other) noexcept :
 		data(other.data)
 	{
 		other.data = nullptr;
@@ -75,6 +102,14 @@ namespace DEngine::Std
 		data = right.data;
 		right.data = nullptr;
 
+		return *this;
+	}
+
+	template<typename T>
+	inline Box<T>& Box<T>::operator=(decltype(nullptr)) noexcept
+	{
+		Clear();
+		data = nullptr;
 		return *this;
 	}
 

@@ -16,84 +16,48 @@ namespace DEngine::Editor
 {
 	class EditorImpl;
 
-	class MoveWidget : public Gui::StackLayout
+	class MoveWidget : public Gui::CollapsingHeader
 	{
 	public:
-		MoveWidget(Scene* scene, Entity id) :
-			Gui::StackLayout(Gui::StackLayout::Direction::Vertical)
-		{
-			Gui::Button* button = new Gui::Button;
-			this->AddWidget(Std::Box<Gui::Widget>{ button });
-			button->type = Gui::Button::Type::Toggle;
-			button->text = "Testing - Move";
-			button->activatePfn = [this, id, scene](
-				Gui::Button& btn)
-			{
-				if (btn.GetToggled())
-				{
-					// Crash if we have an existing rigidbody on this entity
-					DENGINE_DETAIL_ASSERT(scene->GetComponent<Move>(id) == nullptr);
+		using ComponentType = Move;
 
-					scene->AddComponent(id, Move{});
-					Move& component = *scene->GetComponent<Move>(id);
-
-					Expand(*scene, id, component);
-				}
-				else
-				{
-					// Remove all children except for index 0, it's the button to add/remove.
-					uSize childCount = this->ChildCount();
-					for (uSize i = childCount - 1; i != 0; i -= 1)
-						this->RemoveItem(i);
-
-					// Remove the transform
-					scene->DeleteComponent<Move>(id);
-				}
-			};
-
-			Move* moveComponentPtr = scene->GetComponent<Move>(id);
-			if (moveComponentPtr != nullptr)
-			{
-				button->SetToggled(true);
-
-				Move& component = *moveComponentPtr;
-
-				Expand(*scene, id, component);
-			}
-		}
-
-		void Expand(Scene& scene, Entity id, Move const& component)
-		{
-		}
+		MoveWidget(EditorImpl const& editorImpl);
 	};
 	
 	class TransformWidget : public Gui::CollapsingHeader
 	{
 	public:
+		using ComponentType = Transform;
+
 		Gui::LineEdit* positionInputFields[3] = {};
 		Gui::LineEdit* rotationInput = nullptr;
+		Gui::LineEdit* scaleInputFields[2] = {};
 
 		TransformWidget(EditorImpl const& editorImpl);
-		void Update(Transform const& component);
+		void Update(ComponentType const& component);
 	};
 
 	class SpriteRenderer2DWidget : public Gui::CollapsingHeader
 	{
 	public:
+		using ComponentType = Gfx::TextureID;
+
 		Gui::LineEdit* textureIdInput = nullptr;
 		
 		SpriteRenderer2DWidget(EditorImpl const& editorImpl);
-		void Update(Gfx::TextureID const& component);
+		void Update(ComponentType const& component);
 	};
 
 	class RigidbodyWidget : public Gui::CollapsingHeader
 	{
+	public:
+		using ComponentType = Physics::Rigidbody2D;
+
 		Gui::Dropdown* bodyTypeDropdown = nullptr;
 
 		Gui::Text* debug_VelocityLabel = nullptr;
 
-	public:
 		RigidbodyWidget(EditorImpl const& editorImpl);
-		void Update(Physics::Rigidbody2D const& component);
+		void Update(ComponentType const& component);
 	};
 }

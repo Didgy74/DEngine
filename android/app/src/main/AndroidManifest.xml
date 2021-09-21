@@ -10,7 +10,7 @@
 
     <application
         android:label="@string/app_name"
-        android:isGame="true"
+        android:isGame="false"
         android:theme="@android:style/Theme.NoTitleBar">
 
         <!-- Our activity is the built-in NativeActivity framework class.
@@ -18,12 +18,14 @@
         <activity
             android:name="didgy.dengine.editor.DEngineActivity"
             android:label="@string/app_name"
-            android:configChanges="orientation|screenSize">
+            android:configChanges="orientation|screenSize"
+            android:exported="true">
             <!-- Tell NativeActivity the name of or .so -->
-            <meta-data android:name="android.app.lib_name"
-                    android:value="@string/lib_name" />
+            <meta-data
+                android:name="android.app.lib_name" android:value="@string/lib_name" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

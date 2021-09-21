@@ -1,52 +1,57 @@
-#include "ViewportWidget.hpp"
-
 #include "Editor.hpp"
 #include "EditorImpl.hpp"
+
+#include "ViewportWidget.hpp"
 #include "ComponentWidgets.hpp"
 
-#include <DEngine/Gui/ButtonGroup.hpp>
-#include <DEngine/Gui/DockArea.hpp>
 #include <DEngine/Gui/LineList.hpp>
 #include <DEngine/Gui/ScrollArea.hpp>
 
-#include <DEngine/Application.hpp>
-#include <DEngine/Gfx/Gfx.hpp>
 #include <DEngine/Time.hpp>
-
-#include <DEngine/Physics.hpp>
-
-#include <DEngine/Std/Containers/Box.hpp>
-#include <DEngine/Std/Utility.hpp>
-
-#include <DEngine/Math/Constant.hpp>
-#include <DEngine/Math/LinearTransform3D.hpp>
 
 #include <vector>
 #include <string>
 
+using namespace DEngine;
+using namespace DEngine::Editor;
+
+Std::Array<Math::Vec4, (int)Settings::Color::COUNT> Settings::colorArray = Settings::BuildColorArray();
+
 namespace DEngine::Editor
 {
+	enum class FileMenuEnum
+	{
+		Entities,
+		Components,
+		NewViewport,
+		COUNT
+	};
+
 	class EntityIdList : public Gui::StackLayout
 	{
 	public:
 		Gui::LineList* entitiesList = nullptr;
 		EditorImpl* editorImpl = nullptr;
 
-		EntityIdList(EditorImpl* editorImpl) :
-			editorImpl(editorImpl)
+		EntityIdList(EditorImpl& editorImpl) :
+			editorImpl(&editorImpl)
 		{
-			DENGINE_DETAIL_ASSERT(!editorImpl->entityIdList);
-			editorImpl->entityIdList = this;
+			DENGINE_DETAIL_ASSERT(!editorImpl.entityIdList);
+			editorImpl.entityIdList = this;
 
-			this->direction = Direction::Vertical;
+			direction = Direction::Vertical;
 
-			Gui::StackLayout* topElementLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-			this->AddWidget(Std::Box<Gui::Widget>{ topElementLayout });
+			auto topElementLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
+			topElementLayout->spacing = 15;
+			this->AddWidget(Std::Box{ topElementLayout });
 
-			Gui::Button* newEntityButton = new Gui::Button;
-			topElementLayout->AddWidget(Std::Box<Gui::Widget>{ newEntityButton });
+			auto newEntityButton = new Gui::Button;
+			topElementLayout->AddWidget(Std::Box{ newEntityButton });
 			newEntityButton->text = "New";
-			newEntityButton->activatePfn = [this](
+			newEntityButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
+			newEntityButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
+			newEntityButton->textMargin = Editor::Settings::defaultTextMargin;
+			newEntityButton->activateFn = [this](
 				Gui::Button& btn)
 			{
 				Entity newId = this->editorImpl->scene->NewEntity();
@@ -54,9 +59,12 @@ namespace DEngine::Editor
 			};
 
 			Gui::Button* entityDeleteButton = new Gui::Button;
-			topElementLayout->AddWidget(Std::Box<Gui::Widget>{ entityDeleteButton });
+			topElementLayout->AddWidget(Std::Box{ entityDeleteButton });
 			entityDeleteButton->text = "Delete";
-			entityDeleteButton->activatePfn = [this](
+			entityDeleteButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
+			entityDeleteButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
+			entityDeleteButton->textMargin = Editor::Settings::defaultTextMargin;
+			entityDeleteButton->activateFn = [this](
 				Gui::Button& btn)
 			{
 				if (!this->editorImpl->GetSelectedEntity().HasValue())
@@ -70,14 +78,30 @@ namespace DEngine::Editor
 
 				this->editorImpl->scene->DeleteEntity(selectedEntity);
 			};
-			
+
+			auto deselectButton = new Gui::Button;
+			topElementLayout->AddWidget(Std::Box{ deselectButton });
+			deselectButton->text = "Deselect";
+			deselectButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
+			deselectButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
+			deselectButton->textMargin = Editor::Settings::defaultTextMargin;
+			deselectButton->activateFn = [this](
+				Gui::Button& btn)
+			{
+				if (!this->editorImpl->GetSelectedEntity().HasValue())
+					return;
+
+				this->editorImpl->UnselectEntity();
+			};
+
 			Gui::ScrollArea* entityListScrollArea = new Gui::ScrollArea();
 			this->AddWidget(Std::Box<Gui::Widget>{ entityListScrollArea });
+			entityListScrollArea->scrollbarInactiveColor = Settings::GetColor(Settings::Color::Scrollbar_Normal);
 
 			entitiesList = new Gui::LineList();
 			entityListScrollArea->widget = Std::Box<Gui::Widget>{ entitiesList };
-			entitiesList->canSelect = true;
-			entitiesList->selectedLineChangedCallback = [this](
+			entitiesList->textMargin = Settings::defaultTextMargin;
+			entitiesList->selectedLineChangedFn = [this](
 				Gui::LineList& widget)
 			{
 				if (widget.selectedLine.HasValue())
@@ -85,24 +109,31 @@ namespace DEngine::Editor
 					auto lineText = widget.lines[widget.selectedLine.Value()].c_str();
 					this->editorImpl->SelectEntity((Entity)std::atoi(lineText));
 				}
+				else
+					this->editorImpl->UnselectEntity();
 			};
 
-			auto entities = editorImpl->scene->GetEntities();
+			auto entities = editorImpl.scene->GetEntities();
 			for (uSize i = 0; i < entities.Size(); i += 1)
 			{
 				Entity entityId = entities[i];
 				AddEntityToList(entityId);
-				if (editorImpl->GetSelectedEntity().HasValue() && entityId == editorImpl->GetSelectedEntity().Value())
+				if (editorImpl.GetSelectedEntity().HasValue() && entityId == editorImpl.GetSelectedEntity().Value())
 				{
 					entitiesList->selectedLine = i;
 				}
 			}
 		}
 
-		virtual ~EntityIdList()
+		virtual ~EntityIdList() override
 		{
 			DENGINE_DETAIL_ASSERT(editorImpl->entityIdList == this);
 			editorImpl->entityIdList = nullptr;
+
+			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Entities].data;
+			DENGINE_DETAIL_ASSERT(submenuLine.IsA<Gui::MenuButton::LineButton>());
+			auto& lineButton = submenuLine.Get<Gui::MenuButton::LineButton>();
+			lineButton.toggled = false;
 		}
 
 		void AddEntityToList(Entity id)
@@ -150,11 +181,13 @@ namespace DEngine::Editor
 		SpriteRenderer2DWidget* spriteRendererWidget = nullptr;
 		RigidbodyWidget* box2DWidget = nullptr;
 
-		ComponentList(EditorImpl* inEditorImpl) :
-			editorImpl(inEditorImpl)
+		ComponentList(EditorImpl& inEditorImpl) :
+			editorImpl(&inEditorImpl)
 		{
 			DENGINE_DETAIL_ASSERT(!editorImpl->componentList);
 			editorImpl->componentList = this;
+
+			scrollbarInactiveColor = Settings::GetColor(Settings::Color::Scrollbar_Normal);
 
 			outerLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
 			this->widget = Std::Box<Gui::Widget>{ outerLayout };
@@ -168,27 +201,32 @@ namespace DEngine::Editor
 			}
 		}
 
-		virtual ~ComponentList()
+		virtual ~ComponentList() override
 		{
 			DENGINE_DETAIL_ASSERT(editorImpl->componentList == this);
 			editorImpl->componentList = nullptr;
+
+			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Components].data;
+			DENGINE_DETAIL_ASSERT(submenuLine.IsA<Gui::MenuButton::LineButton>());
+			auto& lineButton = submenuLine.Get<Gui::MenuButton::LineButton>();
+			lineButton.toggled = false;
 		}
 
 		void EntitySelected(Entity id)
 		{
 			outerLayout->ClearChildren();
-			
-			moveWidget = new MoveWidget(editorImpl->scene, id);
-			outerLayout->AddWidget(Std::Box<Gui::Widget>{ moveWidget });
+
+			moveWidget = new MoveWidget(*editorImpl);
+			outerLayout->AddWidget(Std::Box{ moveWidget });
 
 			transformWidget = new TransformWidget(*editorImpl);
-			outerLayout->AddWidget(Std::Box<Gui::Widget>{ transformWidget });
+			outerLayout->AddWidget(Std::Box{ transformWidget });
 
 			spriteRendererWidget = new SpriteRenderer2DWidget(*editorImpl);
-			outerLayout->AddWidget(Std::Box<Gui::Widget>{ spriteRendererWidget });
+			outerLayout->AddWidget(Std::Box{ spriteRendererWidget });
 
 			box2DWidget = new RigidbodyWidget(*editorImpl);
-			outerLayout->AddWidget(Std::Box<Gui::Widget>{ box2DWidget });
+			outerLayout->AddWidget(Std::Box{ box2DWidget });
 		}
 
 		void Tick(Scene const& scene, Entity id)
@@ -203,7 +241,7 @@ namespace DEngine::Editor::detail
 {
 	struct Gfx_App_Connection : public Gfx::WsiInterface
 	{
-		App::WindowID appWindowID{};
+		App::WindowID appWindowID = {};
 
 		// Return type is VkResult
 		//
@@ -228,81 +266,89 @@ using namespace DEngine;
 
 namespace DEngine::Editor
 {
-	static Std::Box<Gui::Widget> CreateNavigationBar(
+	[[nodiscard]] static Std::Box<Gui::Widget> CreateNavigationBar(
 		EditorImpl& editorImpl)
 	{
-		// Menu button
-		Gui::MenuBar* menuBarA = new Gui::MenuBar(Gui::MenuBar::Direction::Horizontal);
+		auto stackLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
+		stackLayout->spacing = Editor::Settings::defaultTextMargin;
 
-		menuBarA->stackLayout.spacing = 25;
-		
-		menuBarA->AddSubmenuButton(
-			"Submenu",
-			[&editorImpl](
-				Gui::MenuBar& newMenuBar)
-			{
-				newMenuBar.stackLayout.color = { 0.25f, 0.f, 0.25f, 1.f };
-				newMenuBar.stackLayout.spacing = 10;
-				newMenuBar.stackLayout.padding = 10;
-
-				
-				newMenuBar.AddToggleMenuButton(
-					"Entities",
-					editorImpl.entityIdList != nullptr,
-					[&editorImpl](
-						bool activated)
-					{
-						if (activated)
-						{
-							editorImpl.InvalidateRendering();
-							editorImpl.dockArea->AddWindow(
-								"Entities",
-								{ 0.5f, 0.5f, 0.f, 1.f },
-								Std::Box<Gui::Widget>{ new EntityIdList(&editorImpl) });
-						}
-					});
-
-				newMenuBar.AddToggleMenuButton(
-					"Components",
-					editorImpl.componentList != nullptr,
-					[&editorImpl](
-						bool activated)
-					{
-						if (activated)
-						{
-							editorImpl.InvalidateRendering();
-							editorImpl.dockArea->AddWindow(
-								"Components",
-								{ 0.f, 0.5f, 0.5f, 1.f },
-								Std::Box<Gui::Widget>{ new ComponentList(&editorImpl) });
-						}
-					});
-
-				newMenuBar.AddMenuButton(
-					"New viewport",
-					[&editorImpl]()
-					{
-						editorImpl.InvalidateRendering();
-						editorImpl.dockArea->AddWindow(
-							"Viewport",
-							{ 0.5f, 0.f, 0.5f, 1.f },
-							Std::Box<Gui::Widget>{ new ViewportWidget(editorImpl, *editorImpl.gfxCtx) });
-					});
-			});
+		auto menuButton = new Gui::MenuButton;
+		editorImpl.viewMenuButton = menuButton;
+		menuButton->colors.normal = Settings::GetColor(Settings::Color::Button_Normal);
+		menuButton->spacing = Editor::Settings::defaultTextMargin;
+		menuButton->margin = Editor::Settings::defaultTextMargin;
+		stackLayout->AddWidget(Std::Box{ menuButton });
+		menuButton->submenu.lines.resize((int)FileMenuEnum::COUNT);
+		menuButton->title = "Menu";
+		{
+			// Create button for Entities window
+			Gui::MenuButton::LineButton btn = {};
+			btn.toggled = true;
+			btn.togglable = true;
+			btn.callback = [&editorImpl](Gui::MenuButton::LineButton& btn) {
+				if (btn.toggled)
+				{
+					editorImpl.dockArea->AddWindow(
+						"Entities",
+						Settings::GetColor(Settings::Color::Window_Entities),
+						Std::Box{ new EntityIdList(editorImpl) });
+				}
+				btn.toggled = true;
+			};
+			Gui::MenuButton::Line line = { Std::Move(btn) };
+			line.title = "Entities";
+			menuButton->submenu.lines[(int)FileMenuEnum::Entities] = Std::Move(line);
+		}
+		{
+			// Create button for Components window
+			Gui::MenuButton::LineButton btn = {};
+			btn.toggled = true;
+			btn.togglable = true;
+			btn.callback = [&editorImpl](Gui::MenuButton::LineButton& btn) {
+				if (btn.toggled)
+				{
+					editorImpl.dockArea->AddWindow(
+						"Components",
+						Settings::GetColor(Settings::Color::Window_Components),
+						Std::Box{ new ComponentList(editorImpl) });
+				}
+				btn.toggled = true;
+			};
+			Gui::MenuButton::Line line = { Std::Move(btn) };
+			line.title = "Components";
+			menuButton->submenu.lines[(int)FileMenuEnum::Components] = Std::Move(line);
+		}
+		{
+			// Create button for adding viewport
+			Gui::MenuButton::LineButton btn = {};
+			btn.toggled = false;
+			btn.togglable = false;
+			btn.callback = [&editorImpl](Gui::MenuButton::LineButton& btn) {
+				editorImpl.dockArea->AddWindow(
+					"Viewport",
+					Settings::GetColor(Settings::Color::Window_Viewport),
+					Std::Box{ new ViewportWidget(editorImpl) });
+			};
+			Gui::MenuButton::Line line = { Std::Move(btn) };
+			line.title = "New viewport";
+			menuButton->submenu.lines[(int)FileMenuEnum::NewViewport] = Std::Move(line);
+		}
 
 		// Delta time counter at the top
 		Gui::Text* deltaText = new Gui::Text;
-		menuBarA->stackLayout.AddWidget(Std::Box<Gui::Widget>{ deltaText });
+		stackLayout->AddWidget(Std::Box{ deltaText });
 		editorImpl.test_fpsText = deltaText;
+		deltaText->margin = Editor::Settings::defaultTextMargin;
 		deltaText->String_Set("Child text");
-		
 
-		Gui::Button* playButton = new Gui::Button;
-		menuBarA->stackLayout.AddWidget(Std::Box<Gui::Widget>{ playButton });
+		auto playButton = new Gui::Button;
+		stackLayout->AddWidget(Std::Box{ playButton });
+		playButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
+		playButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
 		playButton->text = "Play";
+		playButton->textMargin = Editor::Settings::defaultTextMargin;
 		playButton->type = Gui::Button::Type::Toggle;
-		playButton->activatePfn = [&editorImpl](
-			Gui::Button& btn)
+		playButton->activateFn = [&editorImpl](Gui::Button& btn)
 		{
 			if (btn.GetToggled())
 			{
@@ -316,12 +362,15 @@ namespace DEngine::Editor
 
 		Gui::ButtonGroup* gizmoBtnGroup = new Gui::ButtonGroup;
 		editorImpl.gizmoTypeBtnGroup = gizmoBtnGroup;
-		menuBarA->stackLayout.AddWidget(Std::Box<Gui::Widget>{ gizmoBtnGroup });
+		stackLayout->AddWidget(Std::Box{ gizmoBtnGroup });
+		gizmoBtnGroup->inactiveColor = Settings::GetColor(Settings::Color::Button_Normal);
+		gizmoBtnGroup->activeColor = Settings::GetColor(Settings::Color::Button_Active);
+		gizmoBtnGroup->margin = Editor::Settings::defaultTextMargin;
 		gizmoBtnGroup->AddButton("Translate");
 		gizmoBtnGroup->AddButton("Rotate");
 		gizmoBtnGroup->AddButton("Scale");
 
-		return Std::Box<Gui::Widget>{ menuBarA };
+		return Std::Box{ stackLayout };
 	}
 }
 
@@ -334,35 +383,105 @@ Editor::Context Editor::Context::Create(
 
 	newCtx.implData = new EditorImpl;
 	EditorImpl& implData = *newCtx.implData;
-	implData.guiCtx = Std::Box{ new Gui::Context(Gui::Context::Create(implData, gfxCtx)) };
+	
 	implData.gfxCtx = gfxCtx;
 	implData.scene = scene;
 	App::InsertEventInterface(implData);
 
-	Gui::StackLayout* outmostLayout = implData.guiCtx->outerLayout;
+	auto outmostLayout = new Gui::StackLayout(Gui::StackLayout::Dir::Vertical);
 
 	outmostLayout->AddWidget(CreateNavigationBar(implData));
 
 	Gui::DockArea* dockArea = new Gui::DockArea;
 	implData.dockArea = dockArea;
-	outmostLayout->AddWidget(Std::Box<Gui::Widget>{ dockArea });
+	outmostLayout->AddWidget(Std::Box{ dockArea });
+	dockArea->tabTextMargin = Editor::Settings::defaultTextMargin;
 
-	implData.dockArea->AddWindow(
+	dockArea->AddWindow(
 		"Entities",
-		{ 0.5f, 0.5f, 0.f, 1.f },
-		Std::Box<Gui::Widget>{ new EntityIdList(&implData) });
+		Settings::GetColor(Settings::Color::Window_Entities),
+		Std::Box{ new EntityIdList(implData) });
 
-	implData.dockArea->AddWindow(
+	dockArea->AddWindow(
 		"Components",
-		{ 0.f, 0.5f, 0.5f, 1.f },
-		Std::Box<Gui::Widget>{ new ComponentList(&implData) });
+		Settings::GetColor(Settings::Color::Window_Components),
+		Std::Box{ new ComponentList(implData) });
 		
-	implData.dockArea->AddWindow(
+	dockArea->AddWindow(
 		"Viewport",
-		{ 0.5f, 0.f, 0.5f, 1.f },
-		Std::Box<Gui::Widget>{ new ViewportWidget(implData, *implData.gfxCtx) });
+		Settings::GetColor(Settings::Color::Window_Viewport),
+		Std::Box{ new ViewportWidget(implData) });
 	
+	Gui::WindowHandler& guiWinHandler = implData;
+	implData.guiCtx = Std::Box{ new Gui::Context(Gui::Context::Create(guiWinHandler, gfxCtx)) };
+
+	auto const clearColor = Settings::GetColor(Settings::Color::Background);
+	auto windowExtent = App::GetWindowExtent(mainWindow);
+	auto windowPos = App::GetWindowPosition(mainWindow);
+	auto visibleExtent = App::GetWindowVisibleExtent(mainWindow);
+	auto visibleOffset = App::GetWindowVisibleOffset(mainWindow);
+	implData.guiCtx->AdoptWindow(
+		(Gui::WindowID)mainWindow,
+		clearColor,
+		{ windowPos, { windowExtent.width, windowExtent.height } },
+		{ windowPos + visibleOffset, { visibleExtent.width, visibleExtent.height } },
+		Std::Box{ outmostLayout });
+
 	return newCtx;
+}
+
+void Editor::EditorImpl::FlushQueuedEvents()
+{
+	for (auto const& event : queuedGuiEvents)
+	{
+		using EventT = Std::Trait::RemoveCVRef<decltype(event)>;
+
+		switch (event.GetIndex())
+		{
+			case EventT::indexOf<Gui::CharEnterEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CharEnterEvent>());
+				break;
+			case EventT::indexOf<Gui::CharEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CharEvent>());
+				break;
+			case EventT::indexOf<Gui::CharRemoveEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CharRemoveEvent>());
+				break;
+			case EventT::indexOf<Gui::CursorClickEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CursorClickEvent>());
+				break;
+			case EventT::indexOf<Gui::CursorMoveEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CursorMoveEvent>());
+				break;
+			case EventT::indexOf<Gui::TouchPressEvent>:
+				guiCtx->PushEvent(event.Get<Gui::TouchPressEvent>());
+				break;
+			case EventT::indexOf<Gui::TouchMoveEvent>:
+				guiCtx->PushEvent(event.Get<Gui::TouchMoveEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowCloseEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowCloseEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowCursorEnterEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowCursorEnterEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowMinimizeEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowMinimizeEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowMoveEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowMoveEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowResizeEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowResizeEvent>());
+				break;
+
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				break;
+		}
+		InvalidateRendering();
+	}
+	queuedGuiEvents.clear();
 }
 
 void Editor::Context::ProcessEvents()
@@ -372,33 +491,18 @@ void Editor::Context::ProcessEvents()
 	if (App::TickCount() == 1)
 		implData.InvalidateRendering();
 	
-	for (impl::GuiEvent const& event : implData.queuedGuiEvents)
-	{
-		switch (event.type)
-		{
-			case impl::GuiEvent::Type::CharEnterEvent: implData.guiCtx->PushEvent(event.charEnter); break;
-			case impl::GuiEvent::Type::CharEvent: implData.guiCtx->PushEvent(event.charEvent); break;
-			case impl::GuiEvent::Type::CharRemoveEvent: implData.guiCtx->PushEvent(event.charRemove); break;
-			case impl::GuiEvent::Type::CursorClickEvent: implData.guiCtx->PushEvent(event.cursorClick); break;
-			case impl::GuiEvent::Type::CursorMoveEvent: implData.guiCtx->PushEvent(event.cursorMove); break;
-			case impl::GuiEvent::Type::TouchEvent: implData.guiCtx->PushEvent(event.touch); break;
-			case impl::GuiEvent::Type::WindowCloseEvent: implData.guiCtx->PushEvent(event.windowClose); break;
-			case impl::GuiEvent::Type::WindowCursorEnterEvent: implData.guiCtx->PushEvent(event.windowCursorEnter); break;
-			case impl::GuiEvent::Type::WindowMinimizeEvent: implData.guiCtx->PushEvent(event.windowMinimize); break;
-			case impl::GuiEvent::Type::WindowMoveEvent: implData.guiCtx->PushEvent(event.windowMove); break;
-			case impl::GuiEvent::Type::WindowResizeEvent: implData.guiCtx->PushEvent(event.windowResize); break;
-		}
-		implData.InvalidateRendering();
-	}
-	implData.queuedGuiEvents.clear();
+	implData.FlushQueuedEvents();
 
 	for (auto viewportPtr : implData.viewportWidgets)
 	{
-		viewportPtr->TickTest(Time::Delta());
+		viewportPtr->Tick(Time::Delta());
 	}
 	if (App::TickCount() % 60 == 0)
 	{
-		implData.test_fpsText->String_Set(std::to_string(Time::Delta()).c_str());
+		std::string temp;
+		//temp += std::to_string(1.f / Time::Delta()) + " - ";
+		temp += std::to_string(Time::Delta());
+		implData.test_fpsText->String_Set(temp.c_str());
 		implData.InvalidateRendering();
 	}
 	if (App::TickCount() % 10 == 0)
@@ -416,7 +520,7 @@ void Editor::Context::ProcessEvents()
 
 		for (auto viewportPtr : implData.viewportWidgets)
 		{
-			viewportPtr->isVisible = false;
+			viewportPtr->viewport->isVisible = false;
 		}
 
 		implData.vertices.clear();
@@ -431,8 +535,8 @@ void Editor::Context::ProcessEvents()
 
 		for (auto viewportPtr : implData.viewportWidgets)
 		{
-			if (viewportPtr->currentExtent == Gui::Extent{} && viewportPtr->newExtent != Gui::Extent{})
-				viewportPtr->currentExtent = viewportPtr->newExtent;
+			if (viewportPtr->viewport->currentExtent == Gui::Extent{} && viewportPtr->viewport->newExtent != Gui::Extent{})
+				viewportPtr->viewport->currentExtent = viewportPtr->viewport->newExtent;
 		}
 	}
 }
@@ -469,12 +573,12 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 	{
 		DENGINE_DETAIL_ASSERT(viewportWidgetPtr);
 		auto& viewportWidget = *viewportWidgetPtr;
-		if (viewportWidgetPtr->isVisible)
+		if (viewportWidgetPtr->viewport->isVisible)
 		{
-			DENGINE_DETAIL_ASSERT(viewportWidget.currentExtent.width > 0 && viewportWidget.currentExtent.height > 0);
-			DENGINE_DETAIL_ASSERT(viewportWidget.newExtent.width > 0 && viewportWidget.newExtent.height > 0);
+			DENGINE_DETAIL_ASSERT(viewportWidget.viewport->currentExtent.width > 0 && viewportWidget.viewport->currentExtent.height > 0);
+			DENGINE_DETAIL_ASSERT(viewportWidget.viewport->newExtent.width > 0 && viewportWidget.viewport->newExtent.height > 0);
 
-			Gfx::ViewportUpdate update = viewportWidget.GetViewportUpdate(
+			Gfx::ViewportUpdate update = viewportWidget.viewport->GetViewportUpdate(
 				*this,
 				returnVal.lineVertices,
 				returnVal.lineDrawCmds);
@@ -486,7 +590,7 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 	return returnVal;
 }
 
-bool Editor::Context::CurrentlySimulating() const
+bool Editor::Context::IsSimulating() const
 {
 	EditorImpl& implData = this->ImplData();
 	return implData.tempScene;
@@ -566,12 +670,12 @@ void Editor::EditorImpl::StopSimulating()
 	tempScene.Clear();
 }
 
-std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh()
+std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh3D()
 {
-	Gizmo::Arrow arrow = Editor::Gizmo::defaultArrow;
+	auto const arrow = Gizmo::defaultArrow;
 
 	f32 arrowShaftRadius = arrow.shaftDiameter / 2.f;
-	f32 arrowCapRadius = arrow.capSize / 2.f;
+	f32 arrowCapRadius = arrow.capDiameter / 2.f;
 
 	u32 subdivisions = 4;
 	// We need atleast 2 subdivisons so we can atleast get a diamond
@@ -585,13 +689,13 @@ std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh()
 		f32 currentRadiansB = 2 * Math::pi / baseCircleTriangleCount * ((i + 1) % baseCircleTriangleCount);
 		
 		{
-			Math::Vec3 shaftBaseVertA{};
+			Math::Vec3 shaftBaseVertA = {};
 			shaftBaseVertA.x = Math::Sin(currentRadiansA);
 			shaftBaseVertA.x *= arrowShaftRadius;
 			shaftBaseVertA.y = Math::Cos(currentRadiansA);
 			shaftBaseVertA.y *= arrowShaftRadius;
 
-			Math::Vec3 shaftBaseVertB{};
+			Math::Vec3 shaftBaseVertB = {};
 			shaftBaseVertB.x = Math::Sin(currentRadiansB);
 			shaftBaseVertB.x *= arrowShaftRadius;
 			shaftBaseVertB.y = Math::Cos(currentRadiansB);
@@ -616,14 +720,14 @@ std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh()
 			vertices.push_back(shaftTopVertB);
 
 			// Append walls to build base of cap
-			Math::Vec3 capBaseVertA{};
+			Math::Vec3 capBaseVertA = {};
 			capBaseVertA.x = Math::Sin(currentRadiansA);
 			capBaseVertA.x *= arrowCapRadius;
 			capBaseVertA.y = Math::Cos(currentRadiansA);
 			capBaseVertA.y *= arrowCapRadius;
 			capBaseVertA.z = arrow.shaftLength;
 
-			Math::Vec3 capBaseVertB{};
+			Math::Vec3 capBaseVertB = {};
 			capBaseVertB.x = Math::Sin(currentRadiansB);
 			capBaseVertB.x *= arrowCapRadius;
 			capBaseVertB.y = Math::Cos(currentRadiansB);
@@ -639,7 +743,7 @@ std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh()
 			vertices.push_back(capBaseVertB);
 
 			// Connect cap base to arrow head
-			Math::Vec3 arrowHeadMidVert{};
+			Math::Vec3 arrowHeadMidVert = {};
 			arrowHeadMidVert.z = arrow.shaftLength + arrow.capLength;
 
 			vertices.push_back(capBaseVertA);
@@ -651,7 +755,49 @@ std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh()
 	return vertices;
 }
 
-std::vector<Math::Vec3> Editor::BuildGizmoTorusMesh()
+std::vector<Math::Vec3> Editor::BuildGizmoTranslateArrowMesh2D()
+{
+	std::vector<Math::Vec3> vertices;
+
+	// Make quad for the base
+	constexpr auto arrow = Gizmo::defaultArrow;
+
+	Math::Vec3 bleh = {};
+
+	bleh.x = 0.f;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = 0.f;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+
+	bleh.x = 0.f;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+
+	bleh.x = arrow.shaftLength;
+	bleh.y = arrow.capDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.capDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength + arrow.capLength;
+	bleh.y = 0.f;
+	vertices.push_back(bleh);
+
+	return vertices;
+}
+
+std::vector<Math::Vec3> Editor::BuildGizmoTorusMesh2D()
 {
 	std::vector<Math::Vec3> vertices;
 
@@ -666,21 +812,73 @@ std::vector<Math::Vec3> Editor::BuildGizmoTorusMesh()
 		f32 radianB = 2 * Math::pi / outerCount * (i + 1);
 
 		Math::Vec3 temp = { Math::Cos(radianA), Math::Sin(radianA), 0.f };
-		Math::Vec3 a = temp * (outerRadius + innerRadius);
-		Math::Vec3 b = temp * (outerRadius - innerRadius);
+		auto a = temp * (outerRadius + innerRadius);
+		auto b = temp * (outerRadius - innerRadius);
 
 		temp = { Math::Cos(radianB), Math::Sin(radianB), 0.f };
-		Math::Vec3 c = temp * (outerRadius + innerRadius);
+		auto c = temp * (outerRadius + innerRadius);
 
 		vertices.push_back(a);
 		vertices.push_back(b);
 		vertices.push_back(c);
 
-		Math::Vec3 d = temp * (outerRadius - innerRadius);
+		auto d = temp * (outerRadius - innerRadius);
 		vertices.push_back(b);
 		vertices.push_back(c);
 		vertices.push_back(d);
 	}
+
+	return vertices;
+}
+
+std::vector<Math::Vec3> Editor::BuildGizmoScaleArrowMesh2D()
+{
+	std::vector<Math::Vec3> vertices;
+
+	// Make quad for the base
+	constexpr auto arrow = Gizmo::defaultArrow;
+
+	Math::Vec3 bleh = {};
+
+	bleh.x = 0.f;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = 0.f;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+
+	bleh.x = 0.f;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = arrow.shaftDiameter / 2.f;
+	vertices.push_back(bleh);
+
+	bleh.x = arrow.shaftLength;
+	bleh.y = arrow.capLength / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength;
+	bleh.y = -arrow.capLength / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength + arrow.capLength;
+	bleh.y = -arrow.capLength / 2.f;
+	vertices.push_back(bleh);
+
+	bleh.x = arrow.shaftLength;
+	bleh.y = arrow.capLength / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength + arrow.capLength;
+	bleh.y = -arrow.capLength / 2.f;
+	vertices.push_back(bleh);
+	bleh.x = arrow.shaftLength + arrow.capLength;
+	bleh.y = arrow.capLength / 2.f;
+	vertices.push_back(bleh);
 
 	return vertices;
 }

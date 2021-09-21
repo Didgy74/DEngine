@@ -26,7 +26,7 @@ namespace DEngine::Gfx::Vk
 		WsiInterface* wsiConnection = nullptr;
 		vk::SurfaceKHR surface = {};
 		vk::SwapchainKHR swapchain = {};
-		Std::StackVec<vk::Image, Constants::maxSwapchainLength> swapchainImages;
+		Std::StackVec<vk::Image, Const::maxSwapchainLength> swapchainImages;
 		Std::StackVec<vk::ImageView, Const::maxSwapchainLength> swapchainImgViews;
 		vk::Semaphore swapchainImgReadySem = {};
 		Std::StackVec<vk::Framebuffer, Const::maxSwapchainLength> framebuffers;

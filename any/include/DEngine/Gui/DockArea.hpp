@@ -2,9 +2,12 @@
 
 #include <DEngine/Gui/Widget.hpp>
 
+#include <DEngine/FixedWidthTypes.hpp>
+
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/Variant.hpp>
+#include <DEngine/Std/Containers/Str.hpp>
 
 #include <DEngine/Math/Vector.hpp>
 
@@ -16,29 +19,27 @@ namespace DEngine::Gui
 	class DockArea : public Widget
 	{
 	public:
-		DockArea();
-		
-		struct Node;
+		struct NodeBase
+		{
+			virtual ~NodeBase() {}
+		};
 		struct Layer
 		{
 			// This rect is relative to the DockArea widget's position.
-			Rect rect{};
-			Std::Box<Node> root;
+			Rect rect = {};
+			Std::Box<NodeBase> root = nullptr;
 		};
 		std::vector<Layer> layers;
 
 		u32 gizmoSize = 75;
 		u32 resizeHandleThickness = 50;
 		u32 resizeHandleLength = 75;
-		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.75f };
+		u32 tabTextMargin = 0;
+		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.5f };
 		Math::Vec4 deleteLayerGizmoColor = { 1.f, 0.f, 0.f, 0.75f };
 		Math::Vec4 dockingHighlightColor = { 0.f, 0.5f, 1.f, 0.5f };
 
-		static constexpr auto cursorPointerID = static_cast<u8>(-1);
-
-		struct State_Normal
-		{
-		};
+		struct State_Normal {};
 		struct State_Moving
 		{
 			bool movingSplitNode;
@@ -60,7 +61,7 @@ namespace DEngine::Gui
 		struct State_HoldingTab
 		{
 			// This is a impl::DA_WindowNode type
-			void const* windowBeingHeld = nullptr;
+			void const* windowBeingHeld;
 			u8 pointerId;
 			// Pointer offset relative to tab origin
 			Math::Vec2 pointerOffset;
@@ -68,7 +69,7 @@ namespace DEngine::Gui
 		struct State_ResizingSplitNode
 		{
 			uSize layerIndex;
-			void const* splitNode = nullptr;
+			void const* splitNode;
 			u8 pointerId;
 		};
 		using StateDataT = Std::Variant<
@@ -76,7 +77,10 @@ namespace DEngine::Gui
 			State_Moving,
 			State_HoldingTab,
 			State_ResizingSplitNode>;
-		StateDataT stateData{};
+		StateDataT stateData = State_Normal{};
+
+	public:
+		DockArea();
 
 		void AddWindow(
 			Std::Str title,
@@ -93,14 +97,7 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		virtual void CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event) override;
-
-		virtual void CursorClick(
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -108,12 +105,28 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
-		virtual void TouchEvent(
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override;
+			CursorMoveEvent event,
+			bool occluded) override;
+
+		virtual bool TouchPressEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchPressEvent event) override;
+
+		virtual bool TouchMoveEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchMoveEvent event,
+			bool occluded) override;
 
 		virtual void InputConnectionLost() override;
 

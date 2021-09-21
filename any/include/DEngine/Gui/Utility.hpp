@@ -3,6 +3,8 @@
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Gui/impl/Assert.hpp>
 
+#include <DEngine/detail/Assert.hpp>
+
 #include <DEngine/Math/Common.hpp>
 #include <DEngine/Math/Vector.hpp>
 
@@ -17,23 +19,32 @@ namespace DEngine::Gui
 
 		[[nodiscard]] constexpr u32& operator[](uSize index) noexcept
 		{
-			DENGINE_IMPL_GUI_ASSERT_MSG(
-				index < 2,
-				"Attempted to index into an Extent with an index out of bounds.");
-			return (&width)[index];
+			switch (index)
+			{
+				case 0: return width;
+				case 1: return height;
+				default:
+					DENGINE_IMPL_UNREACHABLE();
+					return width;
+			}
 		}
 		[[nodiscard]] constexpr u32 operator[](uSize index) const noexcept
 		{
-			DENGINE_IMPL_GUI_ASSERT_MSG(
-				index < 2,
-				"Attempted to index into an Extent with an index out of bounds.");
-			return (&width)[index];
+			switch (index)
+			{
+			case 0: return width;
+			case 1: return height;
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				return width;
+			}
 		}
 
 		[[nodiscard]] constexpr bool operator==(Extent const&) const noexcept;
 		[[nodiscard]] constexpr bool operator!=(Extent const&) const noexcept;
 	};
 
+	// Represents a rectangle in UI space. Includes position and extent.
 	struct Rect
 	{
 		Math::Vec2Int position = {};

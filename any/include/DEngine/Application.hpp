@@ -43,10 +43,11 @@ namespace DEngine::Application
 		Extent extents);
 	void DestroyWindow(WindowID) noexcept;
 	u32 GetWindowCount() noexcept;
-	Extent GetWindowSize(WindowID) noexcept;
-	Extent GetWindowVisibleSize(WindowID) noexcept;
+	Extent GetWindowExtent(WindowID) noexcept;
+	Extent GetWindowVisibleExtent(WindowID) noexcept;
 	Math::Vec2Int GetWindowPosition(WindowID) noexcept;
-	Math::Vec2Int GetWindowVisiblePosition(WindowID) noexcept;
+	// Gets the offset of the visible extent, relative to the window's position.
+	Math::Vec2Int GetWindowVisibleOffset(WindowID) noexcept;
 	bool GetWindowMinimized(WindowID) noexcept;
 	WindowEvents GetWindowEvents(WindowID) noexcept;
 	Std::StackVec<char const*, 5> RequiredVulkanInstanceExtensions() noexcept;
@@ -68,7 +69,12 @@ namespace DEngine::Application
 	enum class Platform : u8;
 
 	enum class Button : u16;
-	enum class KeyEventType : u8;
+	enum class KeyEventType : u8
+	{
+		Unchanged,
+		Unpressed,
+		Pressed,
+	};
 	bool ButtonValue(Button input) noexcept;
 	KeyEventType ButtonEvent(Button input) noexcept;
 	f32 ButtonDuration(Button input) noexcept;
@@ -82,10 +88,41 @@ namespace DEngine::Application
 	struct TouchInput;
 	Std::StackVec<TouchInput, maxTouchEventCount> TouchInputs();
 
+	enum class GamepadKey : u8
+	{
+		Invalid,
+		A,
+		B,
+		X,
+		Y,
+		L1,
+		L2,
+		L3,
+		R1,
+		R2,
+		R3,
+		COUNT, // Invalid use to index with
+	};
+	enum class GamepadAxis : u8
+	{
+		Invalid,
+		LeftX, // [-1, 1]
+		LeftY, // [-1, 1]
+		COUNT, // Invalid use to index with
+	};
 	struct GamepadState
 	{
-		f32 leftStickX = 0.f;
-		f32 leftStickY = 0.f;
+	public:
+		Std::Array<bool, (int)GamepadKey::COUNT> keyStates = {};
+		[[nodiscard]] bool GetKeyState(GamepadKey btn) const noexcept;
+
+		Std::Array<KeyEventType, (int)GamepadKey::COUNT> keyEvents = {};
+		[[nodiscard]] KeyEventType GetKeyEvent(GamepadKey btn) const noexcept;
+
+		Std::Array<f32, (int)GamepadAxis::COUNT> axisValues = {};
+		[[nodiscard]] f32 GetGamepadAxisValue(GamepadAxis axis) const noexcept;
+
+		f32 stickDeadzone = 0.1f;
 	};
 	Std::Opt<GamepadState> GetGamepad();
 
@@ -152,13 +189,6 @@ namespace DEngine::Application
 #endif
 }
 
-enum class DEngine::Application::KeyEventType : DEngine::u8
-{
-	Unchanged,
-	Unpressed,
-	Pressed,
-};
-
 enum class DEngine::Application::Button : DEngine::u16
 {
 	Undefined,
@@ -205,6 +235,7 @@ enum class DEngine::Application::TouchEventType : DEngine::u8
 struct DEngine::Application::TouchInput
 {
 	static constexpr u8 invalidID = static_cast<u8>(-1);
+
 	u8 id = invalidID;
 	TouchEventType eventType = TouchEventType::Unchanged;
 	f32 x = 0.f;

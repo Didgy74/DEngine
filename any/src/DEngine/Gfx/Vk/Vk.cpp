@@ -8,9 +8,13 @@
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Utility.hpp>
+
+
 // For file IO
 #include <DEngine/Application.hpp>
 
+#include <iostream>
+#include <stdexcept>
 #include <string>
 
 //vk::DispatchLoaderDynamic vk::defaultDispatchLoaderDynamic;
@@ -21,7 +25,7 @@ namespace DEngine::Gfx::Vk
 
 	namespace Init
 	{
-		void GetPrettyFunctionString(APIData& apiData);
+		void InitTestPipeline(APIData& apiData);
 	}
 }
 
@@ -83,7 +87,7 @@ Vk::GlobUtils::GlobUtils()
 
 namespace DEngine::Gfx::Vk
 {
-	[[noreturn]] void GetPrettyFunctionString(APIData* inApiData)
+	[[noreturn]] void RenderingThreadEntryPoint(APIData* inApiData)
 	{
 		Std::NameThisThread("RenderingThread");
 
@@ -109,7 +113,7 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 	APIData& apiData = *static_cast<APIData*>(apiDataBuffer);
 	GlobUtils& globUtils = apiData.globUtils;
 
-	apiData.renderingThread = std::thread(&GetPrettyFunctionString, &apiData);
+	apiData.renderingThread = std::thread(&RenderingThreadEntryPoint, &apiData);
 
 
 	vk::Result vkResult{};
@@ -302,7 +306,7 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 		true, 
 		globUtils.DebugUtilsPtr());
 
-	Init::GetPrettyFunctionString(apiData);
+	Init::InitTestPipeline(apiData);
 
 
 	GuiResourceManager::Init(
@@ -313,22 +317,23 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 		globUtils.guiRenderPass,
 		globUtils.DebugUtilsPtr());
 
-	GizmoManager::Initialize(
-		apiData.gizmoManager,
-		globUtils.inFlightCount,
-		globUtils.device,
-		globUtils.queues,
-		globUtils.vma,
-		globUtils.delQueue,
-		globUtils.DebugUtilsPtr(),
-		apiData,
-		{ initInfo.gizmoArrowMesh.data(), initInfo.gizmoArrowMesh.size() },
-		{ initInfo.gizmoCircleLineMesh.data(), initInfo.gizmoCircleLineMesh.size() });
+	GizmoManager::InitInfo gizmoManagerInfo = {};
+	gizmoManagerInfo.apiData = &apiData;
+	gizmoManagerInfo.arrowMesh = { initInfo.gizmoArrowMesh.data(), initInfo.gizmoArrowMesh.size() };
+	gizmoManagerInfo.arrowScaleMesh2d = { initInfo.gizmoArrowScaleMesh2d.data(), initInfo.gizmoArrowScaleMesh2d.size() };
+	gizmoManagerInfo.circleLineMesh = { initInfo.gizmoCircleLineMesh.data(), initInfo.gizmoCircleLineMesh.size() };
+	gizmoManagerInfo.debugUtils = globUtils.DebugUtilsPtr();
+	gizmoManagerInfo.delQueue = &globUtils.delQueue;
+	gizmoManagerInfo.device = &globUtils.device;
+	gizmoManagerInfo.inFlightCount = globUtils.inFlightCount;
+	gizmoManagerInfo.queues = &globUtils.queues;
+	gizmoManagerInfo.vma = &globUtils.vma;
+	GizmoManager::Initialize(apiData.gizmoManager, gizmoManagerInfo);
 
 	return true;
 }
 
-void Vk::Init::GetPrettyFunctionString(APIData& apiData)
+void Vk::Init::InitTestPipeline(APIData& apiData)
 {
 	vk::Result vkResult{};
 

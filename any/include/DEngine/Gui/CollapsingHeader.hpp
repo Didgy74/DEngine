@@ -5,26 +5,31 @@
 #include <DEngine/Gui/Button.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
+#include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/Str.hpp>
 
 #include <functional>
+#include <string>
+
+namespace DEngine::Gui::impl { struct CH_Impl; }
 
 namespace DEngine::Gui
 {
 	class CollapsingHeader : public Widget
 	{
 	public:
-		static constexpr Math::Vec4 fieldBackgroundColor = { 1.f, 1.f, 1.f, 0.25f };
+		CollapsingHeader();
 
-		CollapsingHeader(bool collapsed = true);
+		Std::Box<Widget> child;
+		bool collapsed = true;
+		std::string title = "Title";
+		u32 titleMargin = 0;
 
-		using CollapseFn = void(bool collapsed);
-		std::function<CollapseFn> collapseCallback;
-		[[nodiscard]] StackLayout& GetChildStackLayout() noexcept { return *childStackLayoutPtr; }
-		[[nodiscard]] StackLayout const& GetChildStackLayout() const noexcept { return *childStackLayoutPtr; }
-		[[nodiscard]] bool IsCollapsed() const noexcept;
-		void SetCollapsed(bool value);
-		void SetHeaderText(Std::Str text);
+		Math::Vec4 collapsedColor = { 0.3f, 0.3f, 0.3f, 1.f };
+		Math::Vec4 expandedColor = { 0.6f, 0.6f, 0.6f, 1.f };
+
+		using CollapseFnT = void(CollapsingHeader& widget);
+		std::function<CollapseFnT> collapseFn;
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
@@ -48,14 +53,7 @@ namespace DEngine::Gui
 		
 		virtual void InputConnectionLost() override;
 
-		virtual void CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event) override;
-
-		virtual void CursorClick(
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -63,16 +61,33 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
-		virtual void TouchEvent(
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override;
+			CursorMoveEvent event,
+			bool occluded) override;
 
-	private:
-		StackLayout mainStackLayout = StackLayout(StackLayout::Direction::Vertical);
-		Std::Box<StackLayout> childStackLayoutBox;
-		StackLayout* childStackLayoutPtr = nullptr;
+		virtual bool TouchPressEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchPressEvent event) override;
+
+		virtual bool TouchMoveEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchMoveEvent event,
+			bool occluded) override;
+
+	protected:
+		friend impl::CH_Impl;
+
+		Std::Opt<u8> headerPointerId;
+		bool hoveredByCursor = false;
 	};
 }

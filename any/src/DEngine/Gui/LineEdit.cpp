@@ -3,7 +3,99 @@
 #include <DEngine/Gui/Context.hpp>
 #include "ImplData.hpp"
 
-#include <DEngine/Std/Utility.hpp>
+namespace DEngine::Gui::impl
+{
+	enum class PointerType : u8 { Primary, Secondary };
+	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
+	{
+		switch (in)
+		{
+			case CursorButton::Primary: return PointerType::Primary;
+			case CursorButton::Secondary: return PointerType::Secondary;
+			default: break;
+		}
+		DENGINE_IMPL_UNREACHABLE();
+		return {};
+	}
+
+	constexpr u8 cursorPointerId = ~static_cast<u8>(0);
+
+	struct PointerPress_Params
+	{
+		Context* ctx = {};
+		LineEdit* widget = {};
+		Rect widgetRect = {};
+		Rect visibleRect = {};
+
+		u8 pointerId = {};
+		Math::Vec2 pointerPos = {};
+		bool pointerPressed = {};
+		PointerType pointerType = {};
+	};
+}
+
+struct DEngine::Gui::impl::LineEditImpl
+{
+public:
+	static void BeginInputSession(LineEdit& widget, Context& ctx)
+	{
+		SoftInputFilter filter = {};
+		if (widget.type == LineEdit::Type::Float)
+			filter = SoftInputFilter::SignedFloat;
+		else if (widget.type == LineEdit::Type::Integer)
+			filter = SoftInputFilter::SignedInteger;
+		else if (widget.type == LineEdit::Type::UnsignedInteger)
+			filter = SoftInputFilter::UnsignedInteger;
+		else
+			DENGINE_IMPL_UNREACHABLE();
+
+		ctx.TakeInputConnection(
+			widget,
+			filter,
+			{ widget.text.data(), widget.text.length() });
+		widget.inputConnectionCtx = &ctx;
+	}
+
+	[[nodiscard]] static bool PointerPressed(PointerPress_Params const& in) noexcept
+	{
+		auto pointerInside =
+			in.widgetRect.PointIsInside(in.pointerPos) &&
+			in.visibleRect.PointIsInside(in.pointerPos);
+
+		// The field is currently being held.
+		if (in.widget->pointerId.HasValue())
+		{
+			auto const pointerId = in.widget->pointerId.Value();
+
+			// It's a developer bug if we received a click down on a pointer id
+			// that's already holding this widget.
+			DENGINE_IMPL_GUI_ASSERT(!(pointerId == in.pointerId && in.pointerPressed));
+
+			if (pointerInside &&
+				pointerId == in.pointerId &&
+				!in.pointerPressed &&
+				in.pointerType == PointerType::Primary)
+			{
+				in.widget->pointerId = Std::nullOpt;
+
+				BeginInputSession(*in.widget, *in.ctx);
+			}
+			else if (!pointerInside && pointerId == in.pointerId && !in.pointerPressed)
+			{
+				in.widget->pointerId = Std::nullOpt;
+			}
+		}
+		else
+		{
+			if (pointerInside && in.pointerType == PointerType::Primary)
+			{
+				in.widget->pointerId = in.pointerId;
+			}
+		}
+
+		return pointerInside;
+	}
+};
 
 using namespace DEngine;
 using namespace DEngine::Gui;
@@ -14,17 +106,15 @@ LineEdit::~LineEdit()
 		ClearInputConnection();
 }
 
-bool LineEdit::CurrentlyBeingEdited() const
-{
-	return this->inputConnectionCtx;
-}
-
 SizeHint LineEdit::GetSizeHint(Context const& ctx) const
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-	return impl::TextManager::GetSizeHint(
+	auto returnVal = impl::TextManager::GetSizeHint(
 		implData.textManager,
 		{ text.data(), text.size() });
+	returnVal.preferred.width += margin * 2;
+	returnVal.preferred.height += margin * 2;
+	return returnVal;
 }
 
 void LineEdit::Render(
@@ -37,11 +127,18 @@ void LineEdit::Render(
 	drawInfo.PushFilledQuad(widgetRect, backgroundColor);
 
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+
+	auto textRect = widgetRect;
+	textRect.position.x += margin;
+	textRect.position.y += margin;
+	textRect.extent.width -= margin * 2;
+	textRect.extent.height -= margin * 2;
+
 	impl::TextManager::RenderText(
 		implData.textManager,
 		{ text.data(), text.size() },
 		{ 1.f, 1.f, 1.f, 1.f },
-		widgetRect,
+		textRect,
 		drawInfo);
 }
 
@@ -52,8 +149,8 @@ void LineEdit::CharEnterEvent(Context& ctx)
 		if (text.empty())
 		{
 			text = "0";
-			if (textChangedPfn)
-				textChangedPfn(*this);
+			if (textChangedFn)
+				textChangedFn(*this);
 		}
 		ClearInputConnection();
 	}
@@ -113,8 +210,8 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 			auto const& string = text;
 			if (string != "" && string != "-" && string != "." && string != "-.")
 			{
-				if (textChangedPfn)
-					textChangedPfn(*this);
+				if (textChangedFn)
+					textChangedFn(*this);
 			}
 		}
 	}
@@ -128,8 +225,8 @@ void LineEdit::CharRemoveEvent(Context& ctx)
 		auto const& string = text;
 		if (string != "" && string != "-" && string != "." && string != "-.")
 		{
-			if (textChangedPfn)
-				textChangedPfn(*this);
+			if (textChangedFn)
+				textChangedFn(*this);
 		}
 	}
 }
@@ -142,7 +239,7 @@ void LineEdit::InputConnectionLost()
 	}
 }
 
-void LineEdit::CursorClick(
+bool LineEdit::CursorPress(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
@@ -150,77 +247,37 @@ void LineEdit::CursorClick(
 	Math::Vec2Int cursorPos,
 	CursorClickEvent event)
 {
-	if (event.button == CursorButton::Primary)
-	{
-		bool cursorIsInside = widgetRect.PointIsInside(cursorPos);
+	impl::PointerPress_Params temp = {};
+	temp.ctx = &ctx;
+	temp.pointerId = impl::cursorPointerId;
+	temp.pointerPos = { (f32)cursorPos.x, (f32)cursorPos.y };
+	temp.pointerPressed = event.clicked;
+	temp.pointerType = impl::ToPointerType(event.button);
+	temp.visibleRect = visibleRect;
+	temp.widgetRect = widgetRect;
+	temp.widget = this;
 
-		if (cursorIsInside && event.clicked && !inputConnectionCtx)
-		{
-			SoftInputFilter filter{};
-			if (this->type == Type::Float)
-				filter = SoftInputFilter::SignedFloat;
-			else if (this->type == Type::Integer)
-				filter = SoftInputFilter::SignedInteger;
-			else if (this->type == Type::UnsignedInteger)
-				filter = SoftInputFilter::UnsignedInteger;
-			ctx.TakeInputConnection(
-				*this,
-				filter,
-				{ text.data(), text.length() });
-			this->inputConnectionCtx = &ctx;
-		}
-		else if (!cursorIsInside && event.clicked && inputConnectionCtx)
-		{
-			if (text.empty())
-			{
-				text = "0";
-				if (textChangedPfn)
-					textChangedPfn(*this);
-			}
-
-			DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx == &ctx);
-			ClearInputConnection();
-		}
-	}
+	return impl::LineEditImpl::PointerPressed(temp);
 }
 
-void LineEdit::TouchEvent(
+bool LineEdit::TouchPressEvent(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event)
+	Gui::TouchPressEvent event)
 {
-	bool cursorIsInside = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
+	impl::PointerPress_Params temp = {};
+	temp.ctx = &ctx;
+	temp.pointerId = impl::cursorPointerId;
+	temp.pointerPos = event.position;
+	temp.pointerPressed = event.pressed;
+	temp.pointerType = impl::PointerType::Primary;
+	temp.visibleRect = visibleRect;
+	temp.widgetRect = widgetRect;
+	temp.widget = this;
 
-	if (event.id == 0 && event.type == TouchEventType::Down && cursorIsInside && !inputConnectionCtx)
-	{
-		SoftInputFilter filter{};
-		if (this->type == Type::Float)
-			filter = SoftInputFilter::SignedFloat;
-		else if (this->type == Type::Integer)
-			filter = SoftInputFilter::SignedInteger;
-		else if (this->type == Type::UnsignedInteger)
-			filter = SoftInputFilter::UnsignedInteger;
-		ctx.TakeInputConnection(
-			*this,
-			filter,
-			{ text.data(), text.length() });
-		this->inputConnectionCtx = &ctx;
-	}
-
-	if (event.id == 0 && event.type == TouchEventType::Down && !cursorIsInside && inputConnectionCtx)
-	{
-		if (text.empty())
-		{
-			text = "0";
-			if (textChangedPfn)
-				textChangedPfn(*this);
-		}
-		
-		DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx == &ctx);
-		ClearInputConnection();
-	}
+	return impl::LineEditImpl::PointerPressed(temp);
 }
 
 void LineEdit::ClearInputConnection()

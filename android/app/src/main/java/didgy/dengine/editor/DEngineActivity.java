@@ -2,7 +2,6 @@ package didgy.dengine.editor;
 
 import android.app.NativeActivity;
 import android.content.Context;
-import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.text.Editable;
@@ -11,7 +10,6 @@ import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.util.Log;
-import android.view.InputQueue;
 import android.view.KeyEvent;
 import android.view.SurfaceHolder;
 import android.view.View;
@@ -48,7 +46,6 @@ public class DEngineActivity extends NativeActivity  {
     public InputEditable mEditable = null;
     public InputMethodManager mIMM = null;
     public Configuration mCurrentConfig = null;
-
 
     int mLastContentX = 0;
     int mLastContentY = 0;
@@ -127,7 +124,7 @@ public class DEngineActivity extends NativeActivity  {
         super.surfaceChanged(holder, format, width, height);
     }
 
-    public void openSoftInput(String text, final int softInputFilter) {
+    public void openSoftInput(String text, int softInputFilter) {
         class OpenSoftInputRunnable implements Runnable {
             final DEngineActivity activity;
             final int softInputFilter;
@@ -153,7 +150,6 @@ public class DEngineActivity extends NativeActivity  {
     public void hideSoftInput()
     {
         class HideSoftInputRunnable implements Runnable {
-            DEngineActivity activity;
             HideSoftInputRunnable() {
             }
             public void run() {

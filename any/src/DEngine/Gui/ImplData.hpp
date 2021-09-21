@@ -9,6 +9,7 @@
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
 
+#include <functional>
 #include <vector>
 
 // Definitely temporary
@@ -29,19 +30,19 @@ namespace DEngine::Gui::impl
 	{
 		Gfx::Context* gfxCtx = nullptr;
 
-		FT_Library ftLib{};
-		FT_Face face{};
+		FT_Library ftLib = {};
+		FT_Face face = {};
 		std::vector<u8> fontFileData;
 		u32 lineheight = 0;
 		u32 lineMinY = 0;
 		struct GlyphData
 		{
-			bool hasBitmap{};
-			u32 bitmapWidth{};
-			u32 bitmapHeight{};
+			bool hasBitmap = {};
+			u32 bitmapWidth = {};
+			u32 bitmapHeight = {};
 
-			i32 advanceX{};
-			Math::Vec2Int posOffset{};
+			i32 advanceX = {};
+			Math::Vec2Int posOffset = {};
 		};
 		// Stores glyph-data that is not in the ascii-table
 		std::unordered_map<u32, GlyphData> glyphDatas;
@@ -54,31 +55,25 @@ namespace DEngine::Gui::impl
 
 		static void RenderText(
 			TextManager& manager,
-			Std::Str string,
+			Std::Span<char const> str,
 			Math::Vec4 color,
 			Rect widgetRect,
 			DrawInfo& drawInfo);
 
 		[[nodiscard]] static SizeHint GetSizeHint(
 			TextManager& manager,
-			Std::Str st);
+			Std::Span<char const> str);
 	};
 
 	struct WindowData
 	{
-		Rect rect{};
-		Rect visibleRect{};
-		bool isMinimized{};
-		Math::Vec4 clearColor{ 0, 0, 0, 1 };
-		u32 drawCmdOffset{};
-		u32 drawCmdCount{};
-		Std::Box<Widget> topLayout{};
-	};
-
-	struct Test_Menu
-	{
-		Rect rect{};
-		Std::Box<Widget> topLayout{};
+		Rect rect = {};
+		Rect visibleRect = {};
+		bool isMinimized = {};
+		Math::Vec4 clearColor = { 0, 0, 0, 1 };
+		u32 drawCmdOffset = {};
+		u32 drawCmdCount = {};
+		Std::Box<Widget> topLayout = {};
 	};
 
 	struct WindowNode
@@ -86,22 +81,7 @@ namespace DEngine::Gui::impl
 		WindowID id;
 		WindowData data;
 
-		// The first element is the front-most one.
-		std::vector<Test_Menu> test_Menus{};
-		bool currentlyIterating = false;
-		std::vector<Test_Menu> pendingMenuDestroys;
-		struct MenuAddRemove
-		{
-			
-			enum class Type : u8
-			{
-				Add,
-				Remove
-			};
-			Type type = static_cast<Type>(-1);
-			uSize index = static_cast<uSize>(-1);
-		};
-		std::vector<MenuAddRemove> menuAddRemoves;
+		Std::Box<Layer> frontmostLayer = {};
 	};
 
 	struct ImplData
@@ -115,7 +95,7 @@ namespace DEngine::Gui::impl
 
 		std::vector<WindowNode> windows;
 
-		Math::Vec2Int cursorPosition{};
+		Math::Vec2Int cursorPosition = {};
 
 		TextManager textManager;
 	};

@@ -3,35 +3,126 @@
 #include <DEngine/Gui/Context.hpp>
 #include "ImplData.hpp"
 
+namespace DEngine::Gui::impl
+{
+	enum class PointerType : u8 { Primary, Secondary };
+	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
+	{
+		switch (in)
+		{
+			case CursorButton::Primary: return PointerType::Primary;
+			case CursorButton::Secondary: return PointerType::Secondary;
+			default: break;
+		}
+		DENGINE_IMPL_UNREACHABLE();
+		return {};
+	}
+
+	static constexpr u8 cursorPointerId = (u8)-1;
+
+	struct BtnImpl;
+
+	struct PointerPress_Params
+	{
+		Button* widget = nullptr;
+		Context* ctx = nullptr;
+		Rect const* widgetRect = nullptr;
+		Rect const* visibleRect = nullptr;
+		u8 pointerId = 0;
+		PointerType pointerType = {};
+		Math::Vec2 pointerPos = {};
+		bool pointerPressed = {};
+	};
+
+	struct PointerMove_Params
+	{
+		Button* widget = nullptr;
+		Context* ctx = nullptr;
+		Rect const* widgetRect = nullptr;
+		Rect const* visibleRect = nullptr;
+		u8 pointerId = 0;
+		Math::Vec2 pointerPos = {};
+		bool pointerOccluded = {};
+	};
+}
+
 using namespace DEngine;
 using namespace DEngine::Gui;
+
+class [[maybe_unused]] impl::BtnImpl
+{
+public:
+	// Return true if the event is consumed.
+	[[nodiscard]] static bool PointerPress(PointerPress_Params const& params)
+	{
+		auto& widget = *params.widget;
+
+		bool returnVal = false;
+
+		auto const pointerInside =
+			params.widgetRect->PointIsInside(params.pointerPos) &&
+			params.visibleRect->PointIsInside(params.pointerPos);
+
+		if (pointerInside)
+			returnVal = true;
+
+		if (params.pointerType != PointerType::Primary)
+			return returnVal;
+
+		if (widget.pointerId.HasValue())
+		{
+			auto const currPointerId = widget.pointerId.Value();
+			if (params.pointerId == currPointerId && !params.pointerPressed)
+			{
+				widget.pointerId = Std::nullOpt;
+
+				if (pointerInside)
+					widget.Activate();
+			}
+		}
+		else
+		{
+			if (pointerInside && params.pointerPressed)
+				widget.pointerId = params.pointerId;
+		}
+
+		return returnVal;
+	}
+
+	[[nodiscard]] static bool PointerMove(PointerMove_Params const& params)
+	{
+		auto const pointerInside =
+			params.widgetRect->PointIsInside(params.pointerPos) &&
+			params.visibleRect->PointIsInside(params.pointerPos);
+
+		if (params.pointerId == cursorPointerId)
+		{
+			params.widget->hoveredByCursor = pointerInside && !params.pointerOccluded;
+		}
+
+		return pointerInside;
+	}
+};
 
 Button::Button()
 {
 	text = "Button";
 }
 
-void Button::Activate(
-	Context& ctx)
+void Button::Activate()
 {
 	if (type == Type::Toggle)
 	{
 		toggled = !toggled;
 	}
 
-	if (activatePfn)
-		activatePfn(
-			*this);
+	if (activateFn)
+		activateFn(*this);
 }
 
 void Button::SetToggled(bool toggled)
 {
-	if (toggled)
-	{
-		state = State::Toggled;
-	}
-
-	this->toggled = toggled;
+	toggled = toggled;
 }
 
 bool Button::GetToggled() const
@@ -43,9 +134,14 @@ SizeHint Button::GetSizeHint(
 	Context const& ctx) const
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-	return impl::TextManager::GetSizeHint(
+	auto returnVal = impl::TextManager::GetSizeHint(
 		implData.textManager,
 		{ text.data(), text.size() });
+
+	returnVal.preferred.width += textMargin * 2;
+	returnVal.preferred.height += textMargin * 2;
+
+	return returnVal;
 }
 
 void Button::Render(
@@ -55,50 +151,69 @@ void Button::Render(
 	Rect visibleRect,
 	DrawInfo& drawInfo) const
 {
-	Math::Vec4 currentColor{};
-	Math::Vec4 currentTextColor{};
-	if (state == State::Normal && toggled)
+	Math::Vec4 currColor = {};
+	Math::Vec4 currTextColor = {};
+
+	if (pointerId.HasValue())
 	{
-		currentColor = toggledColor;
-		currentTextColor = toggledTextColor;
+		// We have a finger pressing on the button atm
+		currColor = pressedColor;
+		currTextColor = pressedTextColor;
 	}
 	else
 	{
-		switch (state)
+		if (type == Type::Toggle)
 		{
-			case State::Hovered:
-				currentColor = hoverColor;
-				currentTextColor = hoverTextColor;
-				break;
-			case State::Normal:
-				currentColor = normalColor;
-				currentTextColor = normalTextColor;
-				break;
-			case State::Pressed:
-				currentColor = pressedColor;
-				currentTextColor = pressedTextColor;
-				break;
-			case State::Toggled:
-				currentColor = toggledColor;
-				currentTextColor = toggledTextColor;
-				break;
-			default:
-				break;
+			if (toggled)
+			{
+				currColor = toggledColor;
+				currTextColor = toggledTextColor;
+			}
+			else
+			{
+				currColor = normalColor;
+				currTextColor = normalTextColor;
+			}
+		}
+		else if (type == Type::Push)
+		{
+			currColor = normalColor;
+			currTextColor = normalTextColor;
+		}
+		else
+			DENGINE_IMPL_UNREACHABLE();
+
+		if (hoveredByCursor)
+		{
+			for (auto i = 0; i < 3; i++)
+				currColor[i] += hoverOverlayColor[i];
 		}
 	}
 
-	drawInfo.PushFilledQuad(widgetRect, currentColor);
+	for (auto i = 0; i < 4; i++)
+	{
+		currColor[i] = Math::Clamp(currColor[i], 0.f, 1.f);
+		currTextColor[i] = Math::Clamp(currTextColor[i], 0.f, 1.f);
+	}
+	drawInfo.PushFilledQuad(widgetRect, currColor);
 
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+
+	auto textRect = widgetRect;
+	textRect.position.x += textMargin;
+	textRect.position.y += textMargin;
+	textRect.extent.width -= textMargin * 2;
+	textRect.extent.height -= textMargin * 2;
+
 	impl::TextManager::RenderText(
 		implData.textManager,
 		{ text.data(), text.length() },
-		currentTextColor,
-		widgetRect,
+		currTextColor,
+		textRect,
 		drawInfo);
 }
 
-void Button::CursorClick(
+bool Button::CursorPress(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
@@ -106,74 +221,75 @@ void Button::CursorClick(
 	Math::Vec2Int cursorPos,
 	CursorClickEvent event)
 {
-	if (event.button == CursorButton::Primary)
-	{
-		bool temp = widgetRect.PointIsInside(cursorPos) && visibleRect.PointIsInside(cursorPos);
+	impl::PointerPress_Params params = {};
+	params.widget = this;
+	params.ctx = &ctx;
+	params.widgetRect = &widgetRect;
+	params.visibleRect = &visibleRect;
+	params.pointerId = impl::cursorPointerId;
+	params.pointerType = impl::ToPointerType(event.button);
+	params.pointerPos = { (f32)cursorPos.x, (f32)cursorPos.y };
+	params.pointerPressed = event.clicked;
 
-		if (temp)
-		{
-			if (event.clicked)
-				state = State::Pressed;
-			else
-			{
-				if (state == State::Pressed)
-				{
-					Activate(
-						ctx);
-				}
-				state = State::Hovered;
-			}
-		}
-	}
+	return impl::BtnImpl::PointerPress(params);
 }
 
-void Button::CursorMove(
+bool Button::CursorMove(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	CursorMoveEvent event)
+	CursorMoveEvent event,
+	bool cursorOccluded)
 {
-	bool temp = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
-	if (temp)
-	{
-		if (state != State::Pressed)
-			state = State::Hovered;
-	}
-	else
-	{
-		if (toggled)
-			state = State::Toggled;
-		else
-			state = State::Normal;
-	}
+	impl::PointerMove_Params params = {};
+	params.widget = this;
+	params.ctx = &ctx;
+	params.widgetRect = &widgetRect;
+	params.visibleRect = &visibleRect;
+	params.pointerId = impl::cursorPointerId;
+	params.pointerPos = { (f32)event.position.x, (f32)event.position.y };
+	params.pointerOccluded = cursorOccluded;
+
+	return impl::BtnImpl::PointerMove(params);
 }
 
-void Button::TouchEvent(
+bool Button::TouchPressEvent(
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect,
 	Rect visibleRect,
-	Gui::TouchEvent event)
+	Gui::TouchPressEvent event)
 {
-	if (event.id == 0)
-	{
-		bool temp = widgetRect.PointIsInside(event.position) && visibleRect.PointIsInside(event.position);
-		if (temp)
-		{
-			if (event.type == TouchEventType::Down)
-				state = State::Pressed;
-			else if (event.type == TouchEventType::Up)
-			{
-				if (state == State::Pressed)
-					Activate(
-						ctx);
-				state = State::Normal;
-			}
-		}
-		else
-		{
-			state = State::Normal;
-		}
-	}
+	impl::PointerPress_Params params = {};
+	params.widget = this;
+	params.ctx = &ctx;
+	params.widgetRect = &widgetRect;
+	params.visibleRect = &visibleRect;
+	params.pointerId = event.id;
+	params.pointerType = impl::PointerType::Primary;
+	params.pointerPos = event.position;
+	params.pointerPressed = event.pressed;
+
+	return impl::BtnImpl::PointerPress(params);
+}
+
+bool Button::TouchMoveEvent(
+	Context& ctx,
+	WindowID windowId,
+	Rect widgetRect,
+	Rect visibleRect,
+	Gui::TouchMoveEvent event,
+	bool occluded)
+{
+	impl::PointerMove_Params params = {};
+	params.widget = this;
+	params.ctx = &ctx;
+	params.widgetRect = &widgetRect;
+	params.visibleRect = &visibleRect;
+	params.pointerId = event.id;
+	params.pointerPos = event.position;
+	params.pointerOccluded = occluded;
+
+	return impl::BtnImpl::PointerMove(params);
 }

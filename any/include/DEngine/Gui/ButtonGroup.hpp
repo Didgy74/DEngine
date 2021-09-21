@@ -4,6 +4,7 @@
 #include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/Std/Containers/Opt.hpp>
+#include <DEngine/Math/Vector.hpp>
 
 #include <vector>
 #include <string>
@@ -11,6 +12,8 @@
 
 namespace DEngine::Gui
 {
+	namespace impl { struct BtnGroupImpl; }
+
 	class ButtonGroup : public Widget
 	{
 	public:
@@ -21,15 +24,14 @@ namespace DEngine::Gui
 		};
 		std::vector<InternalButton> buttons;
 
-		struct HeldPointerData
-		{
-			u8 buttonIndex = 0;
-			u8 pointerId = 0;
-		};
-		Std::Opt<HeldPointerData> heldPointerId;
+		u32 margin = 0;
 
 		using ActiveChangedCallbackT = void(ButtonGroup& widget, u32 newIndex);
 		std::function<ActiveChangedCallbackT> activeChangedCallback;
+
+		Math::Vec4 inactiveColor = { 0.3f, 0.3f, 0.3f, 1.f };
+		Math::Vec4 hoveredColor = { 0.4f, 0.4f, 0.4f, 1.f };
+		Math::Vec4 activeColor = { 0.6f, 0.6f, 0.6f, 1.f };
 
 		void AddButton(std::string const& title);
 		[[nodiscard]] u32 GetButtonCount() const;
@@ -44,14 +46,15 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		virtual void CursorMove(
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			CursorMoveEvent event) override;
+			CursorMoveEvent event,
+			bool occluded) override;
 
-		virtual void CursorClick(
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -59,11 +62,30 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
-		virtual void TouchEvent(
+		virtual bool TouchMoveEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override;
+			Gui::TouchMoveEvent event,
+			bool occluded) override;
+
+		virtual bool TouchPressEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchPressEvent event) override;
+
+	protected:
+		struct HeldPointerData
+		{
+			uSize buttonIndex = 0;
+			u8 pointerId = 0;
+		};
+		Std::Opt<HeldPointerData> heldPointerData;
+		Std::Opt<uSize> cursorHoverIndex;
+
+		friend impl::BtnGroupImpl;
 	};
 }

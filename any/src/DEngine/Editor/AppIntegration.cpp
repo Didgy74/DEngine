@@ -9,46 +9,35 @@ void Editor::EditorImpl::ButtonEvent(
 {
 	if (button == App::Button::LeftMouse || button == App::Button::RightMouse)
 	{
-		impl::GuiEvent event{};
-		event.type = impl::GuiEvent::Type::CursorClickEvent;
+		Gui::CursorClickEvent event = {};
+		event.clicked = state;
+
 		if (button == App::Button::LeftMouse)
-			event.cursorClick.button = Gui::CursorButton::Primary;
+			event.button = Gui::CursorButton::Primary;
 		else if (button == App::Button::RightMouse)
-			event.cursorClick.button = Gui::CursorButton::Secondary;
-		event.cursorClick.clicked = state;
-		queuedGuiEvents.push_back(event);
-	}
-	else if (button == App::Button::Enter)
-	{
-		impl::GuiEvent event{};
-		event.type = impl::GuiEvent::Type::CharEnterEvent;
-		event.charEnter = {};
-		queuedGuiEvents.push_back(event);
+			event.button = Gui::CursorButton::Secondary;
+
+		queuedGuiEvents.emplace_back(event);
 	}
 }
 
 void Editor::EditorImpl::CharEnterEvent()
 {
-	impl::GuiEvent event{};
-	event.type = impl::GuiEvent::Type::CharEnterEvent;
-	event.charEnter = {};
-	queuedGuiEvents.push_back(event);
+	Gui::CharEnterEvent event = {};
+	queuedGuiEvents.emplace_back(event);
 }
 
 void Editor::EditorImpl::CharEvent(
 	u32 value)
 {
-	impl::GuiEvent event{};
-	event.type = impl::GuiEvent::Type::CharEvent;
-	event.charEvent.utfValue = value;
-	queuedGuiEvents.push_back(event);
+	Gui::CharEvent event = {};
+	event.utfValue = value;
+	queuedGuiEvents.emplace_back(event);
 }
 
 void Editor::EditorImpl::CharRemoveEvent()
 {
-	impl::GuiEvent event{};
-	event.type = impl::GuiEvent::Type::CharRemoveEvent;
-	event.charRemove = {};
+	Gui::CharRemoveEvent event = {};
 	queuedGuiEvents.push_back(event);
 }
 
@@ -56,11 +45,10 @@ void Editor::EditorImpl::CursorMove(
 	Math::Vec2Int position,
 	Math::Vec2Int positionDelta)
 {
-	impl::GuiEvent event{};
-	event.type = impl::GuiEvent::Type::CursorMoveEvent;
-	event.cursorMove.position = position;
-	event.cursorMove.positionDelta = positionDelta;
-	queuedGuiEvents.push_back(event);
+	Gui::CursorMoveEvent event = {};
+	event.position = position;
+	event.positionDelta = positionDelta;
+	queuedGuiEvents.emplace_back(event);
 }
 
 void Editor::EditorImpl::TouchEvent(
@@ -68,58 +56,58 @@ void Editor::EditorImpl::TouchEvent(
 	App::TouchEventType type,
 	Math::Vec2 position)
 {
-	impl::GuiEvent event{};
-	event.type = impl::GuiEvent::Type::TouchEvent;
-	event.touch.id = id;
-	event.touch.position = position;
-	if (type == App::TouchEventType::Down)
-		event.touch.type = Gui::TouchEventType::Down;
+	if (type == App::TouchEventType::Down || type == App::TouchEventType::Up)
+	{
+		Gui::TouchPressEvent event = {};
+		event.id = id;
+		event.position = position;
+		event.pressed = type == App::TouchEventType::Down;
+		queuedGuiEvents.emplace_back(event);
+	}
 	else if (type == App::TouchEventType::Moved)
-		event.touch.type = Gui::TouchEventType::Moved;
-	else if (type == App::TouchEventType::Up)
-		event.touch.type = Gui::TouchEventType::Up;
-	queuedGuiEvents.push_back(event);
+	{
+		Gui::TouchMoveEvent event = {};
+		event.id = id;
+		event.position = position;
+		queuedGuiEvents.emplace_back(event);
+	}
 }
 
 void Editor::EditorImpl::WindowClose(App::WindowID windowId)
 {
-	impl::GuiEvent event{};
-	event.type = impl::GuiEvent::Type::WindowCloseEvent;
-	event.windowClose.windowId = (Gui::WindowID)windowId;
-	queuedGuiEvents.push_back(event);
+	Gui::WindowCloseEvent event = {};
+	event.windowId = (Gui::WindowID)windowId;
+	queuedGuiEvents.emplace_back(event);
 }
 
 void Editor::EditorImpl::WindowCursorEnter(
 	App::WindowID window,
 	bool entered)
 {
-	impl::GuiEvent event{};
-	event.type = impl::GuiEvent::Type::WindowCursorEnterEvent;
-	event.windowCursorEnter.windowId = (Gui::WindowID)window;
-	event.windowCursorEnter.entered = entered;
-	queuedGuiEvents.push_back(event);
+	Gui::WindowCursorEnterEvent event = {};
+	event.windowId = (Gui::WindowID)window;
+	event.entered = entered;
+	queuedGuiEvents.emplace_back(event);
 }
 
 void Editor::EditorImpl::WindowMinimize(
 	App::WindowID window,
 	bool wasMinimized)
 {
-	impl::GuiEvent event{};
-	event.type = impl::GuiEvent::Type::WindowMinimizeEvent;
-	event.windowMinimize.windowId = (Gui::WindowID)window;
-	event.windowMinimize.wasMinimized = wasMinimized;
-	queuedGuiEvents.push_back(event);
+	Gui::WindowMinimizeEvent event = {};
+	event.windowId = (Gui::WindowID)window;
+	event.wasMinimized = wasMinimized;
+	queuedGuiEvents.emplace_back(event);
 }
 
 void Editor::EditorImpl::WindowMove(
 	App::WindowID window,
 	Math::Vec2Int position)
 {
-	impl::GuiEvent event{};
-	event.type = impl::GuiEvent::Type::WindowMoveEvent;
-	event.windowMove.windowId = (Gui::WindowID)window;
-	event.windowMove.position = position;
-	queuedGuiEvents.push_back(event);
+	Gui::WindowMoveEvent event = {};
+	event.windowId = (Gui::WindowID)window;
+	event.position = position;
+	queuedGuiEvents.emplace_back(event);
 }
 
 void Editor::EditorImpl::WindowResize(
@@ -128,12 +116,11 @@ void Editor::EditorImpl::WindowResize(
 	Math::Vec2Int visiblePos,
 	App::Extent visibleSize)
 {
-	impl::GuiEvent event{};
-	event.type = impl::GuiEvent::Type::WindowResizeEvent;
-	event.windowResize.windowId = (Gui::WindowID)window;
-	event.windowResize.extent = Gui::Extent{ newExtent.width, newExtent.height };
-	event.windowResize.visibleRect = Gui::Rect{ visiblePos, Gui::Extent{ visibleSize.width, visibleSize.height } };
-	queuedGuiEvents.push_back(event);
+	Gui::WindowResizeEvent event = {};
+	event.windowId = (Gui::WindowID)window;
+	event.extent = Gui::Extent{ newExtent.width, newExtent.height };
+	event.visibleRect = Gui::Rect{ visiblePos, Gui::Extent{ visibleSize.width, visibleSize.height } };
+	queuedGuiEvents.emplace_back(event);
 }
 
 void Editor::EditorImpl::CloseWindow(Gui::WindowID id)

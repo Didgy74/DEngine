@@ -1,13 +1,16 @@
 #pragma once
 
-#include <DEngine/Gui/Context.hpp>
-#include <DEngine/Gui/Text.hpp>
-#include <DEngine/Gui/DockArea.hpp>
 #include <DEngine/Gui/ButtonGroup.hpp>
+#include <DEngine/Gui/Context.hpp>
+#include <DEngine/Gui/DockArea.hpp>
+#include <DEngine/Gui/MenuButton.hpp>
+#include <DEngine/Gui/Text.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
+#include <DEngine/Std/Containers/Variant.hpp>
+
 #include <DEngine/Application.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
 #include <DEngine/Scene.hpp>
@@ -18,50 +21,32 @@ namespace DEngine::Editor
 {
 	namespace impl
 	{
-		struct GuiEvent
-		{
-			enum class Type
-			{
-				CharEnterEvent,
-				CharEvent,
-				CharRemoveEvent,
-				CursorClickEvent,
-				CursorMoveEvent,
-				TouchEvent,	
-				WindowCloseEvent,
-				WindowCursorEnterEvent,
-				WindowMinimizeEvent,
-				WindowMoveEvent,
-				WindowResizeEvent,
-			};
-			Type type;
-
-			union
-			{
-				Gui::CharEnterEvent charEnter;
-				Gui::CharEvent charEvent;
-				Gui::CharRemoveEvent charRemove;
-				Gui::CursorClickEvent cursorClick;
-				Gui::CursorMoveEvent cursorMove;
-				Gui::TouchEvent touch;
-				Gui::WindowCloseEvent windowClose;
-				Gui::WindowCursorEnterEvent windowCursorEnter;
-				Gui::WindowMinimizeEvent windowMinimize;
-				Gui::WindowMoveEvent windowMove;
-				Gui::WindowResizeEvent windowResize;
-			};
-		};
+		using GuiEvent_T = Std::Variant<
+			Gui::CharEnterEvent,
+			Gui::CharEvent,
+			Gui::CharRemoveEvent,
+			Gui::CursorClickEvent,
+			Gui::CursorMoveEvent,
+			Gui::TouchPressEvent,
+			Gui::TouchMoveEvent,
+			Gui::WindowCloseEvent,
+			Gui::WindowCursorEnterEvent,
+			Gui::WindowMinimizeEvent,
+			Gui::WindowMoveEvent,
+			Gui::WindowResizeEvent>;
 	}
 
 	enum class GizmoType : u8 { Translate, Rotate, Scale, COUNT };
 	class EntityIdList;
 	class ComponentList;
-	class InternalViewportWidget;
+	class ViewportWidget;
 
 	class EditorImpl : public App::EventInterface, public Gui::WindowHandler
 	{
 	public:
 		Std::Box<Gui::Context> guiCtx;
+
+		void FlushQueuedEvents();
 
 		// Override app-interface methods
 		virtual void ButtonEvent(
@@ -94,8 +79,7 @@ namespace DEngine::Editor
 			Math::Vec2Int visiblePos,
 			App::Extent visibleExtent) override;
 		
-		
-		std::vector<impl::GuiEvent> queuedGuiEvents;
+		std::vector<impl::GuiEvent_T> queuedGuiEvents;
 
 		// Override window-handler methods
 		virtual void CloseWindow(Gui::WindowID) override;
@@ -126,9 +110,10 @@ namespace DEngine::Editor
 		
 		EntityIdList* entityIdList = nullptr;
 		ComponentList* componentList = nullptr;
+		Gui::MenuButton* viewMenuButton = nullptr;
 		Gui::DockArea* dockArea = nullptr;
 		Gui::ButtonGroup* gizmoTypeBtnGroup = nullptr;
-		std::vector<InternalViewportWidget*> viewportWidgets;
+		std::vector<ViewportWidget*> viewportWidgets;
 		void SelectEntity(Entity id);
 		void UnselectEntity();
 		[[nodiscard]] Std::Opt<Entity> const& GetSelectedEntity() const { return selectedEntity; }

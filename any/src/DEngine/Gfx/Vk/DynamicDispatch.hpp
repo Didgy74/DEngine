@@ -225,7 +225,7 @@ namespace DEngine::Gfx::Vk
 		{
 			using BaseType = typename T::CType;
 			DENGINE_DETAIL_GFX_ASSERT(raw.vkSetDebugUtilsObjectNameEXT != nullptr);
-			vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+			vk::DebugUtilsObjectNameInfoEXT nameInfo = {};
 			nameInfo.objectHandle = uint64_t(BaseType(handle));
 			nameInfo.objectType = T::objectType;
 			nameInfo.pObjectName = name;

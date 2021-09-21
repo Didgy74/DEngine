@@ -2,20 +2,27 @@
 
 #include <DEngine/Gui/Widget.hpp>
 
+#include <DEngine/Std/Containers/Opt.hpp>
+
 #include <functional>
 #include <string>
+#include <vector>
+
+namespace DEngine::Gui::impl { class DropdownImpl; }
 
 namespace DEngine::Gui
 {
 	class Dropdown : public Widget
 	{
 	public:
+		u32 textMargin = 0;
+
 		u32 selectedItem = 0;
 
 		std::vector<std::string> items;
 
 		using SelectionChangedCallback = void(Dropdown&);
-		std::function<SelectionChangedCallback> selectedItemChangedCallback;
+		std::function<SelectionChangedCallback> selectionChangedCallback;
 
 		Dropdown();
 		virtual ~Dropdown() override;
@@ -30,7 +37,7 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		virtual void CursorClick(
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -38,22 +45,32 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
-		virtual void TouchEvent(
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override;
-		
-	private:
-		Context* menuWidgetCtx = nullptr;
-		WindowID menuWidgetWindowId{};
-		Widget* menuWidget = nullptr;
+			CursorMoveEvent event,
+			bool cursorOccluded) override;
 
-		void CreateDropdownMenu(
+		virtual bool TouchPressEvent(
 			Context& ctx,
 			WindowID windowId,
-			Math::Vec2Int menuPosition);
-		void ClearDropdownMenu();
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchPressEvent event) override;
+
+		virtual bool TouchMoveEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchMoveEvent event,
+			bool occluded) override;
+
+	private:
+		friend impl::DropdownImpl;
+
+		Std::Opt<u8> heldPointerId;
 	};
 }

@@ -11,43 +11,42 @@
 #include <DEngine/Math/Vector.hpp>
 #include <DEngine/Math/UnitQuaternion.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
+
 #include <iostream>
 #include <vector>
 #include <string>
 
 void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 {
-	Math::Vec2 addAcceleration{};
-
-	f32 amount = 300.f * deltaTime;
-
-	if (App::ButtonValue(App::Button::Up))
-		addAcceleration.y += 1.f;
-	if (App::ButtonValue(App::Button::Down))
-		addAcceleration.y -= 1.f;
-	if (App::ButtonValue(App::Button::Right))
-		addAcceleration.x += 1.f;
-	if (App::ButtonValue(App::Button::Left))
-		addAcceleration.x -= 1.f;
-
-	if (addAcceleration.MagnitudeSqrd() != 0)
+	auto const rbPtr = scene.GetComponent<Physics::Rigidbody2D>(entity);
+	b2Body* physBodyPtr = nullptr;
+	if (rbPtr != nullptr)
 	{
-		addAcceleration.Normalize();
-		addAcceleration *= amount;
+		DENGINE_DETAIL_ASSERT(rbPtr->b2BodyPtr);
+		physBodyPtr = (b2Body*)rbPtr->b2BodyPtr;
+	}
+	if (!physBodyPtr)
+		return;
+	auto& physBody = *physBodyPtr;
+
+	auto const gamepadOpt = App::GetGamepad();
+	if (!gamepadOpt.HasValue())
+		return;
+
+	auto const& gamepadState = gamepadOpt.Value();
+	if (gamepadState.GetKeyEvent(App::GamepadKey::A) == App::KeyEventType::Pressed)
+	{
+		physBody.ApplyLinearImpulseToCenter({ 0.f, 5.f }, true);
 	}
 
-	if (App::ButtonEvent(App::Button::Space) == App::KeyEventType::Pressed)
-		addAcceleration.y += 400.f;
-
-	if (addAcceleration.MagnitudeSqrd() != 0)
+	auto leftStickX = gamepadState.GetGamepadAxisValue(App::GamepadAxis::LeftX);
+	if (Math::Abs(leftStickX) > gamepadState.stickDeadzone)
 	{
-		Physics::Rigidbody2D* body = scene.GetComponent<Physics::Rigidbody2D>(entity);
-		if (body != nullptr)
-		{
-			DENGINE_DETAIL_ASSERT(body->b2BodyPtr);
-			b2Body* physBody = (b2Body*)body->b2BodyPtr;
-			physBody->ApplyForceToCenter({ addAcceleration.x, addAcceleration.y }, true);
-		}
+		leftStickX *= 2.f;
+
+		auto const currVelocity = physBody.GetLinearVelocity();
+		physBody.SetLinearVelocity({ leftStickX, currVelocity.y });
+		physBody.SetAwake(true);
 	}
 }
 
@@ -71,12 +70,17 @@ namespace DEngine::impl
 	{
 		virtual char const* get(Gfx::TextureID id) const override
 		{
-			if ((u64)id == 0)
-				return "data/01.ktx";
-			else if ((u64)id == 1)
-				return "data/2.png";
-			else
-				return "data/Circle.png";
+			switch ((int)id)
+			{
+				case 0:
+					return "data/Ground.png";
+				case 1:
+					return "data/Crate.png";
+				case 2:
+					return "data/02.png";
+				default:
+					return "data/01.ktx";
+			}
 		}
 	};
 
@@ -113,8 +117,9 @@ namespace DEngine::impl
 		rendererInitInfo.texAssetInterface = &textureAssetConnection;
 		rendererInitInfo.optional_logger = &logger;
 		rendererInitInfo.requiredVkInstanceExtensions = requiredVkInstanceExtensions;
-		rendererInitInfo.gizmoArrowMesh = Editor::BuildGizmoArrowMesh();
-		rendererInitInfo.gizmoCircleLineMesh = Editor::BuildGizmoTorusMesh();
+		rendererInitInfo.gizmoArrowMesh = Editor::BuildGizmoTranslateArrowMesh2D();
+		rendererInitInfo.gizmoCircleLineMesh = Editor::BuildGizmoTorusMesh2D();
+		rendererInitInfo.gizmoArrowScaleMesh2d = Editor::BuildGizmoScaleArrowMesh2D();
 		Std::Opt<Gfx::Context> rendererDataOpt = Gfx::Initialize(rendererInitInfo);
 		if (!rendererDataOpt.HasValue())
 		{
@@ -270,7 +275,7 @@ namespace DEngine::impl
 	template<typename T>
 	constexpr unsigned long long GetTypeID() noexcept
 	{
-		return Hash(GetPrettyFunctionString<T>());
+		return Hash(InitTestPipeline<T>());
 	}
 }
  */
@@ -286,14 +291,14 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	App::WindowID mainWindow = App::CreateWindow(
 		"Main window",
-		{ 1000, 750 });
+		{ 1280, 800 });
 
 	auto gfxWsiConnection = new impl::GfxWsiConnection;
 	gfxWsiConnection->appWindowID = mainWindow;
 
 	// Initialize the renderer
 	auto requiredInstanceExtensions = App::RequiredVulkanInstanceExtensions();
-	impl::GfxLogger gfxLogger{};
+	impl::GfxLogger gfxLogger = {};
 	impl::GfxTexAssetInterfacer gfxTexAssetInterfacer{};
 	Gfx::Context gfxCtx = impl::CreateGfxContext(
 		*gfxWsiConnection,
@@ -313,8 +318,33 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		//transform.scale = { 1.f, 1.f };
 		myScene.AddComponent(ent, transform);
 
+		Gfx::TextureID textureId{ 1 };
+		myScene.AddComponent(ent, textureId);
+
+		Physics::Rigidbody2D rb = {};
+		rb.type = Physics::Rigidbody2D::Type::Dynamic;
+		myScene.AddComponent(ent, rb);
+
+		Move move = {};
+		myScene.AddComponent(ent, move);
+	}
+
+	{
+		Entity ent = myScene.NewEntity();
+
+		Transform transform = {};
+		transform.position.x = 0.f;
+		transform.position.y = -2.f;
+		//transform.rotation = 0.707f;
+		transform.scale.x = 5.f;
+		myScene.AddComponent(ent, transform);
+
 		Gfx::TextureID textureId{ 0 };
 		myScene.AddComponent(ent, textureId);
+
+		Physics::Rigidbody2D rb = {};
+		rb.type = Physics::Rigidbody2D::Type::Static;
+		myScene.AddComponent(ent, rb);
 
 		Move move = {};
 		myScene.AddComponent(ent, move);
@@ -336,7 +366,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 		Scene* renderedScene = &myScene;
 
-		if (editorCtx.CurrentlySimulating())
+		if (editorCtx.IsSimulating())
 		{
 			Scene& scene = editorCtx.GetActiveScene();
 			renderedScene = &scene;
@@ -418,7 +448,8 @@ void DEngine::impl::SubmitRendering(
 		params.textureIDs.push_back(item.b);
 
 		Math::Mat4 transformMat = Math::LinAlg3D::Translate(transform.position) *
-			Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation);
+			Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation) *
+			Math::LinAlg3D::Scale_Homo(transform.scale.AsVec3(1.f));
 		params.transforms.push_back(transformMat);
 	}
 

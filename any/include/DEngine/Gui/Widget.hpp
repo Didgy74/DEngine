@@ -1,12 +1,12 @@
 #pragma once
 
-#include <DEngine/Gui/DrawInfo.hpp>
 #include <DEngine/Gui/Events.hpp>
 #include <DEngine/Gui/SizeHint.hpp>
 #include <DEngine/Gui/Utility.hpp>
 
 namespace DEngine::Gui
 {
+	class DrawInfo;
 	class Context;
 
 	class Widget
@@ -42,27 +42,77 @@ namespace DEngine::Gui
 
 		virtual void InputConnectionLost() {}
 
-		virtual void CursorMove(
+
+		// Returns true if the widget occludes the move event point.
+		// That means widgets that are behind/under this one in terms of Z axis,
+		// should not react to this move event for i.e highlights.
+		// 
+		// Transparent overlays should always return false.
+		// 
+		// The change is reflected in the "occluded" parameter for all
+		// subsequent widget this event dispatch.
+		// 
+		// If the occluded parameter is already true,
+		// the return value should ordinarily be ignored.
+		//
+		// If the return value is true, it does NOT ordinarily mean
+		// you can end event dispatching early. That is to say
+		// this event should ordinarily always be passed to every widget
+		// in the hierarchy.
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			CursorMoveEvent event) {}
+			CursorMoveEvent event,
+			bool occluded) { return false; }
 
-		virtual void CursorClick(
+		// Return true if event has been consumed.
+		//
+		// You can end dispatching ONLY if the event is down-pressed.
+		// Unpressed events should ordinarily be dispatched everywhere.
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
-			CursorClickEvent event) {}
+			CursorClickEvent event) { return false; }
 
-		virtual void TouchEvent(
+		// Returns true if the widget occludes the move event point.
+		// That means widgets that are behind/under this one in terms of Z axis,
+		// should not react to this move event for i.e highlights.
+		// 
+		// Transparent overlays should always return false.
+		// 
+		// The change is reflected in the "occluded" parameter for all
+		// subsequent widget this event dispatch.
+		// 
+		// If the occluded parameter is already true,
+		// the return value should ordinarily be ignored.
+		//
+		// If the return value is true, it does NOT ordinarily mean
+		// you can end event dispatching early. That is to say
+		// this event should ordinarily always be passed to every widget
+		// in the hierarchy.
+		virtual bool TouchMoveEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			TouchEvent event) {}
+			TouchMoveEvent event,
+			bool occluded) { return false; }
+
+		// Return true if event has been consumed.
+		//
+		// You can end dispatching ONLY if the event is down-pressed.
+		// Unpressed events should ordinarily be dispatched everywhere.
+		virtual bool TouchPressEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			TouchPressEvent event) { return false; }
 	};
 
 	inline Widget::~Widget() {}

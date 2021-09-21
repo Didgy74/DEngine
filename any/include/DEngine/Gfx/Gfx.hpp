@@ -75,6 +75,7 @@ namespace DEngine::Gfx
 		u32 width;
 		u32 height;
 		Math::Mat4 transform;
+		Math::Vec4 clearColor = { 1.f, 0.f, 0.f, 1.f };
 
 		enum class GizmoType : u8 { Translate, Rotate, Scale, COUNT };
 		struct Gizmo
@@ -155,10 +156,11 @@ namespace DEngine::Gfx
 
 	struct DrawParams
 	{
-		// Scene specific stuff
+		// Scene specific stuff, this is WIP
 		std::vector<TextureID> textureIDs;
 		std::vector<Math::Mat4> transforms;
 
+		// This is decent generic stuff
 		std::vector<LineDrawCmd> lineDrawCmds;
 		std::vector<Math::Vec3> lineVertices;
 
@@ -180,6 +182,7 @@ namespace DEngine::Gfx
 
 		std::vector<Math::Vec3> gizmoArrowMesh;
 		std::vector<Math::Vec3> gizmoCircleLineMesh;
+		std::vector<Math::Vec3> gizmoArrowScaleMesh2d;
 	};
 
 	class LogInterface

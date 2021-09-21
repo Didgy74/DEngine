@@ -33,6 +33,7 @@ namespace DEngine::Application::detail
 	struct AndroidPollSource {
 		LooperID looperId = LooperID::Input;
 
+		AppData* appData = nullptr;
 		BackendData* backendData = nullptr;
 	};
 
@@ -49,6 +50,7 @@ namespace DEngine::Application::detail
 			VisibleAreaChanged,
 			NewOrientation,
 		};
+		Type type;
 
 		template<Type>
 		struct Data {};
@@ -81,16 +83,18 @@ namespace DEngine::Application::detail
 			uint8_t newOrientation;
 		};
 
-		using VariantType = Std::Variant<
-			Data<Type::CharInput>,
-			Data<Type::CharRemove>,
-			Data<Type::CharEnter>,
-			Data<Type::NativeWindowCreated>,
-			Data<Type::NativeWindowDestroyed>,
-			Data<Type::InputQueueCreated>,
-			Data<Type::VisibleAreaChanged>,
-			Data<Type::NewOrientation>>;
-		VariantType data{};
+		union Data_T
+		{
+			Data<Type::CharInput> charInput;
+			Data<Type::CharRemove> charRemove;
+			Data<Type::CharEnter> charEnter;
+			Data<Type::NativeWindowCreated> nativeWindowCreated;
+			Data<Type::NativeWindowDestroyed> nativeWindowDestroyed;
+			Data<Type::InputQueueCreated> inputQueueCreated;
+			Data<Type::VisibleAreaChanged> visibleAreaChanged;
+			Data<Type::NewOrientation> newOrientation;
+		};
+		Data_T data;
 	};
 
 	struct BackendData
@@ -118,10 +122,6 @@ namespace DEngine::Application::detail
 	};
 
 	BackendData* pBackendData = nullptr;
-
-	[[nodiscard]] static bool HandleInputEvents_Motion(
-			AInputEvent* event,
-			int32_t source);
 }
 
 using namespace DEngine;
@@ -140,6 +140,16 @@ namespace DEngine::Application::detail
 				break;
 		}
 		return Orientation::Invalid;
+	}
+
+	[[nodiscard]] static GamepadKey ToGamepadButton(int32_t androidKeyCode) noexcept
+	{
+		switch (androidKeyCode)
+		{
+			case AKEYCODE_BUTTON_A:
+				return GamepadKey::A;
+		}
+		return GamepadKey::Invalid;
 	}
 
 	static void onStart(ANativeActivity* activity)
@@ -172,13 +182,14 @@ namespace DEngine::Application::detail
 		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
-		CustomEvent newEvent = {};
+		CustomEvent event = {};
+		event.type = CustomEvent::Type::NativeWindowCreated;
 		CustomEvent::Data<CustomEvent::Type::NativeWindowCreated> data = {};
 		data.nativeWindow = window;
-		newEvent.data.Set(data);
+		event.data.nativeWindowCreated = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
-		backendData.customEventQueue.push_back(newEvent);
+		backendData.customEventQueue.push_back(event);
 	}
 
 	static void onNativeWindowDestroyed(ANativeActivity* activity, ANativeWindow* window)
@@ -186,12 +197,13 @@ namespace DEngine::Application::detail
 		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
-		CustomEvent newEvent = {};
+		CustomEvent event = {};
+		event.type = CustomEvent::Type::NativeWindowDestroyed;
 		CustomEvent::Data<CustomEvent::Type::NativeWindowDestroyed> data = {};
-		newEvent.data.Set(data);
+		event.data.nativeWindowDestroyed = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
-		backendData.customEventQueue.push_back(newEvent);
+		backendData.customEventQueue.push_back(event);
 	}
 
 	static void onInputQueueCreated(ANativeActivity* activity, AInputQueue* queue)
@@ -199,13 +211,14 @@ namespace DEngine::Application::detail
 		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
-		CustomEvent newEvent = {};
+		CustomEvent event = {};
+		event.type = CustomEvent::Type::InputQueueCreated;
 		CustomEvent::Data<CustomEvent::Type::InputQueueCreated> data = {};
 		data.inputQueue = queue;
-		newEvent.data.Set(data);
+		event.data.inputQueueCreated = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
-		backendData.customEventQueue.push_back(newEvent);
+		backendData.customEventQueue.push_back(event);
 	}
 
 	static void onInputQueueDestroyed(ANativeActivity* activity, AInputQueue* queue)
@@ -219,12 +232,13 @@ namespace DEngine::Application::detail
 
 		auto& backendData = *detail::pBackendData;
 
-		CustomEvent newEvent = {};
+		CustomEvent event = {};
+		event.type = CustomEvent::Type::NewOrientation;
 		CustomEvent::Data<CustomEvent::Type::NewOrientation> data = {};
-		newEvent.data.Set(data);
+		event.data.newOrientation = data;
 
 		std::lock_guard _{ backendData.customEventQueueLock };
-		backendData.customEventQueue.push_back(newEvent);
+		backendData.customEventQueue.push_back(event);
 	}
 }
 
@@ -302,13 +316,14 @@ extern "C"
 
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent = {};
+	CustomEvent event = {};
+	event.type = CustomEvent::Type::CharInput;
 	CustomEvent::Data<CustomEvent::Type::CharInput> data = {};
 	data.charInput = utfValue;
-	newEvent.data.Set(data);
+	event.data.charInput = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
-	backendData.customEventQueue.push_back(newEvent);
+	backendData.customEventQueue.push_back(event);
 }
 
 extern "C"
@@ -323,12 +338,13 @@ extern "C"
 	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent = {};
+	CustomEvent event = {};
+	event.type = CustomEvent::Type::CharEnter;
 	CustomEvent::Data<CustomEvent::Type::CharEnter> data = {};
-	newEvent.data.Set(data);
+	event.data.charEnter = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
-	backendData.customEventQueue.push_back(newEvent);
+	backendData.customEventQueue.push_back(event);
 }
 
 extern "C"
@@ -343,12 +359,13 @@ extern "C"
 	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent = {};
+	CustomEvent event = {};
+	event.type = CustomEvent::Type::CharRemove;
 	CustomEvent::Data<CustomEvent::Type::CharRemove> data = {};
-	newEvent.data.Set(data);
+	event.data.charRemove = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
-	backendData.customEventQueue.push_back(newEvent);
+	backendData.customEventQueue.push_back(event);
 }
 
 // We do not use ANativeActivity's View in this implementation,
@@ -372,16 +389,17 @@ extern "C"
 	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent = {};
+	CustomEvent event = {};
+	event.type = CustomEvent::Type::VisibleAreaChanged;
 	CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged> data = {};
 	data.offsetX = (i32)posX;
 	data.offsetY = (i32)posY;
 	data.width = (u32)width;
 	data.height = (u32)height;
-	newEvent.data.Set(data);
+	event.data.visibleAreaChanged = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
-	backendData.customEventQueue.push_back(newEvent);
+	backendData.customEventQueue.push_back(event);
 }
 
 /*
@@ -404,92 +422,139 @@ extern "C"
 	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
-	CustomEvent newEvent = {};
+	CustomEvent event = {};
+	event.type = CustomEvent::Type::NewOrientation;
 	CustomEvent::Data<CustomEvent::Type::NewOrientation> data = {};
 	data.newOrientation = (uint8_t)newOrientation;
-	newEvent.data.Set(data);
+	event.data.newOrientation = data;
 
 	std::lock_guard _{ backendData.customEventQueueLock };
-	backendData.customEventQueue.push_back(newEvent);
+	backendData.customEventQueue.push_back(event);
 }
 
-static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, int32_t source)
+namespace DEngine::Application::detail
 {
-	bool handled = false;
-
-	if (source == AINPUT_SOURCE_MOUSE)
+	// This function is called from the AInputQueue function when we poll the ALooper
+	static bool HandleInputEvents_Key(
+		AppData& appData,
+		BackendData& backendData,
+		AInputEvent* event,
+		int32_t sourceFlags)
 	{
-		auto action = decltype(AMOTION_EVENT_ACTION_DOWN)(AMotionEvent_getAction(event));
-		int32_t index = int32_t((action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT);
+		bool handled = false;
+
+		auto const keyCode = AKeyEvent_getKeyCode(event);
+
+		auto const gamepadButton = ToGamepadButton(keyCode);
+
+		if (gamepadButton != GamepadKey::Invalid)
+		{
+			handled = true;
+
+			auto const action = AKeyEvent_getAction(event);
+
+			if (action != AKEY_EVENT_ACTION_MULTIPLE)
+			{
+				auto const pressed = action == AKEY_EVENT_ACTION_DOWN;
+
+				detail::UpdateGamepadButton(
+					appData,
+					gamepadButton,
+					pressed);
+			}
+		}
+
+		return handled;
+	}
+
+	// This function is called from the AInputQueue function when we poll the ALooper
+	// Should return true if the event has been handled by the app.
+	static bool HandleInputEvents_Motion_Cursor(
+		AppData& appData,
+		BackendData& backendData,
+		AInputEvent* event,
+		i32 sourceFlags,
+		i32 action,
+		i32 index)
+	{
+		if ((sourceFlags & AINPUT_SOURCE_MOUSE) != AINPUT_SOURCE_MOUSE)
+			return false;
+
+		auto handled = false;
+
 		if (action == AMOTION_EVENT_ACTION_HOVER_ENTER)
 		{
 			// The cursor started existing
-			f32 x = AMotionEvent_getX(event, index);
-			f32 y = AMotionEvent_getY(event, index);
+			f32 const x = AMotionEvent_getX(event, index);
+			f32 const y = AMotionEvent_getY(event, index);
 
-			pAppData->cursorOpt = CursorData{};
-			pAppData->cursorOpt.Value().position = { (int32_t)x, (int32_t)y };
-			pAppData->cursorOpt.Value().positionDelta = {};
-			pAppData->cursorOpt.Value().scrollDeltaY = 0;
+			appData.cursorOpt = CursorData{};
+			auto& cursorData = appData.cursorOpt.Value();
+			cursorData.position = { (i32)x, (i32)y };
+
+			handled = true;
 		}
 		else if (action == AMOTION_EVENT_ACTION_HOVER_MOVE || action == AMOTION_EVENT_ACTION_MOVE)
 		{
-			f32 x = AMotionEvent_getX(event, index);
-			f32 y = AMotionEvent_getY(event, index);
-			AppData::WindowNode* windowNode = detail::GetWindowNode(detail::pBackendData->currentWindow.Value());
-			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
-			detail::UpdateCursor(*windowNode, { (int32_t)x, (int32_t)y });
+			f32 const x = AMotionEvent_getX(event, index);
+			f32 const y = AMotionEvent_getY(event, index);
+			detail::UpdateCursor(
+				appData,
+				backendData.currentWindow.Value(),
+				{ (i32)x, (i32)y });
 			handled = true;
-			return handled;
 		}
 		else if (action == AMOTION_EVENT_ACTION_DOWN)
 		{
-			AppData::WindowNode* windowNode = detail::GetWindowNode(detail::pBackendData->currentWindow.Value());
-			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
-			detail::UpdateButton(Button::LeftMouse, true);
+			detail::UpdateButton(appData, Button::LeftMouse, true);
 			handled = true;
-			return handled;
 		}
 		else if (action == AMOTION_EVENT_ACTION_UP)
 		{
-			AppData::WindowNode* windowNode = detail::GetWindowNode(detail::pBackendData->currentWindow.Value());
-			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
-			detail::UpdateButton(Button::LeftMouse, false);
+			detail::UpdateButton(appData, Button::LeftMouse, false);
 			handled = true;
-			return handled;
 		}
 
+		return handled;
 	}
 
-	auto pointer = decltype(AMOTION_EVENT_ACTION_DOWN)(AMotionEvent_getAction(event));
-
-	int32_t action = pointer & AMOTION_EVENT_ACTION_MASK;
-	size_t index = size_t((pointer & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT);
-
-	if (source == AINPUT_SOURCE_TOUCHSCREEN)
+	// This function is called from the AInputQueue function when we poll the ALooper
+	// Should return true if the event has been handled by the app.
+	static bool HandleInputEvents_Motion_Touch(
+		AppData& appData,
+		BackendData& backendData,
+		AInputEvent* event,
+		i32 sourceFlags,
+		i32 action,
+		i32 index)
 	{
+		if ((sourceFlags & AINPUT_SOURCE_TOUCHSCREEN) == 0)
+			return false;
+
+		auto handled = false;
+
 		switch (action)
 		{
 			case AMOTION_EVENT_ACTION_DOWN:
 			case AMOTION_EVENT_ACTION_POINTER_DOWN:
 			{
-				f32 x = AMotionEvent_getX(event, index);
-				f32 y = AMotionEvent_getY(event, index);
-				i32 id = AMotionEvent_getPointerId(event, index);
-				detail::UpdateTouchInput(TouchEventType::Down, (u8)id, x, y);
+				auto const x = AMotionEvent_getX(event, index);
+				auto const y = AMotionEvent_getY(event, index);
+				auto const id = AMotionEvent_getPointerId(event, index);
+				detail::UpdateTouchInput(appData, TouchEventType::Down, (u8)id, x, y);
 				handled = true;
 				break;
 			}
 
 			case AMOTION_EVENT_ACTION_MOVE:
 			{
-				size_t count = AMotionEvent_getPointerCount(event);
-				for (size_t i = 0; i < count; i++)
+				auto const count = AMotionEvent_getPointerCount(event);
+				for (auto i = 0; i < count; i++)
 				{
-					f32 x = AMotionEvent_getX(event, i);
-					f32 y = AMotionEvent_getY(event, i);
-					i32 id = AMotionEvent_getPointerId(event, i);
-					detail::UpdateTouchInput(TouchEventType::Moved, (u8)id, x, y);
+					auto const x = AMotionEvent_getX(event, i);
+					auto const y = AMotionEvent_getY(event, i);
+					auto const  id = AMotionEvent_getPointerId(event, i);
+					detail::UpdateTouchInput(appData, TouchEventType::Moved, (u8)id, x, y);
 				}
 				handled = true;
 				break;
@@ -498,10 +563,10 @@ static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, in
 			case AMOTION_EVENT_ACTION_UP:
 			case AMOTION_EVENT_ACTION_POINTER_UP:
 			{
-				f32 x = AMotionEvent_getX(event, index);
-				f32 y = AMotionEvent_getY(event, index);
-				i32 id = AMotionEvent_getPointerId(event, index);
-				detail::UpdateTouchInput(TouchEventType::Up, (u8)id, x, y);
+				auto const  x = AMotionEvent_getX(event, index);
+				auto const  y = AMotionEvent_getY(event, index);
+				auto const  id = AMotionEvent_getPointerId(event, index);
+				detail::UpdateTouchInput(appData, TouchEventType::Up, (u8)id, x, y);
 				handled = true;
 				break;
 			}
@@ -509,37 +574,125 @@ static bool Application::detail::HandleInputEvents_Motion(AInputEvent* event, in
 			default:
 				break;
 		}
+
+		return handled;
 	}
 
-	return handled;
+	// This function is called from the AInputQueue function when we poll the ALooper
+	// Should return true if the event has been handled by the app.
+	static bool HandleInputEvents_Motion_Joystick(
+		AppData& appData,
+		BackendData& backendData,
+		AInputEvent* event,
+		i32 sourceFlags,
+		i32 action,
+		i32 index)
+	{
+		if ((sourceFlags & AINPUT_SOURCE_JOYSTICK) == 0)
+			return false;
+
+		auto handled = false;
+
+		if (action == AMOTION_EVENT_ACTION_MOVE)
+		{
+			auto const leftStickX = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_X, 0);
+
+			detail::UpdateGamepadAxis(
+				appData,
+				GamepadAxis::LeftX,
+				leftStickX);
+
+			handled = true;
+		}
+
+		return handled;
+	}
+
+	// This function is called from the AInputQueue function when we poll the ALooper
+	// Should return true if the event has been handled by the app.
+	static bool HandleInputEvents_Motion(
+		AppData& appData,
+		BackendData& backendData,
+		AInputEvent* event,
+		int32_t sourceFlags)
+	{
+		bool handled;
+
+		auto const actionIndexCombo = AMotionEvent_getAction(event);
+		auto const action = actionIndexCombo & AMOTION_EVENT_ACTION_MASK;
+		auto const index =
+			(actionIndexCombo & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >>
+			AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
+
+		handled = HandleInputEvents_Motion_Cursor(
+			appData,
+			backendData,
+			event,
+			sourceFlags,
+			action,
+			index);
+		if (handled)
+			return true;
+
+		handled = HandleInputEvents_Motion_Touch(
+			appData,
+			backendData,
+			event,
+			sourceFlags,
+			action,
+			index);
+		if (handled)
+			return true;
+
+		handled = HandleInputEvents_Motion_Joystick(
+			appData,
+			backendData,
+			event,
+			sourceFlags,
+			action,
+			index);
+		if (handled)
+			return true;
+
+		return handled;
+	}
 }
 
 namespace DEngine::Application::detail
 {
+	// Callback for AInputQueue_attachLooper.
+	// This needs to return 1 if we want to keep receiving
+	// callbacks, or 0 if we want to unregister this callback from the looper.
 	int testCallback(int fd, int events, void *data)
 	{
-		AndroidPollSource& androidPollSource = *(AndroidPollSource*)data;
+		auto& androidPollSource = *static_cast<AndroidPollSource*>(data);
+		auto& appData = *androidPollSource.appData;
 		auto& backendData = *androidPollSource.backendData;
+
 		if ((unsigned int)events & ALOOPER_EVENT_INPUT)
 		{
 			while (true)
 			{
 				AInputEvent* event = nullptr;
-				int32_t eventIndex = AInputQueue_getEvent(backendData.inputQueue, &event);
+				auto const eventIndex = AInputQueue_getEvent(backendData.inputQueue, &event);
 				if (eventIndex < 0)
 					break;
 
-				if (AInputQueue_preDispatchEvent(backendData.inputQueue, event) != 0) {
+				if (AInputQueue_preDispatchEvent(backendData.inputQueue, event) != 0)
 					continue;
-				}
-				int handled = 0;
 
-				int32_t eventType = AInputEvent_getType(event);
-				int32_t eventSource = AInputEvent_getSource(event);
+				bool handled = false;
 
-				if (eventType == AINPUT_EVENT_TYPE_MOTION)
+				auto const eventType = AInputEvent_getType(event);
+				auto const eventSourceFlags = AInputEvent_getSource(event);
+
+				if (!handled && eventType == AINPUT_EVENT_TYPE_MOTION)
 				{
-					handled = HandleInputEvents_Motion(event, eventSource);
+					handled = HandleInputEvents_Motion(appData, backendData, event, eventSourceFlags);
+				}
+				if (!handled && eventType == AINPUT_EVENT_TYPE_KEY)
+				{
+					handled = HandleInputEvents_Key(appData, backendData, event, eventSourceFlags);
 				}
 
 				AInputQueue_finishEvent(backendData.inputQueue, event, handled);
@@ -562,7 +715,7 @@ namespace DEngine::Application::detail
 		// Need to maximize the window
 		if (backendData.currentWindow.HasValue())
 		{
-			AppData::WindowNode* windowNode = detail::GetWindowNode(backendData.currentWindow.Value());
+			AppData::WindowNode* windowNode = detail::GetWindowNode(appData, backendData.currentWindow.Value());
 			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
 			detail::UpdateWindowMinimized(*windowNode, false);
 			windowNode->platformHandle = backendData.nativeWindow;
@@ -577,7 +730,7 @@ namespace DEngine::Application::detail
 		// We need to minimize the window
 		if (backendData.currentWindow.HasValue())
 		{
-			AppData::WindowNode* windowNode = detail::GetWindowNode(backendData.currentWindow.Value());
+			AppData::WindowNode* windowNode = detail::GetWindowNode(appData, backendData.currentWindow.Value());
 			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
 			detail::UpdateWindowMinimized(*windowNode, true);
 			windowNode->platformHandle = nullptr;
@@ -598,13 +751,15 @@ namespace DEngine::Application::detail
 		Math::Vec2Int offset,
 		Extent extent)
 	{
+		auto& appData = *detail::pAppData;
+
 		auto& backendData = *detail::pBackendData;
 		backendData.visibleAreaOffset = offset;
 		backendData.visibleAreaExtent = extent;
 
 		if (backendData.currentWindow.HasValue())
 		{
-			auto windowNodePtr = detail::GetWindowNode(backendData.currentWindow.Value());
+			auto windowNodePtr = detail::GetWindowNode(appData, backendData.currentWindow.Value());
 
 			auto windowWidth = (uint32_t)ANativeWindow_getWidth(backendData.nativeWindow);
 			auto windowHeight = (uint32_t)ANativeWindow_getHeight(backendData.nativeWindow);
@@ -638,61 +793,60 @@ namespace DEngine::Application::detail
 		{
 			if (callable.HasValue())
 				callable.Value()(event);
-			auto typeIndexOpt = event.data.GetIndex();
-			DENGINE_DETAIL_APPLICATION_ASSERT(typeIndexOpt.HasValue());
-			switch (typeIndexOpt.Value())
+			auto typeIndex = event.type;
+			switch (typeIndex)
 			{
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NativeWindowCreated>>:
+				case CustomEvent::Type::NativeWindowCreated:
 				{
-					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::NativeWindowCreated>>();
+					auto const& data = event.data.nativeWindowCreated;
 					HandleEvent_NativeWindowCreated(data.nativeWindow);
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NativeWindowDestroyed>>:
+				case CustomEvent::Type::NativeWindowDestroyed:
 				{
 					HandleEvent_NativeWindowDestroyed();
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::InputQueueCreated>>:
+				case CustomEvent::Type::InputQueueCreated:
 				{
-					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::InputQueueCreated>>();
+					auto const& data = event.data.inputQueueCreated;
 					HandleEvent_InputQueueCreated(data.inputQueue);
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged>>:
+				case CustomEvent::Type::VisibleAreaChanged:
 				{
-					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged>>();
+					auto const& data = event.data.visibleAreaChanged;
 					HandleEvent_VisibleAreaChanged(
 						{ data.offsetX, data.offsetY },
 						{ data.width, data.height });
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::CharInput>>:
+				case CustomEvent::Type::CharInput:
 				{
-					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::CharInput>>();
+					auto const& data = event.data.charInput;
 					detail::PushCharInput(data.charInput);
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::CharRemove>>:
+				case CustomEvent::Type::CharRemove:
 				{
 					detail::PushCharRemoveEvent();
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::CharEnter>>:
+				case CustomEvent::Type::CharEnter:
 				{
 					detail::PushCharEnterEvent();
 					break;
 				}
 
-				case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NewOrientation>>:
+				case CustomEvent::Type::NewOrientation:
 				{
-					auto const& data = event.data.Get<CustomEvent::Data<CustomEvent::Type::NewOrientation>>();
+					auto const& data = event.data.newOrientation;
 					HandleEvent_Reorientation(data.newOrientation);
 					break;
 				}
@@ -721,6 +875,8 @@ bool Application::detail::Backend_Initialize() noexcept
 {
 	auto& appData = *detail::pAppData;
 	auto& backendData = *detail::pBackendData;
+
+	backendData.inputPollSource.appData = &appData;
 
 	// First we attach this thread to the JVM
 	jint attachThreadResult = backendData.activity->vm->AttachCurrentThread(
@@ -794,17 +950,16 @@ bool Application::detail::Backend_Initialize() noexcept
 		ProcessCustomEvents(
 			[&nativeWindowSet, &inputQueueSet, &visibleAreaSet](CustomEvent const& event)
 			{
-				auto typeIndexOpt = event.data.GetIndex();
-				DENGINE_DETAIL_APPLICATION_ASSERT(typeIndexOpt.HasValue());
-				switch (typeIndexOpt.Value())
+				auto typeIndex = event.type;
+				switch (typeIndex)
 				{
-					case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::InputQueueCreated>>:
+					case CustomEvent::Type::InputQueueCreated:
 						inputQueueSet = true;
 						break;
-					case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::NativeWindowCreated>>:
+					case CustomEvent::Type::NativeWindowCreated:
 						nativeWindowSet = true;
 						break;
-					case decltype(event.data)::indexOf<CustomEvent::Data<CustomEvent::Type::VisibleAreaChanged>>:
+					case CustomEvent::Type::VisibleAreaChanged:
 						visibleAreaSet = true;
 						break;
 					default:
@@ -868,10 +1023,10 @@ Application::WindowID Application::CreateWindow(
 
 	int width = ANativeWindow_getWidth(backendData.nativeWindow);
 	int height = ANativeWindow_getHeight(backendData.nativeWindow);
-	newNode.windowData.size.width = (u32)width;
-	newNode.windowData.size.height = (u32)height;
-	newNode.windowData.visiblePosition = backendData.visibleAreaOffset;
-	newNode.windowData.visibleSize = backendData.visibleAreaExtent;
+	newNode.windowData.extent.width = (u32)width;
+	newNode.windowData.extent.height = (u32)height;
+	newNode.windowData.visibleOffset = backendData.visibleAreaOffset;
+	newNode.windowData.visibleExtent = backendData.visibleAreaExtent;
 	newNode.platformHandle = backendData.nativeWindow;
 
 	appData.windows.push_back(newNode);

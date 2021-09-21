@@ -13,6 +13,7 @@ namespace DEngine::Gfx::Vk::impl
 	class BoxVkBuffer
 	{
 	public:
+		constexpr BoxVkBuffer() noexcept = default;
 		BoxVkBuffer(BoxVkBuffer const&) = delete;
 		BoxVkBuffer& operator=(BoxVkBuffer const&) = delete;
 
@@ -34,7 +35,8 @@ namespace DEngine::Gfx::Vk::impl
 	class BoxVkCmdPool
 	{
 	public:
-		BoxVkCmdPool(BoxVkCmdPool const&) = delete;
+		constexpr BoxVkCmdPool() noexcept = default;
+		constexpr BoxVkCmdPool(BoxVkCmdPool const&) = delete;
 		BoxVkCmdPool& operator=(BoxVkCmdPool const&) = delete;
 
 		vk::CommandPool handle = {};
@@ -64,8 +66,6 @@ namespace DEngine::Gfx::Vk::impl
 		VmaAllocator vma,
 		QueueData const& queues,
 		DeletionQueue const& delQueue,
-		DebugUtilsDispatch const* debugUtils,
-		char const* debugUtilsObjectName,
 		Std::Span<char const> bytes) noexcept
 	{
 		GizmoManager_Helper_TestReturn returnVal = {};
@@ -89,13 +89,6 @@ namespace DEngine::Gfx::Vk::impl
 		{
 			returnVal.error = "DEngine-Gfx-Vk: Error while creating dst buffer.";
 			return returnVal;
-		}
-		if (debugUtils)
-		{
-			debugUtils->Helper_SetObjectName(
-				device.handle,
-				dstBuffer.handle,
-				debugUtilsObjectName);
 		}
 
 		vk::BufferCreateInfo vtxBufferInfo_Staging = {};
@@ -225,15 +218,21 @@ namespace DEngine::Gfx::Vk::impl
 			vma,
 			queues,
 			delQueue,
-			debugUtils,
-			"GizmoManager - Translate Arrow VertexBuffer",
 			{ (char const*)arrowMesh.Data(), arrowMesh.Size() * sizeof(arrowMesh[0]) });
 		if (test.result != vk::Result::eSuccess)
 			throw std::runtime_error(std::string("Unable to create gizmo translate arrow mesh") + test.error);
-		
+
 		manager.arrowVtxCount = (u32)arrowMesh.Size();
 		manager.arrowVtxBuffer = test.buffer;
 		manager.arrowVtxVmaAlloc = test.alloc;
+
+		if (debugUtils)
+		{
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.arrowVtxBuffer,
+				"GizmoManager - Translate Arrow VertexBuffer");
+		}
 	}
 
 	static void GizmoManager_InitializeRotateCircleMesh(
@@ -250,8 +249,6 @@ namespace DEngine::Gfx::Vk::impl
 			vma,
 			queues,
 			delQueue,
-			debugUtils,
-			"GizmoManager - Rotate Circle VertexBuffer",
 			{ (char const*)circleLineMesh.Data(), circleLineMesh.Size() * sizeof(circleLineMesh[0]) });
 		if (test.result != vk::Result::eSuccess)
 			throw std::runtime_error(std::string("Unable to create gizmo rotate circle mesh") + test.error);
@@ -259,6 +256,45 @@ namespace DEngine::Gfx::Vk::impl
 		manager.circleVtxBuffer = test.buffer;
 		manager.circleVtxAlloc = test.alloc;
 		manager.circleVtxCount = (u32)circleLineMesh.Size();
+
+		if (debugUtils)
+		{
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.circleVtxBuffer,
+				"GizmoManager - Rotate Circle VertexBuffer");
+		}
+	}
+
+	static void GizmoManager_InitializeScaleArrow2dMesh(
+		GizmoManager& manager,
+		DeviceDispatch const& device,
+		QueueData const& queues,
+		VmaAllocator vma,
+		DeletionQueue const& delQueue,
+		DebugUtilsDispatch const* debugUtils,
+		Std::Span<Math::Vec3 const> scaleArrow2d)
+	{
+		auto test = GizmoManager_Helper_Test(
+			device,
+			vma,
+			queues,
+			delQueue,
+			{ (char const*)scaleArrow2d.Data(), scaleArrow2d.Size() * sizeof(scaleArrow2d[0]) });
+		if (test.result != vk::Result::eSuccess)
+			throw std::runtime_error(std::string("Unable to create gizmo translate arrow mesh") + test.error);
+
+		manager.scaleArrow2d_VtxCount = (u32)scaleArrow2d.Size();
+		manager.scaleArrow2d_VtxBuffer = test.buffer;
+		manager.scaleArrow2d_VtxAlloc = test.alloc;
+
+		if (debugUtils)
+		{
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				manager.scaleArrow2d_VtxBuffer,
+				"GizmoManager - Translate Scale Arrow 2D VtxBuffer");
+		}
 	}
 
 	static void GizmoManager_InitializeArrowShader(
@@ -386,7 +422,7 @@ namespace DEngine::Gfx::Vk::impl
 		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eG;
 		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eB;
 		colorBlendAttachment.colorWriteMask |= vk::ColorComponentFlagBits::eA;
-		colorBlendAttachment.blendEnable = false;
+		colorBlendAttachment.blendEnable = true;
 		colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd;
 		colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
 		colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
@@ -740,6 +776,8 @@ namespace DEngine::Gfx::Vk::impl
 		manager.lineVtxBufferMappedMem = { (u8*)vmaAllocInfo.pMappedData, (uSize)vtxBufferInfo.size };
 	}
 
+	constexpr f32 gizmoTransparency = 0.8f;
+
 	static void GizmoManager_RecordTranslateGizmoDrawCalls(
 		GlobUtils const& globUtils,
 		GizmoManager const& gizmoManager,
@@ -764,9 +802,9 @@ namespace DEngine::Gfx::Vk::impl
 		// Draw X arrow
 		{
 			Math::Mat4 gizmoMatrix = Math::LinAlg3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
-			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Y, Math::pi / 2) * gizmoMatrix;
 			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, gizmo.rotation) * gizmoMatrix;
 			Math::LinAlg3D::SetTranslation(gizmoMatrix, gizmo.position);
+
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				gizmoManager.pipelineLayout,
@@ -774,7 +812,7 @@ namespace DEngine::Gfx::Vk::impl
 				0,
 				sizeof(gizmoMatrix),
 				&gizmoMatrix);
-			Math::Vec4 color = { 1.f, 0.f, 0.f, 1.f };
+			Math::Vec4 color = { 1.f, 0.f, 0.f, gizmoTransparency };
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				gizmoManager.pipelineLayout,
@@ -793,9 +831,9 @@ namespace DEngine::Gfx::Vk::impl
 		// Draw Y arrow
 		{
 			Math::Mat4 gizmoMatrix = Math::LinAlg3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
-			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::X, -Math::pi / 2) * gizmoMatrix;
-			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, gizmo.rotation) * gizmoMatrix;
+			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, Math::pi / 2 + gizmo.rotation) * gizmoMatrix;
 			Math::LinAlg3D::SetTranslation(gizmoMatrix, gizmo.position);
+
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				gizmoManager.pipelineLayout,
@@ -803,7 +841,7 @@ namespace DEngine::Gfx::Vk::impl
 				0,
 				sizeof(gizmoMatrix),
 				&gizmoMatrix);
-			Math::Vec4 color = { 0.f, 1.f, 0.f, 1.f };
+			Math::Vec4 color = { 0.f, 1.f, 0.f, gizmoTransparency };
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				gizmoManager.pipelineLayout,
@@ -836,7 +874,7 @@ namespace DEngine::Gfx::Vk::impl
 				0,
 				sizeof(gizmoMatrix),
 				&gizmoMatrix);
-			Math::Vec4 color = { 1.f, 1.f, 0.f, 0.75f };
+			Math::Vec4 color = { 1.f, 1.f, 0.f, gizmoTransparency };
 			globUtils.device.cmdPushConstants(
 				cmdBuffer,
 				gizmoManager.pipelineLayout,
@@ -883,7 +921,7 @@ namespace DEngine::Gfx::Vk::impl
 			0,
 			sizeof(gizmoMatrix),
 			&gizmoMatrix);
-		Math::Vec4 color = { 0.f, 0.f, 1.f, 1.f };
+		Math::Vec4 color = { 0.f, 0.f, 1.f, gizmoTransparency };
 		globUtils.device.cmdPushConstants(
 			cmdBuffer,
 			gizmoManager.pipelineLayout,
@@ -899,66 +937,182 @@ namespace DEngine::Gfx::Vk::impl
 			0,
 			0);
 	}
+
+	static void GizmoManager_ScaleGizmo_RecordDrawCalls(
+		GlobUtils const& globUtils,
+		GizmoManager const& manager,
+		ViewportData const& viewportData,
+		ViewportUpdate::Gizmo const& gizmo,
+		vk::CommandBuffer cmdBuffer,
+		u8 inFlightIndex)
+	{
+		globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, manager.arrowPipeline);
+
+		globUtils.device.cmdBindVertexBuffers(cmdBuffer, 0, { manager.scaleArrow2d_VtxBuffer }, { 0 });
+
+		Std::Array<vk::DescriptorSet, 1> descrSets = { viewportData.camDataDescrSets[inFlightIndex] };
+		globUtils.device.cmdBindDescriptorSets(
+			cmdBuffer,
+			vk::PipelineBindPoint::eGraphics,
+			manager.pipelineLayout,
+			0,
+			{ (u32)descrSets.Size(), descrSets.Data() },
+			nullptr);
+
+		// Draw X arrow
+		{
+			Math::Mat4 gizmoMatrix = Math::LinAlg3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
+			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, gizmo.rotation) * gizmoMatrix;
+			Math::LinAlg3D::SetTranslation(gizmoMatrix, gizmo.position);
+
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				manager.pipelineLayout,
+				vk::ShaderStageFlagBits::eVertex,
+				0,
+				sizeof(gizmoMatrix),
+				&gizmoMatrix);
+
+			Math::Vec4 color = { 1.f, 0.f, 0.f, gizmoTransparency };
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				manager.pipelineLayout,
+				vk::ShaderStageFlagBits::eFragment,
+				sizeof(gizmoMatrix),
+				sizeof(color),
+				&color);
+
+			globUtils.device.cmdDraw(
+				cmdBuffer,
+				manager.scaleArrow2d_VtxCount,
+				1,
+				0,
+				0);
+		}
+
+		// Draw Y arrow
+		{
+			Math::Mat4 gizmoMatrix = Math::LinAlg3D::Scale_Homo(gizmo.scale, gizmo.scale, gizmo.scale);
+			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, Math::pi / 2 + gizmo.rotation) * gizmoMatrix;
+			Math::LinAlg3D::SetTranslation(gizmoMatrix, gizmo.position);
+
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				manager.pipelineLayout,
+				vk::ShaderStageFlagBits::eVertex,
+				0,
+				sizeof(gizmoMatrix),
+				&gizmoMatrix);
+
+			Math::Vec4 color = { 0.f, 1.f, 0.f, gizmoTransparency };
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				manager.pipelineLayout,
+				vk::ShaderStageFlagBits::eFragment,
+				sizeof(gizmoMatrix),
+				sizeof(color),
+				&color);
+
+			globUtils.device.cmdDraw(
+				cmdBuffer,
+				manager.scaleArrow2d_VtxCount,
+				1,
+				0,
+				0);
+		}
+
+		// Draw the floating quad thing
+		{
+			globUtils.device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, manager.quadPipeline);
+
+			Math::Mat4 gizmoMatrix = Math::LinAlg3D::Scale_Homo(gizmo.quadScale, gizmo.quadScale, gizmo.quadScale);
+			Math::Vec3 preTranslation = Math::Vec3{ 1.f, 1.f, 0.f } *gizmo.quadOffset;
+			Math::LinAlg3D::SetTranslation(gizmoMatrix, preTranslation);
+			gizmoMatrix = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, gizmo.rotation) * gizmoMatrix;
+			Math::Vec3 translation = gizmo.position;
+			gizmoMatrix = Math::LinAlg3D::Translate(translation) * gizmoMatrix;
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				manager.pipelineLayout,
+				vk::ShaderStageFlagBits::eVertex,
+				0,
+				sizeof(gizmoMatrix),
+				&gizmoMatrix);
+			Math::Vec4 color = { 1.f, 1.f, 0.f, gizmoTransparency };
+			globUtils.device.cmdPushConstants(
+				cmdBuffer,
+				manager.pipelineLayout,
+				vk::ShaderStageFlagBits::eFragment,
+				sizeof(gizmoMatrix),
+				sizeof(color),
+				&color);
+			globUtils.device.cmdDraw(
+				cmdBuffer,
+				4,
+				1,
+				0,
+				0);
+		}
+	}
 }
 
 using namespace DEngine;
 using namespace DEngine::Gfx;
 using namespace DEngine::Gfx::Vk;
 
-void Vk::GizmoManager::Initialize(
-	GizmoManager& manager,
-	u8 inFlightCount,
-	DeviceDispatch const& device,
-	QueueData const& queues,
-	VmaAllocator const& vma,
-	DeletionQueue const& delQueue,
-	DebugUtilsDispatch const* debugUtils,
-	APIData const& apiData,
-	Std::Span<Math::Vec3 const> arrowMesh,
-	Std::Span<Math::Vec3 const> circleLineMesh)
+void Vk::GizmoManager::Initialize(GizmoManager& manager, InitInfo const& initInfo)
 {
 	impl::GizmoManager_InitializeArrowMesh(
 		manager,
-		device,
-		queues,
-		vma,
-		delQueue,
-		debugUtils,
-		arrowMesh);
+		*initInfo.device,
+		*initInfo.queues,
+		*initInfo.vma,
+		*initInfo.delQueue,
+		initInfo.debugUtils,
+		initInfo.arrowMesh);
 
 	impl::GizmoManager_InitializeRotateCircleMesh(
 		manager,
-		device,
-		queues,
-		vma,
-		delQueue,
-		debugUtils,
-		circleLineMesh);
+		*initInfo.device,
+		*initInfo.queues,
+		*initInfo.vma,
+		*initInfo.delQueue,
+		initInfo.debugUtils,
+		initInfo.circleLineMesh);
+
+	impl::GizmoManager_InitializeScaleArrow2dMesh(
+		manager,
+		*initInfo.device,
+		*initInfo.queues,
+		*initInfo.vma,
+		*initInfo.delQueue,
+		initInfo.debugUtils,
+		initInfo.arrowScaleMesh2d);
 
 	impl::GizmoManager_InitializeArrowShader(
 		manager,
-		device,
-		debugUtils,
-		apiData);
+		*initInfo.device,
+		initInfo.debugUtils,
+		*initInfo.apiData);
 
 	impl::GizmoManager_InitializeQuadShader(
 		manager,
-		device,
-		debugUtils,
-		apiData);
+		*initInfo.device,
+		initInfo.debugUtils,
+		*initInfo.apiData);
 
 	impl::GizmoManager_InitializeLineShader(
 		manager,
-		device,
-		debugUtils,
-		apiData);
+		*initInfo.device,
+		initInfo.debugUtils,
+		*initInfo.apiData);
 
 	impl::GizmoManager_InitializeLineVtxBuffer(
 		manager,
-		inFlightCount,
-		device,
-		vma,
-		debugUtils);
+		initInfo.inFlightCount,
+		*initInfo.device,
+		*initInfo.vma,
+		initInfo.debugUtils);
 }
 
 void Vk::GizmoManager::UpdateLineVtxBuffer(
@@ -975,7 +1129,7 @@ void Vk::GizmoManager::UpdateLineVtxBuffer(
 	std::memcpy(ptr, vertices.Data(), manager.lineVtxElementSize * vertices.Size());
 }
 
-void  Vk::GizmoManager::DebugLines_RecordDrawCalls(
+void Vk::GizmoManager::DebugLines_RecordDrawCalls(
 	GizmoManager const& manager,
 	GlobUtils const& globUtils,
 	ViewportData const& viewportData,
@@ -1074,6 +1228,13 @@ void Vk::GizmoManager::Gizmo_RecordDrawCalls(
 			break;
 
 		case ViewportUpdate::GizmoType::Scale:
+			impl::GizmoManager_ScaleGizmo_RecordDrawCalls(
+				globUtils,
+				gizmoManager,
+				viewportData,
+				gizmo,
+				cmdBuffer,
+				inFlightIndex);
 			break;
 
 		default:

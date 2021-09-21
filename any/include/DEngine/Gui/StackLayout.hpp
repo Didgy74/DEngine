@@ -5,14 +5,11 @@
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Math/Vector.hpp>
 
+#include <vector>
+
 namespace DEngine::Gui::impl
 {
-	template<typename T, typename Callable>
-	void StackLayout_IterateOverChildren(
-		Context const& ctx,
-		T& layout,
-		Rect widgetRect,
-		Callable const& callable);
+	class StackLayoutImpl;
 }
 
 namespace DEngine::Gui
@@ -27,6 +24,7 @@ namespace DEngine::Gui
 			Horizontal,
 			Vertical,
 		};
+		using Dir = Direction;
 
 		StackLayout(Direction direction = Direction::Horizontal) : 
 			direction(direction)
@@ -73,7 +71,7 @@ namespace DEngine::Gui
 
 		virtual void InputConnectionLost() override;
 
-		virtual void CursorClick(
+		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
@@ -81,19 +79,28 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorClickEvent event) override;
 
-		virtual void CursorMove(
+		virtual bool CursorMove(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			CursorMoveEvent event) override;
+			CursorMoveEvent event,
+			bool occluded) override;
 
-		virtual void TouchEvent(
+		virtual bool TouchPressEvent(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
-			Gui::TouchEvent event) override;
+			Gui::TouchPressEvent event) override;
+
+		virtual bool TouchMoveEvent(
+			Context& ctx,
+			WindowID windowId,
+			Rect widgetRect,
+			Rect visibleRect,
+			Gui::TouchMoveEvent event,
+			bool occluded) override;
 
 	protected:
 		std::vector<Std::Box<Widget>> children;
@@ -118,14 +125,9 @@ namespace DEngine::Gui
 			};
 			Remove remove;
 		};
-		mutable std::vector<InsertRemoveJob> insertionJobs;
-		mutable bool currentlyIterating = false;
-
-		template<typename T, typename Callable>
-		friend void impl::StackLayout_IterateOverChildren(
-			Context const& ctx,
-			T& layout,
-			Rect widgetRect,
-			Callable const& callable);
+		std::vector<InsertRemoveJob> insertionJobs;
+		bool currentlyIterating = false;
+		
+		friend impl::StackLayoutImpl;
 	};
 }

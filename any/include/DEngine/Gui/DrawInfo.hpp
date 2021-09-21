@@ -94,7 +94,7 @@ namespace DEngine::Gui
 		{
 			DENGINE_IMPL_GUI_ASSERT(!scissors.empty());
 			scissors.pop_back();
-			Gfx::GuiDrawCmd cmd{};
+			Gfx::GuiDrawCmd cmd = {};
 			cmd.type = Gfx::GuiDrawCmd::Type::Scissor;
 			if (!scissors.empty())
 			{
@@ -124,5 +124,27 @@ namespace DEngine::Gui
 			cmd.rectExtent.y = f32(rect.extent.height) / framebufferExtent.height;
 			drawCmds->push_back(cmd);
 		}
+
+		class ScopedScissor
+		{
+		public:
+			ScopedScissor(DrawInfo& drawInfo, Rect scissor) : drawInfo{ &drawInfo }
+			{
+				drawInfo.PushScissor(scissor);
+			}
+			ScopedScissor(ScopedScissor const&) = delete;
+			ScopedScissor(ScopedScissor&) = delete;
+			
+			ScopedScissor& operator=(ScopedScissor const&) = delete;
+			ScopedScissor& operator=(ScopedScissor&&) = delete;
+
+			~ScopedScissor()
+			{
+				drawInfo->PopScissor();
+			}
+
+		protected:
+			DrawInfo* drawInfo = nullptr;
+		};
 	};
 }

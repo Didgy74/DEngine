@@ -4,15 +4,15 @@
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Utility.hpp>
 
+#include <DEngine/Gui/Layer.hpp>
+#include <DEngine/Gui/Widget.hpp>
+
+#include <DEngine/Application.hpp>
+
 #include <vector>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
-
-// TEMPORARY INCLUDES
-#include <DEngine/Application.hpp>
-#include <DEngine/Gui/StackLayout.hpp>
-#include <DEngine/Gui/Text.hpp>
 
 #include <stdexcept>
 
@@ -22,7 +22,7 @@ Context Context::Create(
 {
 	Context newCtx;
 	newCtx.pImplData = new impl::ImplData;
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(newCtx.pImplData);
+	auto& implData = *static_cast<impl::ImplData*>(newCtx.pImplData);
 	
 	implData.windowHandler = &windowHandler;
 
@@ -30,48 +30,27 @@ Context Context::Create(
 		implData.textManager,
 		gfxCtx);
 
-	{
-		// Add the test first window shit
-		impl::WindowNode newNode{};
-		newNode.id = WindowID(0);
-		App::Extent appWindowExtent = App::GetWindowSize(App::WindowID(0));
-		newNode.data.rect.extent = { appWindowExtent.width, appWindowExtent.height };
-		newNode.data.rect.position = App::GetWindowPosition(App::WindowID(0));
-		App::Extent appWindowVisibleExtent = App::GetWindowVisibleSize(App::WindowID(0));
-		newNode.data.visibleRect.extent = { appWindowVisibleExtent.width, appWindowVisibleExtent.height };
-		newNode.data.visibleRect.position = App::GetWindowVisiblePosition(App::WindowID(0));
-		newNode.data.clearColor = { 0.1f, 0.1f, 0.1f, 1.f };
-
-		StackLayout* outmostLayout = new StackLayout(StackLayout::Direction::Vertical);
-		newNode.data.topLayout = Std::Box<Widget>{ outmostLayout };
-		implData.windows.emplace_back(Std::Move(newNode));
-
-		newCtx.outerLayout = outmostLayout;
-	}
-
 	return static_cast<Context&&>(newCtx);
 }
 
 Context::Context(Context&& other) noexcept :
-	outerLayout(other.outerLayout),
 	pImplData(other.pImplData)
 {
 	other.pImplData = nullptr;
-	other.outerLayout = nullptr;
 }
 
 void Context::TakeInputConnection(
 	Widget& widget,
 	SoftInputFilter softInputFilter,
-	Std::Str currentText)
+	Std::Span<char const> currentText)
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
 	if (implData.inputConnectionWidget)
 	{
 		implData.inputConnectionWidget->InputConnectionLost();
 	}
 	implData.windowHandler->OpenSoftInput(
-		currentText,
+		{ currentText.Data(), currentText.Size() },
 		softInputFilter);
 	implData.inputConnectionWidget = &widget;
 }
@@ -79,7 +58,7 @@ void Context::TakeInputConnection(
 void Context::ClearInputConnection(
 	Widget& widget)
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
 	DENGINE_IMPL_GUI_ASSERT(&widget == implData.inputConnectionWidget);
 
 	implData.windowHandler->HideSoftInput();
@@ -89,40 +68,15 @@ void Context::ClearInputConnection(
 
 WindowHandler& Context::GetWindowHandler() const
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
 	return *implData.windowHandler;
 }
 
-void Context::Test_AddMenu(
-	WindowID windowId, 
-	Std::Box<Widget>&& layout, 
-	Rect rect)
+void Context::SetFrontmostLayer(
+	WindowID windowId,
+	Std::Box<Layer>&& layer)
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	
-	auto const windowNodeIt = Std::FindIf(
-		implData.windows.begin(),
-		implData.windows.end(),
-		[windowId](decltype(implData.windows)::value_type const& val) -> bool { return windowId == val.id; });
-	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != implData.windows.end());
-	auto& windowNode = *windowNodeIt;
-
-	if (windowNode.currentlyIterating)
-	{
-		impl::WindowNode::MenuAddRemove newVal{};
-		newVal.index = 0;
-		newVal.type = impl::WindowNode::MenuAddRemove::Type::Add;
-		windowNode.menuAddRemoves.push_back(newVal);
-	}
-	impl::Test_Menu yo{};
-	yo.rect = rect;
-	yo.topLayout = static_cast<Std::Box<Widget>&&>(layout);
-	windowNode.test_Menus.emplace(windowNode.test_Menus.begin(), Std::Move(yo));
-}
-
-void Context::Test_DestroyMenu(WindowID windowId, Widget* widget)
-{
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
 
 	auto const windowNodeIt = Std::FindIf(
 		implData.windows.begin(),
@@ -131,255 +85,220 @@ void Context::Test_DestroyMenu(WindowID windowId, Widget* widget)
 	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != implData.windows.end());
 	auto& windowNode = *windowNodeIt;
 
-	auto const menuIt = Std::FindIf(
-		windowNode.test_Menus.begin(),
-		windowNode.test_Menus.end(),
-		[widget](auto const& val) -> bool { return val.topLayout.Get() == widget; });
-	DENGINE_IMPL_GUI_ASSERT(menuIt != windowNode.test_Menus.end());
-
-	if (windowNode.currentlyIterating)
-	{
-		impl::WindowNode::MenuAddRemove newVal{};
-		newVal.index = uSize(menuIt - windowNode.test_Menus.begin());
-		newVal.type = impl::WindowNode::MenuAddRemove::Type::Remove;
-		windowNode.menuAddRemoves.push_back(newVal);
-
-		impl::Test_Menu temp = Std::Move(*menuIt);
-		windowNode.test_Menus.erase(menuIt);
-		windowNode.pendingMenuDestroys.emplace_back(Std::Move(temp));
-	}
-	else
-	{
-		windowNode.test_Menus.erase(menuIt);
-	}
-
+	windowNode.frontmostLayer = static_cast<Std::Box<Layer>&&>(layer);
 }
 
-void Context::PushEvent(CharEnterEvent event)
+void Context::PushEvent(CharEnterEvent const& event)
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
 	for (auto& windowNode : implData.windows)
 	{
-		if (windowNode.data.topLayout)
-		{
-			windowNode.data.topLayout->CharEnterEvent(*this);
-		}
+		if (!windowNode.data.topLayout)
+			continue;
+
+		windowNode.data.topLayout->CharEnterEvent(*this);
 	}
 }
 
-void Context::PushEvent(CharEvent event)
+void Context::PushEvent(CharEvent const& event)
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
 	for (auto& windowNode : implData.windows)
 	{
-		if (windowNode.data.topLayout)
+		if (!windowNode.data.topLayout)
+			continue;
+
+		windowNode.data.topLayout->CharEvent(
+			*this,
+			event.utfValue);
+	}
+}
+
+void Context::PushEvent(CharRemoveEvent const& event)
+{
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	for (auto& windowNode : implData.windows)
+	{
+		if (!windowNode.data.topLayout)
+			continue;
+
+		windowNode.data.topLayout->CharRemoveEvent(*this);
+	}
+}
+
+void Context::PushEvent(CursorClickEvent const& event)
+{
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+
+	for (auto& windowNode : implData.windows)
+	{
+		bool eventConsumed = false;
+		auto const relCursorPos = implData.cursorPosition - windowNode.data.rect.position;
+
+		Rect const windowRect = { {}, windowNode.data.rect.extent };
+		auto visibleRect = windowNode.data.visibleRect;
+		visibleRect.position -= windowNode.data.rect.position;
+
+		bool destroyLayer = false;
+		if (windowNode.frontmostLayer)
 		{
-			windowNode.data.topLayout->CharEvent(
+			auto& layer = *windowNode.frontmostLayer;
+			auto temp = layer.CursorPress(
 				*this,
-				event.utfValue);
-		}
-	}
-}
-
-void Context::PushEvent(CharRemoveEvent event)
-{
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	for (auto& windowNode : implData.windows)
-	{
-		if (windowNode.data.topLayout)
-		{
-			windowNode.data.topLayout->CharRemoveEvent(*this);
-		}
-	}
-}
-
-namespace DEngine::Gui::impl
-{
-	Std::Opt<uSize> GetModifiedMenuIndex(uSize original, Std::Span<WindowNode::MenuAddRemove> menuAddRemoves)
-	{
-		uSize i = original;
-		for (auto const& addRemove : menuAddRemoves)
-		{
-			switch (addRemove.type)
-			{
-			case impl::WindowNode::MenuAddRemove::Type::Add:
-				if (addRemove.index <= i)
-					i += 1;
-				break;
-			case impl::WindowNode::MenuAddRemove::Type::Remove:
-				if (addRemove.index < i)
-					i -= 1;
-				else if (addRemove.index == i)
-					return Std::nullOpt;
-				break;
-			default:
-				DENGINE_IMPL_UNREACHABLE();
-			}
-		}
-
-		return Std::Opt<uSize>{ i };
-	}
-}
-
-void Context::PushEvent(CursorClickEvent event)
-{
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	for (auto& windowNode : implData.windows)
-	{
-		windowNode.currentlyIterating = true;
-		
-		bool bleh = false;
-		uSize menusLength = windowNode.test_Menus.size();
-		for (uSize n = 0; n < menusLength; n += 1)
-		{
-			Std::Opt<uSize> i = impl::GetModifiedMenuIndex(n, { windowNode.menuAddRemoves.data(), windowNode.menuAddRemoves.size() });
-			if (i.HasValue())
-			{
-				auto& menu = windowNode.test_Menus[i.Value()];
-				if (menu.topLayout)
-				{
-					SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
-					Rect widgetRect = { menu.rect.position, sizeHint.preferred };
-					Math::Vec2Int cursorPos = implData.cursorPosition - windowNode.data.rect.position;
-					menu.topLayout->CursorClick(
-						*this,
-						windowNode.id,
-						widgetRect,
-						widgetRect,
-						cursorPos,
-						event);
-					if (widgetRect.PointIsInside(cursorPos))
-					{
-						bleh = true;
-					}
-				}
-			}
-			windowNode.pendingMenuDestroys.clear();
-		}
-
-		if (windowNode.data.topLayout && !bleh)
-		{
-			windowNode.data.topLayout->CursorClick(
-				*this,
-				windowNode.id,
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				implData.cursorPosition - windowNode.data.rect.position,
+				windowRect,
+				visibleRect,
+				relCursorPos,
 				event);
+			eventConsumed = temp.eventConsumed;
+			destroyLayer = temp.destroy;
 		}
+		if (destroyLayer)
+			windowNode.frontmostLayer = nullptr;
 
-		windowNode.menuAddRemoves.clear();
-		windowNode.currentlyIterating = false;
+		// We still want to propagate the event if we depressed.
+		if (!windowNode.data.topLayout || (eventConsumed && event.clicked))
+			continue;
+
+		windowNode.data.topLayout->CursorPress(
+			*this,
+			windowNode.id,
+			visibleRect,
+			visibleRect,
+			relCursorPos,
+			event);
 	}
 }
 
-void Context::PushEvent(CursorMoveEvent event)
+void Context::PushEvent(CursorMoveEvent const& event)
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
 	implData.cursorPosition = event.position;
+
 	for (auto& windowNode : implData.windows)
 	{
-		windowNode.currentlyIterating = true;
+		auto modifiedEvent = event;
+		modifiedEvent.position -= windowNode.data.rect.position;
 
-		CursorMoveEvent modifiedEvent{};
-		modifiedEvent.position = implData.cursorPosition - windowNode.data.rect.position;
-		modifiedEvent.positionDelta = event.positionDelta;
+		Rect const windowRect = { {}, windowNode.data.rect.extent };
+		auto visibleRect = windowNode.data.visibleRect;
+		visibleRect.position -= windowNode.data.rect.position;
 
-		bool bleh = false;
-		uSize menusLength = windowNode.test_Menus.size();
-		for (uSize n = 0; n < menusLength; n += 1)
+		bool cursorOccluded = false;
+
+		if (windowNode.frontmostLayer)
 		{
-			Std::Opt<uSize> i = impl::GetModifiedMenuIndex(n, { windowNode.menuAddRemoves.data(), windowNode.menuAddRemoves.size() });
-			if (i.HasValue())
-			{
-				auto& menu = windowNode.test_Menus[i.Value()];
-				if (menu.topLayout)
-				{
-					SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
-					Rect widgetRect = { menu.rect.position, sizeHint.preferred };
-					Math::Vec2Int cursorPos = implData.cursorPosition - windowNode.data.rect.position;
-					menu.topLayout->CursorMove(
-						*this,
-						windowNode.id,
-						widgetRect,
-						widgetRect,
-						modifiedEvent);
-					if (widgetRect.PointIsInside(cursorPos))
-					{
-						bleh = true;
-					}
-				}
-			}
-			windowNode.pendingMenuDestroys.clear();
+			auto& layer = *windowNode.frontmostLayer;
+			auto const temp = layer.CursorMove(
+				*this,
+				windowRect,
+				visibleRect,
+				modifiedEvent,
+				cursorOccluded);
+			cursorOccluded = temp;
 		}
 
-		if (windowNode.data.topLayout && !bleh)
+		if (!windowNode.data.topLayout)
+			continue;
+
+		windowNode.data.topLayout->CursorMove(
+			*this,
+			windowNode.id,
+			visibleRect,
+			visibleRect,
+			modifiedEvent,
+			cursorOccluded);
+	}
+}
+
+void Context::PushEvent(TouchMoveEvent const& event)
+{
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	for (auto& windowNode : implData.windows)
+	{
+		auto modifiedEvent = event;
+		modifiedEvent.position -= Math::Vec2{
+			(f32)windowNode.data.rect.position.x,
+			(f32)windowNode.data.rect.position.y };
+
+		Rect const windowRect = { {}, windowNode.data.rect.extent };
+		auto visibleRect = windowNode.data.visibleRect;
+		visibleRect.position -= windowNode.data.rect.position;
+
+		bool touchOccluded = false;
+
+		if (windowNode.frontmostLayer)
 		{
-			windowNode.data.topLayout->CursorMove(
+			auto& layer = *windowNode.frontmostLayer;
+			bool const temp = layer.TouchMove(
 				*this,
-				windowNode.id,
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				windowRect,
+				visibleRect,
+				modifiedEvent,
+				touchOccluded);
+
+			touchOccluded = temp;
+		}
+
+		if (!windowNode.data.topLayout)
+			continue;
+		
+		windowNode.data.topLayout->TouchMoveEvent(
+			*this,
+			windowNode.id,
+			visibleRect,
+			visibleRect,
+			event,
+			touchOccluded);
+	}
+}
+
+void Context::PushEvent(TouchPressEvent const& event)
+{
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	for (auto& windowNode : implData.windows)
+	{
+		auto modifiedEvent = event;
+		modifiedEvent.position -= Math::Vec2{
+			(f32)windowNode.data.rect.position.x,
+			(f32)windowNode.data.rect.position.y };
+
+		Rect const windowRect = { {}, windowNode.data.rect.extent };
+		auto visibleRect = windowNode.data.visibleRect;
+		visibleRect.position -= windowNode.data.rect.position;
+
+		bool eventConsumed = false;
+		bool destroyMenu = false;
+
+		if (windowNode.frontmostLayer)
+		{
+			auto& layer = *windowNode.frontmostLayer;
+			auto const temp = layer.TouchPress(
+				*this,
+				windowRect,
+				visibleRect,
 				modifiedEvent);
-		}
 
-		windowNode.menuAddRemoves.clear();
-		windowNode.currentlyIterating = false;
+			eventConsumed = temp.eventConsumed;
+			destroyMenu = temp.destroy;
+		}
+		if (destroyMenu)
+			windowNode.frontmostLayer = nullptr;
+
+		if (!windowNode.data.topLayout || (eventConsumed && modifiedEvent.pressed))
+			continue;
+
+		windowNode.data.topLayout->TouchPressEvent(
+			*this,
+			windowNode.id,
+			visibleRect,
+			visibleRect,
+			modifiedEvent);
 	}
 }
 
-void Context::PushEvent(TouchEvent event)
+void Context::PushEvent(WindowCloseEvent const& event)
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	for (auto& windowNode : implData.windows)
-	{
-		windowNode.currentlyIterating = true;
-
-		bool bleh = false;
-		uSize menusLength = windowNode.test_Menus.size();
-		for (uSize n = 0; n < menusLength; n += 1)
-		{
-			Std::Opt<uSize> i = impl::GetModifiedMenuIndex(n, { windowNode.menuAddRemoves.data(), windowNode.menuAddRemoves.size() });
-			if (i.HasValue())
-			{
-				auto& menu = windowNode.test_Menus[i.Value()];
-				if (menu.topLayout)
-				{
-					SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
-					Rect widgetRect = { menu.rect.position, sizeHint.preferred };
-					menu.topLayout->TouchEvent(
-						*this,
-						windowNode.id,
-						widgetRect,
-						widgetRect,
-						event);
-					if (widgetRect.PointIsInside(event.position) && event.type == TouchEventType::Down)
-					{
-						bleh = true;
-					}
-				}
-			}
-			windowNode.pendingMenuDestroys.clear();
-		}
-
-		if (windowNode.data.topLayout && !bleh)
-		{
-			windowNode.data.topLayout->TouchEvent(
-				*this,
-				windowNode.id,
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				event);
-		}
-
-		windowNode.menuAddRemoves.clear();
-		windowNode.currentlyIterating = false;
-	}
-}
-
-void Context::PushEvent(WindowCloseEvent event)
-{
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
 	auto windowIt = Std::FindIf(
 		implData.windows.begin(),
 		implData.windows.end(),
@@ -390,7 +309,7 @@ void Context::PushEvent(WindowCloseEvent event)
 	implData.windowHandler->CloseWindow(windowId);
 }
 
-void Context::PushEvent(WindowCursorEnterEvent event)
+void Context::PushEvent(WindowCursorEnterEvent const& event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 	auto windowIt = Std::FindIf(
@@ -401,7 +320,7 @@ void Context::PushEvent(WindowCursorEnterEvent event)
 	auto& windowData = windowIt->data;
 }
 
-void Context::PushEvent(WindowMinimizeEvent event)
+void Context::PushEvent(WindowMinimizeEvent const& event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 	auto windowIt = Std::FindIf(
@@ -413,7 +332,7 @@ void Context::PushEvent(WindowMinimizeEvent event)
 	windowData.isMinimized = event.wasMinimized;
 }
 
-void Context::PushEvent(WindowMoveEvent event)
+void Context::PushEvent(WindowMoveEvent const& event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 	auto windowIt = Std::FindIf(
@@ -423,9 +342,10 @@ void Context::PushEvent(WindowMoveEvent event)
 	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
 	auto& windowData = windowIt->data;
 	windowData.rect.position = event.position;
+	windowData.visibleRect.position = windowData.rect.position;
 }
 
-void Context::PushEvent(WindowResizeEvent event)
+void Context::PushEvent(WindowResizeEvent const& event)
 {
 	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
 	auto windowIt = Std::FindIf(
@@ -438,13 +358,32 @@ void Context::PushEvent(WindowResizeEvent event)
 	windowData.visibleRect = event.visibleRect;
 }
 
+void Context::AdoptWindow(
+	WindowID id,
+	Math::Vec4 const& clearColor,
+	Rect const& windowRect,
+	Rect const& visibleRect,
+	Std::Box<Widget>&& widget)
+{
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+
+	impl::WindowNode newNode = {};
+	newNode.id = id;
+	newNode.data.rect = windowRect;
+	newNode.data.visibleRect = visibleRect;
+	newNode.data.clearColor = clearColor;
+	newNode.data.topLayout = Std::Move(widget);
+
+	implData.windows.emplace_back(Std::Move(newNode));
+}
+
 void Context::Render(
 	std::vector<Gfx::GuiVertex>& vertices,
 	std::vector<u32>& indices,
 	std::vector<Gfx::GuiDrawCmd>& drawCmds,
 	std::vector<Gfx::NativeWindowUpdate>& windowUpdates) const
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
 
 	for (auto& windowNode : implData.windows)
 	{
@@ -453,40 +392,39 @@ void Context::Render(
 
 		windowNode.data.drawCmdOffset = (u32)drawCmds.size();
 
+		Rect const windowRect = { {}, windowNode.data.rect.extent };
+		auto visibleRect = windowNode.data.visibleRect;
+		visibleRect.position -= windowNode.data.rect.position;
+
+		DrawInfo drawInfo = {
+			windowNode.data.rect.extent,
+			vertices,
+			indices,
+			drawCmds };
+
 		if (windowNode.data.topLayout)
 		{
-			DrawInfo drawInfo(
-				windowNode.data.rect.extent,
-				vertices,
-				indices,
-				drawCmds);
-
 			windowNode.data.topLayout->Render(
 				*this,
 				windowNode.data.rect.extent,
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
-				{ windowNode.data.visibleRect.position, windowNode.data.visibleRect.extent },
+				visibleRect,
+				visibleRect,
 				drawInfo);
+		}
 
-			for (uSize n = windowNode.test_Menus.size(); n > 0; n -= 1)
-			{
-				uSize i = n - 1;
-				auto& menu = windowNode.test_Menus[i];
-				if (!menu.topLayout)
-					continue;
-				SizeHint sizeHint = menu.topLayout->GetSizeHint(*this);
-				menu.topLayout->Render(
-					*this,
-					windowNode.data.rect.extent,
-					{ menu.rect.position, sizeHint.preferred },
-					{ menu.rect.position, sizeHint.preferred },
-					drawInfo);
-			}
+		if (windowNode.frontmostLayer)
+		{
+			auto const& layer = *windowNode.frontmostLayer;
+			layer.Render(
+				*this,
+				windowRect,
+				visibleRect,
+				drawInfo);
 		}
 
 		windowNode.data.drawCmdCount = (u32)drawCmds.size() - windowNode.data.drawCmdOffset;
 
-		Gfx::NativeWindowUpdate newUpdate{};
+		Gfx::NativeWindowUpdate newUpdate = {};
 		newUpdate.id = Gfx::NativeWindowID(windowNode.id);
 		newUpdate.clearColor = windowNode.data.clearColor;
 		newUpdate.drawCmdOffset = windowNode.data.drawCmdOffset;
@@ -578,7 +516,7 @@ void impl::TextManager::Initialize(
 	if (ftError != FT_Err_Ok)
 		throw std::runtime_error("DEngine - Editor: Unable to initialize FreeType");
 
-	App::FileInputStream fontFile("data/gui/arial.ttf");
+	App::FileInputStream fontFile("data/gui/Roboto-Regular.ttf");
 	if (!fontFile.IsOpen())
 		throw std::runtime_error("DEngine - Editor: Unable to open font file.");
 	fontFile.Seek(0, App::FileInputStream::SeekOrigin::End);
@@ -617,7 +555,7 @@ void impl::TextManager::Initialize(
 
 void impl::TextManager::RenderText(
 	TextManager& manager,
-	Std::Str string,
+	Std::Span<char const> string,
 	Math::Vec4 color,
 	Rect widgetRect,
 	DrawInfo& drawInfo)
@@ -636,7 +574,7 @@ void impl::TextManager::RenderText(
 			Math::Vec2Int glyphPos = penPos;
 			glyphPos += glyphData.posOffset;
 
-			Gfx::GuiDrawCmd cmd;
+			Gfx::GuiDrawCmd cmd = {};
 			cmd.type = Gfx::GuiDrawCmd::Type::TextGlyph;
 			cmd.textGlyph.utfValue = glyphChar;
 			cmd.textGlyph.color = color;
@@ -654,9 +592,9 @@ void impl::TextManager::RenderText(
 
 SizeHint impl::TextManager::GetSizeHint(
 	TextManager& manager,
-	Std::Str str)
+	Std::Span<char const> str)
 {
-	SizeHint returnVar{};
+	SizeHint returnVar = {};
 	returnVar.preferred.height = manager.lineheight;
 	
 	// Iterate over the string, find the bounding box width
