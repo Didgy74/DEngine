@@ -4,8 +4,8 @@ Essentially a sandbox for learning anything related to 3D simulations and game e
 
 This repository also serves as part of my own portfolio for showing future employers whenever I am job-hunting.
 
-![Screenshot](https://github.com/Didgy74/DEngine/raw/master/Screenshot.jpg)
-[Click here](https://github.com/Didgy74/DEngine/raw/master/Usage%20showcase.mp4) for MP4 showcasing the app in action
+![Screenshot](https://user-images.githubusercontent.com/25203601/134176831-fa3bef12-9c3d-4556-ae7a-a944bb949bce.jpg)
+
 ## Highlights
 
  ### Powered by Vulkan
@@ -23,3 +23,6 @@ See BUILD.md
  - FreeType2
  - Vulkan Memory Allocator
 
+## Showcase
+
+https://user-images.githubusercontent.com/25203601/134176645-5a626e1e-d10b-40cc-910e-e75f7b5f2735.mp4
