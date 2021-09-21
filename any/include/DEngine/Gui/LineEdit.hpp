@@ -22,7 +22,7 @@ namespace DEngine::Gui
 		};
 		Type type = Type::Float;
 
-		Math::Vec4 backgroundColor = { 0.25f, 0.25f, 0.25f, 1.f };
+		Math::Vec4 backgroundColor = { 0.3f, 0.3f, 0.3f, 1.f };
 		u32 margin = 0;
 
 		using TextChangedFn = void(LineEdit& widget);

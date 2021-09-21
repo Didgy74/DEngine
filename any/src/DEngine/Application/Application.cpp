@@ -10,6 +10,8 @@ namespace DEngine::Application::detail
 {
 	AppData* pAppData = nullptr;
 	static constexpr bool IsValid(Button in) noexcept;
+	static constexpr bool IsValid(GamepadKey in) noexcept;
+	static constexpr bool IsValid(GamepadAxis in) noexcept;
 
 	static void FlushQueuedEventCallbacks(AppData& appData);
 }
@@ -167,6 +169,16 @@ static constexpr bool Application::detail::IsValid(Button in) noexcept
 	return static_cast<unsigned int>(in) < static_cast<unsigned int>(Button::COUNT);
 }
 
+static constexpr bool Application::detail::IsValid(GamepadKey in) noexcept
+{
+	return static_cast<unsigned int>(in) < static_cast<unsigned int>(GamepadKey::COUNT);
+}
+
+static constexpr bool Application::detail::IsValid(GamepadAxis in) noexcept
+{
+	return static_cast<unsigned int>(in) < static_cast<unsigned int>(GamepadAxis::COUNT);
+}
+
 u64 Application::TickCount()
 {
 	return detail::pAppData->tickCount;
@@ -213,12 +225,44 @@ void Application::detail::UpdateButton(
 	}
 }
 
+void Application::detail::UpdateGamepadButton(
+	AppData& appData,
+	GamepadKey button,
+	bool pressed)
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(button));
+
+	auto& gamepadState = appData.gamepadState;
+
+	auto& keyState = gamepadState.keyStates[(int)button];
+	auto const oldKeyState = keyState;
+	keyState = pressed;
+
+	auto& keyEvent = gamepadState.keyEvents[(int)button];
+	if (oldKeyState && !pressed)
+		keyEvent = KeyEventType::Unpressed;
+	else if (!oldKeyState && pressed)
+		keyEvent = KeyEventType::Pressed;
+	else
+		keyEvent = KeyEventType::Unchanged;
+}
+
+void Application::detail::UpdateGamepadAxis(
+	AppData& appData,
+	GamepadAxis axis,
+	f32 newValue)
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(axis));
+
+	auto& gamepadState = appData.gamepadState;
+
+	gamepadState.axisValues[(int)axis] = newValue;
+}
+
 void Application::detail::PushCharInput(u32 charValue)
 {
 	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
-
-	appData.charInputs.push_back(charValue);
 
 	for (auto const& registeredCallback : appData.registeredEventCallbacks)
 	{
@@ -327,14 +371,15 @@ void Application::detail::ProcessEvents()
 	// Window stuff
 	// Clear event-style values.
 	for (auto& window : appData.windows)
-		window.events = WindowEvents();
+		window.events = {};
 	appData.orientationEvent = false;
 
 	// Input stuff
 	// Clear event-style values.
 	for (auto& item : detail::pAppData->buttonEvents)
-		item = KeyEventType::Unchanged;
-	appData.charInputs.clear();
+		item = {};
+	for (auto& item : detail::pAppData->gamepadState.keyEvents)
+		item = {};
 	if (appData.cursorOpt.HasValue())
 	{
 		CursorData& cursorData = appData.cursorOpt.Value();
@@ -709,12 +754,28 @@ void Application::detail::UpdateTouchInput(
 	}
 }
 
-Std::Opt<Application::GamepadState> Application::GetGamepad()
+Std::Opt<GamepadState> Application::GetGamepad()
 {
-	if (detail::pAppData->gamepadConnected)
-		return Std::Opt<Application::GamepadState>{ detail::pAppData->gamepadState };
-	else
-		return {};
+	auto& appData = *detail::pAppData;
+	return appData.gamepadState;
+}
+
+bool GamepadState::GetKeyState(GamepadKey btn) const noexcept
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(btn));
+	return keyStates[(int)btn];
+}
+
+KeyEventType GamepadState::GetKeyEvent(GamepadKey btn) const noexcept
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(btn));
+	return keyEvents[(int)btn];
+}
+
+f32 GamepadState::GetGamepadAxisValue(GamepadAxis axis) const noexcept
+{
+	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(axis));
+	return axisValues[(int)axis];
 }
 
 void Application::Log(char const* msg)

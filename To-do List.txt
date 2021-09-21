@@ -1,6 +1,0 @@
-Change colors on text inside buttons
-Support newlines for text
-Image widgets
-Support different size behavior inside layouts
-Centering text
-Text editing / numerical text input?

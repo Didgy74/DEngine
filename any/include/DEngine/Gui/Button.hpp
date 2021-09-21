@@ -21,6 +21,8 @@ namespace DEngine::Gui
 	public:
 		using ParentType = Widget;
 
+		static constexpr Math::Vec3 hoverOverlayColor = { 0.1f, 0.1f, 0.1f };
+
 		Button();
 		virtual ~Button() override {}
 
@@ -38,8 +40,6 @@ namespace DEngine::Gui
 		Math::Vec4 normalTextColor = Math::Vec4::One();
 		Math::Vec4 toggledColor = { 0.6f, 0.6f, 0.6f, 1.f };
 		Math::Vec4 toggledTextColor = Math::Vec4::One();
-		Math::Vec4 hoverColor = { 0.4f, 0.4f, 0.4f, 1.f };
-		Math::Vec4 hoverTextColor = Math::Vec4::One();
 		Math::Vec4 pressedColor = { 1.f, 1.f, 1.f, 1.f };
 		Math::Vec4 pressedTextColor = Math::Vec4::Zero();
 
@@ -92,18 +92,10 @@ namespace DEngine::Gui
 
 	protected:
 		bool toggled = false;
-		enum class State
-		{
-			Normal,
-			Hovered,
-			Pressed,
-			Toggled,
-		};
-		State state = State::Normal;
 		Std::Opt<u8> pointerId;
+		bool hoveredByCursor = false;
 		
-		void Activate(
-			Context& ctx);
+		void Activate();
 
 		friend impl::BtnImpl;
 	};

@@ -300,14 +300,14 @@ void CollapsingHeader::Render(
 		if (collapsed)
 		{
 			if (!hoveredByCursor)
-				headerBgColor = { 0.3f, 0.3f, 0.3f, 1.f };
+				headerBgColor = collapsedColor;
 			else
 				headerBgColor = { 0.4f, 0.4f, 0.4f, 1.f };
 		}
 		else
 		{
 			if (!hoveredByCursor)
-				headerBgColor = { 0.6f, 0.6f, 0.6f, 1.f };
+				headerBgColor = expandedColor;
 			else
 				headerBgColor = { 0.7f, 0.7f, 0.7f, 1.f };
 		}

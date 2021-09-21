@@ -37,7 +37,6 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-
 		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,

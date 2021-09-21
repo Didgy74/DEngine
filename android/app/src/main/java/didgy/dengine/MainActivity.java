@@ -35,16 +35,6 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback2,
             super(context);
         }
 
-        @Override
-        public WindowInsets onApplyWindowInsets(WindowInsets insets) {
-
-            Insets test = insets.getStableInsets();
-            Insets test2 = insets.getSystemWindowInsets();
-
-            android.view.DisplayCutout yo = insets.getDisplayCutout();
-
-            return insets;
-        }
     }
 
     public NativeView mNativeView = null;

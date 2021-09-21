@@ -3,7 +3,9 @@
 #include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/Std/Containers/Box.hpp>
-#include <DEngine/Std/Containers/Variant.hpp>
+#include <DEngine/Std/Containers/Opt.hpp>
+
+namespace DEngine::Gui::impl { class SA_Impl; }
 
 namespace DEngine::Gui
 {
@@ -12,30 +14,10 @@ namespace DEngine::Gui
 	public:
 		using ParentType = Widget;
 
-		u32 currScrollbarPos = 0;
-		u32 scrollbarThickness = 50;
-
-		struct ScrollbarState_Normal
-		{
-			ScrollbarState_Normal() = default;
-			ScrollbarState_Normal(ScrollbarState_Normal const&) = default;
-		};
-		struct ScrollbarState_Hovered
-		{
-			u8 pointerId;
-		};
-		struct ScrollbarState_Pressed
-		{
-			u8 pointerId;
-			f32 pointerRelativePosY;
-		};
-		using ScrollbarState_T = Std::Variant<
-			ScrollbarState_Normal,
-			ScrollbarState_Hovered,
-			ScrollbarState_Pressed>;
-		ScrollbarState_T scrollbarState = ScrollbarState_Normal{};
-
 		Std::Box<Widget> widget;
+
+		static constexpr Math::Vec3 scrollbarHoverHighlight = { 0.1f, 0.1f, 0.1f };
+		Math::Vec4 scrollbarInactiveColor = { 0.3f, 0.3f, 0.3f, 1.f };
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
@@ -46,7 +28,6 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
-
 
 		virtual bool CursorPress(
 			Context& ctx,
@@ -90,5 +71,20 @@ namespace DEngine::Gui
 
 		virtual void CharRemoveEvent(
 			Context& ctx) override;
+
+	private:
+		friend impl::SA_Impl;
+
+		u32 currScrollbarPos = 0;
+		u32 scrollbarThickness = 50;
+
+		struct Scrollbar_Pressed_T
+		{
+			u8 pointerId;
+			f32 pointerRelativePosY;
+		};
+		Std::Opt<Scrollbar_Pressed_T> scrollbarHeldData;
+
+		bool scrollbarHoveredByCursor = false;
 	};
 }

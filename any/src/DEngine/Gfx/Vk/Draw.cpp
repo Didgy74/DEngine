@@ -258,13 +258,18 @@ namespace DEngine::Gfx::Vk
 		u8 inFlightIndex,
 		APIData& test_apiData)
 	{
-		vk::RenderPassBeginInfo rpBegin{};
+		vk::RenderPassBeginInfo rpBegin = {};
 		rpBegin.framebuffer = viewportData.renderTarget.framebuffer;
 		rpBegin.renderPass = globUtils.gfxRenderPass;
 		rpBegin.renderArea.extent = viewportData.renderTarget.extent;
 		rpBegin.clearValueCount = 1;
-		vk::ClearColorValue clearVal{};
-		clearVal.setFloat32({ 0.25f, 0.25f, 0.25f, 1.f });
+
+		vk::ClearColorValue clearVal = {};
+		clearVal.setFloat32({
+			viewportUpdate.clearColor.x,
+			viewportUpdate.clearColor.y,
+			viewportUpdate.clearColor.z,
+			viewportUpdate.clearColor.w });
 		vk::ClearValue clear = clearVal;
 		rpBegin.pClearValues = &clear;
 		globUtils.device.cmdBeginRenderPass(cmdBuffer, rpBegin, vk::SubpassContents::eInline);

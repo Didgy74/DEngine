@@ -47,7 +47,6 @@ public class DEngineActivity extends NativeActivity  {
     public InputMethodManager mIMM = null;
     public Configuration mCurrentConfig = null;
 
-
     int mLastContentX = 0;
     int mLastContentY = 0;
     int mLastContentWidth = 0;
@@ -125,7 +124,7 @@ public class DEngineActivity extends NativeActivity  {
         super.surfaceChanged(holder, format, width, height);
     }
 
-    public void openSoftInput(String text, final int softInputFilter) {
+    public void openSoftInput(String text, int softInputFilter) {
         class OpenSoftInputRunnable implements Runnable {
             final DEngineActivity activity;
             final int softInputFilter;
@@ -151,7 +150,6 @@ public class DEngineActivity extends NativeActivity  {
     public void hideSoftInput()
     {
         class HideSoftInputRunnable implements Runnable {
-            DEngineActivity activity;
             HideSoftInputRunnable() {
             }
             public void run() {

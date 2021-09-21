@@ -19,37 +19,45 @@ namespace DEngine::Editor
 	class MoveWidget : public Gui::CollapsingHeader
 	{
 	public:
+		using ComponentType = Move;
+
 		MoveWidget(EditorImpl const& editorImpl);
 	};
 	
 	class TransformWidget : public Gui::CollapsingHeader
 	{
 	public:
+		using ComponentType = Transform;
+
 		Gui::LineEdit* positionInputFields[3] = {};
 		Gui::LineEdit* rotationInput = nullptr;
 		Gui::LineEdit* scaleInputFields[2] = {};
 
 		TransformWidget(EditorImpl const& editorImpl);
-		void Update(Transform const& component);
+		void Update(ComponentType const& component);
 	};
 
 	class SpriteRenderer2DWidget : public Gui::CollapsingHeader
 	{
 	public:
+		using ComponentType = Gfx::TextureID;
+
 		Gui::LineEdit* textureIdInput = nullptr;
 		
 		SpriteRenderer2DWidget(EditorImpl const& editorImpl);
-		void Update(Gfx::TextureID const& component);
+		void Update(ComponentType const& component);
 	};
 
 	class RigidbodyWidget : public Gui::CollapsingHeader
 	{
+	public:
+		using ComponentType = Physics::Rigidbody2D;
+
 		Gui::Dropdown* bodyTypeDropdown = nullptr;
 
 		Gui::Text* debug_VelocityLabel = nullptr;
 
-	public:
 		RigidbodyWidget(EditorImpl const& editorImpl);
-		void Update(Physics::Rigidbody2D const& component);
+		void Update(ComponentType const& component);
 	};
 }

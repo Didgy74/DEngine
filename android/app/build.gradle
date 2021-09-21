@@ -19,6 +19,7 @@ android {
             main {
                 assets.srcDirs "../../data"
             }
+
             debug {
                 jniLibs.srcDirs "src/lib"
             }
@@ -34,17 +35,68 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled = false
+            proguardFiles getDefaultProguardFile(
+                'proguard-android-optimize.txt'),
+                'proguard-rules.pro'
+            minifyEnabled true
+            shrinkResources true
+            debuggable false
+            jniDebuggable false
+            ndk {
+                debuggable = false
+            }
+            renderscriptDebuggable false
+        }
+
+        debug {
+            signingConfig signingConfigs.debug
+            versionNameSuffix ".dev"
+            minifyEnabled false
+            debuggable true
+            jniDebuggable true
             ndk {
                 debuggable = true
             }
         }
-        debug {
+
+        debug_profiling {
+            proguardFiles getDefaultProguardFile(
+                'proguard-android-optimize.txt'),
+                'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+            versionNameSuffix ".dev"
+            shrinkResources true
+            minifyEnabled true
+            debuggable false
+            jniDebuggable false
             ndk {
                 debuggable = true
             }
-            debuggable = true
-            jniDebuggable = true
+            externalNativeBuild {
+                cmake {
+                    arguments += "--config RelWithDebInfo"
+                }
+            }
+        }
+
+        release_unsigned {
+            proguardFiles getDefaultProguardFile(
+                'proguard-android-optimize.txt'),
+                'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+            versionNameSuffix ".dev"
+            minifyEnabled true
+            shrinkResources true
+            debuggable false
+            jniDebuggable false
+            ndk {
+                debuggable = false
+            }
+            externalNativeBuild {
+                cmake {
+                    arguments += "--config Release"
+                }
+            }
         }
     }
 }

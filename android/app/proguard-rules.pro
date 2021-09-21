@@ -15,3 +15,12 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
+
+-keep public class didgy.dengine.editor.DEngineActivity {
+    public void openSoftInput(java.lang.String, int);
+    public void hideSoftInput();
+}

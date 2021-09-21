@@ -223,15 +223,6 @@ bool Application::detail::Backend_Initialize() noexcept
 void Application::detail::Backend_ProcessEvents()
 {
 	glfwPollEvents();
-
-	if (detail::pAppData->gamepadConnected)
-	{
-		int gamepadCount = 0;
-		float const* axes = glfwGetJoystickAxes(detail::pAppData->gamepadID, &gamepadCount);
-
-		detail::pAppData->gamepadState.leftStickX = axes[GLFW_GAMEPAD_AXIS_LEFT_X];
-		detail::pAppData->gamepadState.leftStickY = axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
-	}
 }
 
 static void Application::detail::Backend_GLFW_KeyboardKeyCallback(
@@ -325,20 +316,7 @@ static void Application::detail::Backend_GLFW_ScrollCallback(GLFWwindow* window,
 
 void Application::detail::Backend_GLFW_JoystickConnectedCallback(int jid, int event)
 {
-	if (event == GLFW_CONNECTED)
-	{
-		detail::pAppData->gamepadConnected = true;
-		detail::pAppData->gamepadID = jid;
-	}
-	else if (event == GLFW_DISCONNECTED)
-	{
-		detail::pAppData->gamepadConnected = false;
-	}
-	else
-	{
-		// This can happen in future releases.
 
-	}
 }
 
 static void Application::detail::Backend_GLFW_WindowPosCallback(

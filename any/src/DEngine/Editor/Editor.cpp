@@ -12,6 +12,11 @@
 #include <vector>
 #include <string>
 
+using namespace DEngine;
+using namespace DEngine::Editor;
+
+Std::Array<Math::Vec4, (int)Settings::Color::COUNT> Settings::colorArray = Settings::BuildColorArray();
+
 namespace DEngine::Editor
 {
 	enum class FileMenuEnum
@@ -34,15 +39,17 @@ namespace DEngine::Editor
 			DENGINE_DETAIL_ASSERT(!editorImpl.entityIdList);
 			editorImpl.entityIdList = this;
 
-			this->direction = Direction::Vertical;
+			direction = Direction::Vertical;
 
-			Gui::StackLayout* topElementLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
-			topElementLayout->spacing = 30;
+			auto topElementLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
+			topElementLayout->spacing = 15;
 			this->AddWidget(Std::Box{ topElementLayout });
 
-			Gui::Button* newEntityButton = new Gui::Button;
+			auto newEntityButton = new Gui::Button;
 			topElementLayout->AddWidget(Std::Box{ newEntityButton });
 			newEntityButton->text = "New";
+			newEntityButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
+			newEntityButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
 			newEntityButton->textMargin = Editor::Settings::defaultTextMargin;
 			newEntityButton->activateFn = [this](
 				Gui::Button& btn)
@@ -54,6 +61,8 @@ namespace DEngine::Editor
 			Gui::Button* entityDeleteButton = new Gui::Button;
 			topElementLayout->AddWidget(Std::Box{ entityDeleteButton });
 			entityDeleteButton->text = "Delete";
+			entityDeleteButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
+			entityDeleteButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
 			entityDeleteButton->textMargin = Editor::Settings::defaultTextMargin;
 			entityDeleteButton->activateFn = [this](
 				Gui::Button& btn)
@@ -69,9 +78,25 @@ namespace DEngine::Editor
 
 				this->editorImpl->scene->DeleteEntity(selectedEntity);
 			};
-			
+
+			auto deselectButton = new Gui::Button;
+			topElementLayout->AddWidget(Std::Box{ deselectButton });
+			deselectButton->text = "Deselect";
+			deselectButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
+			deselectButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
+			deselectButton->textMargin = Editor::Settings::defaultTextMargin;
+			deselectButton->activateFn = [this](
+				Gui::Button& btn)
+			{
+				if (!this->editorImpl->GetSelectedEntity().HasValue())
+					return;
+
+				this->editorImpl->UnselectEntity();
+			};
+
 			Gui::ScrollArea* entityListScrollArea = new Gui::ScrollArea();
 			this->AddWidget(Std::Box<Gui::Widget>{ entityListScrollArea });
+			entityListScrollArea->scrollbarInactiveColor = Settings::GetColor(Settings::Color::Scrollbar_Normal);
 
 			entitiesList = new Gui::LineList();
 			entityListScrollArea->widget = Std::Box<Gui::Widget>{ entitiesList };
@@ -162,6 +187,8 @@ namespace DEngine::Editor
 			DENGINE_DETAIL_ASSERT(!editorImpl->componentList);
 			editorImpl->componentList = this;
 
+			scrollbarInactiveColor = Settings::GetColor(Settings::Color::Scrollbar_Normal);
+
 			outerLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
 			this->widget = Std::Box<Gui::Widget>{ outerLayout };
 			outerLayout->padding = 5;
@@ -247,6 +274,7 @@ namespace DEngine::Editor
 
 		auto menuButton = new Gui::MenuButton;
 		editorImpl.viewMenuButton = menuButton;
+		menuButton->colors.normal = Settings::GetColor(Settings::Color::Button_Normal);
 		menuButton->spacing = Editor::Settings::defaultTextMargin;
 		menuButton->margin = Editor::Settings::defaultTextMargin;
 		stackLayout->AddWidget(Std::Box{ menuButton });
@@ -262,7 +290,7 @@ namespace DEngine::Editor
 				{
 					editorImpl.dockArea->AddWindow(
 						"Entities",
-						{ 0.5f, 0.5f, 0.f, 1.f },
+						Settings::GetColor(Settings::Color::Window_Entities),
 						Std::Box{ new EntityIdList(editorImpl) });
 				}
 				btn.toggled = true;
@@ -281,7 +309,7 @@ namespace DEngine::Editor
 				{
 					editorImpl.dockArea->AddWindow(
 						"Components",
-						{ 0.f, 0.5f, 0.5f, 1.f },
+						Settings::GetColor(Settings::Color::Window_Components),
 						Std::Box{ new ComponentList(editorImpl) });
 				}
 				btn.toggled = true;
@@ -298,7 +326,7 @@ namespace DEngine::Editor
 			btn.callback = [&editorImpl](Gui::MenuButton::LineButton& btn) {
 				editorImpl.dockArea->AddWindow(
 					"Viewport",
-					{ 0.5f, 0.f, 0.5f, 1.f },
+					Settings::GetColor(Settings::Color::Window_Viewport),
 					Std::Box{ new ViewportWidget(editorImpl) });
 			};
 			Gui::MenuButton::Line line = { Std::Move(btn) };
@@ -315,6 +343,8 @@ namespace DEngine::Editor
 
 		auto playButton = new Gui::Button;
 		stackLayout->AddWidget(Std::Box{ playButton });
+		playButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
+		playButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
 		playButton->text = "Play";
 		playButton->textMargin = Editor::Settings::defaultTextMargin;
 		playButton->type = Gui::Button::Type::Toggle;
@@ -333,6 +363,8 @@ namespace DEngine::Editor
 		Gui::ButtonGroup* gizmoBtnGroup = new Gui::ButtonGroup;
 		editorImpl.gizmoTypeBtnGroup = gizmoBtnGroup;
 		stackLayout->AddWidget(Std::Box{ gizmoBtnGroup });
+		gizmoBtnGroup->inactiveColor = Settings::GetColor(Settings::Color::Button_Normal);
+		gizmoBtnGroup->activeColor = Settings::GetColor(Settings::Color::Button_Active);
 		gizmoBtnGroup->margin = Editor::Settings::defaultTextMargin;
 		gizmoBtnGroup->AddButton("Translate");
 		gizmoBtnGroup->AddButton("Rotate");
@@ -367,23 +399,23 @@ Editor::Context Editor::Context::Create(
 
 	dockArea->AddWindow(
 		"Entities",
-		{ 0.5f, 0.5f, 0.f, 1.f },
+		Settings::GetColor(Settings::Color::Window_Entities),
 		Std::Box{ new EntityIdList(implData) });
 
 	dockArea->AddWindow(
 		"Components",
-		{ 0.f, 0.5f, 0.5f, 1.f },
+		Settings::GetColor(Settings::Color::Window_Components),
 		Std::Box{ new ComponentList(implData) });
 		
 	dockArea->AddWindow(
 		"Viewport",
-		{ 0.5f, 0.f, 0.5f, 1.f },
+		Settings::GetColor(Settings::Color::Window_Viewport),
 		Std::Box{ new ViewportWidget(implData) });
 	
 	Gui::WindowHandler& guiWinHandler = implData;
 	implData.guiCtx = Std::Box{ new Gui::Context(Gui::Context::Create(guiWinHandler, gfxCtx)) };
 
-	Math::Vec4 clearColor = { 0.f, 0.0f, 0.f, 1.f };
+	auto const clearColor = Settings::GetColor(Settings::Color::Background);
 	auto windowExtent = App::GetWindowExtent(mainWindow);
 	auto windowPos = App::GetWindowPosition(mainWindow);
 	auto visibleExtent = App::GetWindowVisibleExtent(mainWindow);
@@ -558,7 +590,7 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 	return returnVal;
 }
 
-bool Editor::Context::CurrentlySimulating() const
+bool Editor::Context::IsSimulating() const
 {
 	EditorImpl& implData = this->ImplData();
 	return implData.tempScene;

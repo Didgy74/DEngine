@@ -13,6 +13,8 @@ using namespace DEngine::Gui;
 MoveWidget::MoveWidget(EditorImpl const& editorImpl)
 {
 	title = "PlayerMove";
+	collapsedColor = Settings::GetColor(Settings::Color::Button_Normal);
+	expandedColor = Settings::GetColor(Settings::Color::Button_Active);
 	titleMargin = Settings::defaultTextMargin;
 
 	this->collapseFn = [&editorImpl](CollapsingHeader& widget)
@@ -23,24 +25,24 @@ MoveWidget::MoveWidget(EditorImpl const& editorImpl)
 		if (!widget.collapsed)
 		{
 			// Confirm we have no component atm.
-			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<Move>(entity));
+			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<ComponentType>(entity));
 
 			// Add the component
-			Move component = {};
+			ComponentType component = {};
 			editorImpl.scene->AddComponent(entity, component);
 		}
 		else
 		{
 			// Confirm we have transform component atm
-			DENGINE_DETAIL_ASSERT(editorImpl.scene->GetComponent<Move>(entity));
+			DENGINE_DETAIL_ASSERT(editorImpl.scene->GetComponent<ComponentType>(entity));
 			// Remove the component
-			editorImpl.scene->DeleteComponent<Move>(entity);
+			editorImpl.scene->DeleteComponent<ComponentType>(entity);
 		}
 	};
 
 	DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 	auto entity = editorImpl.GetSelectedEntity().Value();
-	if (editorImpl.scene->GetComponent<Transform>(entity))
+	if (editorImpl.scene->GetComponent<ComponentType>(entity))
 	{
 		this->collapsed = false;
 	}
@@ -53,6 +55,8 @@ MoveWidget::MoveWidget(EditorImpl const& editorImpl)
 TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 {
 	title = "Transform";
+	collapsedColor = Settings::GetColor(Settings::Color::Button_Normal);
+	expandedColor = Settings::GetColor(Settings::Color::Button_Active);
 	titleMargin = Settings::defaultTextMargin;
 
 	auto innerStackLayout = new StackLayout(StackLayout::Dir::Vertical);
@@ -74,16 +78,17 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 	// Create the Position input fields
 	for (uSize i = 0; i < 3; i += 1)
 	{
-		auto& inputField = this->positionInputFields[i];
+		auto& inputField = positionInputFields[i];
 		inputField = new LineEdit;
 		positionLayout->AddWidget(Std::Box{ inputField });
+		inputField->backgroundColor = Settings::GetColor(Settings::Color::Button_Normal);
 		inputField->margin = Settings::defaultTextMargin;
 		inputField->type = LineEdit::Type::Float;
 		inputField->textChangedFn = [i, &editorImpl](LineEdit& widget)
 		{
 			DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 			auto entity = editorImpl.GetSelectedEntity().Value();
-			auto componentPtr = editorImpl.scene->GetComponent<Transform>(entity);
+			auto componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity);
 			DENGINE_DETAIL_ASSERT(componentPtr);
 			auto& component = *componentPtr;
 
@@ -102,12 +107,13 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 
 	rotationInput = new LineEdit;
 	rotationLayout->AddWidget(Std::Box{ rotationInput });
+	rotationInput->backgroundColor = Settings::GetColor(Settings::Color::Button_Normal);
 	rotationInput->margin = Settings::defaultTextMargin;
 	rotationInput->textChangedFn = [&editorImpl](LineEdit& widget)
 	{
 		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 		auto entity = editorImpl.GetSelectedEntity().Value();
-		auto componentPtr = editorImpl.scene->GetComponent<Transform>(entity);
+		auto componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity);
 		DENGINE_DETAIL_ASSERT(componentPtr);
 		auto& component = *componentPtr;
 		component.rotation = std::stof(widget.text.c_str());
@@ -130,13 +136,14 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 		auto& inputField = this->scaleInputFields[i];
 		inputField = new LineEdit;
 		scaleLayout->AddWidget(Std::Box{ inputField });
+		inputField->backgroundColor = Settings::GetColor(Settings::Color::Button_Normal);
 		inputField->margin = Settings::defaultTextMargin;
 		inputField->type = LineEdit::Type::Float;
 		inputField->textChangedFn = [i, &editorImpl](LineEdit& widget)
 		{
 			DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 			auto entity = editorImpl.GetSelectedEntity().Value();
-			auto componentPtr = editorImpl.scene->GetComponent<Transform>(entity);
+			auto componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity);
 			DENGINE_DETAIL_ASSERT(componentPtr);
 			auto& component = *componentPtr;
 
@@ -152,27 +159,27 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 		if (!widget.collapsed)
 		{
 			// Confirm we have no component atm.
-			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<Transform>(entity));
+			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<ComponentType>(entity));
 			
 			// Add the component
-			Transform component{};
+			ComponentType component{};
 			editorImpl.scene->AddComponent(entity, component);
 
 			auto& cast = static_cast<TransformWidget&>(widget);
-			cast.Update(*editorImpl.scene->GetComponent<Transform>(entity));
+			cast.Update(*editorImpl.scene->GetComponent<ComponentType>(entity));
 		}
 		else
 		{
 			// Confirm we have transform component atm
-			DENGINE_DETAIL_ASSERT(editorImpl.scene->GetComponent<Transform>(entity));
+			DENGINE_DETAIL_ASSERT(editorImpl.scene->GetComponent<ComponentType>(entity));
 			// Remove the component
-			editorImpl.scene->DeleteComponent<Transform>(entity);
+			editorImpl.scene->DeleteComponent<ComponentType>(entity);
 		}
 	};
 
 	DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 	auto entity = editorImpl.GetSelectedEntity().Value();
-	if (auto componentPtr = editorImpl.scene->GetComponent<Transform>(entity))
+	if (auto componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity))
 	{
 		this->collapsed = false;
 		Update(*componentPtr);
@@ -183,7 +190,7 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 	}
 }
 
-void TransformWidget::Update(Transform const& component)
+void TransformWidget::Update(ComponentType const& component)
 {
 	for (uSize i = 0; i < 3; i += 1)
 	{
@@ -221,11 +228,13 @@ void TransformWidget::Update(Transform const& component)
 
 SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 {
-	this->title = "SpriteRender2D";
-	this->titleMargin = Settings::defaultTextMargin;
+	title = "SpriteRender2D";
+	collapsedColor = Settings::GetColor(Settings::Color::Button_Normal);
+	expandedColor = Settings::GetColor(Settings::Color::Button_Active);
+	titleMargin = Settings::defaultTextMargin;
 
 	auto innerStackLayout = new StackLayout(StackLayout::Dir::Vertical);
-	this->child = Std::Box{ innerStackLayout };
+	child = Std::Box{ innerStackLayout };
 
 	// Create the horizontal position stuff layout
 	auto textureIdLayout = new StackLayout(StackLayout::Dir::Horizontal);
@@ -241,13 +250,14 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 	// Create the Position input field
 	textureIdInput = new LineEdit;
 	textureIdLayout->AddWidget(Std::Box{ textureIdInput });
+	textureIdInput->backgroundColor = Settings::GetColor(Settings::Color::Button_Normal);
 	textureIdInput->margin = Settings::defaultTextMargin;
 	textureIdInput->type = LineEdit::Type::Integer;
 	textureIdInput->textChangedFn = [&editorImpl](LineEdit& widget)
 	{
 		DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 		auto entity = editorImpl.GetSelectedEntity().Value();
-		auto componentPtr = editorImpl.scene->GetComponent<Gfx::TextureID>(entity);
+		auto componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity);
 		DENGINE_DETAIL_ASSERT(componentPtr);
 		auto& component = *componentPtr;
 		component = (Gfx::TextureID)std::stoi(widget.text.c_str());
@@ -261,27 +271,27 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 		if (!widget.collapsed)
 		{
 			// Confirm we have no component atm.
-			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<Gfx::TextureID>(entity));
+			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<ComponentType>(entity));
 
 			// Add the component
 			Gfx::TextureID component{};
 			editorImpl.scene->AddComponent(entity, component);
 
 			auto& cast = static_cast<SpriteRenderer2DWidget&>(widget);
-			cast.Update(*editorImpl.scene->GetComponent<Gfx::TextureID>(entity));
+			cast.Update(*editorImpl.scene->GetComponent<ComponentType>(entity));
 		}
 		else
 		{
 			// Confirm we have transform component atm
-			DENGINE_DETAIL_ASSERT(editorImpl.scene->GetComponent<Gfx::TextureID>(entity));
+			DENGINE_DETAIL_ASSERT(editorImpl.scene->GetComponent<ComponentType>(entity));
 			// Remove the component
-			editorImpl.scene->DeleteComponent<Gfx::TextureID>(entity);
+			editorImpl.scene->DeleteComponent<ComponentType>(entity);
 		}
 	};
 
 	DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 	auto entity = editorImpl.GetSelectedEntity().Value();
-	if (auto componentPtr = editorImpl.scene->GetComponent<Gfx::TextureID>(entity))
+	if (auto componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity))
 	{
 		this->collapsed = false;
 		Update(*componentPtr);
@@ -292,7 +302,7 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 	}
 }
 
-void SpriteRenderer2DWidget::Update(Gfx::TextureID const& component)
+void SpriteRenderer2DWidget::Update(ComponentType const& component)
 {
 	if (!textureIdInput->CurrentlyBeingEdited())
 		textureIdInput->text = std::to_string((unsigned int)component);
@@ -300,11 +310,13 @@ void SpriteRenderer2DWidget::Update(Gfx::TextureID const& component)
 
 RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 {
-	this->title = "Rigidbody2D";
-	this->titleMargin = Settings::defaultTextMargin;
+	title = "Rigidbody2D";
+	collapsedColor = Settings::GetColor(Settings::Color::Button_Normal);
+	expandedColor = Settings::GetColor(Settings::Color::Button_Active);
+	titleMargin = Settings::defaultTextMargin;
 
 	auto innerStackLayout = new StackLayout(StackLayout::Dir::Vertical);
-	this->child = Std::Box{ innerStackLayout };
+	child = Std::Box{ innerStackLayout };
 
 	{
 		auto bodyTypeLayout = new StackLayout(StackLayout::Dir::Horizontal);
@@ -326,10 +338,10 @@ RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 			// Update the box2D body
 			DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 			Entity entity = editorImpl.GetSelectedEntity().Value();
-			auto componentPtr = editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity);
+			auto componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity);
 			DENGINE_DETAIL_ASSERT(componentPtr);
 			auto& component = *componentPtr;
-			component.type = (Physics::Rigidbody2D::Type)dropdown.selectedItem;
+			component.type = (ComponentType::Type)dropdown.selectedItem;
 		};
 	}
 
@@ -341,23 +353,23 @@ RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 		if (!widget.collapsed)
 		{
 			// Confirm we have no rigidbody component atm.
-			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity));
+			DENGINE_DETAIL_ASSERT(!editorImpl.scene->GetComponent<ComponentType>(entity));
 
-			Physics::Rigidbody2D newComponent = {};
+			ComponentType newComponent = {};
 
 			editorImpl.scene->AddComponent(entity, newComponent);
 			auto& cast = static_cast<RigidbodyWidget&>(widget);
-			cast.Update(*editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity));
+			cast.Update(*editorImpl.scene->GetComponent<ComponentType>(entity));
 		}
 		else
 		{
-			editorImpl.scene->DeleteComponent<Physics::Rigidbody2D>(entity);
+			editorImpl.scene->DeleteComponent<ComponentType>(entity);
 		}
 	};
 
 	DENGINE_DETAIL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 	auto entity = editorImpl.GetSelectedEntity().Value();
-	if (auto componentPtr = editorImpl.scene->GetComponent<Physics::Rigidbody2D>(entity))
+	if (auto componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity))
 	{
 		this->collapsed = false;
 		Update(*componentPtr);
@@ -368,11 +380,11 @@ RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 	}
 }
 
-void RigidbodyWidget::Update(Physics::Rigidbody2D const& component)
+void RigidbodyWidget::Update(ComponentType const& component)
 {
 	if (!component.b2BodyPtr)
 		return;
-	b2Body* physBody = (b2Body*)component.b2BodyPtr;
+	auto physBody = (b2Body*)component.b2BodyPtr;
 	auto velocity = physBody->GetLinearVelocity();
 	std::string velocityText = "Velocity: " + std::to_string(velocity.x) + " , " + std::to_string(velocity.y);
 	debug_VelocityLabel->String_Set(velocityText.c_str());

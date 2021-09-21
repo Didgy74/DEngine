@@ -289,15 +289,17 @@ namespace DEngine::Editor::impl
 	}
 
 	// Returns the distance of the hit.
-	[[nodiscard]] static Std::Opt<f32> Intersect_Ray_PhysicsCollider(
+	[[nodiscard]] static Std::Opt<f32> Intersect_Ray_PhysicsCollider2D(
 		InternalViewportWidget& widget,
 		Std::Span<Math::Vec2 const> vertices,
 		Math::Vec2 position,
 		f32 rotation,
+		Math::Vec2 scale,
 		Math::Vec3 rayOrigin,
 		Math::Vec3 rayDir)
 	{
-		Math::Mat4 transMat = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, rotation);
+		Math::Mat4 transMat = Math::LinAlg3D::Scale_Homo(scale.x, scale.y, 1.f);
+		transMat = transMat * Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, rotation);
 		Math::LinAlg3D::SetTranslation(transMat, position.AsVec3());
 
 		// Compare against all trianges to check if we hit it
@@ -340,29 +342,46 @@ namespace DEngine::Editor::impl
 		arrow.shaftDiameter *= gizmoScale;
 		arrow.shaftLength *= gizmoScale;
 
+		auto const localRight = Math::Vec2::Right().GetRotated(gizmoRotation);
+		auto const localUp = localRight.GetRotated90(true);
+		auto const distToShaftCenter = arrow.shaftLength / 2.f;
+		auto const distToCapCenter = arrow.shaftLength + (arrow.capLength / 2.f);
+
 		Std::Opt<f32> closestDistance;
 		Gizmo::GizmoPart gizmoPart = {};
 		{
 			// Next we handle the X arrow
 
 			Rectangle3D shaftRect = {};
-			shaftRect.center = gizmoPosition + (Math::Vec2::Right().GetRotated(gizmoRotation) * (arrow.shaftLength / 2.f)).AsVec3();
+			shaftRect.center = gizmoPosition + (localRight * distToShaftCenter).AsVec3();
 			shaftRect.normal = Math::Vec3::Forward();
 			shaftRect.rotation = gizmoRotation;
 			shaftRect.width = arrow.shaftLength;
 			shaftRect.height = arrow.shaftDiameter;
-			auto shaftHit = Intersect_Ray_Rectangle(rayOrigin, rayDir, shaftRect);
+			auto const shaftHit = Intersect_Ray_Rectangle(rayOrigin, rayDir, shaftRect);
 			if (shaftHit.HasValue() && (!closestDistance.HasValue() || shaftHit.Value() < closestDistance.Value()))
 			{
 				closestDistance = shaftHit.Value();
 				gizmoPart = Gizmo::GizmoPart::ArrowX;
 			}
+
+			Rectangle3D capRect = {};
+			capRect.center = gizmoPosition + (localRight * distToCapCenter).AsVec3();
+			capRect.normal = Math::Vec3::Forward();
+			capRect.rotation = gizmoRotation;
+			capRect.width = arrow.capLength;
+			capRect.height = arrow.capDiameter;
+			auto capHit = Intersect_Ray_Rectangle(rayOrigin, rayDir, capRect);
+			if (capHit.HasValue() && (!closestDistance.HasValue() || capHit.Value() < closestDistance.Value()))
+			{
+				closestDistance = capHit.Value();
+				gizmoPart = Gizmo::GizmoPart::ArrowX;
+			}
 		}
 		{
 			// Next we handle the Y arrow
-
 			Rectangle3D shaftRect = {};
-			shaftRect.center = gizmoPosition + (Math::Vec2::Up().GetRotated(gizmoRotation) * (arrow.shaftLength / 2.f)).AsVec3();
+			shaftRect.center = gizmoPosition + (localUp * distToShaftCenter).AsVec3();
 			shaftRect.normal = Math::Vec3::Forward();
 			shaftRect.rotation = gizmoRotation + Math::pi / 2.f; // Rotate by 90 degrees.
 			shaftRect.width = arrow.shaftLength;
@@ -371,6 +390,19 @@ namespace DEngine::Editor::impl
 			if (shaftHit.HasValue() && (!closestDistance.HasValue() || shaftHit.Value() < closestDistance.Value()))
 			{
 				closestDistance = shaftHit.Value();
+				gizmoPart = Gizmo::GizmoPart::ArrowY;
+			}
+
+			Rectangle3D capRect = {};
+			capRect.center = gizmoPosition + (localUp * distToCapCenter).AsVec3();
+			capRect.normal = Math::Vec3::Forward();
+			capRect.rotation = gizmoRotation + Math::pi / 2.f; // Rotate by 90 degrees.
+			capRect.width = arrow.capLength;
+			capRect.height = arrow.capDiameter;
+			auto capHit = Intersect_Ray_Rectangle(rayOrigin, rayDir, capRect);
+			if (capHit.HasValue() && (!closestDistance.HasValue() || capHit.Value() < closestDistance.Value()))
+			{
+				closestDistance = capHit.Value();
 				gizmoPart = Gizmo::GizmoPart::ArrowY;
 			}
 		}
@@ -421,13 +453,18 @@ namespace DEngine::Editor::impl
 		arrow.shaftDiameter *= gizmoScale;
 		arrow.shaftLength *= gizmoScale;
 
+		auto const localRight = Math::Vec2::Right().GetRotated(gizmoRotation);
+		auto const localUp = localRight.GetRotated90(true);
+		auto const distToShaftCenter = arrow.shaftLength / 2.f;
+		auto const distToCapCenter = arrow.shaftLength + (arrow.capLength / 2.f);
+
 		Std::Opt<f32> closestDistance;
 		Gizmo::GizmoPart gizmoPart = {};
 		{
 			// Next we handle the X arrow
 
 			Rectangle3D shaftRect = {};
-			shaftRect.center = gizmoPosition + (Math::Vec2::Right().GetRotated(gizmoRotation) * (arrow.shaftLength / 2.f)).AsVec3();
+			shaftRect.center = gizmoPosition + (localRight * distToShaftCenter).AsVec3();
 			shaftRect.normal = Math::Vec3::Forward();
 			shaftRect.rotation = gizmoRotation;
 			shaftRect.width = arrow.shaftLength;
@@ -438,12 +475,25 @@ namespace DEngine::Editor::impl
 				closestDistance = shaftHit.Value();
 				gizmoPart = Gizmo::GizmoPart::ArrowX;
 			}
+
+			Rectangle3D capRect = {};
+			capRect.center = gizmoPosition + (localRight * distToCapCenter).AsVec3();
+			capRect.normal = Math::Vec3::Forward();
+			capRect.rotation = gizmoRotation;
+			capRect.width = arrow.capLength;
+			capRect.height = arrow.capLength;
+			auto capHit = Intersect_Ray_Rectangle(rayOrigin, rayDir, capRect);
+			if (capHit.HasValue() && (!closestDistance.HasValue() || capHit.Value() < closestDistance.Value()))
+			{
+				closestDistance = capHit.Value();
+				gizmoPart = Gizmo::GizmoPart::ArrowX;
+			}
 		}
 		{
 			// Next we handle the Y arrow
 
 			Rectangle3D shaftRect = {};
-			shaftRect.center = gizmoPosition + (Math::Vec2::Up().GetRotated(gizmoRotation) * (arrow.shaftLength / 2.f)).AsVec3();
+			shaftRect.center = gizmoPosition + (localUp * distToShaftCenter).AsVec3();
 			shaftRect.normal = Math::Vec3::Forward();
 			shaftRect.rotation = gizmoRotation + Math::pi / 2.f; // Rotate by 90 degrees.
 			shaftRect.width = arrow.shaftLength;
@@ -452,6 +502,19 @@ namespace DEngine::Editor::impl
 			if (shaftHit.HasValue() && (!closestDistance.HasValue() || shaftHit.Value() < closestDistance.Value()))
 			{
 				closestDistance = shaftHit.Value();
+				gizmoPart = Gizmo::GizmoPart::ArrowY;
+			}
+
+			Rectangle3D capRect = {};
+			capRect.center = gizmoPosition + (localUp * distToCapCenter).AsVec3();
+			capRect.normal = Math::Vec3::Forward();
+			capRect.rotation = gizmoRotation + Math::pi / 2.f; // Rotate by 90 degrees.
+			capRect.width = arrow.capLength;
+			capRect.height = arrow.capLength;
+			auto capHit = Intersect_Ray_Rectangle(rayOrigin, rayDir, capRect);
+			if (capHit.HasValue() && (!closestDistance.HasValue() || capHit.Value() < closestDistance.Value()))
+			{
+				closestDistance = capHit.Value();
 				gizmoPart = Gizmo::GizmoPart::ArrowY;
 			}
 		}
@@ -526,6 +589,7 @@ namespace DEngine::Editor::impl
 		Gizmo::GizmoPart part;
 		// Holds the normalized 
 		Math::Vec3 normalizedHitPoint_Gizmo;
+		f32 rotationOffset;
 	};
 
 	[[nodiscard]] static Std::Opt<GizmoHitTest_ReturnT> GizmoHitTest(
@@ -544,8 +608,8 @@ namespace DEngine::Editor::impl
 			widget.BuildProjectionMatrix(widgetRect.extent.Aspect()),
 			widgetRect.extent);
 
-		Math::Vec3 rayOrigin = widget.cam.position;
-		Math::Vec3 rayDir = widget.BuildRayDirection(widgetRect, pointerPos);
+		auto const rayOrigin = widget.cam.position;
+		auto const rayDir = widget.BuildRayDirection(widgetRect, pointerPos);
 
 		if (gizmoType == GizmoType::Translate)
 		{
@@ -568,21 +632,20 @@ namespace DEngine::Editor::impl
 				returnVal.normalizedHitPoint_Gizmo = hitPoint - gizmoPosition;
 				returnVal.normalizedHitPoint_Gizmo *= 1.f / scale;
 
-
 				return returnVal;
 			}
 		}
 		else if (gizmoType == GizmoType::Rotate)
 		{
-			auto const& hitOpt = GizmoHitTest_Rotate(
-				gizmoPosition,
-				scale,
-				rayOrigin,
-				rayDir);
+			auto const& hitOpt = GizmoHitTest_Rotate(gizmoPosition, scale, rayOrigin, rayDir);
 			if (hitOpt.HasValue())
 			{
 				auto const& distance = hitOpt.Value();
 				GizmoHitTest_ReturnT returnVal = {};
+				auto const absoluteHitPoint = rayOrigin + (rayDir * hitOpt.Value());
+				auto const relativeHitPoint = absoluteHitPoint - gizmoPosition;
+				auto const localUp = Math::Vec2::Up().GetRotated(gizmoRotation);
+				returnVal.rotationOffset = Math::Vec2::SignedAngle(localUp, relativeHitPoint.AsVec2().GetNormalized());
 				return returnVal;
 			}
 		}
@@ -684,8 +747,8 @@ namespace DEngine::Editor::impl
 		if (!distanceOpt.HasValue())
 			return;
 
-		Math::Vec3 hitPoint = rayOrigin + rayDir * distanceOpt.Value();
-		Math::Vec3 hitPointRel = hitPoint - transform.position;
+		auto const hitPoint = rayOrigin + rayDir * distanceOpt.Value();
+		auto const hitPointRel = hitPoint - transform.position;
 
 		// We should technically project the hitpoint as 2D vector onto the plane,
 		// But the plane is facing directly towards Z anyways so we just ditch the Z component.
@@ -950,11 +1013,9 @@ static bool impl::PointerPress(
 				holdingGizmoData.initialPos = transform.position;
 				holdingGizmoData.normalizedOffsetGizmo = hit.normalizedHitPoint_Gizmo;
 				holdingGizmoData.pointerId = pointer.id;
-
 				holdingGizmoData.initialObjectScale = transform.scale;
-
 				holdingGizmoData.relativeHitPointObject = hit.relativeHitPoint_Object;
-
+				holdingGizmoData.rotationOffset = hit.rotationOffset;
 				widget.holdingGizmoData = holdingGizmoData;
 				widget.state = InternalViewportWidget::BehaviorState::Gizmo;
 				hitGizmo = true;
@@ -980,16 +1041,17 @@ static bool impl::PointerPress(
 						{ 0.5f, 0.5f },
 						{ 0.5f, -0.5f },
 						{ -0.5f, -0.5f } };
-					Std::Opt<f32> distanceOpt = Intersect_Ray_PhysicsCollider(
+					Std::Opt<f32> distanceOpt = Intersect_Ray_PhysicsCollider2D(
 						widget,
 						{ vertices, 4 },
 						transform->position.AsVec2(),
 						transform->rotation,
+						transform->scale,
 						rayOrigin,
 						rayDir);
 					if (distanceOpt.HasValue())
 					{
-						f32 newDist = distanceOpt.Value();
+						auto const newDist = distanceOpt.Value();
 						if (!hitEntity.HasValue() || newDist <= hitEntity.Value().a)
 							hitEntity = { newDist, entity };
 					}
@@ -1157,6 +1219,7 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 	returnVal.id = viewportId;
 	returnVal.width = currentExtent.width;
 	returnVal.height = currentExtent.height;
+	returnVal.clearColor = Editor::Settings::GetColor(Editor::Settings::Color::Window_DefaultViewportBackground);
 
 	f32 aspectRatio = (f32)newExtent.width / (f32)newExtent.height;
 	Math::Mat4 projMat = BuildProjectionMatrix(aspectRatio);
@@ -1168,7 +1231,7 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 		Entity selected = editorImpl.GetSelectedEntity().Value();
 		// Find Transform component of this entity
 
-		Transform const* transformPtr = scene.GetComponent<Transform>(selected);
+		auto transformPtr = scene.GetComponent<Transform>(selected);
 
 		// Draw gizmo
 		if (transformPtr != nullptr)
@@ -1194,10 +1257,10 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 		}
 
 		// Draw debug lines for collider if there is one
-		Physics::Rigidbody2D const* rbPtr = scene.GetComponent<Physics::Rigidbody2D>(selected);
+		auto const rbPtr = scene.GetComponent<Physics::Rigidbody2D>(selected);
 		if (rbPtr && transformPtr)
 		{
-			Transform const& transform = *transformPtr;
+			auto const& transform = *transformPtr;
 
 			Math::Vec2 vertices[4] = {
 				{-0.5f, 0.5f },
@@ -1205,11 +1268,12 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 				{ 0.5f, -0.5f },
 				{ -0.5f, -0.5f } };
 
-			// We need to build a transform from the physics-body, not the Transform component?
 			Math::Mat4 worldTransform = Math::Mat4::Identity();
+			worldTransform = Math::LinAlg3D::Scale_Homo(transform.scale.AsVec3()) * worldTransform;
 			worldTransform = Math::LinAlg3D::Rotate_Homo(Math::ElementaryAxis::Z, transform.rotation) * worldTransform;
 			Math::LinAlg3D::SetTranslation(worldTransform, transform.position);
 
+			// Iterate over the 4 points of the box.
 			for (uSize i = 0; i < 5; i++)
 			{
 				Math::Vec2 vertex = vertices[i % 4];

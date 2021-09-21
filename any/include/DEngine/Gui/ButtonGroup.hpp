@@ -17,10 +17,6 @@ namespace DEngine::Gui
 	class ButtonGroup : public Widget
 	{
 	public:
-		static constexpr Math::Vec4 inactiveColor = { 0.3f, 0.3f, 0.3f, 1.f };
-		static constexpr Math::Vec4 hoveredColor = { 0.4f, 0.4f, 0.4f, 1.f };
-		static constexpr Math::Vec4 activeColor = { 0.6f, 0.6f, 0.6f, 1.f };
-
 		u32 activeIndex = 0;
 		struct InternalButton
 		{
@@ -32,6 +28,10 @@ namespace DEngine::Gui
 
 		using ActiveChangedCallbackT = void(ButtonGroup& widget, u32 newIndex);
 		std::function<ActiveChangedCallbackT> activeChangedCallback;
+
+		Math::Vec4 inactiveColor = { 0.3f, 0.3f, 0.3f, 1.f };
+		Math::Vec4 hoveredColor = { 0.4f, 0.4f, 0.4f, 1.f };
+		Math::Vec4 activeColor = { 0.6f, 0.6f, 0.6f, 1.f };
 
 		void AddButton(std::string const& title);
 		[[nodiscard]] u32 GetButtonCount() const;

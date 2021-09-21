@@ -90,139 +90,7 @@ namespace DEngine::Gui::impl
 			return currScrollbarPos;
 	}
 
-	static void CorrectState(
-		ScrollArea& scrollArea,
-		Rect const& widgetRect,
-		Extent const& childExtent) noexcept
-	{
-		// If we don't have a widget, we always want to make sure we're in normal state.
-		if (!scrollArea.widget)
-		{
-			scrollArea.scrollbarState = ScrollArea::ScrollbarState_Normal{};
-			scrollArea.currScrollbarPos = 0;
-		}
-		else
-		{
-			// We want to correct our scrollbar position based on whatever size the child has now.
-			scrollArea.currScrollbarPos = GetCorrectedScrollbarPos(
-				widgetRect.extent.height,
-				childExtent.height,
-				scrollArea.currScrollbarPos);
-		}
-	}
-
 	static constexpr u8 cursorPointerId = (u8)-1;
-
-	struct PointerMoveEvent
-	{
-		u8 id;
-		Math::Vec2 pos;
-		bool occluded;
-	};
-
-	// T should either be CursorMoveEvent or TouchMoveEvent.
-	// 
-	// Returns true if the pointer is occluded.
-	template<class T>
-	static bool PointerMove(
-		ScrollArea& scrollArea,
-		Context& ctx,
-		WindowID windowId,
-		Rect const& widgetRect,
-		Rect const& visibleRect,
-		PointerMoveEvent const& pointer,
-		T const& event)
-	{
-		SizeHint childSizeHint = {};
-		if (scrollArea.widget)
-			childSizeHint = scrollArea.widget->GetSizeHint(ctx);
-
-		auto childExtent = GetChildExtent(widgetRect.extent, scrollArea.scrollbarThickness, childSizeHint);
-
-		CorrectState(
-			scrollArea,
-			widgetRect,
-			childExtent);
-
-		bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
-
-		// If we don't have a widget, we don't want to do anything.
-		if (!scrollArea.widget)
-			return pointerInside;
-
-		// If we are hovering and the pointer becomes occluded, go into normal state.
-		if (auto ptr = scrollArea.scrollbarState.ToPtr<ScrollArea::ScrollbarState_Hovered>();
-			ptr && ptr->pointerId == pointer.id && pointer.occluded && pointerInside)
-		{
-			scrollArea.scrollbarState = ScrollArea::ScrollbarState_Normal{};
-			return pointerInside;
-		}
-
-		Rect const childRect = impl::GetChildRect(
-			widgetRect,
-			childSizeHint,
-			scrollArea.currScrollbarPos,
-			scrollArea.scrollbarThickness);
-
-		if (auto pressedState = scrollArea.scrollbarState.ToPtr<ScrollArea::ScrollbarState_Pressed>())
-		{
-			if (pressedState->pointerId == pointer.id && widgetRect.extent.height < childRect.extent.height)
-			{
-				// The scroll-bar is currently pressed so we need to move it with the pointer.
-				
-				// Find out where mouse is relative to the scroll bar position
-				i32 test = pointer.pos.y - widgetRect.position.y - pressedState->pointerRelativePosY;
-				u32 scrollBarHeight = (f32)widgetRect.extent.height * (f32)widgetRect.extent.height / (f32)childRect.extent.height;
-				f32 factor = (f32)test / (f32)(widgetRect.extent.height - scrollBarHeight);
-				factor = Math::Clamp(factor, 0.f, 1.f);
-				scrollArea.currScrollbarPos = u32(factor * (f32)(childRect.extent.height - widgetRect.extent.height));
-			}
-		}
-		else
-		{
-			Rect scrollBarRect = impl::GetScrollbarRect(
-				scrollArea.scrollbarThickness,
-				scrollArea.currScrollbarPos,
-				widgetRect,
-				childRect.extent.height);
-
-			bool pointerOverScrollbar = scrollBarRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
-			if (pointerOverScrollbar && !pointer.occluded)
-			{
-				ScrollArea::ScrollbarState_Hovered newState = {};
-				newState.pointerId = pointer.id;
-				scrollArea.scrollbarState = newState;
-			}
-			else
-			{
-				scrollArea.scrollbarState = ScrollArea::ScrollbarState_Normal{};
-			}
-		}
-
-		// We only want one of either.
-		if constexpr (Std::Trait::isSame<T, CursorMoveEvent>)
-		{
-			scrollArea.widget->CursorMove(
-				ctx,
-				windowId,
-				childRect,
-				Rect::Intersection(childRect, visibleRect),
-				event,
-				pointer.occluded);
-		}
-		else if constexpr (Std::Trait::isSame<T, TouchMoveEvent>)
-		{
-			scrollArea.widget->TouchMoveEvent(
-				ctx,
-				windowId,
-				childRect,
-				Rect::Intersection(childRect, visibleRect),
-				event,
-				pointer.occluded);
-		}
-
-		return pointerInside;
-	}
 
 	enum class PointerType : u8 { Primary, Secondary };
 	[[nodiscard]] static PointerType ToPointerType(Gui::CursorButton in) noexcept
@@ -236,6 +104,7 @@ namespace DEngine::Gui::impl
 		DENGINE_IMPL_UNREACHABLE();
 		return {};
 	}
+
 	struct PointerPressEvent
 	{
 		u8 id;
@@ -244,39 +113,66 @@ namespace DEngine::Gui::impl
 		bool pressed;
 	};
 
-	// T should either be CursorPressEvent or TouchPressEvent.
 	template<class T>
-	[[nodiscard]] static bool PointerPress(
-		ScrollArea& scrollArea,
-		Context& ctx,
-		WindowID windowId,
-		Rect const& widgetRect,
-		Rect const& visibleRect,
-		PointerPressEvent const& pointer,
-		T const& event)
+	struct PointerPress_Params
 	{
+		ScrollArea* scrollArea = nullptr;
+		Context* ctx = nullptr;
+		WindowID windowId = {};
+		Rect const* widgetRect = nullptr;
+		Rect const* visibleRect = nullptr;
+		PointerPressEvent const* pointer = nullptr;
+		T const* event = nullptr;
+	};
+
+	struct PointerMoveEvent
+	{
+		u8 id;
+		Math::Vec2 pos;
+		bool occluded;
+	};
+
+	template<class T>
+	struct PointerMove_Params
+	{
+		ScrollArea* scrollArea = nullptr;
+		Context* ctx = nullptr;
+		WindowID windowId = {};
+		Rect const* widgetRect = nullptr;
+		Rect const* visibleRect = nullptr;
+		PointerMoveEvent const* pointer = nullptr;
+		T const* event = nullptr;
+	};
+}
+
+class impl::SA_Impl
+{
+public:
+	// T should either be CursorPressEvent or TouchPressEvent.
+	//
+	// Returns true if the event was consumed.
+	template<class T>
+	[[nodiscard]] static bool PointerPress(PointerPress_Params<T> const& params)
+	{
+		auto& scrollArea = *params.scrollArea;
+		auto& widgetRect = *params.widgetRect;
+		auto& visibleRect = *params.visibleRect;
+		auto& pointer = *params.pointer;
+
 		SizeHint childSizeHint = {};
 		if (scrollArea.widget)
-			childSizeHint = scrollArea.widget->GetSizeHint(ctx);
+			childSizeHint = scrollArea.widget->GetSizeHint(*params.ctx);
 
 		auto const childExtent = GetChildExtent(widgetRect.extent, scrollArea.scrollbarThickness, childSizeHint);
 
-		CorrectState(
-			scrollArea,
-			widgetRect,
-			childExtent);
+		auto eventConsumed = false;
 
-		bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
-		if (!pointerInside && pointer.pressed)
-			return false;
+		auto const pointerInside =
+			widgetRect.PointIsInside(pointer.pos) &&
+			visibleRect.PointIsInside(pointer.pos);
 
-		if (!scrollArea.widget)
-		{
-			// If we don't have a widget, we don't want to do anything.
-			// Since we're inside the ScrollArea, we just consume the event
-			// and return.
-			return true;
-		}
+		if (pointerInside && pointer.pressed)
+			eventConsumed = true;
 
 		auto const scrollbarRect = impl::GetScrollbarRect(
 			scrollArea.scrollbarThickness,
@@ -284,33 +180,28 @@ namespace DEngine::Gui::impl
 			widgetRect,
 			childExtent.height);
 
-		bool pointerHoversScrollbar = scrollbarRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+		auto const pointerInsideScrollbar =
+			scrollbarRect.PointIsInside(pointer.pos) &&
+			visibleRect.PointIsInside(pointer.pos);
 
-		// If we are unpressed while previously pressing the scrollbar, with the previous pointerID
-		// return to normal state.
-		if (auto ptr = scrollArea.scrollbarState.ToPtr<ScrollArea::ScrollbarState_Pressed>(); 
-			ptr && ptr->pointerId == pointer.id && !pointer.pressed)
+		if (scrollArea.scrollbarHeldData.HasValue())
 		{
-			// Return to normal state, if we are the cursor and inside scrollbare
-			if (pointer.id == cursorPointerId && pointerHoversScrollbar)
-				scrollArea.scrollbarState = ScrollArea::ScrollbarState_Hovered{};
-			else
-				scrollArea.scrollbarState = ScrollArea::ScrollbarState_Normal{};
-
-			// We don't want to return early when the pointer was unpressed,
-			// we want to dispatch it to the widget.
+			auto const heldData = scrollArea.scrollbarHeldData.Value();
+			if (heldData.pointerId == pointer.id && !pointer.pressed)
+			{
+				scrollArea.scrollbarHeldData = Std::nullOpt;
+			}
 		}
-
-		if (pointerHoversScrollbar && pointer.pressed && !scrollArea.scrollbarState.IsA<ScrollArea::ScrollbarState_Pressed>())
+		else
 		{
-			ScrollArea::ScrollbarState_Pressed newState = {};
-			newState.pointerId = pointer.id;
-			newState.pointerRelativePosY = pointer.pos.y - scrollbarRect.position.y;
-			scrollArea.scrollbarState = newState;
-			return true;
+			if (pointerInsideScrollbar && pointer.pressed)
+			{
+				ScrollArea::Scrollbar_Pressed_T newPressedData = {};
+				newPressedData.pointerId = pointer.id;
+				newPressedData.pointerRelativePosY = pointer.pos.y - scrollbarRect.position.y;
+				scrollArea.scrollbarHeldData = newPressedData;
+			}
 		}
-		
-		bool pointerInsideContent = pointerInside && !pointerHoversScrollbar;
 
 		Rect const childRect = impl::GetChildRect(
 			widgetRect,
@@ -318,35 +209,123 @@ namespace DEngine::Gui::impl
 			scrollArea.currScrollbarPos,
 			scrollArea.scrollbarThickness);
 
-		// We want to dispatch the press if
-		// The pointer was unpressed
-		// OR if the pointer was pressed and was inside the content rect.
-		if (!pointer.pressed || (pointer.pressed && pointerInsideContent))
+		if (scrollArea.widget)
 		{
+			auto childConsumed = false;
+
 			if constexpr (Std::Trait::isSame<T, CursorClickEvent>)
 			{
-				scrollArea.widget->CursorPress(
-					ctx,
-					windowId,
+				childConsumed = scrollArea.widget->CursorPress(
+					*params.ctx,
+					params.windowId,
 					childRect,
 					Rect::Intersection(childRect, visibleRect),
 					{ (i32)pointer.pos.x, (i32)pointer.pos.y },
-					event);
+					*params.event);
+
+
 			}
 			else if constexpr (Std::Trait::isSame<T, TouchPressEvent>)
 			{
-				scrollArea.widget->TouchPressEvent(
-					ctx,
-					windowId,
+				childConsumed = scrollArea.widget->TouchPressEvent(
+					*params.ctx,
+					params.windowId,
 					childRect,
 					Rect::Intersection(childRect, visibleRect),
-					event);
+					*params.event);
+
+			}
+
+			eventConsumed = eventConsumed || childConsumed;
+		}
+
+		return eventConsumed;
+	}
+
+	// T should either be CursorMoveEvent or TouchMoveEvent.
+	//
+	// Returns true if the pointer is occluded.
+	template<class T>
+	static bool PointerMove(PointerMove_Params<T> const& params)
+	{
+		auto& scrollArea = *params.scrollArea;
+		auto& widgetRect = *params.widgetRect;
+		auto& visibleRect = *params.visibleRect;
+		auto& pointer = *params.pointer;
+
+		SizeHint childSizeHint = {};
+		if (scrollArea.widget)
+			childSizeHint = scrollArea.widget->GetSizeHint(*params.ctx);
+
+		auto const pointerInside =
+			 widgetRect.PointIsInside(pointer.pos) &&
+			 visibleRect.PointIsInside(pointer.pos);
+
+		auto const childRect = impl::GetChildRect(
+			widgetRect,
+			childSizeHint,
+			scrollArea.currScrollbarPos,
+			scrollArea.scrollbarThickness);
+
+		if (pointer.id == cursorPointerId)
+		{
+			auto const childExtent = GetChildExtent(widgetRect.extent, scrollArea.scrollbarThickness, childSizeHint);
+
+			auto const scrollbarRect = impl::GetScrollbarRect(
+				scrollArea.scrollbarThickness,
+				scrollArea.currScrollbarPos,
+				widgetRect,
+				childExtent.height);
+
+			auto const pointerInsideScrollbar =
+				scrollbarRect.PointIsInside(pointer.pos) &&
+				visibleRect.PointIsInside(pointer.pos);
+
+			scrollArea.scrollbarHoveredByCursor = pointerInsideScrollbar && !pointer.occluded;
+		}
+
+		if (scrollArea.scrollbarHeldData.HasValue())
+		{
+			auto const& heldData = scrollArea.scrollbarHeldData.Value();
+			if (heldData.pointerId == pointer.id && widgetRect.extent.height < childRect.extent.height)
+			{
+				// The scroll-bar is currently pressed so we need to move it with the pointer.
+
+				// Find out where mouse is relative to the scroll bar position
+				i32 test = pointer.pos.y - widgetRect.position.y - heldData.pointerRelativePosY;
+				u32 scrollBarHeight = (f32)widgetRect.extent.height * (f32)widgetRect.extent.height / (f32)childRect.extent.height;
+				f32 factor = (f32)test / (f32)(widgetRect.extent.height - scrollBarHeight);
+				factor = Math::Clamp(factor, 0.f, 1.f);
+				scrollArea.currScrollbarPos = u32(factor * (f32)(childRect.extent.height - widgetRect.extent.height));
 			}
 		}
 
-		return true;
+		// We only want one of either.
+		if constexpr (Std::Trait::isSame<T, CursorMoveEvent>)
+		{
+			scrollArea.widget->CursorMove(
+				*params.ctx,
+				params.windowId,
+				childRect,
+				Rect::Intersection(childRect, visibleRect),
+				*params.event,
+				pointer.occluded);
+		}
+		else if constexpr (Std::Trait::isSame<T, TouchMoveEvent>)
+		{
+			scrollArea.widget->TouchMoveEvent(
+				*params.ctx,
+				params.windowId,
+				childRect,
+				Rect::Intersection(childRect, visibleRect),
+				*params.event,
+				pointer.occluded);
+		}
+
+		return pointerInside;
 	}
-}
+
+};
 
 SizeHint ScrollArea::GetSizeHint(
 	Context const& ctx) const
@@ -409,15 +388,23 @@ void ScrollArea::Render(
 		widgetRect,
 		childRect.extent.height);
 
-	Math::Vec4 color = {};
-	if (scrollbarState.IsA<ScrollbarState_Normal>())
-		color = { 0.5f, 0.5f, 0.5f, 1.f };
-	else if (scrollbarState.IsA<ScrollbarState_Hovered>())
-		color = { 0.75f, 0.75f, 0.75f, 1.f };
-	else if (scrollbarState.IsA<ScrollbarState_Pressed>())
+	Math::Vec4 color = scrollbarInactiveColor;
+	if (scrollbarHeldData.HasValue())
+	{
 		color = { 1.f, 1.f, 1.f, 1.f };
+	}
 	else
-		DENGINE_IMPL_UNREACHABLE();
+	{
+		color = scrollbarInactiveColor;
+		if (scrollbarHoveredByCursor)
+		{
+			for (auto i = 0; i < 3; i++)
+				color[i] += scrollbarHoverHighlight[i];
+		}
+	}
+
+	for (auto i = 0; i < 4; i++)
+		color[i] = Math::Clamp(color[i], 0.f, 1.f);
 
 	drawInfo.PushFilledQuad(scrollBarRect, color);
 }
@@ -435,14 +422,17 @@ bool ScrollArea::CursorPress(
 	pointerPress.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
 	pointerPress.type = impl::ToPointerType(event.button);
 	pointerPress.pressed = event.clicked;
-	return impl::PointerPress(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		pointerPress,
-		event);
+
+	impl::PointerPress_Params<decltype(event)> params = {};
+	params.scrollArea = this;
+	params.ctx = &ctx;
+	params.windowId = windowId;
+	params.widgetRect = &widgetRect;
+	params.visibleRect = &visibleRect;
+	params.pointer = &pointerPress;
+	params.event = &event;
+
+	return impl::SA_Impl::PointerPress(params);
 }
 
 bool ScrollArea::CursorMove(
@@ -457,14 +447,17 @@ bool ScrollArea::CursorMove(
 	pointerMove.id = impl::cursorPointerId;
 	pointerMove.occluded = occluded;
 	pointerMove.pos = { (f32)event.position.x, (f32)event.position.y };
-	return impl::PointerMove(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		pointerMove,
-		event);
+
+	impl::PointerMove_Params<decltype(event)> params = {};
+	params.scrollArea = this;
+	params.ctx = &ctx;
+	params.windowId = windowId;
+	params.widgetRect = &widgetRect;
+	params.visibleRect = &visibleRect;
+	params.pointer = &pointerMove;
+	params.event = &event;
+
+	return impl::SA_Impl::PointerMove(params);
 }
 
 bool ScrollArea::TouchPressEvent(
@@ -479,14 +472,17 @@ bool ScrollArea::TouchPressEvent(
 	pointerPress.pos = event.position;
 	pointerPress.type = impl::PointerType::Primary;
 	pointerPress.pressed = event.pressed;
-	return impl::PointerPress(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		pointerPress,
-		event);
+
+	impl::PointerPress_Params<decltype(event)> params = {};
+	params.scrollArea = this;
+	params.ctx = &ctx;
+	params.windowId = windowId;
+	params.widgetRect = &widgetRect;
+	params.visibleRect = &visibleRect;
+	params.pointer = &pointerPress;
+	params.event = &event;
+
+	return impl::SA_Impl::PointerPress(params);
 }
 
 bool ScrollArea::TouchMoveEvent(
@@ -501,14 +497,17 @@ bool ScrollArea::TouchMoveEvent(
 	pointerMove.id = event.id;
 	pointerMove.occluded = occluded;
 	pointerMove.pos = event.position;
-	return impl::PointerMove(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		pointerMove,
-		event);
+
+	impl::PointerMove_Params<decltype(event)> params = {};
+	params.scrollArea = this;
+	params.ctx = &ctx;
+	params.windowId = windowId;
+	params.widgetRect = &widgetRect;
+	params.visibleRect = &visibleRect;
+	params.pointer = &pointerMove;
+	params.event = &event;
+
+	return impl::SA_Impl::PointerMove(params);
 }
 
 void ScrollArea::InputConnectionLost()

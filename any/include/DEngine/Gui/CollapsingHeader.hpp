@@ -18,13 +18,15 @@ namespace DEngine::Gui
 	class CollapsingHeader : public Widget
 	{
 	public:
-
 		CollapsingHeader();
 
 		Std::Box<Widget> child;
 		bool collapsed = true;
 		std::string title = "Title";
 		u32 titleMargin = 0;
+
+		Math::Vec4 collapsedColor = { 0.3f, 0.3f, 0.3f, 1.f };
+		Math::Vec4 expandedColor = { 0.6f, 0.6f, 0.6f, 1.f };
 
 		using CollapseFnT = void(CollapsingHeader& widget);
 		std::function<CollapseFnT> collapseFn;

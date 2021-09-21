@@ -23,7 +23,7 @@ namespace DEngine::Gfx::Vk
 		auto messageType = static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypeIn);
 		auto pCallbackData = reinterpret_cast<vk::DebugUtilsMessengerCallbackDataEXT const*>(pCallbackDataIn);
 
-		LogInterface* logger = static_cast<LogInterface*>(pUserData);
+		auto logger = static_cast<LogInterface*>(pUserData);
 
 		if (logger != nullptr)
 		{
@@ -68,7 +68,7 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	BaseDispatch const& baseDispatch,
 	LogInterface* logger)
 {
-	vk::Result vkResult{};
+	vk::Result vkResult;
 	CreateVkInstance_Return returnValue{};
 
 	// Build what extensions we are going to use

@@ -116,7 +116,6 @@ namespace DEngine::Application::detail
 		std::chrono::high_resolution_clock::time_point buttonHeldStart[(int)Button::COUNT] = {};
 		f32 buttonHeldDuration[(int)Button::COUNT] = {};
 		KeyEventType buttonEvents[(int)Button::COUNT] = {};
-		std::vector<u32> charInputs{};
 
 		Std::Opt<CursorData> cursorOpt{};
 
@@ -130,8 +129,6 @@ namespace DEngine::Application::detail
 		std::chrono::high_resolution_clock::time_point previousNow{};
 
 		GamepadState gamepadState = {};
-		bool gamepadConnected = false;
-		int gamepadID = 0;
 
 		// Polymorphic callback events.
 		// These call specific functions when events happen,
@@ -208,10 +205,20 @@ namespace DEngine::Application::detail
 		f32 x, 
 		f32 y);
 
-	void UpdateButton(
+	[[maybe_unused]] void UpdateButton(
 		AppData& appData,
 		Button button, 
 		bool pressed);
+
+	void UpdateGamepadButton(
+		AppData& appData,
+		GamepadKey button,
+		bool pressed);
+	void UpdateGamepadAxis(
+		AppData& appData,
+		GamepadAxis axis,
+		f32 newValue);
+
 	void PushCharInput(u32 charValue);
 	void PushCharEnterEvent();
 	void PushCharRemoveEvent();

@@ -54,7 +54,7 @@ void Scene::Begin()
 {
 	DENGINE_DETAIL_ASSERT(!physicsWorld);
 
-	b2World* physWorld = new b2World({ 0.f, -10.f });
+	auto physWorld = new b2World({ 0.f, -10.f });
 	physicsWorld = Std::Box{ physWorld };
 
 	for (auto& [entity, rb] : GetAllComponents<Physics::Rigidbody2D>())
@@ -91,8 +91,8 @@ void Scene::Begin()
 		fixtureDef.friction = 1.f;
 		fixtureDef.restitution = 0.f;
 
-		b2PolygonShape shape{};
-		shape.SetAsBox(0.5f, 0.5f);
+		b2PolygonShape shape = {};
+		shape.SetAsBox(transform.scale.x / 2.f, transform.scale.y / 2.f);
 		fixtureDef.shape = &shape;
 
 		newBody->CreateFixture(&fixtureDef);

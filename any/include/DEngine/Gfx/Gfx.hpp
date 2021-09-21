@@ -75,6 +75,7 @@ namespace DEngine::Gfx
 		u32 width;
 		u32 height;
 		Math::Mat4 transform;
+		Math::Vec4 clearColor = { 1.f, 0.f, 0.f, 1.f };
 
 		enum class GizmoType : u8 { Translate, Rotate, Scale, COUNT };
 		struct Gizmo
