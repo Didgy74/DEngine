@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/impl/Assert.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Pair.hpp>
 #include <DEngine/Std/Containers/Span.hpp>

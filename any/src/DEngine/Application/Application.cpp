@@ -63,7 +63,7 @@ static void Application::detail::FlushQueuedEventCallbacks(AppData& appData)
 				break;
 			}
 			default:
-				DENGINE_IMPL_UNREACHABLE();
+				DENGINE_IMPL_APPLICATION_UNREACHABLE();
 				break;
 		}
 	}

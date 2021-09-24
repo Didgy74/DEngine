@@ -1239,7 +1239,7 @@ void Vk::GizmoManager::Gizmo_RecordDrawCalls(
 			break;
 
 		default:
-			DENGINE_IMPL_UNREACHABLE();
+			DENGINE_IMPL_GFX_UNREACHABLE();
 			break;
 	};
 }

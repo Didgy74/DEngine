@@ -540,7 +540,7 @@ vk::RenderPass Vk::Init::BuildMainGfxRenderPass(
 	DebugUtilsDispatch const* debugUtils)
 {
 	if (!useEditorPipeline)
-		DENGINE_IMPL_UNREACHABLE(); // We haven't implemented this yet.
+		DENGINE_IMPL_GFX_UNREACHABLE(); // We haven't implemented this yet.
 
 	vk::AttachmentDescription colorAttach = {};
 	colorAttach.loadOp = vk::AttachmentLoadOp::eClear;

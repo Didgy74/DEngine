@@ -6,6 +6,8 @@
 
 // For Std::NameThisThread
 #include <DEngine/Application.hpp>
+#include <DEngine/impl/Assert.hpp>
+
 #if defined(DENGINE_OS_WINDOWS)
 #	include <windows.h>
 #	include <processthreadsapi.h>

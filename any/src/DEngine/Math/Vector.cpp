@@ -37,8 +37,8 @@ Vector<2, f32> Vector<2, f32>::GetRotated(f32 radians) const noexcept
 
 f32 Vector<2, f32>::SignedAngle(Vector<2, f32> const& a, Vector<2, f32> const& b) noexcept
 {
-	DENGINE_IMPL_ASSERT((a.MagnitudeSqrd() - 1.f) <= 0.00001f);
-	DENGINE_IMPL_ASSERT((b.MagnitudeSqrd() - 1.f) <= 0.00001f);
+	DENGINE_IMPL_MATH_ASSERT((a.MagnitudeSqrd() - 1.f) <= 0.00001f);
+	DENGINE_IMPL_MATH_ASSERT((b.MagnitudeSqrd() - 1.f) <= 0.00001f);
 
 	f32 temp = ArcTan2(a.y, a.x) - ArcTan2(b.y, b.x);
 	if (temp > pi)

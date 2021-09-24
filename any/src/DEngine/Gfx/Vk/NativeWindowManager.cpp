@@ -69,7 +69,7 @@ namespace DEngine::Gfx::Vk::NativeWinManImpl
 		case vk::SurfaceTransformFlagBitsKHR::eRotate270:
 			return Math::Mat2{ { { 0, 1, -1, 0 } } };
 		default:
-			DENGINE_IMPL_UNREACHABLE();
+			DENGINE_IMPL_GFX_UNREACHABLE();
 			return Math::Mat2();
 		}
 	}
