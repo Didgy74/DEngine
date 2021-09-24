@@ -16,6 +16,8 @@
 #include <vector>
 #include <string>
 
+#include <Tracy.hpp>
+
 void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 {
 	auto const rbPtr = scene.GetComponent<Physics::Rigidbody2D>(entity);
@@ -386,6 +388,8 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 			gfxCtx, 
 			editorCtx, 
 			*renderedScene);
+
+		FrameMark
 	}
 
 	return 0;

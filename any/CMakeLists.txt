@@ -4,100 +4,38 @@ project(dengine_any)
 
 find_package(Threads REQUIRED)
 
-set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "Don't build box2d unit tests.")
-set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "Don't build box2d testbed.")
-set(BOX2D_BUILD_DOCS OFF CACHE BOOL "Don't build box2d documentation.")
-add_subdirectory(external/box2d box2d)
-
-add_subdirectory(external/Texas Texas)
-
-find_package(Freetype QUIET)
-if(NOT ${Freetype_FOUND})
-
-	set(CMAKE_DISABLE_FIND_PACKAGE_ZLIB TRUE)
-	set(CMAKE_DISABLE_FIND_PACKAGE_BZip2 TRUE)
-	set(CMAKE_DISABLE_FIND_PACKAGE_PNG TRUE)
-	set(CMAKE_DISABLE_FIND_PACKAGE_HarfBuzz TRUE)
-	set(CMAKE_DISABLE_FIND_PACKAGE_BrotliDec TRUE)
-	add_subdirectory(external/freetype freetype)
-
-endif()
-
-add_subdirectory(external/Tracy Tracy)
-
-add_subdirectory(external/Vulkan-Headers Vulkan-Headers)
-
 file(GLOB_RECURSE DENGINE_HEADERS
 	"*.hpp"
 	"include")
+file(READ "SourceFileList.txt" DENGINE_SOURCE_FILES)
+string(REPLACE "\n" ";" DENGINE_SOURCE_FILES ${DENGINE_SOURCE_FILES})
+set(DENGINE_ANY_TARGET_NAME dengine_any)
 
-add_library(dengine_any STATIC
-		"src/main.cpp"
-		"src/DEngine/Assert.cpp"
-		"src/DEngine/Scene.cpp"
-		"src/DEngine/Std.cpp"
-		"src/DEngine/Editor/AppIntegration.cpp"
-		"src/DEngine/Editor/ComponentWidgets.cpp"
-		"src/DEngine/Editor/Editor.cpp"
-		"src/DEngine/Editor/Joystick.cpp"
-		"src/DEngine/Editor/ViewportWidget.cpp"
-		"src/DEngine/FrameAllocator.cpp"
-		"src/DEngine/Gui/AnchorArea.cpp"
-		"src/DEngine/Gui/Button.cpp"
-		"src/DEngine/Gui/ButtonGroup.cpp"
-		"src/DEngine/Gui/CollapsingHeader.cpp"
-		"src/DEngine/Gui/Context.cpp"
-		"src/DEngine/Gui/DockArea.cpp"
-		"src/DEngine/Gui/Dropdown.cpp"
-		"src/DEngine/Gui/Image.cpp"
-		"src/DEngine/Gui/LineEdit.cpp"
-		"src/DEngine/Gui/LineFloatEdit.cpp"
-		"src/DEngine/Gui/LineList.cpp"
-		"src/DEngine/Gui/MenuButton.cpp"
-		"src/DEngine/Gui/ScrollArea.cpp"
-		"src/DEngine/Gui/StackLayout.cpp"
-		"src/DEngine/Gui/Text.cpp"
-		"src/DEngine/Physics2D.cpp"
-		"src/DEngine/Time.cpp"
-		"src/DEngine/Utility.cpp"
-		"src/DEngine/Application/Application.cpp"
-		"src/DEngine/Gfx/Gfx.cpp"
-		"src/DEngine/Gfx/Vk/DeletionQueue.cpp"
-		"src/DEngine/Gfx/Vk/Draw.cpp"
-		"src/DEngine/Gfx/Vk/DynamicDispatch.cpp"
-		"src/DEngine/Gfx/Vk/Init.cpp"
-		"src/DEngine/Gfx/Vk/GizmoManager.cpp"
-		"src/DEngine/Gfx/Vk/GuiResourceManager.cpp"
-		"src/DEngine/Gfx/Vk/NativeWindowManager.cpp"
-		"src/DEngine/Gfx/Vk/ObjectDataManager.cpp"
-		"src/DEngine/Gfx/Vk/QueueData.cpp"
-		"src/DEngine/Gfx/Vk/TextureManager.cpp"
-		"src/DEngine/Gfx/Vk/ViewportManager.cpp"
-		"src/DEngine/Gfx/Vk/Vk.cpp"
-		"src/DEngine/Gfx/Vk/vk_mem_alloc.cpp"
-		"src/DEngine/Math/Common.cpp"
-		"src/DEngine/Math/Vector.cpp")
+# Create main library
+add_library(${DENGINE_ANY_TARGET_NAME} STATIC ${DENGINE_SOURCE_FILES})
 
-target_include_directories(dengine_any
+target_include_directories(${DENGINE_ANY_TARGET_NAME}
 	PUBLIC
 		"include")
-target_link_libraries(dengine_any
+target_link_libraries(${DENGINE_ANY_TARGET_NAME}
 	PUBLIC
 		Threads::Threads
-		Vulkan-Headers
-		Texas
-		freetype
-		box2d
-		tracy
 		${CMAKE_DL_LIBS})
-target_sources(dengine_any
+target_sources(${DENGINE_ANY_TARGET_NAME}
 	PUBLIC
 		${DENGINE_HEADERS})
-target_compile_features(dengine_any PRIVATE cxx_std_20)
-set_target_properties(dengine_any PROPERTIES 
+target_compile_features(${DENGINE_ANY_TARGET_NAME} PRIVATE cxx_std_20)
+set_target_properties(${DENGINE_ANY_TARGET_NAME} PROPERTIES
 	CXX_STANDARD 20
 	CXX_EXTENSIONS OFF)
 #target_compile_options(dengine_any PUBLIC "-ftime-trace")
+
+
+
+# Run script for linking dependencies
+include(LinkDependencies.cmake)
+
+
 
 set(DENGINE_DEFAULT_SETTING OFF)
 option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ${DENGINE_DEFAULT_SETTING})
