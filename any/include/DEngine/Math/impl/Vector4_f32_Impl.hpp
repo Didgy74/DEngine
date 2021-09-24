@@ -1,6 +1,6 @@
 #pragma once
 
-#include <DEngine/detail/Assert.hpp>
+#include <DEngine/Std/Containers/impl/Assert.hpp>
 #include "Vector4_f32.hpp"
 
 namespace DEngine::Math
@@ -38,7 +38,7 @@ namespace DEngine::Math
 		case 3:
 			return w;
 		default:
-			DENGINE_IMPL_UNREACHABLE();
+			DENGINE_IMPL_CONTAINERS_UNREACHABLE();
 		}
 	}
 
@@ -55,7 +55,7 @@ namespace DEngine::Math
 		case 3:
 			return w;
 		default:
-			DENGINE_IMPL_UNREACHABLE();
+			DENGINE_IMPL_CONTAINERS_UNREACHABLE();
 		}
 	}
 
@@ -124,7 +124,7 @@ namespace DEngine::Math
 		case 3:
 			return w;
 		default:
-			DENGINE_IMPL_UNREACHABLE();
+			DENGINE_IMPL_CONTAINERS_UNREACHABLE();
 		}
 	}
 
@@ -141,7 +141,7 @@ namespace DEngine::Math
 		case 3:
 			return w;
 		default:
-			DENGINE_IMPL_UNREACHABLE();
+			DENGINE_IMPL_CONTAINERS_UNREACHABLE();
 		}
 	}
 
