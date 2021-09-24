@@ -284,7 +284,7 @@ namespace DEngine::Gui::impl
 	}
 }
 
-class [[maybe_unused]] impl::DropdownImpl
+class [[maybe_unused]] Gui::impl::DropdownImpl
 {
 public:
 	[[nodiscard]] static bool Dropdown_PointerPress(
@@ -347,7 +347,7 @@ public:
 	}
 };
 
-void impl::DropdownLayer::Render(
+void Gui::impl::DropdownLayer::Render(
 	Context const& ctx,
 	Rect const& windowRect,
 	Rect const& usableRect,
@@ -396,7 +396,7 @@ void impl::DropdownLayer::Render(
 	}
 }
 
-bool impl::DropdownLayer::CursorMove(
+bool Gui::impl::DropdownLayer::CursorMove(
 	Context& ctx,
 	Rect const& windowRect,
 	Rect const& usableRect,
@@ -416,7 +416,7 @@ bool impl::DropdownLayer::CursorMove(
 		pointer);
 }
 
-Layer::Press_Return impl::DropdownLayer::CursorPress(
+Layer::Press_Return Gui::impl::DropdownLayer::CursorPress(
 	Context& ctx,
 	Rect const& windowRect,
 	Rect const& usableRect,
@@ -438,7 +438,7 @@ Layer::Press_Return impl::DropdownLayer::CursorPress(
 		pointer);
 }
 
-Layer::Press_Return impl::DropdownLayer::TouchPress(
+Layer::Press_Return Gui::impl::DropdownLayer::TouchPress(
 	Context& ctx,
 	Rect const& windowRect,
 	Rect const& usableRect,

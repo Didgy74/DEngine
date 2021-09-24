@@ -3,7 +3,7 @@
 
 #include <DEngine/Math/Common.hpp>
 
-#include <DEngine/Gfx/detail/Assert.hpp>
+#include <DEngine/Gfx/impl/Assert.hpp>
 
 #include <string>
 
@@ -106,7 +106,7 @@ void DEngine::Gfx::Vk::ObjectDataManager::Update(
 	Std::Span<Math::Mat4 const> transforms,
 	u8 currentInFlightIndex)
 {
-	DENGINE_DETAIL_GFX_ASSERT(transforms.Size() <= manager.capacity);
+	DENGINE_IMPL_GFX_ASSERT(transforms.Size() <= manager.capacity);
 
 	char* dstResourceSet = (char*)manager.mappedMem + manager.capacity * manager.elementSize * currentInFlightIndex;
 	for (uSize i = 0; i < transforms.Size(); i += 1)

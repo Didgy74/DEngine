@@ -1,21 +1,30 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
-set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "Don't build box2d unit tests.")
-set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "Don't build box2d testbed.")
-set(BOX2D_BUILD_DOCS OFF CACHE BOOL "Don't build box2d documentation.")
 project(dengine_any)
 
 find_package(Threads REQUIRED)
 
+set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "Don't build box2d unit tests.")
+set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "Don't build box2d testbed.")
+set(BOX2D_BUILD_DOCS OFF CACHE BOOL "Don't build box2d documentation.")
 add_subdirectory(external/box2d box2d)
+
 add_subdirectory(external/Texas Texas)
 
-set(CMAKE_DISABLE_FIND_PACKAGE_ZLIB TRUE)
-set(CMAKE_DISABLE_FIND_PACKAGE_BZip2 TRUE)
-set(CMAKE_DISABLE_FIND_PACKAGE_PNG TRUE)
-set(CMAKE_DISABLE_FIND_PACKAGE_HarfBuzz TRUE)
-set(CMAKE_DISABLE_FIND_PACKAGE_BrotliDec TRUE)
-add_subdirectory(external/freetype freetype)
+find_package(Freetype QUIET)
+if(NOT ${Freetype_FOUND})
+
+	set(CMAKE_DISABLE_FIND_PACKAGE_ZLIB TRUE)
+	set(CMAKE_DISABLE_FIND_PACKAGE_BZip2 TRUE)
+	set(CMAKE_DISABLE_FIND_PACKAGE_PNG TRUE)
+	set(CMAKE_DISABLE_FIND_PACKAGE_HarfBuzz TRUE)
+	set(CMAKE_DISABLE_FIND_PACKAGE_BrotliDec TRUE)
+	add_subdirectory(external/freetype freetype)
+
+endif()
+
+add_subdirectory(external/Tracy Tracy)
+
 add_subdirectory(external/Vulkan-Headers Vulkan-Headers)
 
 file(GLOB_RECURSE DENGINE_HEADERS
@@ -79,6 +88,7 @@ target_link_libraries(dengine_any
 		Texas
 		freetype
 		box2d
+		tracy
 		${CMAKE_DL_LIBS})
 target_sources(dengine_any
 	PUBLIC

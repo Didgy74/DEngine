@@ -10,6 +10,7 @@
 
 using namespace DEngine;
 using namespace DEngine::Gui;
+using namespace DEngine::Gui::impl;
 using DA = DockArea;
 
 namespace DEngine::Gui::impl
@@ -1018,15 +1019,15 @@ namespace DEngine::Gui::impl
 	static bool DA_PointerMove(DA_PointerMove_Params const& in);
 }
 
-bool impl::DA_WindowNode::DockNewNode(
+bool Gui::impl::DA_WindowNode::DockNewNode(
 	Node const* targetNode,
 	impl::DA_InnerLayoutGizmo gizmo,
 	Std::Box<Node>& insertNode)
 {
 	if (targetNode != this)
 		return false;
-	DENGINE_DETAIL_ASSERT(gizmo == impl::DA_InnerLayoutGizmo::Center);
-	DENGINE_DETAIL_ASSERT(insertNode->GetNodeType() == NodeType::Window);
+	DENGINE_IMPL_ASSERT(gizmo == impl::DA_InnerLayoutGizmo::Center);
+	DENGINE_IMPL_ASSERT(insertNode->GetNodeType() == NodeType::Window);
 
 	Std::Box<Node> oldBox = Std::Move(insertNode);
 
@@ -1043,7 +1044,7 @@ bool impl::DA_WindowNode::DockNewNode(
 	return true;
 }
 
-bool impl::DA_SplitNode::DockNewNode(
+bool Gui::impl::DA_SplitNode::DockNewNode(
 	Node const* targetNode,
 	impl::DA_InnerLayoutGizmo gizmo,
 	Std::Box<Node>& insertNode)
@@ -1060,7 +1061,7 @@ bool impl::DA_SplitNode::DockNewNode(
 	return false;
 }
 
-void impl::DA_WindowNode::Render(
+void Gui::impl::DA_WindowNode::Render(
 	DA const* dockArea,
 	Context const& ctx,
 	Extent framebufferExtent,
@@ -1134,7 +1135,7 @@ void impl::DA_WindowNode::Render(
 	}
 }
 
-void impl::DA_SplitNode::Render(
+void Gui::impl::DA_SplitNode::Render(
 	DA const* dockArea,
 	Context const& ctx,
 	Extent framebufferExtent,
@@ -1172,7 +1173,7 @@ void impl::DA_SplitNode::Render(
 	drawInfo.PushFilledQuad(handleRect, dockArea->resizeHandleColor);
 }
 
-bool impl::DA_WindowNode::RenderDockingHighlight(
+bool Gui::impl::DA_WindowNode::RenderDockingHighlight(
 	Rect nodeRect,
 	Math::Vec4 highlightColor,
 	Node const* hoveredWindow,
@@ -1188,7 +1189,7 @@ bool impl::DA_WindowNode::RenderDockingHighlight(
 	return true;
 }
 
-bool impl::DA_SplitNode::RenderDockingHighlight(
+bool Gui::impl::DA_SplitNode::RenderDockingHighlight(
 	Rect nodeRect,
 	Math::Vec4 highlightColor,
 	Node const* hoveredWindow,
@@ -1220,7 +1221,7 @@ bool impl::DA_SplitNode::RenderDockingHighlight(
 	return true;
 }
 
-bool impl::DA_WindowNode::RenderLayoutGizmo(
+bool Gui::impl::DA_WindowNode::RenderLayoutGizmo(
 	Rect nodeRect,
 	u32 gizmoSize,
 	Math::Vec4 gizmoColor,
@@ -1243,7 +1244,7 @@ bool impl::DA_WindowNode::RenderLayoutGizmo(
 	return true;
 }
 
-bool impl::DA_SplitNode::RenderLayoutGizmo(
+bool Gui::impl::DA_SplitNode::RenderLayoutGizmo(
 	Rect nodeRect,
 	u32 gizmoSize,
 	Math::Vec4 gizmoColor,
@@ -1276,7 +1277,7 @@ bool impl::DA_SplitNode::RenderLayoutGizmo(
 	return windowFound;
 }
 
-impl::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(PointerPress_Params const& in)
+Gui::impl::Node::PointerPress_Result Gui::impl::DA_WindowNode::PointerPress_StateNormal(PointerPress_Params const& in)
 {
 	PointerPress_Result returnVal = {};
 
@@ -1377,7 +1378,7 @@ impl::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateNormal(Po
 	return returnVal;
 }
 
-impl::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateMoving(PointerPress_Params const& in)
+Gui::impl::Node::PointerPress_Result Gui::impl::DA_WindowNode::PointerPress_StateMoving(PointerPress_Params const& in)
 {
 	PointerPress_Result returnVal = {};
 
@@ -1409,7 +1410,7 @@ impl::Node::PointerPress_Result impl::DA_WindowNode::PointerPress_StateMoving(Po
 	return returnVal;
 }
 
-impl::Node::PointerPress_Result impl::DA_WindowNode::PointerPress(PointerPress_Params const& in)
+Gui::impl::Node::PointerPress_Result Gui::impl::DA_WindowNode::PointerPress(PointerPress_Params const& in)
 {
 	PointerPress_Result returnVal{};
 
@@ -1429,7 +1430,7 @@ impl::Node::PointerPress_Result impl::DA_WindowNode::PointerPress(PointerPress_P
 	return returnVal;
 }
 
-impl::Node::PointerPress_Result impl::DA_SplitNode::PointerPress(PointerPress_Params const& in)
+Gui::impl::Node::PointerPress_Result Gui::impl::DA_SplitNode::PointerPress(PointerPress_Params const& in)
 {
 	DENGINE_IMPL_GUI_ASSERT(a);
 	DENGINE_IMPL_GUI_ASSERT(b);
@@ -1480,7 +1481,7 @@ impl::Node::PointerPress_Result impl::DA_SplitNode::PointerPress(PointerPress_Pa
 	return result;
 }
 
-bool impl::DA_PointerPress(DA_PointerPress_Params const& in)
+bool Gui::impl::DA_PointerPress(DA_PointerPress_Params const& in)
 {
 	bool pointerInside = in.widgetRect.PointIsInside(in.pointerPos) && in.visibleRect.PointIsInside(in.pointerPos);
 	if (!pointerInside && in.pointerPressed)
@@ -1616,7 +1617,7 @@ bool impl::DA_PointerPress(DA_PointerPress_Params const& in)
 	return pointerInside;
 }
 
-impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateNormal(PointerMove_Params const& in)
+Gui::impl::Node::PointerMove_Result Gui::impl::DA_WindowNode::PointerMove_StateNormal(PointerMove_Params const& in)
 {
 	PointerMove_Result returnVal = {};
 
@@ -1656,7 +1657,7 @@ impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateNormal(Poin
 	return returnVal;
 }
 
-impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateHoldingTab(PointerMove_Params const& in)
+Gui::impl::Node::PointerMove_Result Gui::impl::DA_WindowNode::PointerMove_StateHoldingTab(PointerMove_Params const& in)
 {
 	DENGINE_IMPL_GUI_ASSERT(in.dockArea->stateData.IsA<DA::State_HoldingTab>());
 
@@ -1705,7 +1706,7 @@ impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateHoldingTab(
 	return returnVal;
 }
 
-impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateMoving(PointerMove_Params const& in)
+Gui::impl::Node::PointerMove_Result Gui::impl::DA_WindowNode::PointerMove_StateMoving(PointerMove_Params const& in)
 {
 	PointerMove_Result returnVal = {};
 
@@ -1759,7 +1760,7 @@ impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove_StateMoving(Poin
 	return returnVal;
 }
 
-impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove(PointerMove_Params const& in)
+Gui::impl::Node::PointerMove_Result Gui::impl::DA_WindowNode::PointerMove(PointerMove_Params const& in)
 {
 	PointerMove_Result returnVal = {};
 
@@ -1778,7 +1779,7 @@ impl::Node::PointerMove_Result impl::DA_WindowNode::PointerMove(PointerMove_Para
 	return returnVal;
 }
 
-void impl::DA_WindowNode::InputConnectionLost()
+void Gui::impl::DA_WindowNode::InputConnectionLost()
 {
 	DENGINE_IMPL_GUI_ASSERT(!tabs.empty());
 	DENGINE_IMPL_GUI_ASSERT(selectedTab < tabs.size());
@@ -1787,7 +1788,7 @@ void impl::DA_WindowNode::InputConnectionLost()
 		tab.widget->InputConnectionLost();
 }
 
-void impl::DA_WindowNode::CharEnterEvent(Context& ctx)
+void Gui::impl::DA_WindowNode::CharEnterEvent(Context& ctx)
 {
 	DENGINE_IMPL_GUI_ASSERT(!tabs.empty());
 	DENGINE_IMPL_GUI_ASSERT(selectedTab < tabs.size());
@@ -1796,7 +1797,7 @@ void impl::DA_WindowNode::CharEnterEvent(Context& ctx)
 		tab.widget->CharEnterEvent(ctx);
 }
 
-void impl::DA_WindowNode::CharEvent(Context& ctx, u32 utfValue)
+void Gui::impl::DA_WindowNode::CharEvent(Context& ctx, u32 utfValue)
 {
 	DENGINE_IMPL_GUI_ASSERT(!tabs.empty());
 	DENGINE_IMPL_GUI_ASSERT(selectedTab < tabs.size());
@@ -1805,7 +1806,7 @@ void impl::DA_WindowNode::CharEvent(Context& ctx, u32 utfValue)
 		tab.widget->CharEvent(ctx, utfValue);
 }
 
-void impl::DA_WindowNode::CharRemoveEvent(Context& ctx)
+void Gui::impl::DA_WindowNode::CharRemoveEvent(Context& ctx)
 {
 	DENGINE_IMPL_GUI_ASSERT(!tabs.empty());
 	DENGINE_IMPL_GUI_ASSERT(selectedTab < tabs.size());
@@ -1814,7 +1815,7 @@ void impl::DA_WindowNode::CharRemoveEvent(Context& ctx)
 		tab.widget->CharRemoveEvent(ctx);
 }
 
-impl::Node::PointerMove_Result impl::DA_SplitNode::PointerMove(PointerMove_Params const& in)
+Gui::impl::Node::PointerMove_Result Gui::impl::DA_SplitNode::PointerMove(PointerMove_Params const& in)
 {
 	DENGINE_IMPL_GUI_ASSERT(a);
 	DENGINE_IMPL_GUI_ASSERT(b);
@@ -1864,7 +1865,7 @@ impl::Node::PointerMove_Result impl::DA_SplitNode::PointerMove(PointerMove_Param
 	return result;
 }
 
-void impl::DA_SplitNode::InputConnectionLost()
+void Gui::impl::DA_SplitNode::InputConnectionLost()
 {
 	DENGINE_IMPL_GUI_ASSERT(a);
 	DENGINE_IMPL_GUI_ASSERT(b);
@@ -1873,7 +1874,7 @@ void impl::DA_SplitNode::InputConnectionLost()
 	b->InputConnectionLost();
 }
 
-void DEngine::Gui::impl::DA_SplitNode::CharEnterEvent(Context& ctx)
+void Gui::impl::DA_SplitNode::CharEnterEvent(Context& ctx)
 {
 	DENGINE_IMPL_GUI_ASSERT(a);
 	DENGINE_IMPL_GUI_ASSERT(b);
@@ -1881,7 +1882,7 @@ void DEngine::Gui::impl::DA_SplitNode::CharEnterEvent(Context& ctx)
 	b->CharEnterEvent(ctx);
 }
 
-void impl::DA_SplitNode::CharEvent(Context& ctx, u32 utfValue)
+void Gui::impl::DA_SplitNode::CharEvent(Context& ctx, u32 utfValue)
 {
 	DENGINE_IMPL_GUI_ASSERT(a);
 	DENGINE_IMPL_GUI_ASSERT(b);
@@ -1889,7 +1890,7 @@ void impl::DA_SplitNode::CharEvent(Context& ctx, u32 utfValue)
 	b->CharEvent(ctx, utfValue);
 }
 
-void impl::DA_SplitNode::CharRemoveEvent(Context& ctx)
+void Gui::impl::DA_SplitNode::CharRemoveEvent(Context& ctx)
 {
 	DENGINE_IMPL_GUI_ASSERT(a);
 	DENGINE_IMPL_GUI_ASSERT(b);
@@ -1897,7 +1898,7 @@ void impl::DA_SplitNode::CharRemoveEvent(Context& ctx)
 	b->CharRemoveEvent(ctx);
 }
 
-bool impl::DA_PointerMove(DA_PointerMove_Params const& in)
+bool Gui::impl::DA_PointerMove(DA_PointerMove_Params const& in)
 {
 	bool pointerInside = in.widgetRect.PointIsInside(in.pointerPos) && in.visibleRect.PointIsInside(in.pointerPos);
 

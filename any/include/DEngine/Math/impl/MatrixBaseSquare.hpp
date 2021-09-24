@@ -2,7 +2,7 @@
 
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
-#include <DEngine/Math/detail/MatrixBase.hpp>
+#include <DEngine/Math/impl/MatrixBase.hpp>
 #include <DEngine/Math/Trait.hpp>
 
 namespace DEngine::Math

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <DEngine/Math/detail/Assert.hpp>
+#include <DEngine/Math/impl/Assert.hpp>
 
 namespace DEngine::Math
 {
@@ -65,14 +65,14 @@ namespace DEngine::Math
 
 	constexpr i32& Vector<2, i32>::operator[](uSize i) noexcept
 	{
-		DENGINE_DETAIL_MATH_ASSERT_MSG(
+		DENGINE_IMPL_MATH_ASSERT_MSG(
 			i < 2,
 			"Attempted to index into a Vec<2, i32> with an index out of bounds.");
 		return (&x)[i];
 	}
 	constexpr i32 Vector<2, i32>::operator[](uSize i) const noexcept
 	{
-		DENGINE_DETAIL_MATH_ASSERT_MSG(
+		DENGINE_IMPL_MATH_ASSERT_MSG(
 			i < 2,
 			"Attempted to index into a Vec<2, i32> with an index out of bounds.");
 		return (&x)[i];

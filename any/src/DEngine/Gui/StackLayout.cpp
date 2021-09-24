@@ -98,7 +98,7 @@ namespace DEngine::Gui::impl
 	}
 }
 
-class impl::StackLayoutImpl
+class Gui::impl::StackLayoutImpl
 {
 public:
 	// Gives you the modified index based on the insertion/remove jobs.
@@ -251,7 +251,7 @@ public:
 };
 
 template<class T>
-typename impl::StackLayoutImpl::It<T>::Deref_T impl::StackLayoutImpl::It<T>::operator*() const noexcept
+typename Gui::impl::StackLayoutImpl::It<T>::Deref_T Gui::impl::StackLayoutImpl::It<T>::operator*() const noexcept
 {
 	DENGINE_IMPL_GUI_ASSERT(index < itPair->childRects.size());
 	DENGINE_IMPL_GUI_ASSERT(widgetIndex < itPair->layout->children.size());
@@ -261,7 +261,7 @@ typename impl::StackLayoutImpl::It<T>::Deref_T impl::StackLayoutImpl::It<T>::ope
 }
 
 template<class T>
-impl::StackLayoutImpl::It<T>& impl::StackLayoutImpl::It<T>::operator++() noexcept
+Gui::impl::StackLayoutImpl::It<T>& Gui::impl::StackLayoutImpl::It<T>::operator++() noexcept
 {
 	while (index < itPair->childRects.size())
 	{

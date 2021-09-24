@@ -1,6 +1,6 @@
 #pragma once
 
-#include <DEngine/detail/InnerAssert.hpp>
+#include <DEngine/impl/InnerAssert.hpp>
 
 #ifdef DENGINE_ENABLE_ASSERT
 namespace DEngine::impl
@@ -29,21 +29,20 @@ namespace DEngine::impl
 
 #endif
 
-
 // Define Assert and Assert_Msg
 #ifdef DENGINE_ENABLE_ASSERT
-# 	define DENGINE_DETAIL_ASSERT(condition) \
+# 	define DENGINE_IMPL_ASSERT(condition) \
 		(static_cast<bool>(condition) ? \
 			static_cast<void>(0) : \
 			::DEngine::impl::Assert(#condition, __FILE__, __LINE__, nullptr))
-#	define DENGINE_DETAIL_ASSERT_MSG(condition, msg) \
+#	define DENGINE_IMPL_ASSERT_MSG(condition, msg) \
 		(static_cast<bool>(condition) ? \
 			static_cast<void>(0) : \
 			::DEngine::impl::Assert(#condition, __FILE__, __LINE__, msg))
 
 #else
 
-#	define DENGINE_DETAIL_ASSERT(condition) DENGINE_IMPL_INNER_ASSUME(condition)
-#	define DENGINE_DETAIL_ASSERT_MSG(condition, msg) DENGINE_IMPL_INNER_ASSUME(condition)
+#	define DENGINE_IMPL_ASSERT(condition) DENGINE_IMPL_INNER_ASSUME(condition)
+#	define DENGINE_IMPL_ASSERT_MSG(condition, msg) DENGINE_IMPL_INNER_ASSUME(condition)
 
 #endif

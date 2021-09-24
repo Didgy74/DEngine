@@ -4,7 +4,7 @@
 #include "Constants.hpp"
 #include "DynamicDispatch.hpp"
 
-#include <DEngine/Gfx/detail/Assert.hpp>
+#include <DEngine/Gfx/impl/Assert.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Pair.hpp>
@@ -137,8 +137,8 @@ namespace DEngine::Gfx::Vk
 		TempData tempData(callback, customData);
 		CallbackPFN wrapperFunc = [](GlobUtils const& globUtils, Std::Span<u8> customData)
 		{
-			DENGINE_DETAIL_GFX_ASSERT(reinterpret_cast<uSize>(customData.Data()) % alignof(TempData) == 0);
-			DENGINE_DETAIL_GFX_ASSERT(sizeof(TempData) == customData.Size());
+			DENGINE_IMPL_GFX_ASSERT(reinterpret_cast<uSize>(customData.Data()) % alignof(TempData) == 0);
+			DENGINE_IMPL_GFX_ASSERT(sizeof(TempData) == customData.Size());
 			TempData& tempData = *reinterpret_cast<TempData*>(customData.Data());
 			tempData.callback(globUtils, tempData.customData);
 		};
@@ -161,8 +161,8 @@ namespace DEngine::Gfx::Vk
 		tempData.customData = customData;
 		CallbackPFN wrapperFunc = [](GlobUtils const& globUtils, Std::Span<u8> customData)
 		{
-			DENGINE_DETAIL_GFX_ASSERT(reinterpret_cast<uSize>(customData.Data()) % alignof(TempData) == 0);
-			DENGINE_DETAIL_GFX_ASSERT(sizeof(TempData) == customData.Size());
+			DENGINE_IMPL_GFX_ASSERT(reinterpret_cast<uSize>(customData.Data()) % alignof(TempData) == 0);
+			DENGINE_IMPL_GFX_ASSERT(sizeof(TempData) == customData.Size());
 			TempData& tempData = *reinterpret_cast<TempData*>(customData.Data());
 			tempData.callback(globUtils, tempData.customData);
 		};

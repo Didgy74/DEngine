@@ -507,7 +507,7 @@ namespace DEngine::Gui::impl
 	}
 }
 
-void impl::TextManager::Initialize(
+void Gui::impl::TextManager::Initialize(
 	TextManager& manager,
 	Gfx::Context* gfxCtx)
 {
@@ -553,7 +553,7 @@ void impl::TextManager::Initialize(
 		manager.lowGlyphDatas[i] = impl::LoadNewGlyph(manager, (u32)i);
 }
 
-void impl::TextManager::RenderText(
+void Gui::impl::TextManager::RenderText(
 	TextManager& manager,
 	Std::Span<char const> string,
 	Math::Vec4 color,
@@ -590,7 +590,7 @@ void impl::TextManager::RenderText(
 	}
 }
 
-SizeHint impl::TextManager::GetSizeHint(
+SizeHint Gui::impl::TextManager::GetSizeHint(
 	TextManager& manager,
 	Std::Span<char const> str)
 {

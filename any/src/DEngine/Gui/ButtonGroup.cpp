@@ -105,7 +105,7 @@ namespace DEngine::Gui::impl
 	};
 }
 
-struct impl::BtnGroupImpl
+struct Gui::impl::BtnGroupImpl
 {
 public:
 	[[nodiscard]] static bool PointerMove(

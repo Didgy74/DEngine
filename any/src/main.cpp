@@ -1,4 +1,4 @@
-#include <DEngine/detail/Application.hpp>
+#include <DEngine/impl/Application.hpp>
 #include "DEngine/Editor/Editor.hpp"
 #include "DEngine/Gfx/Gfx.hpp"
 
@@ -22,7 +22,7 @@ void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 	b2Body* physBodyPtr = nullptr;
 	if (rbPtr != nullptr)
 	{
-		DENGINE_DETAIL_ASSERT(rbPtr->b2BodyPtr);
+		DENGINE_IMPL_ASSERT(rbPtr->b2BodyPtr);
 		physBodyPtr = (b2Body*)rbPtr->b2BodyPtr;
 	}
 	if (!physBodyPtr)
@@ -399,7 +399,7 @@ void DEngine::impl::CopyTransformToPhysicsWorld(Scene& scene)
 		Entity a = physicsBodyPair.a;
 
 		Transform const* transformPtr = scene.GetComponent<Transform>(a);
-		DENGINE_DETAIL_ASSERT(transformPtr != nullptr);
+		DENGINE_IMPL_ASSERT(transformPtr != nullptr);
 		Transform const& transform = *transformPtr;
 		b2Body* pBody = (b2Body*)physicsBodyPair.b.b2BodyPtr;
 		pBody->SetTransform({ transform.position.x, transform.position.y }, transform.rotation);
@@ -418,7 +418,7 @@ void DEngine::impl::RunPhysicsStep(
 	{
 		Entity a = physicsBodyPair.a;
 		Transform* transformPtr = scene.GetComponent<Transform>(a);
-		DENGINE_DETAIL_ASSERT(transformPtr != nullptr);
+		DENGINE_IMPL_ASSERT(transformPtr != nullptr);
 		Transform& transform = *transformPtr;
 
 		b2Body* pBody = (b2Body*)physicsBodyPair.b.b2BodyPtr;

@@ -5,11 +5,9 @@
 #include "DynamicDispatch.hpp"
 #include "SurfaceInfo.hpp"
 
-#include <DEngine/Gfx/detail/Assert.hpp>
+#include <DEngine/Gfx/impl/Assert.hpp>
 
 #include <string>
-
-#undef max
 
 namespace DEngine::Gfx::Vk
 {

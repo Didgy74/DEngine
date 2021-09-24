@@ -1,5 +1,5 @@
-#include <DEngine/detail/Application.hpp>
-#include <DEngine/detail/AppAssert.hpp>
+#include <DEngine/impl/Application.hpp>
+#include <DEngine/impl/AppAssert.hpp>
 
 #include <DEngine/Std/Utility.hpp>
 
@@ -78,7 +78,7 @@ void Application::DestroyWindow(WindowID id) noexcept
 		appData.windows.end(),
 		[id](detail::AppData::WindowNode const& val) -> bool {
 			return id == val.id; });
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	
 	detail::Backend_DestroyWindow(*windowNodeIt);
 
@@ -95,7 +95,7 @@ Extent Application::GetWindowExtent(WindowID window) noexcept
 {
 	auto const& appData = *detail::pAppData;
 	auto const windowNodePtr = detail::GetWindowNode(appData, window);
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto const& windowNode = *windowNodePtr;
 	return windowNode.windowData.extent;
 }
@@ -107,7 +107,7 @@ Extent Application::GetWindowVisibleExtent(WindowID window) noexcept
 		appData.windows.begin(),
 		appData.windows.end(),
 		[window](auto const& val) -> bool { return window == val.id; });
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	auto const& windowNode = *windowNodeIt;
 	return windowNode.windowData.visibleExtent;
 }
@@ -120,7 +120,7 @@ Math::Vec2Int Application::GetWindowPosition(WindowID window) noexcept
 		appData.windows.end(),
 		[window](detail::AppData::WindowNode const& val) -> bool {
 			return window == val.id; });
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	auto const& windowNode = *windowNodeIt;
 	return windowNode.windowData.position;
 }
@@ -133,7 +133,7 @@ Math::Vec2Int Application::GetWindowVisibleOffset(WindowID window) noexcept
 		appData.windows.end(),
 		[window](detail::AppData::WindowNode const& val) -> bool {
 			return window == val.id; });
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	auto const& windowNode = *windowNodeIt;
 	return windowNode.windowData.visibleOffset;
 }
@@ -146,7 +146,7 @@ bool Application::GetWindowMinimized(WindowID window) noexcept
 		appData.windows.end(),
 		[window](detail::AppData::WindowNode const& val) -> bool { 
 			return window == val.id; });
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	auto const& windowNode = *windowNodeIt;
 	return windowNode.windowData.isMinimized;
 }
@@ -159,7 +159,7 @@ WindowEvents Application::GetWindowEvents(WindowID window) noexcept
 		appData.windows.end(),
 		[window](detail::AppData::WindowNode const& val) -> bool {
 			return window == val.id; });
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	auto const& windowNode = *windowNodeIt;
 	return windowNode.events;
 }
@@ -186,8 +186,8 @@ u64 Application::TickCount()
 
 bool Application::ButtonValue(Button input) noexcept
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
-	DENGINE_DETAIL_APPLICATION_ASSERT(detail::IsValid(input));
+	DENGINE_IMPL_APPLICATION_ASSERT(detail::pAppData);
+	DENGINE_IMPL_APPLICATION_ASSERT(detail::IsValid(input));
 	return detail::pAppData->buttonValues[(int)input];
 }
 
@@ -196,7 +196,7 @@ void Application::detail::UpdateButton(
 	Button button,
 	bool pressed)
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(button));
+	DENGINE_IMPL_APPLICATION_ASSERT(IsValid(button));
 
 	appData.buttonValues[(int)button] = pressed;
 	appData.buttonEvents[(int)button] = pressed ? KeyEventType::Pressed : KeyEventType::Unpressed;
@@ -230,7 +230,7 @@ void Application::detail::UpdateGamepadButton(
 	GamepadKey button,
 	bool pressed)
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(button));
+	DENGINE_IMPL_APPLICATION_ASSERT(IsValid(button));
 
 	auto& gamepadState = appData.gamepadState;
 
@@ -252,7 +252,7 @@ void Application::detail::UpdateGamepadAxis(
 	GamepadAxis axis,
 	f32 newValue)
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(axis));
+	DENGINE_IMPL_APPLICATION_ASSERT(IsValid(axis));
 
 	auto& gamepadState = appData.gamepadState;
 
@@ -261,7 +261,7 @@ void Application::detail::UpdateGamepadAxis(
 
 void Application::detail::PushCharInput(u32 charValue)
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
+	DENGINE_IMPL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
 
 	for (auto const& registeredCallback : appData.registeredEventCallbacks)
@@ -280,7 +280,7 @@ void Application::detail::PushCharInput(u32 charValue)
 
 void DEngine::Application::detail::PushCharEnterEvent()
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
+	DENGINE_IMPL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
 
 	for (auto const& registeredCallback : appData.registeredEventCallbacks)
@@ -298,7 +298,7 @@ void DEngine::Application::detail::PushCharEnterEvent()
 
 void Application::detail::PushCharRemoveEvent()
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
+	DENGINE_IMPL_APPLICATION_ASSERT(detail::pAppData);
 	auto& appData = *detail::pAppData;
 
 	for (auto const& registeredCallback : appData.registeredEventCallbacks)
@@ -316,21 +316,21 @@ void Application::detail::PushCharRemoveEvent()
 
 Application::KeyEventType Application::ButtonEvent(Button input) noexcept
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
-	DENGINE_DETAIL_APPLICATION_ASSERT(detail::IsValid(input));
+	DENGINE_IMPL_APPLICATION_ASSERT(detail::pAppData);
+	DENGINE_IMPL_APPLICATION_ASSERT(detail::IsValid(input));
 	return detail::pAppData->buttonEvents[(int)input];
 }
 
 f32 Application::ButtonDuration(Button input) noexcept
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
-	DENGINE_DETAIL_APPLICATION_ASSERT(detail::IsValid(input));
+	DENGINE_IMPL_APPLICATION_ASSERT(detail::pAppData);
+	DENGINE_IMPL_APPLICATION_ASSERT(detail::IsValid(input));
 	return detail::pAppData->buttonHeldDuration[(int)input];
 }
 
 Std::Opt<Application::CursorData> Application::Cursor() noexcept
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(detail::pAppData);
+	DENGINE_IMPL_APPLICATION_ASSERT(detail::pAppData);
 	return detail::pAppData->cursorOpt;
 }
 
@@ -502,7 +502,7 @@ void Application::detail::UpdateWindowPosition(
 	Math::Vec2Int newPosition)
 {
 	auto windowNodePtr = GetWindowNode(appData, platformHandle);
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 
 	windowNode.windowData.position = newPosition;
@@ -576,7 +576,7 @@ void Application::detail::UpdateWindowCursorEnter(
 		appData.windows.end(),
 		[platformHandle](AppData::WindowNode const& val) -> bool {
 			return val.platformHandle == platformHandle; });
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodeIt != appData.windows.end());
 	auto& windowNode = *windowNodeIt;
 	if (entered)
 		windowNode.events.cursorEnter = true;
@@ -588,7 +588,7 @@ void Application::detail::UpdateWindowCursorEnter(
 
 void Application::detail::UpdateOrientation(Orientation newOrient)
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(newOrient != Orientation::Invalid);
+	DENGINE_IMPL_APPLICATION_ASSERT(newOrient != Orientation::Invalid);
 	auto& appData = *detail::pAppData;
 	appData.currentOrientation = newOrient;
 	appData.orientationEvent = true;
@@ -606,7 +606,7 @@ namespace DEngine::Application::detail
 			pos.x + windowNode.windowData.position.x,
 			pos.y + windowNode.windowData.position.y };
 
-		DENGINE_DETAIL_APPLICATION_ASSERT(appData.cursorOpt.HasValue());
+		DENGINE_IMPL_APPLICATION_ASSERT(appData.cursorOpt.HasValue());
 		CursorData& cursorData = appData.cursorOpt.Value();
 		cursorData.position = newPosition;
 		cursorData.positionDelta += delta;
@@ -633,7 +633,7 @@ namespace DEngine::Application::detail
 			pos.x + windowNode.windowData.position.x,
 			pos.y + windowNode.windowData.position.y };
 
-		DENGINE_DETAIL_APPLICATION_ASSERT(appData.cursorOpt.HasValue());
+		DENGINE_IMPL_APPLICATION_ASSERT(appData.cursorOpt.HasValue());
 		CursorData& cursorData = appData.cursorOpt.Value();
 
 		Math::Vec2Int delta = newPosition - cursorData.position;
@@ -653,7 +653,7 @@ void Application::detail::UpdateCursor(
 	Math::Vec2Int delta)
 {
 	auto windowNodePtr = GetWindowNode(appData, id);
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 	return UpdateCursor(
 		appData,
@@ -668,7 +668,7 @@ void Application::detail::UpdateCursor(
 	Math::Vec2Int pos)
 {
 	auto windowNodePtr = GetWindowNode(appData, id);
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 	return UpdateCursor(
 		appData,
@@ -683,7 +683,7 @@ void Application::detail::UpdateCursor(
 	Math::Vec2Int delta)
 {
 	auto windowNodePtr = GetWindowNode(appData, platformHandle);
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 	return UpdateCursor(
 		appData,
@@ -698,7 +698,7 @@ void Application::detail::UpdateCursor(
 	Math::Vec2Int pos)
 {
 	auto windowNodePtr = GetWindowNode(appData, platformHandle);
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNodePtr);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 	return UpdateCursor(
 		appData,
@@ -715,7 +715,7 @@ void Application::detail::UpdateTouchInput(
 {
 	if (type == TouchEventType::Down)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(appData.touchInputs.CanPushBack());
+		DENGINE_IMPL_APPLICATION_ASSERT(appData.touchInputs.CanPushBack());
 		TouchInput newValue = {};
 		newValue.eventType = TouchEventType::Down;
 		newValue.id = id;
@@ -726,7 +726,7 @@ void Application::detail::UpdateTouchInput(
 	}
 	else
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(TouchInputIDExists(id));
+		DENGINE_IMPL_APPLICATION_ASSERT(TouchInputIDExists(id));
 		for (auto& item : appData.touchInputs)
 		{
 			if (item.id == id)
@@ -762,19 +762,19 @@ Std::Opt<GamepadState> Application::GetGamepad()
 
 bool GamepadState::GetKeyState(GamepadKey btn) const noexcept
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(btn));
+	DENGINE_IMPL_APPLICATION_ASSERT(IsValid(btn));
 	return keyStates[(int)btn];
 }
 
 KeyEventType GamepadState::GetKeyEvent(GamepadKey btn) const noexcept
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(btn));
+	DENGINE_IMPL_APPLICATION_ASSERT(IsValid(btn));
 	return keyEvents[(int)btn];
 }
 
 f32 GamepadState::GetGamepadAxisValue(GamepadAxis axis) const noexcept
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(IsValid(axis));
+	DENGINE_IMPL_APPLICATION_ASSERT(IsValid(axis));
 	return axisValues[(int)axis];
 }
 

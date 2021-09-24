@@ -53,14 +53,14 @@ void Std::NameThisThread(Str name)
 	// This includes the null-terminator.
 	[[maybe_unused]] constexpr u32 maxThreadNameLength = 16;
 	
-	DENGINE_DETAIL_ASSERT(name.Size() < maxThreadNameLength);
+	DENGINE_IMPL_ASSERT(name.Size() < maxThreadNameLength);
 
 #if defined(DENGINE_OS_WINDOWS)
 	wchar_t tempString[maxThreadNameLength] = {};
 	for (u8 i = 0; i < (u8)name.Size(); i += 1)
 		tempString[i] = name[i];
 
-	HRESULT r = SetThreadDescription(
+	[[maybe_unused]] HRESULT r = SetThreadDescription(
 		GetCurrentThread(),
 		tempString);
 #elif defined(DENGINE_OS_LINUX) || defined(DENGINE_OS_ANDROID)

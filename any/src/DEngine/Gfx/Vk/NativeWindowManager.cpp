@@ -162,7 +162,7 @@ void NativeWinMan::ProcessEvents(
 			manager.nativeWindows.begin(),
 			manager.nativeWindows.end(),
 			[&item](auto const& val) -> bool { return item.id == val.id; });
-		DENGINE_DETAIL_GFX_ASSERT(windowNodeIt != manager.nativeWindows.end());
+		DENGINE_IMPL_GFX_ASSERT(windowNodeIt != manager.nativeWindows.end());
 		auto& windowNode = *windowNodeIt;
 
 		switch (item.event)
@@ -466,7 +466,7 @@ static void NativeWinManImpl::HandleCreationJobs(
 	for (auto& createJob : manager.createJobs)
 	{
 		// Check if the ID already exists
-		DENGINE_DETAIL_GFX_ASSERT(
+		DENGINE_IMPL_GFX_ASSERT(
 			Std::FindIf(
 				manager.nativeWindows.begin(),
 				manager.nativeWindows.end(),

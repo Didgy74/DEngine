@@ -3,7 +3,7 @@
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Gui/impl/Assert.hpp>
 
-#include <DEngine/detail/Assert.hpp>
+#include <DEngine/impl/Assert.hpp>
 
 #include <DEngine/Math/Common.hpp>
 #include <DEngine/Math/Vector.hpp>

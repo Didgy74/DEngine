@@ -36,7 +36,7 @@ namespace DEngine::Editor
 		EntityIdList(EditorImpl& editorImpl) :
 			editorImpl(&editorImpl)
 		{
-			DENGINE_DETAIL_ASSERT(!editorImpl.entityIdList);
+			DENGINE_IMPL_ASSERT(!editorImpl.entityIdList);
 			editorImpl.entityIdList = this;
 
 			direction = Direction::Vertical;
@@ -127,11 +127,11 @@ namespace DEngine::Editor
 
 		virtual ~EntityIdList() override
 		{
-			DENGINE_DETAIL_ASSERT(editorImpl->entityIdList == this);
+			DENGINE_IMPL_ASSERT(editorImpl->entityIdList == this);
 			editorImpl->entityIdList = nullptr;
 
 			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Entities].data;
-			DENGINE_DETAIL_ASSERT(submenuLine.IsA<Gui::MenuButton::LineButton>());
+			DENGINE_IMPL_ASSERT(submenuLine.IsA<Gui::MenuButton::LineButton>());
 			auto& lineButton = submenuLine.Get<Gui::MenuButton::LineButton>();
 			lineButton.toggled = false;
 		}
@@ -143,7 +143,7 @@ namespace DEngine::Editor
 
 		void RemoveEntityFromList(Entity id)
 		{
-			DENGINE_DETAIL_ASSERT(entitiesList->selectedLine.HasValue());
+			DENGINE_IMPL_ASSERT(entitiesList->selectedLine.HasValue());
 			entitiesList->RemoveLine(entitiesList->selectedLine.Value());
 		}
 
@@ -160,7 +160,7 @@ namespace DEngine::Editor
 					break;
 				}
 			}
-			DENGINE_DETAIL_ASSERT(newLine.HasValue());
+			DENGINE_IMPL_ASSERT(newLine.HasValue());
 			entitiesList->selectedLine = newLine.Value();
 		}
 
@@ -184,7 +184,7 @@ namespace DEngine::Editor
 		ComponentList(EditorImpl& inEditorImpl) :
 			editorImpl(&inEditorImpl)
 		{
-			DENGINE_DETAIL_ASSERT(!editorImpl->componentList);
+			DENGINE_IMPL_ASSERT(!editorImpl->componentList);
 			editorImpl->componentList = this;
 
 			scrollbarInactiveColor = Settings::GetColor(Settings::Color::Scrollbar_Normal);
@@ -203,11 +203,11 @@ namespace DEngine::Editor
 
 		virtual ~ComponentList() override
 		{
-			DENGINE_DETAIL_ASSERT(editorImpl->componentList == this);
+			DENGINE_IMPL_ASSERT(editorImpl->componentList == this);
 			editorImpl->componentList = nullptr;
 
 			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Components].data;
-			DENGINE_DETAIL_ASSERT(submenuLine.IsA<Gui::MenuButton::LineButton>());
+			DENGINE_IMPL_ASSERT(submenuLine.IsA<Gui::MenuButton::LineButton>());
 			auto& lineButton = submenuLine.Get<Gui::MenuButton::LineButton>();
 			lineButton.toggled = false;
 		}
@@ -527,6 +527,9 @@ void Editor::Context::ProcessEvents()
 		implData.indices.clear();
 		implData.drawCmds.clear();
 		implData.windowUpdates.clear();
+
+
+
 		implData.guiCtx->Render(
 			implData.vertices,
 			implData.indices,
@@ -571,12 +574,12 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 
 	for (auto viewportWidgetPtr : implData.viewportWidgets)
 	{
-		DENGINE_DETAIL_ASSERT(viewportWidgetPtr);
+		DENGINE_IMPL_ASSERT(viewportWidgetPtr);
 		auto& viewportWidget = *viewportWidgetPtr;
 		if (viewportWidgetPtr->viewport->isVisible)
 		{
-			DENGINE_DETAIL_ASSERT(viewportWidget.viewport->currentExtent.width > 0 && viewportWidget.viewport->currentExtent.height > 0);
-			DENGINE_DETAIL_ASSERT(viewportWidget.viewport->newExtent.width > 0 && viewportWidget.viewport->newExtent.height > 0);
+			DENGINE_IMPL_ASSERT(viewportWidget.viewport->currentExtent.width > 0 && viewportWidget.viewport->currentExtent.height > 0);
+			DENGINE_IMPL_ASSERT(viewportWidget.viewport->newExtent.width > 0 && viewportWidget.viewport->newExtent.height > 0);
 
 			Gfx::ViewportUpdate update = viewportWidget.viewport->GetViewportUpdate(
 				*this,
@@ -634,7 +637,7 @@ void Editor::EditorImpl::UnselectEntity()
 
 Editor::GizmoType Editor::EditorImpl::GetCurrentGizmoType() const
 {
-	DENGINE_DETAIL_ASSERT(gizmoTypeBtnGroup->GetButtonCount() == (u8)GizmoType::COUNT);
+	DENGINE_IMPL_ASSERT(gizmoTypeBtnGroup->GetButtonCount() == (u8)GizmoType::COUNT);
 
 	return (GizmoType)gizmoTypeBtnGroup->GetActiveButtonIndex();
 }
@@ -655,7 +658,7 @@ Scene const& Editor::EditorImpl::GetActiveScene() const
 
 void Editor::EditorImpl::BeginSimulating()
 {
-	DENGINE_DETAIL_ASSERT(!tempScene);
+	DENGINE_IMPL_ASSERT(!tempScene);
 
 	Scene* copyScene = new Scene;
 	tempScene = Std::Box{ copyScene };
@@ -665,7 +668,7 @@ void Editor::EditorImpl::BeginSimulating()
 
 void Editor::EditorImpl::StopSimulating()
 {
-	DENGINE_DETAIL_ASSERT(tempScene);
+	DENGINE_IMPL_ASSERT(tempScene);
 
 	tempScene.Clear();
 }
@@ -679,7 +682,7 @@ std::vector<Math::Vec3> Editor::BuildGizmoArrowMesh3D()
 
 	u32 subdivisions = 4;
 	// We need atleast 2 subdivisons so we can atleast get a diamond
-	DENGINE_DETAIL_ASSERT(subdivisions > 1);
+	DENGINE_IMPL_ASSERT(subdivisions > 1);
 	u32 baseCircleTriangleCount = (subdivisions * 2);
 
 	std::vector<Math::Vec3> vertices;

@@ -5,7 +5,7 @@
 #include "GlobUtils.hpp"
 #include "GuiResourceManager.hpp"
 
-#include <DEngine/Gfx/detail/Assert.hpp>
+#include <DEngine/Gfx/impl/Assert.hpp>
 #include <DEngine/Std/Utility.hpp>
 
 #include <string>
@@ -175,7 +175,7 @@ namespace DEngine::Gfx::Vk
 				viewportManager.viewportNodes.begin(),
 				viewportManager.viewportNodes.end(),
 				[id](auto const& val) -> bool { return id == val.id; });
-			DENGINE_DETAIL_GFX_ASSERT(viewportDataNodeIt != viewportManager.viewportNodes.end());
+			DENGINE_IMPL_GFX_ASSERT(viewportDataNodeIt != viewportManager.viewportNodes.end());
 			auto& viewportNode = *viewportDataNodeIt;
 			ViewportData& viewportData = viewportDataNodeIt->viewport;
 
@@ -287,7 +287,7 @@ void Vk::ViewportManager::ProcessEvents(
 			manager.viewportNodes.begin(),
 			manager.viewportNodes.end(),
 			[&updateData](auto const& val) -> bool {return updateData.id == val.id; });
-		DENGINE_DETAIL_GFX_ASSERT(viewportDataNodeIt != manager.viewportNodes.end());
+		DENGINE_IMPL_GFX_ASSERT(viewportDataNodeIt != manager.viewportNodes.end());
 		ViewportData& viewportData = viewportDataNodeIt->viewport;
 		if (viewportData.renderTarget.img == vk::Image())
 		{
@@ -354,9 +354,9 @@ void Vk::ViewportManager::UpdateCameras(
 			manager.viewportNodes.end(),
 			[&viewportUpdate](auto const& val) -> bool {
 				return viewportUpdate.id == val.id; });
-		DENGINE_DETAIL_GFX_ASSERT(nodeIt != manager.viewportNodes.end());
+		DENGINE_IMPL_GFX_ASSERT(nodeIt != manager.viewportNodes.end());
 		auto& node = *nodeIt;
-		DENGINE_DETAIL_GFX_ASSERT(manager.camElementSize * inFlightIndex < node.viewport.camDataMappedMem.Size());
+		DENGINE_IMPL_GFX_ASSERT(manager.camElementSize * inFlightIndex < node.viewport.camDataMappedMem.Size());
 		std::memcpy(
 			node.viewport.camDataMappedMem.Data() + manager.camElementSize * inFlightIndex,
 			&viewportUpdate.transform,

@@ -1122,9 +1122,10 @@ void Vk::GizmoManager::UpdateLineVtxBuffer(
 	Std::Span<Math::Vec3 const> vertices)
 {
 	uSize const ptrOffset = manager.lineVtxBufferCapacity * manager.lineVtxElementSize * inFlightIndex;
-	DENGINE_DETAIL_GFX_ASSERT(ptrOffset + manager.lineVtxElementSize * vertices.Size() < manager.lineVtxBufferMappedMem.Size());
+	DENGINE_IMPL_GFX_ASSERT(ptrOffset + manager.lineVtxElementSize * vertices.Size() < manager.lineVtxBufferMappedMem.Size());
 
 	u8* ptr = manager.lineVtxBufferMappedMem.Data() + ptrOffset;
+
 
 	std::memcpy(ptr, vertices.Data(), manager.lineVtxElementSize * vertices.Size());
 }

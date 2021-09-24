@@ -96,7 +96,7 @@ namespace DEngine::Gui::impl
 	};
 }
 
-class [[maybe_unused]] impl::LineListImpl
+class [[maybe_unused]] Gui::impl::LineListImpl
 {
 public:
 	[[nodiscard]] static bool PointerPress(

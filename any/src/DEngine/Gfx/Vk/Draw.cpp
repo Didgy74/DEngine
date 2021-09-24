@@ -1,5 +1,5 @@
 #include "Vk.hpp"
-#include <DEngine/Gfx/detail/Assert.hpp>
+#include <DEngine/Gfx/impl/Assert.hpp>
 
 #include <DEngine/Math/LinearTransform3D.hpp>
 #include <DEngine/Std/Utility.hpp>
@@ -418,7 +418,7 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 			apiData.viewportManager.viewportNodes.begin(),
 			apiData.viewportManager.viewportNodes.end(),
 			[&viewportUpdate](auto const& val) -> bool { return viewportUpdate.id == val.id; });
-		DENGINE_DETAIL_GFX_ASSERT(viewportDataIt != apiData.viewportManager.viewportNodes.end());
+		DENGINE_IMPL_GFX_ASSERT(viewportDataIt != apiData.viewportManager.viewportNodes.end());
 		ViewportManager::Node const& viewportNode = *viewportDataIt;
 		
 		if (!cmdBufferBegun)
@@ -462,7 +462,7 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 			apiData.nativeWindowManager.nativeWindows.begin(),
 			apiData.nativeWindowManager.nativeWindows.end(),
 			[&windowUpdate](auto const& node) -> bool { return node.id == windowUpdate.id; });
-		DENGINE_DETAIL_GFX_ASSERT(windowDataIt != apiData.nativeWindowManager.nativeWindows.end());
+		DENGINE_IMPL_GFX_ASSERT(windowDataIt != apiData.nativeWindowManager.nativeWindows.end());
 		auto const& nativeWindow = *windowDataIt;
 
 		if (!cmdBufferBegun)
@@ -479,7 +479,7 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		Std::Span<GuiDrawCmd const> drawCmds;
 		if (!drawParams.guiDrawCmds.empty())
 		{
-			DENGINE_DETAIL_GFX_ASSERT((u64)windowUpdate.drawCmdOffset + (u64)windowUpdate.drawCmdCount <= drawParams.guiDrawCmds.size());
+			DENGINE_IMPL_GFX_ASSERT((u64)windowUpdate.drawCmdOffset + (u64)windowUpdate.drawCmdCount <= drawParams.guiDrawCmds.size());
 			drawCmds = { &drawParams.guiDrawCmds[windowUpdate.drawCmdOffset], windowUpdate.drawCmdCount };
 		}
 

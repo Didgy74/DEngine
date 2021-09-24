@@ -1,8 +1,8 @@
 #define DENGINE_APPLICATION_CURSORTYPE_COUNT
 #define DENGINE_APPLICATION_BUTTON_COUNT
 
-#include <DEngine/detail/AppAssert.hpp>
-#include <DEngine/detail/Application.hpp>
+#include <DEngine/impl/AppAssert.hpp>
+#include <DEngine/impl/Application.hpp>
 #include <DEngine/Std/Utility.hpp>
 
 #define GLFW_INCLUDE_VULKAN
@@ -232,7 +232,7 @@ static void Application::detail::Backend_GLFW_KeyboardKeyCallback(
 	int action, 
 	int mods)
 {
-	DENGINE_DETAIL_APPLICATION_ASSERT(pAppData);
+	DENGINE_IMPL_APPLICATION_ASSERT(pAppData);
 	auto& appData = *pAppData;
 
 	auto button = Backend_GLFW_KeyboardKeyToRawButton(key);
@@ -266,7 +266,7 @@ static void Application::detail::Backend_GLFW_MouseButtonCallback(
 	if (action != GLFW_PRESS && action != GLFW_RELEASE)
 		throw std::runtime_error("DEngine - Application: Encountered unexpected action value in GLFW mouse button press callback.");
 
-	DENGINE_DETAIL_APPLICATION_ASSERT(pAppData);
+	DENGINE_IMPL_APPLICATION_ASSERT(pAppData);
 	auto& appData = *pAppData;
 
 	bool wasPressed = false;
@@ -370,7 +370,7 @@ static void Application::detail::Backend_GLFW_WindowCloseCallback(
 {
 	auto& appData = *detail::pAppData;
 	AppData::WindowNode* windowNode = detail::GetWindowNode(appData, window);
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNode);
 	detail::UpdateWindowClose(*windowNode);
 }
 
@@ -390,7 +390,7 @@ static void Application::detail::Backend_GLFW_WindowMinimizeCallback(
 {
 	auto& appData = *detail::pAppData;
 	AppData::WindowNode* windowNode = detail::GetWindowNode(appData, window);
-	DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNode);
 	detail::UpdateWindowMinimized(*windowNode, iconified);
 }
 

@@ -34,7 +34,7 @@ void DeletionQueue::ExecuteTick(
 	{
 		// First we execute all the deletion-job planned for this tick
 		auto& currentQueue = queue.jobQueues[currentInFlightIndex];
-		DENGINE_DETAIL_GFX_ASSERT((uSize)currentQueue.customData.data() % DeletionQueueImpl::customDataAlignment == 0);
+		DENGINE_IMPL_GFX_ASSERT((uSize)currentQueue.customData.data() % DeletionQueueImpl::customDataAlignment == 0);
 		for (auto const& item : currentQueue.jobs)
 		{
 			item.callback(
@@ -105,7 +105,7 @@ void DeletionQueue::ExecuteTick(
 
 void Vk::DeletionQueue::Destroy(VmaAllocation vmaAlloc, vk::Image img) const
 {
-	DENGINE_DETAIL_GFX_ASSERT(vmaAlloc != nullptr);
+	DENGINE_IMPL_GFX_ASSERT(vmaAlloc != nullptr);
 	struct Data
 	{
 		VmaAllocation alloc{};
@@ -124,7 +124,7 @@ void Vk::DeletionQueue::Destroy(VmaAllocation vmaAlloc, vk::Image img) const
 
 void DeletionQueue::Destroy(VmaAllocation vmaAlloc, vk::Buffer buff) const
 {
-	DENGINE_DETAIL_GFX_ASSERT(vmaAlloc != nullptr);
+	DENGINE_IMPL_GFX_ASSERT(vmaAlloc != nullptr);
 	struct Data
 	{
 		VmaAllocation alloc{};
@@ -191,8 +191,8 @@ void DeletionQueue::Destroy(
 	vk::CommandPool cmdPool, 
 	Std::Span<vk::CommandBuffer const> cmdBuffers) const
 {
-	DENGINE_DETAIL_GFX_ASSERT(cmdPool != vk::CommandPool());
-	DENGINE_DETAIL_GFX_ASSERT(
+	DENGINE_IMPL_GFX_ASSERT(cmdPool != vk::CommandPool());
+	DENGINE_IMPL_GFX_ASSERT(
 		Std::AllOf(cmdBuffers.AsRange(),
 		[](vk::CommandBuffer cmdBuffer) -> bool { return cmdBuffer != vk::CommandBuffer{}; }));
 
@@ -261,8 +261,8 @@ void DeletionQueue::Destroy(
 	vk::CommandPool in, 
 	vk::Optional<vk::AllocationCallbacks> callbacks) const
 {
-	DENGINE_DETAIL_GFX_ASSERT(fence != vk::Fence());
-	DENGINE_DETAIL_GFX_ASSERT(in != vk::CommandPool());
+	DENGINE_IMPL_GFX_ASSERT(fence != vk::Fence());
+	DENGINE_IMPL_GFX_ASSERT(in != vk::CommandPool());
 	DeletionQueueImpl::DestroyDeviceLevelHandle(*this, fence, in, callbacks);
 }
 
@@ -278,8 +278,8 @@ void DEngine::Gfx::Vk::DeletionQueue::Destroy(
 		vk::DescriptorPool in,
 		vk::Optional<vk::AllocationCallbacks> callbacks) const
 {
-	DENGINE_DETAIL_GFX_ASSERT(fence != vk::Fence());
-	DENGINE_DETAIL_GFX_ASSERT(in != vk::DescriptorPool());
+	DENGINE_IMPL_GFX_ASSERT(fence != vk::Fence());
+	DENGINE_IMPL_GFX_ASSERT(in != vk::DescriptorPool());
 	DeletionQueueImpl::DestroyDeviceLevelHandle(*this, fence, in, callbacks);
 }
 

@@ -253,7 +253,7 @@ namespace DEngine::Gui::impl
 	}
 }
 
-Layer::Press_Return impl::MenuButtonImpl::MenuLayer_PointerPress(
+Layer::Press_Return Gui::impl::MenuButtonImpl::MenuLayer_PointerPress(
 	MenuLayer& layer,
 	Context& ctx,
 	Rect const& usableRect,
@@ -288,7 +288,7 @@ Layer::Press_Return impl::MenuButtonImpl::MenuLayer_PointerPress(
 	return returnVal;
 }
 
-Layer::Press_Return impl::MenuButtonImpl::MenuLayer_PointerPress_Inner(
+Layer::Press_Return Gui::impl::MenuButtonImpl::MenuLayer_PointerPress_Inner(
 	MenuButton::Submenu& submenu,
 	Math::Vec2Int desiredPos,
 	MenuLayer_PointerPress_Inner_Params const& params)
@@ -426,7 +426,7 @@ Layer::Press_Return impl::MenuButtonImpl::MenuLayer_PointerPress_Inner(
 	return returnVal;
 }
 
-bool impl::MenuButtonImpl::MenuLayer_PointerMove(
+bool Gui::impl::MenuButtonImpl::MenuLayer_PointerMove(
 	MenuLayer& layer,
 	Context& ctx,
 	Rect const& usableRect,
@@ -450,7 +450,7 @@ bool impl::MenuButtonImpl::MenuLayer_PointerMove(
 		params);
 }
 
-bool impl::MenuButtonImpl::MenuLayer_PointerMove_Inner(
+bool Gui::impl::MenuButtonImpl::MenuLayer_PointerMove_Inner(
 	MenuButton::Submenu& submenu,
 	Math::Vec2Int desiredPos,
 	MenuLayer_PointerMove_Inner_Params const& params)
@@ -520,7 +520,7 @@ bool impl::MenuButtonImpl::MenuLayer_PointerMove_Inner(
 	return occluded;
 }
 
-bool impl::MenuButtonImpl::MenuButton_PointerPress(
+bool Gui::impl::MenuButtonImpl::MenuButton_PointerPress(
 	MenuButton& widget,
 	Context& ctx,
 	WindowID windowId,
@@ -564,7 +564,7 @@ bool impl::MenuButtonImpl::MenuButton_PointerPress(
 	return pointerInside;
 }
 
-Rect impl::Submenu_BuildRectOuter(
+Rect Gui::impl::Submenu_BuildRectOuter(
 	Context const& ctx,
 	MenuButton::Submenu const& submenu,
 	u32 spacing,
@@ -610,7 +610,7 @@ Rect impl::Submenu_BuildRectOuter(
 	return widgetRect;
 }
 
-Rect impl::Submenu_BuildRectInner(
+Rect Gui::impl::Submenu_BuildRectInner(
 	Rect outerRect,
 	u32 margin) noexcept
 {
@@ -622,7 +622,7 @@ Rect impl::Submenu_BuildRectInner(
 	return returnVal;
 }
 
-void impl::MenuLayer::Render(
+void Gui::impl::MenuLayer::Render(
 	Context const& ctx,
 	Rect const& windowRect,
 	Rect const& usableRect,
@@ -644,7 +644,7 @@ void impl::MenuLayer::Render(
 		params);
 }
 
-bool impl::MenuLayer::CursorMove(
+bool Gui::impl::MenuLayer::CursorMove(
 	Context& ctx,
 	Rect const& windowRect,
 	Rect const& usableRect,
@@ -665,7 +665,7 @@ bool impl::MenuLayer::CursorMove(
 		pointer);
 }
 
-Layer::Press_Return impl::MenuLayer::CursorPress(
+Layer::Press_Return Gui::impl::MenuLayer::CursorPress(
 	Context& ctx,
 	Rect const& windowRect,
 	Rect const& usableRect,
@@ -687,7 +687,7 @@ Layer::Press_Return impl::MenuLayer::CursorPress(
 		pointer);
 }
 
-Layer::Press_Return impl::MenuLayer::TouchPress(
+Layer::Press_Return Gui::impl::MenuLayer::TouchPress(
 	Context& ctx,
 	Rect const& windowRect,
 	Rect const& usableRect,
@@ -800,7 +800,7 @@ bool MenuButton::TouchPressEvent(
 		pointer);
 }
 
-void impl::MenuButtonImpl::MenuButton_SpawnSubmenuLayer(
+void Gui::impl::MenuButtonImpl::MenuButton_SpawnSubmenuLayer(
 	MenuButton& widget,
 	Context& ctx,
 	WindowID windowId,

@@ -78,7 +78,7 @@ namespace DEngine::Gui::impl
 	}
 }
 
-struct [[maybe_unused]] impl::CH_Impl
+struct [[maybe_unused]] Gui::impl::CH_Impl
 {
 public:
 	[[nodiscard]] static bool PointerPress(PointerPress_Params const& params)

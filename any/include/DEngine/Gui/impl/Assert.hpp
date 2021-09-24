@@ -1,18 +1,17 @@
 #pragma once
 
-#ifndef DENGINE_GUI_ENABLE_ASSERT
+#ifdef DENGINE_GUI_ENABLE_ASSERT
 
-#define DENGINE_IMPL_GUI_ASSERT(expression)
-
-#define DENGINE_IMPL_GUI_ASSERT_MSG(condition, msg)
+#	include <DEngine/impl/Assert.hpp>
+#	define DENGINE_IMPL_GUI_ASSERT(condition) DENGINE_IMPL_ASSERT(condition)
+#	define DENGINE_IMPL_GUI_ASSERT_MSG(condition, msg) DENGINE_IMPL_ASSERT_MSG(condition, msg)
+#	define DENGINE_IMPL_GUI_UNREACHABLE() DENGINE_IMPL_UNREACHABLE()
 
 #else
 
-#include "DEngine/detail/Assert.hpp"
-
-#define DENGINE_IMPL_GUI_ASSERT(expression) DENGINE_DETAIL_ASSERT(expression)
-
-
-#define DENGINE_IMPL_GUI_ASSERT_MSG(expression, msg) DENGINE_DETAIL_ASSERT_MSG(expression, msg)
+#	include <DEngine/impl/InnerAssert.hpp>
+#	define DENGINE_IMPL_GUI_ASSERT(condition) DENGINE_IMPL_INNER_ASSUME(condition)
+#	define DENGINE_IMPL_GUI_ASSERT_MSG(condition, msg) DENGINE_IMPL_INNER_ASSUME(condition)
+#	define DENGINE_IMPL_GUI_UNREACHABLE() DENGINE_IMPL_INNER_UNREACHABLE()
 
 #endif

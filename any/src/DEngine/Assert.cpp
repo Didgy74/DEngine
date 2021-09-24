@@ -1,8 +1,8 @@
-#include <DEngine/detail/Assert.hpp>
+#include <DEngine/impl/Assert.hpp>
 
 #include <iostream>
 
-namespace DEngine::detail
+namespace DEngine::impl
 {
 	[[noreturn]] void Assert(
 		char const* conditionString,

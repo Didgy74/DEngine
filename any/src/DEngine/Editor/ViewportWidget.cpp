@@ -32,8 +32,8 @@ namespace DEngine::Editor::impl
 		Math::Vec3 planeNormal,
 		Math::Vec3 pointOnPlane) noexcept
 	{
-		DENGINE_DETAIL_ASSERT(Math::Abs(rayDirection.Magnitude() - 1.f) <= 0.00001f);
-		DENGINE_DETAIL_ASSERT(Math::Abs(planeNormal.Magnitude() - 1.f) <= 0.00001f);
+		DENGINE_IMPL_ASSERT(Math::Abs(rayDirection.Magnitude() - 1.f) <= 0.00001f);
+		DENGINE_IMPL_ASSERT(Math::Abs(planeNormal.Magnitude() - 1.f) <= 0.00001f);
 
 		f32 d = Math::Dot(planeNormal, pointOnPlane);
 
@@ -145,7 +145,7 @@ namespace DEngine::Editor::impl
 	{
 		// Reference implementation can be found in Real-Time Collision Detection p. 195
 
-		DENGINE_DETAIL_ASSERT(Math::Abs(rayDir.Magnitude() - 1.f) <= 0.0001f);
+		DENGINE_IMPL_ASSERT(Math::Abs(rayDir.Magnitude() - 1.f) <= 0.0001f);
 
 		// Also referred to as "d"
 		Math::Vec3 const cylinderAxis = cylinderVertB - cylinderVertA;
@@ -865,7 +865,7 @@ namespace DEngine::Editor::impl
 
 		if (widget.state == InternalViewportWidget::BehaviorState::Gizmo)
 		{
-			DENGINE_DETAIL_ASSERT(widget.holdingGizmoData.HasValue());
+			DENGINE_IMPL_ASSERT(widget.holdingGizmoData.HasValue());
 			Entity entity = {};
 			Transform* transformPtr = nullptr;
 			auto const& gizmoHoldingData = widget.holdingGizmoData.Value();
@@ -929,7 +929,7 @@ namespace DEngine::Editor::impl
 using namespace DEngine;
 using namespace DEngine::Editor;
 
-static bool impl::PointerPress(
+static bool Editor::impl::PointerPress(
 	InternalViewportWidget& widget,
 	Gui::Context& ctx,
 	Gui::WindowID windowId,
@@ -971,7 +971,7 @@ static bool impl::PointerPress(
 		return true;
 	}
 
-	DENGINE_DETAIL_ASSERT(widget.editorImpl);
+	DENGINE_IMPL_ASSERT(widget.editorImpl);
 	auto& editorImpl = *widget.editorImpl;
 	Scene const& scene = editorImpl.GetActiveScene();
 
@@ -1134,7 +1134,7 @@ Math::Vec3 InternalViewportWidget::BuildRayDirection(
 	// but with no camera transform applied.
 	auto normalizedCoordPos = pointerNormPos.AsVec4(1.f, 1.f);
 	auto perspMatInvOpt = perspMat.GetInverse();
-	DENGINE_DETAIL_ASSERT(perspMatInvOpt.HasValue());
+	DENGINE_IMPL_ASSERT(perspMatInvOpt.HasValue());
 	auto const& perspMatInv = perspMatInvOpt.Value();
 	auto vector = perspMatInv * normalizedCoordPos;
 	for (auto& item : vector)
@@ -1449,7 +1449,7 @@ Editor::ViewportWidget::~ViewportWidget()
 		editorImpl->viewportWidgets.begin(),
 		editorImpl->viewportWidgets.end(),
 		[this](auto const& val) -> bool { return val == this; });
-	DENGINE_DETAIL_ASSERT(ptrIt != editorImpl->viewportWidgets.end());
+	DENGINE_IMPL_ASSERT(ptrIt != editorImpl->viewportWidgets.end());
 	editorImpl->viewportWidgets.erase(ptrIt);
 }
 

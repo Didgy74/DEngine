@@ -2,7 +2,7 @@
 
 #include "VulkanIncluder.hpp"
 
-#include <DEngine/Gfx/detail/Assert.hpp>
+#include <DEngine/Gfx/impl/Assert.hpp>
 
 namespace DEngine::Gfx::Vk
 {
@@ -224,7 +224,7 @@ namespace DEngine::Gfx::Vk
 		void Helper_SetObjectName(vk::Device device, T handle, char const* name) const
 		{
 			using BaseType = typename T::CType;
-			DENGINE_DETAIL_GFX_ASSERT(raw.vkSetDebugUtilsObjectNameEXT != nullptr);
+			DENGINE_IMPL_GFX_ASSERT(raw.vkSetDebugUtilsObjectNameEXT != nullptr);
 			vk::DebugUtilsObjectNameInfoEXT nameInfo = {};
 			nameInfo.objectHandle = uint64_t(BaseType(handle));
 			nameInfo.objectType = T::objectType;

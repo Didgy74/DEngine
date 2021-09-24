@@ -1,5 +1,5 @@
 #include "Vk.hpp"
-#include <DEngine/Gfx/detail/Assert.hpp>
+#include <DEngine/Gfx/impl/Assert.hpp>
 #include "Init.hpp"
 
 #include "GizmoManager.hpp"

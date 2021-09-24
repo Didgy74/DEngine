@@ -75,24 +75,24 @@ namespace DEngine
 		template<typename T>
 		void AddComponent(Entity entity, T const& component)
 		{
-			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
+			DENGINE_IMPL_ASSERT(ValidateEntity(entity));
 
 			auto& componentVector = Impl_GetAllComponents<T>();
 			// Crash if we already got this component
-			DENGINE_DETAIL_ASSERT(GetComponent<T>(entity) == nullptr);
+			DENGINE_IMPL_ASSERT(GetComponent<T>(entity) == nullptr);
 
 			componentVector.push_back({ entity, component });
 		}
 		template<typename T>
 		void DeleteComponent(Entity entity)
 		{
-			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
+			DENGINE_IMPL_ASSERT(ValidateEntity(entity));
 			auto& componentVector = Impl_GetAllComponents<T>();
 			auto const componentIt = Std::FindIf(
 				componentVector.begin(),
 				componentVector.end(),
 				[entity](auto const& val) -> bool { return entity == val.a; });
-			DENGINE_DETAIL_ASSERT(componentIt != componentVector.end());
+			DENGINE_IMPL_ASSERT(componentIt != componentVector.end());
 			componentVector.erase(componentIt);
 		}
 		template<typename T>
@@ -109,7 +109,7 @@ namespace DEngine
 		template<typename T>
 		[[nodiscard]] T* GetComponent(Entity entity)
 		{
-			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
+			DENGINE_IMPL_ASSERT(ValidateEntity(entity));
 			auto& componentVector = Impl_GetAllComponents<T>();
 			auto const componentIt = Std::FindIf(
 				componentVector.begin(),
@@ -123,7 +123,7 @@ namespace DEngine
 		template<typename T>
 		[[nodiscard]] T const* GetComponent(Entity entity) const
 		{
-			DENGINE_DETAIL_ASSERT(ValidateEntity(entity));
+			DENGINE_IMPL_ASSERT(ValidateEntity(entity));
 			auto& componentVector = Impl_GetAllComponents<T>();
 			auto const componentIt = Std::FindIf(
 				componentVector.begin(),

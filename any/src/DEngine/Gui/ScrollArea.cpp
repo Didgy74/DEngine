@@ -145,7 +145,7 @@ namespace DEngine::Gui::impl
 	};
 }
 
-class impl::SA_Impl
+class Gui::impl::SA_Impl
 {
 public:
 	// T should either be CursorPressEvent or TouchPressEvent.

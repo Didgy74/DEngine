@@ -49,7 +49,7 @@ namespace DEngine::Gui::impl
 using namespace DEngine;
 using namespace DEngine::Gui;
 
-class [[maybe_unused]] impl::BtnImpl
+class [[maybe_unused]] Gui::impl::BtnImpl
 {
 public:
 	// Return true if the event is consumed.

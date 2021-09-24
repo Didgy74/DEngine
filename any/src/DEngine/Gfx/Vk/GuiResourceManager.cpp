@@ -1,6 +1,6 @@
 #include "GuiResourceManager.hpp"
 
-#include "DEngine/Gfx/Gfx.hpp"
+#include <DEngine/Gfx/Gfx.hpp>
 #include "DynamicDispatch.hpp"
 #include "GlobUtils.hpp"
 
@@ -669,19 +669,19 @@ void Vk::GuiResourceManager::Update(
 	Std::Span<u32 const> guiIndices,
 	u8 inFlightIndex)
 {
-	DENGINE_DETAIL_GFX_ASSERT(inFlightIndex < globUtils.inFlightCount);
-	DENGINE_DETAIL_GFX_ASSERT(manager.vtxMappedMem.Size() % globUtils.inFlightCount == 0);
+	DENGINE_IMPL_GFX_ASSERT(inFlightIndex < globUtils.inFlightCount);
+	DENGINE_IMPL_GFX_ASSERT(manager.vtxMappedMem.Size() % globUtils.inFlightCount == 0);
 
 	uSize srcVtxDataSize = guiVertices.Size() * sizeof(decltype(guiVertices)::ValueType);
-	DENGINE_DETAIL_GFX_ASSERT(srcVtxDataSize <= manager.vtxInFlightCapacity);
+	DENGINE_IMPL_GFX_ASSERT(srcVtxDataSize <= manager.vtxInFlightCapacity);
 	std::memcpy(
 		manager.vtxMappedMem.Data() + manager.vtxInFlightCapacity * inFlightIndex,
 		guiVertices.Data(),
 		srcVtxDataSize);
 
-	DENGINE_DETAIL_GFX_ASSERT(manager.indexMappedMem.Size() % globUtils.inFlightCount == 0);
+	DENGINE_IMPL_GFX_ASSERT(manager.indexMappedMem.Size() % globUtils.inFlightCount == 0);
 	uSize srcIndexDataSize = guiIndices.Size() * sizeof(decltype(guiIndices)::ValueType);
-	DENGINE_DETAIL_GFX_ASSERT(srcIndexDataSize <= manager.indexInFlightCapacity);
+	DENGINE_IMPL_GFX_ASSERT(srcIndexDataSize <= manager.indexInFlightCapacity);
 	std::memcpy(
 		manager.indexMappedMem.Data() + manager.indexInFlightCapacity * inFlightIndex,
 		guiIndices.Data(),

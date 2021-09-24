@@ -24,7 +24,7 @@ Entity Scene::NewEntity() noexcept
 
 void Scene::DeleteEntity(Entity ent) noexcept
 {
-	DENGINE_DETAIL_ASSERT(ValidateEntity(ent));
+	DENGINE_IMPL_ASSERT(ValidateEntity(ent));
 	DeleteComponent_CanFail<Transform>(ent);
 	DeleteComponent_CanFail<Gfx::TextureID>(ent);
 	DeleteComponent_CanFail<Move>(ent);
@@ -52,7 +52,7 @@ bool Scene::ValidateEntity(Entity entity) const noexcept
 
 void Scene::Begin()
 {
-	DENGINE_DETAIL_ASSERT(!physicsWorld);
+	DENGINE_IMPL_ASSERT(!physicsWorld);
 
 	auto physWorld = new b2World({ 0.f, -10.f });
 	physicsWorld = Std::Box{ physWorld };
