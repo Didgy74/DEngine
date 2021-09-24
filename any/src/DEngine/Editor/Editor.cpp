@@ -527,9 +527,6 @@ void Editor::Context::ProcessEvents()
 		implData.indices.clear();
 		implData.drawCmds.clear();
 		implData.windowUpdates.clear();
-
-
-
 		implData.guiCtx->Render(
 			implData.vertices,
 			implData.indices,

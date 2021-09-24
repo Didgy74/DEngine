@@ -377,12 +377,15 @@ void Context::AdoptWindow(
 	implData.windows.emplace_back(Std::Move(newNode));
 }
 
+#include <Tracy.hpp>
 void Context::Render(
 	std::vector<Gfx::GuiVertex>& vertices,
 	std::vector<u32>& indices,
 	std::vector<Gfx::GuiDrawCmd>& drawCmds,
 	std::vector<Gfx::NativeWindowUpdate>& windowUpdates) const
 {
+	ZoneScopedNS("GUI Render", 32);
+
 	auto& implData = *static_cast<impl::ImplData*>(pImplData);
 
 	for (auto& windowNode : implData.windows)

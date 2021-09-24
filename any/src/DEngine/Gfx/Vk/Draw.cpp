@@ -348,9 +348,16 @@ void Vk::APIData::Draw(
 	apiData.drawParamsCondVarWorker.notify_one();
 }
 
+
+#include <Tracy.hpp>
+#include <TracyC.h>
 void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 {
-	vk::Result vkResult{};
+	ZoneScopedNS("Render Thread", 32);
+
+	TracyCZoneNS(a, "Pre Fencewait", 32, true);
+
+	vk::Result vkResult = {};
 	APIData& apiData = *this;
 	DevDispatch const& device = globUtils.device;
 
@@ -377,6 +384,8 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 
 	u8 const currentInFlightIndex = apiData.currInFlightIndex;
 
+	TracyCZoneEnd(a);
+
 	// Wait for fences, so we know the resources are available.
 	vkResult = globUtils.device.waitForFences(
 		apiData.mainFences[currentInFlightIndex],
@@ -385,6 +394,8 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("Vulkan: Failed to wait for cmd buffer fence.");
 	device.resetFences(apiData.mainFences[currentInFlightIndex]);
+
+	TracyCZoneNS(b, "Post Fencewait", 32, true);
 
 	// Update object-data
 	ObjectDataManager::Update(
@@ -444,6 +455,7 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 			apiData);
 	}
 
+	TracyCZoneEnd(b);
 
 	// Record all the GUI shit.
 	std::vector<u32> swapchainIndices(drawParams.nativeWindowUpdates.size());

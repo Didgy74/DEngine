@@ -75,7 +75,7 @@ namespace DEngine::impl
 			switch ((int)id)
 			{
 				case 0:
-					return "data/Ground.png";
+					return "data/01.ktx";
 				case 1:
 					return "data/Crate.png";
 				case 2:
@@ -320,7 +320,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		//transform.scale = { 1.f, 1.f };
 		myScene.AddComponent(ent, transform);
 
-		Gfx::TextureID textureId{ 1 };
+		Gfx::TextureID textureId{ 0 };
 		myScene.AddComponent(ent, textureId);
 
 		Physics::Rigidbody2D rb = {};

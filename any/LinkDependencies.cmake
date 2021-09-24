@@ -32,7 +32,9 @@ add_subdirectory(external/Vulkan-Headers Vulkan-Headers)
 target_link_libraries(${DENGINE_ANY_TARGET_NAME} PUBLIC Vulkan-Headers)
 
 
-
 # Tracy
-add_subdirectory(external/Tracy Tracy)
-target_link_libraries(${DENGINE_ANY_TARGET_NAME} PUBLIC TracyClient)
+#add_subdirectory(external/Tracy Tracy)
+#target_link_libraries(${DENGINE_ANY_TARGET_NAME} PUBLIC TracyClient)
+target_sources(${DENGINE_ANY_TARGET_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/external/Tracy/TracyClient.cpp")
+target_include_directories(${DENGINE_ANY_TARGET_NAME} PUBLIC "external/Tracy")
+target_compile_definitions(${DENGINE_ANY_TARGET_NAME} PUBLIC TRACY_ENABLE)
