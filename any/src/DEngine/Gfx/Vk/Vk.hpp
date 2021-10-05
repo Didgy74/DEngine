@@ -19,6 +19,7 @@
 #include <DEngine/Gfx/Gfx.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
 #include <DEngine/Std/Containers/Pair.hpp>
@@ -89,14 +90,16 @@ namespace DEngine::Gfx::Vk
 		Std::StackVec<vk::CommandPool, Const::maxInFlightCount> mainCmdPools;
 		Std::StackVec<vk::CommandBuffer, Const::maxInFlightCount> mainCmdBuffers;
 
-		GlobUtils globUtils{};
+		GlobUtils globUtils = {};
 
-		GizmoManager gizmoManager{};
-		GuiResourceManager guiResourceManager{};
-		NativeWindowManager nativeWindowManager{};
-		ObjectDataManager objectDataManager{};
-		TextureManager textureManager{};
-		ViewportManager viewportManager{};
+		Std::FrameAllocator frameAllocator;
+
+		GizmoManager gizmoManager = {};
+		GuiResourceManager guiResourceManager = {};
+		NativeWindowManager nativeWindowManager = {};
+		ObjectDataManager objectDataManager = {};
+		TextureManager textureManager = {};
+		ViewportManager viewportManager = {};
 
 		vk::PipelineLayout testPipelineLayout{};
 		vk::Pipeline testPipeline{};

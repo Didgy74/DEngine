@@ -1,5 +1,5 @@
-#include <DEngine/detail/Application.hpp>
-#include <DEngine/detail/AppAssert.hpp>
+#include <DEngine/impl/Application.hpp>
+#include <DEngine/impl/AppAssert.hpp>
 
 #include <DEngine/Std/Containers/Variant.hpp>
 #include <DEngine/Std/Utility.hpp>
@@ -154,32 +154,32 @@ namespace DEngine::Application::detail
 
 	static void onStart(ANativeActivity* activity)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+		DENGINE_IMPL_APPLICATION_ASSERT(detail::pBackendData);
 	}
 
 	static void onPause(ANativeActivity* activity)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+		DENGINE_IMPL_APPLICATION_ASSERT(detail::pBackendData);
 	}
 
 	static void onResume(ANativeActivity* activity)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+		DENGINE_IMPL_APPLICATION_ASSERT(detail::pBackendData);
 	}
 
 	static void onStop(ANativeActivity* activity)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+		DENGINE_IMPL_APPLICATION_ASSERT(detail::pBackendData);
 	}
 
 	static void onDestroy(ANativeActivity* activity)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+		DENGINE_IMPL_APPLICATION_ASSERT(detail::pBackendData);
 	}
 
 	static void onNativeWindowCreated(ANativeActivity* activity, ANativeWindow* window)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+		DENGINE_IMPL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
 		CustomEvent event = {};
@@ -194,7 +194,7 @@ namespace DEngine::Application::detail
 
 	static void onNativeWindowDestroyed(ANativeActivity* activity, ANativeWindow* window)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+		DENGINE_IMPL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
 		CustomEvent event = {};
@@ -208,7 +208,7 @@ namespace DEngine::Application::detail
 
 	static void onInputQueueCreated(ANativeActivity* activity, AInputQueue* queue)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+		DENGINE_IMPL_APPLICATION_ASSERT(detail::pBackendData);
 		auto& backendData = *detail::pBackendData;
 
 		CustomEvent event = {};
@@ -223,12 +223,12 @@ namespace DEngine::Application::detail
 
 	static void onInputQueueDestroyed(ANativeActivity* activity, AInputQueue* queue)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+		DENGINE_IMPL_APPLICATION_ASSERT(detail::pBackendData);
 	}
 
 	static void onConfigurationChanged(ANativeActivity* activity)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(detail::pBackendData);
+		DENGINE_IMPL_APPLICATION_ASSERT(detail::pBackendData);
 
 		auto& backendData = *detail::pBackendData;
 
@@ -279,7 +279,7 @@ extern "C"
 	using namespace DEngine::Application;
 	using namespace DEngine::Application::detail;
 
-	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
+	DENGINE_IMPL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
 	backendData.mainActivity = dengineActivity;
@@ -335,7 +335,7 @@ extern "C"
 	using namespace DEngine::Application;
 	using namespace DEngine::Application::detail;
 
-	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
+	DENGINE_IMPL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
 	CustomEvent event = {};
@@ -356,7 +356,7 @@ extern "C"
 	using namespace DEngine::Application;
 	using namespace DEngine::Application::detail;
 
-	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
+	DENGINE_IMPL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
 	CustomEvent event = {};
@@ -386,7 +386,7 @@ extern "C"
 	using namespace DEngine::Application;
 	using namespace DEngine::Application::detail;
 
-	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
+	DENGINE_IMPL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
 	CustomEvent event = {};
@@ -419,7 +419,7 @@ extern "C"
 	using namespace DEngine::Application;
 	using namespace DEngine::Application::detail;
 
-	DENGINE_DETAIL_APPLICATION_ASSERT(Application::detail::pBackendData);
+	DENGINE_IMPL_APPLICATION_ASSERT(Application::detail::pBackendData);
 	auto& backendData = *Application::detail::pBackendData;
 
 	CustomEvent event = {};
@@ -716,7 +716,7 @@ namespace DEngine::Application::detail
 		if (backendData.currentWindow.HasValue())
 		{
 			AppData::WindowNode* windowNode = detail::GetWindowNode(appData, backendData.currentWindow.Value());
-			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
+			DENGINE_IMPL_APPLICATION_ASSERT(windowNode);
 			detail::UpdateWindowMinimized(*windowNode, false);
 			windowNode->platformHandle = backendData.nativeWindow;
 		}
@@ -731,7 +731,7 @@ namespace DEngine::Application::detail
 		if (backendData.currentWindow.HasValue())
 		{
 			AppData::WindowNode* windowNode = detail::GetWindowNode(appData, backendData.currentWindow.Value());
-			DENGINE_DETAIL_APPLICATION_ASSERT(windowNode);
+			DENGINE_IMPL_APPLICATION_ASSERT(windowNode);
 			detail::UpdateWindowMinimized(*windowNode, true);
 			windowNode->platformHandle = nullptr;
 		}
@@ -775,7 +775,7 @@ namespace DEngine::Application::detail
 
 	static void HandleEvent_Reorientation(uint8_t newOrientation)
 	{
-		DENGINE_DETAIL_APPLICATION_ASSERT(pBackendData);
+		DENGINE_IMPL_APPLICATION_ASSERT(pBackendData);
 		auto& backendData = *pBackendData;
 
 
@@ -852,7 +852,7 @@ namespace DEngine::Application::detail
 				}
 
 				default:
-					DENGINE_IMPL_UNREACHABLE();
+					DENGINE_IMPL_APPLICATION_UNREACHABLE();
 					break;
 			}
 		}

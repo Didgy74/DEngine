@@ -4,7 +4,8 @@
 #include "VulkanIncluder.hpp"
 #include "DynamicDispatch.hpp"
 
-#include "DEngine/Std/Containers/Span.hpp"
+#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/Containers/Span.hpp>
 
 namespace DEngine::Gfx::Vk::Init
 {
@@ -17,6 +18,7 @@ namespace DEngine::Gfx::Vk::Init
 		Std::Span<char const*> requiredExtensions,
 		bool enableLayers,
 		BaseDispatch const& baseDispatch,
+		Std::FrameAllocator& frameAlloc,
 		LogInterface* logger);
 
 	[[nodiscard]] vk::DebugUtilsMessengerEXT CreateLayerMessenger(
@@ -26,11 +28,13 @@ namespace DEngine::Gfx::Vk::Init
 
 	[[nodiscard]] PhysDeviceInfo LoadPhysDevice(
 		InstanceDispatch const& instance,
-		vk::SurfaceKHR surface);
+		vk::SurfaceKHR surface,
+		Std::FrameAllocator& frameAlloc);
 
 	[[nodiscard]] vk::Device CreateDevice(
 		InstanceDispatch const& instance,
-		PhysDeviceInfo const& physDevice);
+		PhysDeviceInfo const& physDevice,
+		Std::FrameAllocator& frameAlloc);
 
 	[[nodiscard]] vk::ResultValue<VmaAllocator> InitializeVMA(
 		InstanceDispatch const& instance,

@@ -33,7 +33,7 @@ namespace DEngine::Editor
 		Gui::LineList* entitiesList = nullptr;
 		EditorImpl* editorImpl = nullptr;
 
-		EntityIdList(EditorImpl& editorImpl) :
+		explicit EntityIdList(EditorImpl& editorImpl) :
 			editorImpl(&editorImpl)
 		{
 			DENGINE_IMPL_ASSERT(!editorImpl.entityIdList);
@@ -54,11 +54,11 @@ namespace DEngine::Editor
 			newEntityButton->activateFn = [this](
 				Gui::Button& btn)
 			{
-				Entity newId = this->editorImpl->scene->NewEntity();
+				auto newId = this->editorImpl->scene->NewEntity();
 				AddEntityToList(newId);
 			};
 
-			Gui::Button* entityDeleteButton = new Gui::Button;
+			auto entityDeleteButton = new Gui::Button;
 			topElementLayout->AddWidget(Std::Box{ entityDeleteButton });
 			entityDeleteButton->text = "Delete";
 			entityDeleteButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
@@ -70,7 +70,7 @@ namespace DEngine::Editor
 				if (!this->editorImpl->GetSelectedEntity().HasValue())
 					return;
 
-				Entity selectedEntity = this->editorImpl->GetSelectedEntity().Value();
+				auto selectedEntity = this->editorImpl->GetSelectedEntity().Value();
 
 				RemoveEntityFromList(selectedEntity);
 
@@ -94,7 +94,7 @@ namespace DEngine::Editor
 				this->editorImpl->UnselectEntity();
 			};
 
-			Gui::ScrollArea* entityListScrollArea = new Gui::ScrollArea();
+			auto entityListScrollArea = new Gui::ScrollArea();
 			this->AddWidget(Std::Box<Gui::Widget>{ entityListScrollArea });
 			entityListScrollArea->scrollbarInactiveColor = Settings::GetColor(Settings::Color::Scrollbar_Normal);
 
@@ -116,7 +116,7 @@ namespace DEngine::Editor
 			auto entities = editorImpl.scene->GetEntities();
 			for (uSize i = 0; i < entities.Size(); i += 1)
 			{
-				Entity entityId = entities[i];
+				auto entityId = entities[i];
 				AddEntityToList(entityId);
 				if (editorImpl.GetSelectedEntity().HasValue() && entityId == editorImpl.GetSelectedEntity().Value())
 				{
@@ -153,7 +153,7 @@ namespace DEngine::Editor
 			Std::Opt<uSize> newLine;
 			for (uSize i = 0; i < entitiesList->lines.size(); i += 1)
 			{
-				long id = std::stol(entitiesList->lines[i]);
+				auto const id = std::stol(entitiesList->lines[i]);
 				if ((Entity)id == newId)
 				{
 					newLine = i;
@@ -181,7 +181,7 @@ namespace DEngine::Editor
 		SpriteRenderer2DWidget* spriteRendererWidget = nullptr;
 		RigidbodyWidget* box2DWidget = nullptr;
 
-		ComponentList(EditorImpl& inEditorImpl) :
+		explicit ComponentList(EditorImpl& inEditorImpl) :
 			editorImpl(&inEditorImpl)
 		{
 			DENGINE_IMPL_ASSERT(!editorImpl->componentList);
@@ -335,7 +335,7 @@ namespace DEngine::Editor
 		}
 
 		// Delta time counter at the top
-		Gui::Text* deltaText = new Gui::Text;
+		auto deltaText = new Gui::Text;
 		stackLayout->AddWidget(Std::Box{ deltaText });
 		editorImpl.test_fpsText = deltaText;
 		deltaText->margin = Editor::Settings::defaultTextMargin;
@@ -360,7 +360,7 @@ namespace DEngine::Editor
 			}
 		};
 
-		Gui::ButtonGroup* gizmoBtnGroup = new Gui::ButtonGroup;
+		auto gizmoBtnGroup = new Gui::ButtonGroup;
 		editorImpl.gizmoTypeBtnGroup = gizmoBtnGroup;
 		stackLayout->AddWidget(Std::Box{ gizmoBtnGroup });
 		gizmoBtnGroup->inactiveColor = Settings::GetColor(Settings::Color::Button_Normal);
@@ -392,7 +392,7 @@ Editor::Context Editor::Context::Create(
 
 	outmostLayout->AddWidget(CreateNavigationBar(implData));
 
-	Gui::DockArea* dockArea = new Gui::DockArea;
+	auto dockArea = new Gui::DockArea;
 	implData.dockArea = dockArea;
 	outmostLayout->AddWidget(Std::Box{ dockArea });
 	dockArea->tabTextMargin = Editor::Settings::defaultTextMargin;
@@ -486,7 +486,7 @@ void Editor::EditorImpl::FlushQueuedEvents()
 
 void Editor::Context::ProcessEvents()
 {
-	EditorImpl& implData = this->ImplData();
+	auto& implData = this->ImplData();
 
 	if (App::TickCount() == 1)
 		implData.InvalidateRendering();

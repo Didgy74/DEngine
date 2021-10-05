@@ -2,10 +2,11 @@
 
 #include "GlobUtils.hpp"
 
+#include <DEngine/Std/Containers/Vec.hpp>
+
 #include <Texas/Texas.hpp>
 #include <Texas/Tools.hpp>
 #include <Texas/VkTools.hpp>
-#include <Texas/GLTools.hpp>
 #include <DEngine/Application.hpp>
 
 namespace DEngine::Gfx::Vk
@@ -40,7 +41,8 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 	TextureManager& manager,
 	GlobUtils const& globUtils,
 	DrawParams const& drawParams,
-	Gfx::TextureAssetInterface const& texAssetInterface)
+	Gfx::TextureAssetInterface const& texAssetInterface,
+	Std::FrameAllocator& frameAlloc)
 {
 	vk::Result vkResult{};
 
@@ -65,7 +67,7 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			if (!fileStream.stream.IsOpen())
 				throw std::runtime_error("Error. Could not open file-stream.");
 
-			Texas::ResultValue<Texas::FileInfo> parseResult = Texas::parseStream(fileStream);
+			auto parseResult = Texas::parseStream(fileStream);
 			if (!parseResult.isSuccessful())
 				throw std::runtime_error("Error. Couldnt parse stream.");
 			Texas::FileInfo& texFileInfo = parseResult.value();
@@ -101,15 +103,16 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 					name.c_str());
 			}
 
-			std::byte* workingMemory = nullptr;
+
+			auto workingMemory = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
 			if (texFileInfo.workingMemoryRequired() > 0)
-				workingMemory = new std::byte[texFileInfo.workingMemoryRequired()];
+				workingMemory.Resize(texFileInfo.workingMemoryRequired());
 
 			Texas::ByteSpan dstImageDataSpan = {
 					(std::byte*)stagingBufferResultInfo.pMappedData,
 					static_cast<uSize>(buffInfo.size) };
 			Texas::ByteSpan workingMemSpan = {
-					workingMemory,
+					reinterpret_cast<std::byte*>(workingMemory.Data()),
 					static_cast<uSize>(texFileInfo.workingMemoryRequired()) };
 			Texas::Result loadImageDataResult = Texas::loadImageData(fileStream, texFileInfo, dstImageDataSpan, workingMemSpan);
 			if (!loadImageDataResult.isSuccessful())
@@ -118,7 +121,6 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 				errorMsg += loadImageDataResult.errorMessage();
 				throw std::runtime_error(errorMsg);
 			}
-			delete[] workingMemory;
 
 			vk::ImageCreateInfo imgInfo{};
 			imgInfo.arrayLayers = (u32)texFileInfo.textureInfo().layerCount;
@@ -270,7 +272,7 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			descrSetAllocInfo.pSetLayouts = &manager.descrSetLayout;
 			vkResult = globUtils.device.allocateDescriptorSets(descrSetAllocInfo, &newInner.descrSet);
 			if (vkResult != vk::Result::eSuccess)
-				throw std::runtime_error("DEngine - Vulkan: Could not alloate descriptor set.");
+				throw std::runtime_error("DEngine - Vulkan: Could not allocate descriptor set.");
 			if (globUtils.UsingDebugUtils())
 			{
 				std::string name = "TextureManager - Texture #" + std::to_string((u64)textureID) + " - DescrSet";

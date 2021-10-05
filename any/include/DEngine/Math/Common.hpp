@@ -14,10 +14,16 @@ namespace DEngine::Math
 	[[nodiscard]] f32 Ceil(f32 input);
 	[[nodiscard]] f64 Ceil(f64 input);
 
+	[[nodiscard]] constexpr u64 CeilToPOT(u64 value, u8 factor) noexcept
+	{
+		auto const minus1 = factor - 1;
+		return (value + minus1) & !minus1;
+	}
+
 	template<typename T>
 	[[nodiscard]] constexpr auto CeilToMultiple(T const& value, T const& multiple) noexcept
 	{
-		return value + multiple - T(1) - (value - T(1)) % multiple;
+		return ((value - T(1)) | (multiple - T(1))) + T(1);
 	}
 	/*
 	[[nodiscard]] constexpr u8 CeilToMultiple(u8 value, u8 multiple);

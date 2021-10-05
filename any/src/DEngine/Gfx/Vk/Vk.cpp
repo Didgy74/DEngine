@@ -5,8 +5,10 @@
 #include "GizmoManager.hpp"
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
+#include <DEngine/Std/Containers/Vec.hpp>
 #include <DEngine/Std/Utility.hpp>
 
 
@@ -17,6 +19,7 @@
 #include <stdexcept>
 #include <string>
 
+
 //vk::DispatchLoaderDynamic vk::defaultDispatchLoaderDynamic;
 
 namespace DEngine::Gfx::Vk
@@ -25,7 +28,7 @@ namespace DEngine::Gfx::Vk
 
 	namespace Init
 	{
-		void InitTestPipeline(APIData& apiData);
+		void InitTestPipeline(APIData& apiData, Std::FrameAllocator& frameAlloc);
 	}
 }
 
@@ -113,8 +116,7 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 	APIData& apiData = *static_cast<APIData*>(apiDataBuffer);
 	GlobUtils& globUtils = apiData.globUtils;
 
-	apiData.renderingThread = std::thread(&RenderingThreadEntryPoint, &apiData);
-
+	apiData.frameAllocator = Std::Move(Std::FrameAllocator::PreAllocate(1024 * 1024).Value());
 
 	vk::Result vkResult{};
 	bool boolResult = false;
@@ -133,7 +135,8 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 	Init::CreateVkInstance_Return createVkInstanceResult = Init::CreateVkInstance(
 		initInfo.requiredVkInstanceExtensions, 
 		true, 
-		baseDispatch, 
+		baseDispatch,
+		apiData.frameAllocator,
 		apiData.logger);
 	InstanceDispatch::BuildInPlace(
 		globUtils.instance, 
@@ -165,7 +168,10 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 		throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
 
 	// Pick our phys device and load the info for it
-	apiData.globUtils.physDevice = Init::LoadPhysDevice(globUtils.instance, surface);
+	apiData.globUtils.physDevice = Init::LoadPhysDevice(
+		globUtils.instance,
+		surface,
+		apiData.frameAllocator);
 
 	SurfaceInfo::BuildInPlace(
 		globUtils.surfaceInfo,
@@ -175,7 +181,10 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 
 	PFN_vkGetDeviceProcAddr deviceProcAddr = (PFN_vkGetDeviceProcAddr)instanceProcAddr((VkInstance)globUtils.instance.handle, "vkGetDeviceProcAddr");
 	// Create the device and the dispatch table for it.
-	vk::Device deviceHandle = Init::CreateDevice(globUtils.instance, globUtils.physDevice);
+	vk::Device deviceHandle = Init::CreateDevice(
+		globUtils.instance,
+		globUtils.physDevice,
+		apiData.frameAllocator);
 	DeviceDispatch::BuildInPlace(
 		globUtils.device,
 		deviceHandle,
@@ -306,7 +315,9 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 		true, 
 		globUtils.DebugUtilsPtr());
 
-	Init::InitTestPipeline(apiData);
+	Init::InitTestPipeline(
+		apiData,
+		apiData.frameAllocator);
 
 
 	GuiResourceManager::Init(
@@ -315,6 +326,7 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 		globUtils.vma, 
 		globUtils.inFlightCount, 
 		globUtils.guiRenderPass,
+		apiData.frameAllocator,
 		globUtils.DebugUtilsPtr());
 
 	GizmoManager::InitInfo gizmoManagerInfo = {};
@@ -326,16 +338,19 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 	gizmoManagerInfo.delQueue = &globUtils.delQueue;
 	gizmoManagerInfo.device = &globUtils.device;
 	gizmoManagerInfo.inFlightCount = globUtils.inFlightCount;
+	gizmoManagerInfo.frameAlloc = &apiData.frameAllocator;
 	gizmoManagerInfo.queues = &globUtils.queues;
 	gizmoManagerInfo.vma = &globUtils.vma;
 	GizmoManager::Initialize(apiData.gizmoManager, gizmoManagerInfo);
 
+	apiData.renderingThread = std::thread(&RenderingThreadEntryPoint, &apiData);
+
 	return true;
 }
 
-void Vk::Init::InitTestPipeline(APIData& apiData)
+void Vk::Init::InitTestPipeline(APIData& apiData, Std::FrameAllocator& frameAlloc)
 {
-	vk::Result vkResult{};
+	vk::Result vkResult = {};
 
 	Std::Array<vk::DescriptorSetLayout, 3> layouts{ 
 		apiData.viewportManager.cameraDescrLayout, 
@@ -360,12 +375,13 @@ void Vk::Init::InitTestPipeline(APIData& apiData)
 	vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 	u64 vertFileLength = vertFile.Tell().Value();
 	vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-	std::vector<char> vertCode((uSize)vertFileLength);
-	vertFile.Read(vertCode.data(), vertFileLength);
+	auto vertCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+	vertCode.Resize((uSize)vertFileLength);
+	vertFile.Read(vertCode.Data(), vertFileLength);
 	
 	vk::ShaderModuleCreateInfo vertModCreateInfo{};
-	vertModCreateInfo.codeSize = vertCode.size();
-	vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
+	vertModCreateInfo.codeSize = vertCode.Size();
+	vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
 	vk::ShaderModule vertModule = apiData.globUtils.device.createShaderModule(vertModCreateInfo);
 	vk::PipelineShaderStageCreateInfo vertStageInfo{};
 	vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
@@ -378,12 +394,13 @@ void Vk::Init::InitTestPipeline(APIData& apiData)
 	fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 	u64 fragFileLength = fragFile.Tell().Value();
 	fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-	std::vector<char> fragCode((uSize)fragFileLength);
-	fragFile.Read(fragCode.data(), fragFileLength);
+	auto fragCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+	fragCode.Resize((uSize)fragFileLength);
+	fragFile.Read(fragCode.Data(), fragFileLength);
 
 	vk::ShaderModuleCreateInfo fragModInfo{};
-	fragModInfo.codeSize = fragCode.size();
-	fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.data());
+	fragModInfo.codeSize = fragCode.Size();
+	fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.Data());
 	vk::ShaderModule fragModule = apiData.globUtils.device.createShaderModule(fragModInfo);
 	vk::PipelineShaderStageCreateInfo fragStageInfo{};
 	fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;

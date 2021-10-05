@@ -7,6 +7,8 @@
 
 #include <DEngine/Gfx/impl/Assert.hpp>
 
+#include <DEngine/Std/Containers/Vec.hpp>
+
 #include <string>
 
 namespace DEngine::Gfx::Vk
@@ -52,7 +54,6 @@ namespace DEngine::Gfx::Vk
 			logger->Log(LogInterface::Level::Fatal, msg.data());
 		}
 
-
 		return 0;
 	}
 }
@@ -64,17 +65,18 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	Std::Span<char const*> requiredExtensions,
 	bool enableLayers,
 	BaseDispatch const& baseDispatch,
+	Std::FrameAllocator& frameAlloc,
 	LogInterface* logger)
 {
-	vk::Result vkResult;
-	CreateVkInstance_Return returnValue{};
+	vk::Result vkResult = {};
+	CreateVkInstance_Return returnValue = {};
 
 	// Build what extensions we are going to use
-	std::vector<char const*> totalRequiredExtensions;
-	totalRequiredExtensions.reserve(requiredExtensions.Size() + Constants::requiredInstanceExtensions.size());
+	auto totalRequiredExtensions = Std::Vec<char const*, Std::FrameAllocator>(frameAlloc);
+	totalRequiredExtensions.Reserve(requiredExtensions.Size() + Constants::requiredInstanceExtensions.size());
 	// First copy all required instance extensions
 	for (uSize i = 0; i < requiredExtensions.Size(); i++)
-		totalRequiredExtensions.push_back(requiredExtensions[i]);
+		totalRequiredExtensions.PushBack(requiredExtensions[i]);
 
 	// Next add extensions required by renderer, don't add duplicates
 	for (const char* requiredExtension : Constants::requiredInstanceExtensions)
@@ -89,7 +91,7 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 			}
 		}
 		if (!extensionAlreadyPresent)
-			totalRequiredExtensions.push_back(requiredExtension);
+			totalRequiredExtensions.PushBack(requiredExtension);
 	}
 
 	// Check if all the required extensions are also available
@@ -97,8 +99,9 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	vkResult = baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr);
 	if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 		throw std::runtime_error("Vulkan: Unable to enumerate available instance extension properties.");
-	std::vector<vk::ExtensionProperties> availableExtensions(instanceExtensionCount);
-	vkResult = baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableExtensions.data());
+	auto availableExtensions = Std::Vec<vk::ExtensionProperties, Std::FrameAllocator>(frameAlloc);
+	availableExtensions.Resize(instanceExtensionCount);
+	vkResult = baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableExtensions.Data());
 	for (const char* required : totalRequiredExtensions)
 	{
 		bool requiredExtensionIsAvailable = false;
@@ -168,15 +171,15 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 					}
 				}
 
-				totalRequiredExtensions.push_back(Constants::debugUtilsExtensionName);
+				totalRequiredExtensions.PushBack(Constants::debugUtilsExtensionName);
 				returnValue.debugUtilsEnabled = true;
 			}
 		}
 	}
 
 	vk::InstanceCreateInfo instanceInfo{};
-	instanceInfo.enabledExtensionCount = (u32)totalRequiredExtensions.size();
-	instanceInfo.ppEnabledExtensionNames = totalRequiredExtensions.data();
+	instanceInfo.enabledExtensionCount = (u32)totalRequiredExtensions.Size();
+	instanceInfo.ppEnabledExtensionNames = totalRequiredExtensions.Data();
 	instanceInfo.enabledLayerCount = (u32)layersToUse.Size();
 	instanceInfo.ppEnabledLayerNames = layersToUse.Data();
 
@@ -306,9 +309,7 @@ void Vk::SurfaceInfo::BuildInPlace(
 		std::runtime_error("Vulkan: Found no suitable surface format when querying VkSurfaceKHR.");
 	surfaceInfo.surfaceFormatToUse = formatToUse;
 
-
 	vk::SurfaceCapabilitiesKHR surfaceCaps = instance.getPhysicalDeviceSurfaceCapabilitiesKHR(physDevice, initialSurface);
-
 
 	if (surfaceCaps.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::eOpaque)
 		surfaceInfo.compositeAlphaToUse = vk::CompositeAlphaFlagBitsKHR::eOpaque;
@@ -320,7 +321,8 @@ void Vk::SurfaceInfo::BuildInPlace(
 
 Vk::PhysDeviceInfo Vk::Init::LoadPhysDevice(
 	InstanceDispatch const& instance,
-	vk::SurfaceKHR surface)
+	vk::SurfaceKHR surface,
+	Std::FrameAllocator& frameAlloc)
 {
 	PhysDeviceInfo physDevice{};
 	vk::Result vkResult{};
@@ -331,9 +333,11 @@ Vk::PhysDeviceInfo Vk::Init::LoadPhysDevice(
 		throw std::runtime_error("Vulkan: Unable to enumerate physical devices.");
 	if (physicalDeviceCount == 0)
 		throw std::runtime_error("Vulkan: Host machine has no Vulkan-capable devices.");
-	std::vector<vk::PhysicalDevice> physDevices;
-	physDevices.resize(physicalDeviceCount);
-	vkResult = instance.enumeratePhysicalDevices(&physicalDeviceCount, physDevices.data());
+	auto physDevices = Std::Vec<vk::PhysicalDevice, Std::FrameAllocator>(frameAlloc);
+	physDevices.Resize(physicalDeviceCount);
+	vkResult = instance.enumeratePhysicalDevices(&physicalDeviceCount, physDevices.Data());
+	if (vkResult != vk::Result::eSuccess)
+		throw std::runtime_error("DEngine-Gfx-Vulkan: Unable to enumerate physical devices.");
 
 	// For now we just select the first physDevice we find.
 	physDevice.handle = physDevices[0];
@@ -341,15 +345,15 @@ Vk::PhysDeviceInfo Vk::Init::LoadPhysDevice(
 	// Find preferred queues
 	u32 queueFamilyPropertyCount = 0;
 	instance.getPhysicalDeviceQueueFamilyProperties(
-			physDevice.handle,
-			&queueFamilyPropertyCount,
-			nullptr);
-	std::vector<vk::QueueFamilyProperties> availableQueueFamilies;
-	availableQueueFamilies.resize(queueFamilyPropertyCount);
+		physDevice.handle,
+		&queueFamilyPropertyCount,
+		nullptr);
+	auto availableQueueFamilies = Std::Vec<vk::QueueFamilyProperties, Std::FrameAllocator>(frameAlloc);
+	availableQueueFamilies.Resize(queueFamilyPropertyCount);
 	instance.getPhysicalDeviceQueueFamilyProperties(
 		physDevice.handle, 
 		&queueFamilyPropertyCount, 
-		availableQueueFamilies.data());
+		availableQueueFamilies.Data());
 
 	// Find graphics queue
 	for (u32 i = 0; i < queueFamilyPropertyCount; i++)
@@ -434,7 +438,8 @@ Vk::PhysDeviceInfo Vk::Init::LoadPhysDevice(
 
 vk::Device Vk::Init::CreateDevice(
 	InstanceDispatch const& instance,
-	PhysDeviceInfo const& physDevice)
+	PhysDeviceInfo const& physDevice,
+	Std::FrameAllocator& frameAlloc)
 {
 	vk::Result vkResult{};
 
@@ -482,8 +487,9 @@ vk::Device Vk::Init::CreateDevice(
 	vkResult = instance.enumeratePhysicalDeviceExtensionProperties(physDevice.handle, &deviceExtensionCount, nullptr);
 	if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 		throw std::runtime_error("Vulkan: Unable to enumerate device extensions.");
-	std::vector<vk::ExtensionProperties> availableExtensions(deviceExtensionCount);
-	vkResult = instance.enumeratePhysicalDeviceExtensionProperties(physDevice.handle, &deviceExtensionCount, availableExtensions.data());
+	auto availableExtensions = Std::Vec<vk::ExtensionProperties, Std::FrameAllocator>(frameAlloc);
+	availableExtensions.Resize(deviceExtensionCount);
+	vkResult = instance.enumeratePhysicalDeviceExtensionProperties(physDevice.handle, &deviceExtensionCount, availableExtensions.Data());
 	// Check if all required extensions are present
 	for (const char* required : Constants::requiredDeviceExtensions)
 	{
@@ -496,7 +502,7 @@ vk::Device Vk::Init::CreateDevice(
 				break;
 			}
 		}
-		if (foundExtension == false)
+		if (!foundExtension)
 			throw std::runtime_error("Not all required physDevice extensions were available during Vulkan initialization.");
 	}
 

@@ -5,6 +5,9 @@
 #include "QueueData.hpp"
 #include "Vk.hpp"
 
+#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/Containers/Vec.hpp>
+
 #include <DEngine/Math/LinearTransform3D.hpp>
 #include <DEngine/Application.hpp> // VERY WIP. NEEDS TO BE SWITCHED OUT FOR SOMETHING AGNOSTIC
 
@@ -300,6 +303,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_InitializeArrowShader(
 		GizmoManager& manager,
 		DeviceDispatch const& device,
+		Std::FrameAllocator& frameAlloc,
 		DebugUtilsDispatch const* debugUtils,
 		APIData const& apiData)
 	{
@@ -324,7 +328,7 @@ namespace DEngine::Gfx::Vk::impl
 		pipelineLayoutInfo.pSetLayouts = layouts.Data();
 		pipelineLayoutInfo.pushConstantRangeCount = (u32)pushConstantRanges.Size();
 		pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.Data();
-		manager.pipelineLayout = apiData.globUtils.device.createPipelineLayout(pipelineLayoutInfo);
+		manager.pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
 
 		App::FileInputStream vertFile{ "data/Gizmo/Arrow/vert.spv" };
 		if (!vertFile.IsOpen())
@@ -332,13 +336,14 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> vertCode((uSize)vertFileLength);
-		vertFile.Read(vertCode.data(), vertFileLength);
-
+		auto vertCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		vertCode.Resize((uSize)vertFileLength);
+		vertFile.Read(vertCode.Data(), vertFileLength);
+		vertFile.Close();
 		vk::ShaderModuleCreateInfo vertModCreateInfo{};
-		vertModCreateInfo.codeSize = vertCode.size();
-		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
-		vk::ShaderModule vertModule = apiData.globUtils.device.createShaderModule(vertModCreateInfo);
+		vertModCreateInfo.codeSize = vertCode.Size();
+		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
+		vk::ShaderModule vertModule = device.createShaderModule(vertModCreateInfo);
 		vk::PipelineShaderStageCreateInfo vertStageInfo{};
 		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
 		vertStageInfo.module = vertModule;
@@ -350,12 +355,13 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> fragCode((uSize)fragFileLength);
-		fragFile.Read(fragCode.data(), fragFileLength);
-
+		auto fragCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		fragCode.Resize((uSize)fragFileLength);
+		fragFile.Read(fragCode.Data(), fragFileLength);
+		fragFile.Close();
 		vk::ShaderModuleCreateInfo fragModInfo{};
-		fragModInfo.codeSize = fragCode.size();
-		fragModInfo.pCode = reinterpret_cast<u32 const*>(fragCode.data());
+		fragModInfo.codeSize = fragCode.Size();
+		fragModInfo.pCode = reinterpret_cast<u32 const*>(fragCode.Data());
 		vk::ShaderModule fragModule = apiData.globUtils.device.createShaderModule(fragModInfo);
 		vk::PipelineShaderStageCreateInfo fragStageInfo{};
 		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
@@ -468,6 +474,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_InitializeQuadShader(
 		GizmoManager& manager,
 		DeviceDispatch const& device,
+		Std::FrameAllocator& frameAlloc,
 		DebugUtilsDispatch const* debugUtils,
 		APIData const& apiData)
 	{
@@ -479,13 +486,14 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> vertCode((uSize)vertFileLength);
-		vertFile.Read(vertCode.data(), vertFileLength);
-
+		auto vertCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		vertCode.Resize((uSize)vertFileLength);
+		vertFile.Read(vertCode.Data(), vertFileLength);
+		vertFile.Close();
 		vk::ShaderModuleCreateInfo vertModCreateInfo{};
-		vertModCreateInfo.codeSize = vertCode.size();
-		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
-		vk::ShaderModule vertModule = apiData.globUtils.device.createShaderModule(vertModCreateInfo);
+		vertModCreateInfo.codeSize = vertCode.Size();
+		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
+		vk::ShaderModule vertModule = device.createShaderModule(vertModCreateInfo);
 		vk::PipelineShaderStageCreateInfo vertStageInfo{};
 		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
 		vertStageInfo.module = vertModule;
@@ -497,13 +505,14 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> fragCode((uSize)fragFileLength);
-		fragFile.Read(fragCode.data(), fragFileLength);
-
+		auto fragCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		fragCode.Resize((uSize)fragFileLength);
+		fragFile.Read(fragCode.Data(), fragFileLength);
+		fragFile.Close();
 		vk::ShaderModuleCreateInfo fragModInfo{};
-		fragModInfo.codeSize = fragCode.size();
-		fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.data());
-		vk::ShaderModule fragModule = apiData.globUtils.device.createShaderModule(fragModInfo);
+		fragModInfo.codeSize = fragCode.Size();
+		fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.Data());
+		vk::ShaderModule fragModule = device.createShaderModule(fragModInfo);
 		vk::PipelineShaderStageCreateInfo fragStageInfo{};
 		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
 		fragStageInfo.module = fragModule;
@@ -587,7 +596,7 @@ namespace DEngine::Gfx::Vk::impl
 		pipelineInfo.stageCount = (u32)shaderStages.Size();
 		pipelineInfo.pStages = shaderStages.Data();
 
-		vkResult = apiData.globUtils.device.createGraphicsPipelines(
+		vkResult = device.createGraphicsPipelines(
 			vk::PipelineCache(),
 			{ 1, &pipelineInfo },
 			nullptr,
@@ -595,13 +604,14 @@ namespace DEngine::Gfx::Vk::impl
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to make graphics pipeline.");
 
-		apiData.globUtils.device.destroy(vertModule);
-		apiData.globUtils.device.destroy(fragModule);
+		device.destroy(vertModule);
+		device.destroy(fragModule);
 	}
 
 	static void GizmoManager_InitializeLineShader(
 		GizmoManager& manager,
 		DeviceDispatch const& device,
+		Std::FrameAllocator& frameAlloc,
 		DebugUtilsDispatch const* debugUtils,
 		APIData const& apiData)
 	{
@@ -613,13 +623,14 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> vertCode((uSize)vertFileLength);
-		vertFile.Read(vertCode.data(), vertFileLength);
-
+		auto vertCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		vertCode.Resize((uSize)vertFileLength);
+		vertFile.Read(vertCode.Data(), vertFileLength);
+		vertFile.Close();
 		vk::ShaderModuleCreateInfo vertModCreateInfo{};
-		vertModCreateInfo.codeSize = vertCode.size();
-		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
-		vk::ShaderModule vertModule = apiData.globUtils.device.createShaderModule(vertModCreateInfo);
+		vertModCreateInfo.codeSize = vertCode.Size();
+		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
+		vk::ShaderModule vertModule = device.createShaderModule(vertModCreateInfo);
 		vk::PipelineShaderStageCreateInfo vertStageInfo{};
 		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
 		vertStageInfo.module = vertModule;
@@ -631,12 +642,13 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> fragCode((uSize)fragFileLength);
-		fragFile.Read(fragCode.data(), fragFileLength);
-
+		auto fragCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		fragCode.Resize((uSize)fragFileLength);
+		fragFile.Read(fragCode.Data(), fragFileLength);
+		fragFile.Close();
 		vk::ShaderModuleCreateInfo fragModInfo{};
-		fragModInfo.codeSize = fragCode.size();
-		fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.data());
+		fragModInfo.codeSize = fragCode.Size();
+		fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.Data());
 		vk::ShaderModule fragModule = apiData.globUtils.device.createShaderModule(fragModInfo);
 		vk::PipelineShaderStageCreateInfo fragStageInfo{};
 		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
@@ -726,7 +738,7 @@ namespace DEngine::Gfx::Vk::impl
 		pipelineInfo.stageCount = (u32)shaderStages.Size();
 		pipelineInfo.pStages = shaderStages.Data();
 
-		vkResult = apiData.globUtils.device.createGraphicsPipelines(
+		vkResult = device.createGraphicsPipelines(
 			vk::PipelineCache(),
 			{ 1, &pipelineInfo },
 			nullptr,
@@ -1092,18 +1104,21 @@ void Vk::GizmoManager::Initialize(GizmoManager& manager, InitInfo const& initInf
 	impl::GizmoManager_InitializeArrowShader(
 		manager,
 		*initInfo.device,
+		*initInfo.frameAlloc,
 		initInfo.debugUtils,
 		*initInfo.apiData);
 
 	impl::GizmoManager_InitializeQuadShader(
 		manager,
 		*initInfo.device,
+		*initInfo.frameAlloc,
 		initInfo.debugUtils,
 		*initInfo.apiData);
 
 	impl::GizmoManager_InitializeLineShader(
 		manager,
 		*initInfo.device,
+		*initInfo.frameAlloc,
 		initInfo.debugUtils,
 		*initInfo.apiData);
 

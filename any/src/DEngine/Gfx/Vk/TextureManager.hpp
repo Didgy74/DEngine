@@ -1,7 +1,8 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Gfx/Gfx.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Gfx/Gfx.hpp>
 
 #include "DynamicDispatch.hpp"
 #include "QueueData.hpp"
@@ -44,6 +45,7 @@ namespace DEngine::Gfx::Vk
 			TextureManager& manager,
 			GlobUtils const& globUtils,
 			DrawParams const& drawParams,
-			Gfx::TextureAssetInterface const& texAssetInterface);
+			Gfx::TextureAssetInterface const& texAssetInterface,
+			Std::FrameAllocator& frameAlloc);
 	};
 }

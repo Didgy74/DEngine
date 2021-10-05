@@ -7,12 +7,12 @@ find_package(Threads REQUIRED)
 file(GLOB_RECURSE DENGINE_HEADERS
 	"*.hpp"
 	"include")
-file(READ "SourceFileList.txt" DENGINE_SOURCE_FILES)
-string(REPLACE "\n" ";" DENGINE_SOURCE_FILES ${DENGINE_SOURCE_FILES})
+include(SourceFileList.cmake)
+
 set(DENGINE_ANY_TARGET_NAME dengine_any)
 
 # Create main library
-add_library(${DENGINE_ANY_TARGET_NAME} STATIC ${DENGINE_SOURCE_FILES})
+add_library(${DENGINE_ANY_TARGET_NAME} STATIC ${DENGINE_ANY_SOURCE_FILES})
 
 target_include_directories(${DENGINE_ANY_TARGET_NAME}
 	PUBLIC
@@ -34,6 +34,7 @@ set_target_properties(${DENGINE_ANY_TARGET_NAME} PROPERTIES
 
 # Run script for linking dependencies
 include(LinkDependencies.cmake)
+LinkDependencies(${DENGINE_ANY_TARGET_NAME})
 
 
 

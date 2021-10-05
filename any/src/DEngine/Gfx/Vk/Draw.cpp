@@ -1,6 +1,7 @@
 #include "Vk.hpp"
 #include <DEngine/Gfx/impl/Assert.hpp>
 
+#include <DEngine/Std/Containers/Vec.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
 #include <DEngine/Std/Utility.hpp>
 
@@ -348,7 +349,6 @@ void Vk::APIData::Draw(
 	apiData.drawParamsCondVarWorker.notify_one();
 }
 
-
 #include <Tracy.hpp>
 #include <TracyC.h>
 void Vk::APIData::InternalDraw(DrawParams const& drawParams)
@@ -360,6 +360,7 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	vk::Result vkResult = {};
 	APIData& apiData = *this;
 	DevDispatch const& device = globUtils.device;
+	auto& frameAlloc = apiData.frameAllocator;
 
 	NativeWindowManager::ProcessEvents(
 		apiData.nativeWindowManager,
@@ -380,7 +381,8 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		apiData.textureManager,
 		globUtils,
 		drawParams,
-		*apiData.test_textureAssetInterface);
+		*apiData.test_textureAssetInterface,
+		apiData.frameAllocator);
 
 	u8 const currentInFlightIndex = apiData.currInFlightIndex;
 
@@ -458,10 +460,14 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	TracyCZoneEnd(b);
 
 	// Record all the GUI shit.
-	std::vector<u32> swapchainIndices(drawParams.nativeWindowUpdates.size());
-	std::vector<vk::SwapchainKHR> swapchains(drawParams.nativeWindowUpdates.size());
-	std::vector<vk::Semaphore> swapchainImageReadySemaphores(drawParams.nativeWindowUpdates.size());
-	std::vector<vk::PipelineStageFlags> swapchainImageReadyStages(drawParams.nativeWindowUpdates.size());
+	auto swapchainIndices = Std::Vec<u32, Std::FrameAllocator>(frameAlloc);
+	swapchainIndices.Resize(drawParams.nativeWindowUpdates.size());
+	auto swapchains = Std::Vec<vk::SwapchainKHR, Std::FrameAllocator>(frameAlloc);
+	swapchains.Resize(drawParams.nativeWindowUpdates.size());
+	auto swapchainImageReadySemaphores = Std::Vec<vk::Semaphore, Std::FrameAllocator>(frameAlloc);
+	swapchainImageReadySemaphores.Resize(drawParams.nativeWindowUpdates.size());
+	auto swapchainImageReadyStages = Std::Vec<vk::PipelineStageFlags, Std::FrameAllocator>(frameAlloc);
+	swapchainImageReadyStages.Resize(drawParams.nativeWindowUpdates.size());
 	for (auto& item : swapchainImageReadyStages)
 		item = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	for (uSize i = 0; i < drawParams.nativeWindowUpdates.size(); i += 1)
@@ -529,17 +535,17 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		vk::SubmitInfo submitInfo = {};
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &mainCmdBuffer;
-		submitInfo.pWaitDstStageMask = swapchainImageReadyStages.data();
-		submitInfo.pWaitSemaphores = swapchainImageReadySemaphores.data();
-		submitInfo.waitSemaphoreCount = (u32)swapchainImageReadySemaphores.size();
+		submitInfo.pWaitDstStageMask = swapchainImageReadyStages.Data();
+		submitInfo.pWaitSemaphores = swapchainImageReadySemaphores.Data();
+		submitInfo.waitSemaphoreCount = (u32)swapchainImageReadySemaphores.Size();
 		globUtils.queues.graphics.submit(submitInfo, apiData.mainFences[currentInFlightIndex]);
 
-		if (!swapchainIndices.empty())
+		if (!swapchainIndices.Empty())
 		{
 			vk::PresentInfoKHR presentInfo{};
-			presentInfo.pImageIndices = swapchainIndices.data();
-			presentInfo.pSwapchains = swapchains.data();
-			presentInfo.swapchainCount = (u32)swapchains.size();
+			presentInfo.pImageIndices = swapchainIndices.Data();
+			presentInfo.pSwapchains = swapchains.Data();
+			presentInfo.swapchainCount = (u32)swapchains.Size();
 			vkResult = globUtils.queues.graphics.presentKHR(presentInfo);
 			if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eSuboptimalKHR && vkResult != vk::Result::eErrorOutOfDateKHR)
 				throw std::runtime_error("DEngine - Vulkan: Presentation submission did not return success result.");

@@ -3,6 +3,7 @@
 #include "VulkanIncluder.hpp"
 #include "VMAIncluder.hpp"
 
+#include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
@@ -87,6 +88,7 @@ namespace DEngine::Gfx::Vk
 			VmaAllocator vma,
 			u8 inFlightCount,
 			vk::RenderPass guiRenderPass,
+			Std::FrameAllocator& frameAlloc,
 			DebugUtilsDispatch const* debugUtils);
 
 		static void Update(

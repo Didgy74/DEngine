@@ -280,7 +280,7 @@ namespace DEngine::impl
 		return Hash(InitTestPipeline<T>());
 	}
 }
- */
+*/
 
 int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
@@ -383,6 +383,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 			impl::RunPhysicsStep(scene);
 		}
+
 
 		impl::SubmitRendering(
 			gfxCtx, 

@@ -255,7 +255,7 @@ class DEngine::Application::FileInputStream
 {
 public:
 	FileInputStream();
-	FileInputStream(char const* path);
+	explicit FileInputStream(char const* path);
 	FileInputStream(FileInputStream const&) = delete;
 	FileInputStream(FileInputStream&&) noexcept;
 	~FileInputStream();
@@ -275,8 +275,8 @@ public:
 	bool Read(
 		char* output, 
 		u64 size);
-	Std::Opt<u64> Tell() const;
-	bool IsOpen() const;
+	[[nodiscard]] Std::Opt<u64> Tell() const;
+	[[nodiscard]] bool IsOpen() const;
 	bool Open(char const* path);
 	void Close();
 

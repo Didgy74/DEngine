@@ -11,7 +11,7 @@ namespace DEngine::Gfx::Vk::Constants
 	constexpr u32 maxInFlightCount = 4;
 	constexpr u32 preferredInFlightCount = 3;
 
-	constexpr vk::PresentModeKHR preferredPresentMode = vk::PresentModeKHR::eImmediate;
+	constexpr vk::PresentModeKHR preferredPresentMode = vk::PresentModeKHR::eFifo;
 	constexpr u32 maxSwapchainLength = 4;
 	constexpr u32 preferredSwapchainLength = 3;
 
@@ -20,8 +20,8 @@ namespace DEngine::Gfx::Vk::Constants
 
 	constexpr std::array preferredLayerNames
 	{
-			khronosLayerName,
-			//armMaliPerfLayerName
+		khronosLayerName,
+		//armMaliPerfLayerName
 	};
 
 	constexpr std::array<const char*, 1> requiredInstanceExtensions
@@ -29,7 +29,7 @@ namespace DEngine::Gfx::Vk::Constants
 		"VK_KHR_surface"
 	};
 
-	constexpr bool enableDebugUtils = true;
+	constexpr bool enableDebugUtils = false;
 	constexpr char const* debugUtilsExtensionName{ "VK_EXT_debug_utils" };
 
 	constexpr std::array<const char*, 1> requiredDeviceExtensions

@@ -33,7 +33,7 @@ namespace DEngine::Editor
 		Gui::LineEdit* rotationInput = nullptr;
 		Gui::LineEdit* scaleInputFields[2] = {};
 
-		TransformWidget(EditorImpl const& editorImpl);
+		explicit TransformWidget(EditorImpl const& editorImpl);
 		void Update(ComponentType const& component);
 	};
 
@@ -44,7 +44,7 @@ namespace DEngine::Editor
 
 		Gui::LineEdit* textureIdInput = nullptr;
 		
-		SpriteRenderer2DWidget(EditorImpl const& editorImpl);
+		explicit SpriteRenderer2DWidget(EditorImpl const& editorImpl);
 		void Update(ComponentType const& component);
 	};
 
@@ -57,7 +57,7 @@ namespace DEngine::Editor
 
 		Gui::Text* debug_VelocityLabel = nullptr;
 
-		RigidbodyWidget(EditorImpl const& editorImpl);
+		explicit RigidbodyWidget(EditorImpl const& editorImpl);
 		void Update(ComponentType const& component);
 	};
 }

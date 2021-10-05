@@ -46,6 +46,22 @@ namespace DEngine::Std::Trait::impl
 	struct IsConst<T const> : public BoolValue<true> {};
 
 	template<class T>
+	struct IsCopyConstructible : public BoolValue<__is_constructible(T, T const&)> {};
+	template<class T>
+	struct IsDefaultConstructible : public BoolValue<__is_constructible(T)> {};
+	template<class T>
+	struct IsMoveConstructible : public BoolValue<__is_constructible(T, T&&)> {};
+	template<class T>
+	struct IsTriviallyDefaultConstructible : public BoolValue<__is_trivially_constructible(T)> {};
+	template<class T>
+	struct IsTriviallyCopyable : public BoolValue<__is_trivially_copyable(T)> {};
+
+	template<class T>
+	struct IsCopyAssignable : public BoolValue<__is_assignable(T&, T const&)> {};
+	template<class T>
+	struct IsMoveAssignable : public BoolValue<__is_assignable(T&, T&&)> {};
+
+	template<class T>
 	struct IsRef : public BoolValue<false> {};
 	template<class T>
 	struct IsRef<T&> : public BoolValue<true> {};
@@ -118,6 +134,20 @@ namespace DEngine::Std::Trait
 
 	template<class T>
 	constexpr bool isFloatingPoint = impl::IsSame<T, float>::value || impl::IsSame<T, double>::value;
+
+	template<class T>
+	constexpr bool isCopyConstructible = impl::IsCopyConstructible<T>::value;
+	template<class T>
+	constexpr bool isDefaultConstructible = impl::IsDefaultConstructible<T>::value;
+	template<class T>
+	constexpr bool isTriviallyDefaultConstructible = impl::IsTriviallyDefaultConstructible<T>::value;
+	template<class T>
+	constexpr bool isMoveConstructible = impl::IsMoveConstructible<T>::value;
+
+	template<class T>
+	constexpr bool isCopyAssignable = impl::IsCopyAssignable<T>::value;
+	template<class T>
+	constexpr bool isMoveAssignable = impl::IsMoveAssignable<T>::value;
 
 	template<class T>
 	constexpr bool isRef = impl::IsRef<T>::value;

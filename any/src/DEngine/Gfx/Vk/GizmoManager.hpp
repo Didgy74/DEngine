@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Math/Vector.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
@@ -51,13 +52,16 @@ namespace DEngine::Gfx::Vk
 			QueueData const* queues;
 			VmaAllocator const* vma;
 			DeletionQueue const* delQueue;
+			Std::FrameAllocator* frameAlloc;
 			DebugUtilsDispatch const* debugUtils;
 			APIData const* apiData;
 			Std::Span<Math::Vec3 const> arrowMesh;
 			Std::Span<Math::Vec3 const> circleLineMesh;
 			Std::Span<Math::Vec3 const> arrowScaleMesh2d;
 		};
-		static void Initialize(GizmoManager& manager, InitInfo const& initInfo);
+		static void Initialize(
+			GizmoManager& manager,
+			InitInfo const& initInfo);
 
 		static void UpdateLineVtxBuffer(
 			GizmoManager& manager,
