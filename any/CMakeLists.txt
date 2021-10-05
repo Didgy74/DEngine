@@ -11,6 +11,7 @@ include(SourceFileList.cmake)
 
 set(DENGINE_ANY_TARGET_NAME dengine_any)
 
+
 # Create main library
 add_library(${DENGINE_ANY_TARGET_NAME} STATIC ${DENGINE_ANY_SOURCE_FILES})
 
@@ -30,41 +31,11 @@ set_target_properties(${DENGINE_ANY_TARGET_NAME} PROPERTIES
 	CXX_EXTENSIONS OFF)
 #target_compile_options(dengine_any PUBLIC "-ftime-trace")
 
-
-
 # Run script for linking dependencies
 include(LinkDependencies.cmake)
 LinkDependencies(${DENGINE_ANY_TARGET_NAME})
 
 
-
-set(DENGINE_DEFAULT_SETTING OFF)
-option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ${DENGINE_DEFAULT_SETTING})
-if (${DENGINE_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_ENABLE_ASSERT)
-endif()
-
-option(DENGINE_APPLICATION_ENABLE_ASSERT "Asserts inside the application code" ${DENGINE_DEFAULT_SETTING})
-if (${DENGINE_APPLICATION_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_APPLICATION_ENABLE_ASSERT)
-endif()
-
-option(DENGINE_CONTAINERS_ENABLE_ASSERT "Asserts inside DEngine containers" ${DENGINE_DEFAULT_SETTING})
-if (${DENGINE_CONTAINERS_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_CONTAINERS_ENABLE_ASSERT)
-endif()
-
-option(DENGINE_GFX_ENABLE_ASSERT "Asserts inside the rendering code" ${DENGINE_DEFAULT_SETTING})
-if (${DENGINE_GFX_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_GFX_ENABLE_ASSERT)
-endif()
-
-option(DENGINE_GUI_ENABLE_ASSERT "Asserts inside the GUI toolkit code" ${DENGINE_DEFAULT_SETTING})
-if (${DENGINE_GFX_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_GUI_ENABLE_ASSERT)
-endif()
-
-option(DENGINE_MATH_ENABLE_ASSERT "Asserts inside DEngine math" ${DENGINE_DEFAULT_SETTING})
-if (${DENGINE_MATH_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_MATH_ENABLE_ASSERT)
-endif()
+set(DENGINE_DEFAULT_ASSERT_SETTING ON)
+include(SetupAssertDefines.cmake)
+SetupAssertDefines(${DENGINE_ANY_TARGET_NAME} ${DENGINE_DEFAULT_ASSERT_SETTING})
