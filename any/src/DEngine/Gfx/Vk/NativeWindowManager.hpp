@@ -6,7 +6,9 @@
 #include "Constants.hpp"
 #include "VMAIncluder.hpp"
 
+#include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
+#include <DEngine/Math/Matrix.hpp>
 
 #include <vector>
 #include <mutex>
@@ -23,7 +25,6 @@ namespace DEngine::Gfx::Vk
 
 	struct NativeWindowData
 	{
-		WsiInterface* wsiConnection = nullptr;
 		vk::SurfaceKHR surface = {};
 		vk::SwapchainKHR swapchain = {};
 		Std::StackVec<vk::Image, Const::maxSwapchainLength> swapchainImages;
@@ -35,7 +36,6 @@ namespace DEngine::Gfx::Vk
 	struct WindowGuiData
 	{
 		vk::Extent2D extent{};
-
 		vk::SurfaceTransformFlagBitsKHR surfaceRotation = vk::SurfaceTransformFlagBitsKHR::eIdentity;
 		Math::Mat2 rotation{};
 	};
@@ -43,58 +43,50 @@ namespace DEngine::Gfx::Vk
 	struct NativeWindowManager
 	{
 		// Insertion job resources
-		std::mutex createQueueLock;
-		u64 nativeWindowIdTracker = 0;
 		struct CreateJob
 		{
 			NativeWindowID id;
-			WsiInterface* windowConnection;
 		};
-		std::vector<CreateJob> createJobs;
+		struct InsertionJobsT
+		{
+			std::mutex lock;
+			std::vector<CreateJob> queue;
+		};
+		InsertionJobsT insertionJobs;
 		// Insertion locked resources end
 
-
-		// Main data resources start
-		// This doesn't need a lock because it's ever accessed
-		// from the rendering thread.
 		struct Node
 		{
 			NativeWindowID id;
 			NativeWindowData windowData;
 			WindowGuiData gui;
 		};
-		std::vector<Node> nativeWindows;
-		// Main data resources end
+		struct MainT
+		{
+			std::mutex lock;
+			std::vector<Node> nativeWindows;
+		};
+		MainT main;
 
-		// This requires the manager's mutex to already be locked.
 		static void ProcessEvents(
 			NativeWindowManager& manager,
 			GlobUtils const& globUtils,
+			Std::FrameAlloc& transientAlloc,
 			Std::Span<NativeWindowUpdate const> windowUpdates);
 
+		struct InitInfo
+		{
+			NativeWindowManager* manager;
+			NativeWindowID initialWindow = {};
+			DeviceDispatch const* device;
+			QueueData const* queues;
+			DebugUtilsDispatch const* optional_debugUtils;
+		};
 		static void Initialize(
-			NativeWindowManager& manager,
-			DeviceDispatch const& device,
-			QueueData const& queues,
-			DebugUtilsDispatch const* debugUtils);
+			InitInfo const& initInfo);
 
-		static void BuildInitialNativeWindow(
+		[[nodiscard]] static void PushCreateWindowJob(
 			NativeWindowManager& manager,
-			InstanceDispatch const& instance,
-			DeviceDispatch const& device,
-			vk::PhysicalDevice physDevice,
-			QueueData const& queues,
-			DeletionQueue const& delQueue,
-			SurfaceInfo const& surfaceInfo,
-			VmaAllocator vma,
-			u8 inFlightCount,
-			WsiInterface& initialWindowConnection,
-			vk::SurfaceKHR surface,
-			vk::RenderPass guiRenderPass,
-			DebugUtilsDispatch const* debugUtils);
-
-		[[nodiscard]] static NativeWindowID PushCreateWindowJob(
-			NativeWindowManager& manager,
-			WsiInterface& windowConnection);
+			NativeWindowID windowId) noexcept;
 	};
 }

@@ -82,8 +82,9 @@ set(DENGINE_MATH_SOURCE_FILES
 # Std
 set(DENGINE_STD_SOURCE_FILES
 
-		src/DEngine/Std/Std.cpp
+		src/DEngine/Std/Allocator.cpp
 		src/DEngine/Std/FrameAllocator.cpp
+		src/DEngine/Std/Std.cpp
 		src/DEngine/Std/Utility.cpp
 
 		)
@@ -107,3 +108,25 @@ src/DEngine/Time.cpp
 		${DENGINE_STD_SOURCE_FILES}
 
 )
+
+
+set(DENGINE_ANY_SOURCE_FILES2
+
+		src/main2.cpp
+
+		src/DEngine/Physics2D.cpp
+		src/DEngine/Scene.cpp
+		src/DEngine/Time.cpp
+
+		${DENGINE_APPLICATION_SOURCE_FILES}
+		${DENGINE_ASSERT_SOURCE_FILES}
+		${DENGINE_GFX_SOURCE_FILES}
+		${DENGINE_MATH_SOURCE_FILES}
+		${DENGINE_STD_SOURCE_FILES}
+
+		src/DEngine/Gui/Context.cpp
+		src/DEngine/Gui/Button.cpp
+		src/DEngine/Gui/ScrollArea.cpp
+		src/DEngine/Gui/StackLayout.cpp
+
+		)

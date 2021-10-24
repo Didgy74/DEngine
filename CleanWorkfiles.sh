@@ -24,4 +24,5 @@ rm --recursive desktop/out
 
 # CLion stuff
 rm --recursive .idea
+rm --recursive cmake-build-debug
 rm --recursive desktop/cmake-build-debug

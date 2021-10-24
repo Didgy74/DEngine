@@ -5,6 +5,8 @@
 
 namespace DEngine::Std::impl { struct OptPlacementNewTag {}; }
 constexpr void* operator new(decltype(sizeof(int)) size, void* data, DEngine::Std::impl::OptPlacementNewTag) noexcept { return data; }
+// Having this delete operator silences a compiler warning.
+[[maybe_unused]] constexpr void operator delete(void* data, DEngine::Std::impl::OptPlacementNewTag) noexcept {}
 
 namespace DEngine::Std
 {
@@ -126,8 +128,27 @@ namespace DEngine::Std
 
 		[[nodiscard]] bool HasValue() const noexcept;
 
-		[[nodiscard]] T const& Value() const noexcept;
-		[[nodiscard]] T& Value() noexcept;
+		[[nodiscard]] T const& Value() const& noexcept
+		{
+			DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
+				hasValue,
+				"Tried to deference Opt without a value.");
+			return value;
+		}
+		[[nodiscard]] T& Value() & noexcept
+		{
+			DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
+				hasValue,
+				"Tried to deference Opt without a value.");
+			return value;
+		}
+		[[nodiscard]] T&& Value() && noexcept
+		{
+			DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
+				hasValue,
+				"Tried to deference Opt without a value.");
+			return static_cast<T&&>(value);
+		}
 
 		[[nodiscard]] T const* ToPtr() const noexcept;
 		[[nodiscard]] T* ToPtr() noexcept;
@@ -156,24 +177,6 @@ namespace DEngine::Std
 	bool Opt<T>::HasValue() const noexcept
 	{
 		return hasValue;
-	}
-
-	template<typename T>
-	T const& Opt<T>::Value() const noexcept
-	{
-		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
-			hasValue,
-			"Tried to deference Opt without a value.");
-		return value;
-	}
-
-	template<typename T>
-	T& Opt<T>::Value() noexcept
-	{
-		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
-			hasValue,
-			"Tried to deference Opt without a value.");
-		return value;
 	}
 
 	template<typename T>

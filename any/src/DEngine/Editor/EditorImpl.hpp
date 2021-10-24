@@ -25,7 +25,7 @@ namespace DEngine::Editor
 			Gui::CharEnterEvent,
 			Gui::CharEvent,
 			Gui::CharRemoveEvent,
-			Gui::CursorClickEvent,
+			Gui::CursorPressEvent,
 			Gui::CursorMoveEvent,
 			Gui::TouchPressEvent,
 			Gui::TouchMoveEvent,
@@ -41,7 +41,7 @@ namespace DEngine::Editor
 	class ComponentList;
 	class ViewportWidget;
 
-	class EditorImpl : public App::EventInterface, public Gui::WindowHandler
+	class EditorImpl : public App::EventForwarder, public Gui::WindowHandler
 	{
 	public:
 		Std::Box<Gui::Context> guiCtx;

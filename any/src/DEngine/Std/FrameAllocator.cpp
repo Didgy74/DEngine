@@ -23,17 +23,13 @@ Std::FrameAllocator::FrameAllocator(Std::FrameAllocator&& other) noexcept :
 
 Std::FrameAllocator::~FrameAllocator() noexcept
 {
-	for (uSize i = 0; i < poolCount; i++)
-	{
-		auto& pool = memoryPools[i];
-		DENGINE_IMPL_CONTAINERS_ASSERT(pool.data);
-
-		free(pool.data);
-	}
+	ReleaseMemory();
 }
 
 Std::FrameAllocator& Std::FrameAllocator::operator=(Std::FrameAllocator&& other) noexcept
 {
+	ReleaseMemory();
+
 	offset = other.offset;
 	lastAllocOffset = Std::Move(other.lastAllocOffset);
 	poolCount = other.poolCount;
@@ -75,10 +71,10 @@ void* Std::FrameAllocator::Alloc(uSize size, uSize alignment) noexcept
 {
 	void* returnVal = nullptr;
 
-	auto getAlignedOffset = [](Pool::DataPtrT const* ptr, uSize offset, uSize alignment) {
-		auto const asInt = (uintptr_t)ptr + offset;
+	auto getAlignedOffset = [](Pool::DataPtrT const* ptr, uSize offsetIn, uSize alignment) {
+		auto const asInt = (uintptr_t)ptr + offsetIn;
 		auto const alignedInt = Math::CeilToMultiple(asInt,  alignment);
-		auto const alignedOffset = offset + (alignedInt - asInt);
+		auto const alignedOffset = offsetIn + (alignedInt - asInt);
 		DENGINE_IMPL_CONTAINERS_ASSERT((((uintptr_t)ptr + alignedOffset) % alignment) == 0);
 		return alignedOffset;
 	};
@@ -225,31 +221,51 @@ void Std::FrameAllocator::Reset() noexcept
 	if (poolCount == 0)
 		return;
 
+	// Check that all active pools are valid and no longer have any allocs
+	DENGINE_IMPL_CONTAINERS_ASSERT(Std::AllOf(
+		&memoryPools[0],
+		&memoryPools[poolCount],
+		[](auto const& item) { return item.allocCount == 0 && item.data; }));
+
 	// Clear all pools except the last one and move the last one to the front.
-	for (uSize i = 0; i < poolCount - 1; i += 1)
+	if (poolCount > 1)
 	{
-		auto& pool = memoryPools[i];
-		DENGINE_IMPL_CONTAINERS_ASSERT(pool.data);
-		DENGINE_IMPL_CONTAINERS_ASSERT(pool.allocCount == 0);
+		for (uSize i = 0; i < poolCount - 1; i += 1)
+		{
+			auto& pool = memoryPools[i];
 
-		free(pool.data);
+			free(pool.data);
 
-		// Clear the struct for good measure.
-		pool = {};
+			// Clear the struct for good measure.
+			pool = {};
+		}
+
+		auto& firstPool = memoryPools[0];
+		firstPool = memoryPools[poolCount - 1];
+		memoryPools[poolCount - 1] = {};
+		poolCount = 1;
 	}
 
-	auto& firstPool = memoryPools[0];
-	firstPool = memoryPools[poolCount - 1];
-	memoryPools[poolCount - 1] = {};
-	poolCount = 1;
-
-	firstPool.allocCount = 0;
+	memoryPools[0].allocCount = 0;
 	offset = 0;
 
 	// For testing purposes
 	if constexpr (clearUnusedMemory)
 	{
+		auto& firstPool = memoryPools[0];
 		for (uSize i = 0; i < firstPool.totalSize; i += 1)
 			firstPool.data[i] = 0;
 	}
+}
+
+void Std::FrameAllocator::ReleaseMemory() noexcept
+{
+	for (uSize i = 0; i < poolCount; i++)
+	{
+		auto& pool = memoryPools[i];
+		DENGINE_IMPL_CONTAINERS_ASSERT(pool.data);
+
+		free(pool.data);
+	}
+	poolCount = 0;
 }

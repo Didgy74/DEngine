@@ -31,7 +31,7 @@ namespace DEngine::Gfx
 		virtual ~Context();
 
 		// Thread safe
-		NativeWindowID NewNativeWindow(WsiInterface& wsiConnection);
+		void AdoptNativeWindow(NativeWindowID);
 		void DeleteNativeWindow(NativeWindowID);
 
 		// Thread safe
@@ -56,7 +56,7 @@ namespace DEngine::Gfx
 		LogInterface* logger = nullptr;
 		TextureAssetInterface const* texAssetInterface = nullptr;
 
-		void* apiDataBuffer = nullptr;
+		void* apiDataBase = nullptr;
 
 		friend Std::Opt<Context> Initialize(InitInfo const& initInfo);
 	};
@@ -173,12 +173,13 @@ namespace DEngine::Gfx
 
 	struct InitInfo
 	{
-		WsiInterface* initialWindowConnection = nullptr;
+		NativeWindowID initialWindow = {};
+		WsiInterface* wsiConnection = nullptr;
 
 		LogInterface* optional_logger = nullptr;
 		
 		TextureAssetInterface const* texAssetInterface = nullptr;
-		Std::Span<char const*> requiredVkInstanceExtensions{};
+		Std::Span<char const*> requiredVkInstanceExtensions;
 
 		std::vector<Math::Vec3> gizmoArrowMesh;
 		std::vector<Math::Vec3> gizmoCircleLineMesh;
@@ -195,20 +196,28 @@ namespace DEngine::Gfx
 			Info,
 			Fatal
 		};
-		virtual void Log(Level level, char const* msg) = 0;
+		virtual void Log(Level level, Std::Span<char const> msg) = 0;
 	};
 
 	class WsiInterface
 	{
 	public:
-		virtual ~WsiInterface() {};
+		virtual ~WsiInterface() = default;
 
 		// Return type is VkResult
 		//
 		// Argument #1: VkInstance - The Vulkan instance handle
 		// Argument #2: VkAllocationCallbacks const* - Allocation callbacks for surface creation.
 		// Argument #3: VkSurfaceKHR* - The output surface handle
-		virtual i32 CreateVkSurface(uSize vkInstance, void const* allocCallbacks, u64& outSurface) = 0;
+		struct CreateVkSurface_ReturnT
+		{
+			u32 vkResult;
+			uSize vkSurface;
+		};
+		virtual CreateVkSurface_ReturnT CreateVkSurface(
+			NativeWindowID windowId,
+			uSize vkInstance,
+			void const* allocCallbacks) noexcept = 0;
 	};
 
 	class ViewportRef

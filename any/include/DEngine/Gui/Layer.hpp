@@ -39,7 +39,7 @@ namespace DEngine::Gui
 			Rect const& windowRect,
 			Rect const& usableRect,
 			Math::Vec2Int cursorPos,
-			CursorClickEvent const& event) { return {}; }
+			CursorPressEvent const& event) { return {}; }
 
 		[[nodiscard]] virtual bool TouchMove(
 			Context& ctx,

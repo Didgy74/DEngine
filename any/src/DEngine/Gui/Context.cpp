@@ -6,15 +6,86 @@
 
 #include <DEngine/Gui/Layer.hpp>
 #include <DEngine/Gui/Widget.hpp>
+#include <DEngine/Gui/SizeHintCollection.hpp>
 
 #include <DEngine/Application.hpp>
 
 #include <vector>
+#include <stdexcept>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
 
-#include <stdexcept>
+namespace DEngine::Gui::impl
+{
+	void ImplData_PreDispatchStuff(ImplData& implData)
+	{
+		implData.transientAlloc.Reset();
+
+		implData.sizeHintColl.Clear();
+	}
+
+	// All rects should be relative to window position, not visible rect
+	void BuildSizeHintCollection(
+		Context const& ctx,
+		ImplData const& implData,
+		SizeHintCollection& sizeHintColl,
+		Std::FrameAllocator& transientAlloc)
+	{
+		sizeHintColl.Clear();
+
+		for (auto& windowNode : implData.windows)
+		{
+			if (!windowNode.data.topLayout)
+				continue;
+
+			SizeHintCollection::Pusher sizeHintPusher{ sizeHintColl };
+			Widget::GetSizeHint2_Params params = {
+				.ctx = ctx,
+				.transientAlloc = transientAlloc,
+				.pusher = sizeHintPusher };
+
+			auto& widget = *windowNode.data.topLayout;
+			widget.GetSizeHint2(params);
+
+			transientAlloc.Reset();
+		}
+
+		sizeHintColl.rects.resize(sizeHintColl.widgets.size());
+
+		for (auto& windowNode : implData.windows)
+		{
+			if (!windowNode.data.topLayout)
+				continue;
+
+			SizeHintCollection::Pusher2 sizeHintPusher2 { sizeHintColl };
+
+			//Widget::BuildChildRects_Params params{ *this, sizeHintPusher2, transientAlloc };
+			Widget::BuildChildRects_Params params {
+				.ctx = ctx,
+				.builder = sizeHintPusher2,
+				.transientAlloc = transientAlloc };
+
+			auto const& windowRect = windowNode.data.rect;
+			auto const& visibleOffset = windowNode.data.visibleOffset;
+			auto const& visibleExtent = windowNode.data.visibleExtent;
+			Rect const visibleRect = Rect::Intersection(
+				{{}, windowRect.extent},
+				{{(i32) visibleOffset.x, (i32) visibleOffset.y}, visibleExtent});
+
+			auto& widget = *windowNode.data.topLayout;
+			params.builder.PushRect(
+				widget,
+				{visibleRect, visibleRect});
+			widget.BuildChildRects(
+				params,
+				visibleRect,
+				visibleRect);
+
+			transientAlloc.Reset();
+		}
+	}
+}
 
 Context Context::Create(
 	WindowHandler& windowHandler,
@@ -126,90 +197,231 @@ void Context::PushEvent(CharRemoveEvent const& event)
 	}
 }
 
-void Context::PushEvent(CursorClickEvent const& event)
+void Context::PushEvent(CursorPressEvent const& event)
 {
 	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& windows = implData.windows;
 
-	for (auto& windowNode : implData.windows)
+	auto windowIt = Std::FindIf(
+		windows.begin(),
+		windows.end(),
+		[&event](auto const& item) { return item.id == event.windowId; });
+	DENGINE_IMPL_GUI_ASSERT(windowIt != windows.end());
+	auto& windowNode = *windowIt;
+
+	implData.cursorWindowId = event.windowId;
+
+	impl::ImplData_PreDispatchStuff(implData);
+	impl::BuildSizeHintCollection(
+		*this,
+		implData,
+		implData.sizeHintColl,
+		implData.transientAlloc);
+
+	if (windowNode.data.topLayout)
 	{
-		bool eventConsumed = false;
-		auto const relCursorPos = implData.cursorPosition - windowNode.data.rect.position;
+		RectCollection rectCollection { implData.sizeHintColl };
+		Widget::CursorPressParams params {
+			.ctx = *this,
+			.rectCollection = rectCollection };
+		params.windowId = windowNode.id;
+		params.cursorPos = implData.cursorPosition - windowNode.data.rect.position;
+		params.event = event;
 
-		Rect const windowRect = { {}, windowNode.data.rect.extent };
-		auto visibleRect = windowNode.data.visibleRect;
-		visibleRect.position -= windowNode.data.rect.position;
-
-		bool destroyLayer = false;
-		if (windowNode.frontmostLayer)
-		{
-			auto& layer = *windowNode.frontmostLayer;
-			auto temp = layer.CursorPress(
-				*this,
-				windowRect,
-				visibleRect,
-				relCursorPos,
-				event);
-			eventConsumed = temp.eventConsumed;
-			destroyLayer = temp.destroy;
-		}
-		if (destroyLayer)
-			windowNode.frontmostLayer = nullptr;
-
-		// We still want to propagate the event if we depressed.
-		if (!windowNode.data.topLayout || (eventConsumed && event.clicked))
-			continue;
-
-		windowNode.data.topLayout->CursorPress(
-			*this,
-			windowNode.id,
-			visibleRect,
-			visibleRect,
-			relCursorPos,
-			event);
+		auto& widget = *windowNode.data.topLayout;
+		widget.CursorPress2(params);
 	}
 }
 
 void Context::PushEvent(CursorMoveEvent const& event)
 {
 	auto& implData = *static_cast<impl::ImplData*>(pImplData);
-	implData.cursorPosition = event.position;
+	auto& windows = implData.windows;
 
-	for (auto& windowNode : implData.windows)
+	auto windowIt = Std::FindIf(
+		implData.windows.begin(),
+		implData.windows.end(),
+		[&event](auto const& item) { return item.id == event.windowId; });
+	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
+	auto& windowNode = *windowIt;
+
+	impl::ImplData_PreDispatchStuff(implData);
+	impl::BuildSizeHintCollection(
+		*this,
+		implData,
+		implData.sizeHintColl,
+		implData.transientAlloc);
+
+	// Update the globally stored cursor position
+	implData.cursorPosition = event.position + windowNode.data.rect.position;
+	implData.cursorWindowId = event.windowId;
+
+	if (windowNode.data.topLayout)
 	{
+		auto& widget = *windowNode.data.topLayout;
+
+		RectCollection rectCollection { implData.sizeHintColl };
+
 		auto modifiedEvent = event;
-		modifiedEvent.position -= windowNode.data.rect.position;
+		modifiedEvent.position = implData.cursorPosition - windowNode.data.rect.position;
 
-		Rect const windowRect = { {}, windowNode.data.rect.extent };
-		auto visibleRect = windowNode.data.visibleRect;
-		visibleRect.position -= windowNode.data.rect.position;
+		Widget::CursorMoveParams params {
+			.ctx = *this,
+			.rectCollection = rectCollection };
+		params.windowId = windowNode.id;
+		params.event = modifiedEvent;
 
-		bool cursorOccluded = false;
-
-		if (windowNode.frontmostLayer)
-		{
-			auto& layer = *windowNode.frontmostLayer;
-			auto const temp = layer.CursorMove(
-				*this,
-				windowRect,
-				visibleRect,
-				modifiedEvent,
-				cursorOccluded);
-			cursorOccluded = temp;
-		}
-
-		if (!windowNode.data.topLayout)
-			continue;
-
-		windowNode.data.topLayout->CursorMove(
-			*this,
-			windowNode.id,
-			visibleRect,
-			visibleRect,
-			modifiedEvent,
-			cursorOccluded);
+		widget.CursorMove(params, false);
 	}
 }
 
+void Context::PushEvent(WindowCursorExitEvent const& event)
+{
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& windowNodes = implData.windows;
+
+	auto const windowNodeIt = Std::FindIf(
+		windowNodes.begin(),
+		windowNodes.end(),
+		[event](auto const& node) { return node.id == event.windowId; });
+	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != windowNodes.end());
+
+	auto& windowNode = *windowNodeIt;
+
+	if (implData.cursorWindowId.HasValue())
+	{
+		auto const prevWindowId = implData.cursorWindowId.Value();
+
+		if (event.windowId == prevWindowId)
+		{
+			implData.cursorWindowId = Std::nullOpt;
+
+			if (windowNode.data.topLayout)
+			{
+				auto& widget = *windowNode.data.topLayout;
+				widget.CursorExit(*this);
+			}
+		}
+	}
+}
+
+void Context::PushEvent(WindowFocusEvent const& event)
+{
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& windowNodes = implData.windows;
+
+	auto const windowNodeIt = Std::FindIf(
+		windowNodes.begin(),
+		windowNodes.end(),
+		[event](auto const& node) { return node.id == event.windowId; });
+	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != windowNodes.end());
+
+	if (event.gainedFocus)
+	{
+		// Move our window to the front
+		auto tempWindowNode = Std::Move(*windowNodeIt);
+		windowNodes.erase(windowNodeIt);
+		windowNodes.emplace(windowNodes.begin(), Std::Move(tempWindowNode));
+
+		// Call window focus gained event on widget?
+	}
+}
+
+void Context::PushEvent(WindowMoveEvent const& event)
+{
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& windowNodes = implData.windows;
+
+	auto const windowNodeIt = Std::FindIf(
+		windowNodes.begin(),
+		windowNodes.end(),
+		[event](auto const& node) { return node.id == event.windowId; });
+	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != windowNodes.end());
+
+	auto& windowNode = *windowNodeIt;
+	windowNode.data.rect.position = event.position;
+}
+
+void Context::Render2(Render2_Params const& params) const
+{
+	auto const& implData = *static_cast<impl::ImplData const*>(pImplData);
+	auto& sizeHintColl = params.sizeHintCollection;
+	auto& transientAlloc = params.transientAlloc;
+
+	impl::BuildSizeHintCollection(
+		*this,
+		implData,
+		sizeHintColl,
+		transientAlloc);
+
+	for (auto const& windowNode : implData.windows)
+	{
+		if (windowNode.data.isMinimized || !windowNode.data.topLayout)
+			continue;
+		auto& widget = *windowNode.data.topLayout;
+
+		auto const& windowRect = windowNode.data.rect;
+		auto const& visibleOffset = windowNode.data.visibleOffset;
+		auto const& visibleExtent = windowNode.data.visibleExtent;
+		Rect const visibleRect = Rect::Intersection(
+			{ {}, windowRect.extent },
+			{ { (i32)visibleOffset.x, (i32)visibleOffset.y }, visibleExtent });
+
+		DrawInfo drawInfo = {
+			windowNode.data.rect.extent,
+			params.vertices,
+			params.indices,
+			params.drawCmds };
+
+		RectCollection const rectCollection { sizeHintColl };
+
+		Widget::Render_Params const renderParams {
+			.ctx = *this,
+			.rectCollection = rectCollection,
+			.framebufferExtent = windowNode.data.rect.extent,
+			.drawInfo = drawInfo };
+
+		u32 const drawCmdOffset = params.drawCmds.size();
+
+		widget.Render2(
+			renderParams,
+			visibleRect,
+			visibleRect);
+
+		u32 const drawCmdCount = params.drawCmds.size() - drawCmdOffset;
+
+		Gfx::NativeWindowUpdate newUpdate = {};
+		newUpdate.id = (Gfx::NativeWindowID)windowNode.id;
+		newUpdate.clearColor = windowNode.data.clearColor;
+		newUpdate.drawCmdOffset = drawCmdOffset;
+		newUpdate.drawCmdCount = drawCmdCount;
+
+		params.windowUpdates.push_back(newUpdate);
+	}
+}
+
+void Context::AdoptWindow(
+	WindowID id,
+	Math::Vec4 clearColor,
+	Rect rect,
+	Math::Vec2UInt visibleOffset,
+	Extent visibleExtent,
+	Std::Box<Widget>&& widget)
+{
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+
+	impl::WindowNode newNode = {};
+	newNode.id = id;
+	newNode.data.rect = rect;
+	newNode.data.visibleOffset = visibleOffset;
+	newNode.data.visibleExtent = visibleExtent;
+	newNode.data.clearColor = clearColor;
+	newNode.data.topLayout = Std::Move(widget);
+
+	implData.windows.emplace(implData.windows.begin(), Std::Move(newNode));
+}
+
+/*
 void Context::PushEvent(TouchMoveEvent const& event)
 {
 	auto& implData = *static_cast<impl::ImplData*>(pImplData);
@@ -220,9 +432,11 @@ void Context::PushEvent(TouchMoveEvent const& event)
 			(f32)windowNode.data.rect.position.x,
 			(f32)windowNode.data.rect.position.y };
 
-		Rect const windowRect = { {}, windowNode.data.rect.extent };
-		auto visibleRect = windowNode.data.visibleRect;
-		visibleRect.position -= windowNode.data.rect.position;
+		auto const& rect = windowNode.data.rect;
+		Math::Vec2Int visiblePos = {
+			rect.position.x + (i32)windowNode.data.visibleOffset.x,
+			rect.position.y + (i32)windowNode.data.visibleOffset.y };
+		Rect const visibleRect = { visiblePos, windowNode.data.visibleExtent };
 
 		bool touchOccluded = false;
 
@@ -231,7 +445,7 @@ void Context::PushEvent(TouchMoveEvent const& event)
 			auto& layer = *windowNode.frontmostLayer;
 			bool const temp = layer.TouchMove(
 				*this,
-				windowRect,
+				visibleRect,
 				visibleRect,
 				modifiedEvent,
 				touchOccluded);
@@ -251,16 +465,24 @@ void Context::PushEvent(TouchMoveEvent const& event)
 			touchOccluded);
 	}
 }
+*/
 
+/*
 void Context::PushEvent(TouchPressEvent const& event)
 {
 	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+
 	for (auto& windowNode : implData.windows)
 	{
 		auto modifiedEvent = event;
 		modifiedEvent.position -= Math::Vec2{
 			(f32)windowNode.data.rect.position.x,
 			(f32)windowNode.data.rect.position.y };
+
+		auto const& visibleOffset = windowNode.data.visibleOffset;
+		Math::Vec2Int const visiblePos =
+			windowNode.data.rect.position +
+			Math::Vec2Int{ (i32)visibleOffset.x, (i32)visibleOffset.y };
 
 		Rect const windowRect = { {}, windowNode.data.rect.extent };
 		auto visibleRect = windowNode.data.visibleRect;
@@ -358,34 +580,12 @@ void Context::PushEvent(WindowResizeEvent const& event)
 	windowData.visibleRect = event.visibleRect;
 }
 
-void Context::AdoptWindow(
-	WindowID id,
-	Math::Vec4 const& clearColor,
-	Rect const& windowRect,
-	Rect const& visibleRect,
-	Std::Box<Widget>&& widget)
-{
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
-
-	impl::WindowNode newNode = {};
-	newNode.id = id;
-	newNode.data.rect = windowRect;
-	newNode.data.visibleRect = visibleRect;
-	newNode.data.clearColor = clearColor;
-	newNode.data.topLayout = Std::Move(widget);
-
-	implData.windows.emplace_back(Std::Move(newNode));
-}
-
-#include <Tracy.hpp>
 void Context::Render(
 	std::vector<Gfx::GuiVertex>& vertices,
 	std::vector<u32>& indices,
 	std::vector<Gfx::GuiDrawCmd>& drawCmds,
 	std::vector<Gfx::NativeWindowUpdate>& windowUpdates) const
 {
-	ZoneScopedNS("GUI Render", 32);
-
 	auto& implData = *static_cast<impl::ImplData*>(pImplData);
 
 	for (auto& windowNode : implData.windows)
@@ -441,6 +641,7 @@ void Context::Render(
 		windowUpdates.push_back(newUpdate);
 	}
 }
+*/
 
 namespace DEngine::Gui::impl
 {

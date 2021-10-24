@@ -101,14 +101,14 @@ namespace DEngine::Application
 		R1,
 		R2,
 		R3,
-		COUNT, // Invalid use to index with
+		COUNT,
 	};
 	enum class GamepadAxis : u8
 	{
 		Invalid,
 		LeftX, // [-1, 1]
 		LeftY, // [-1, 1]
-		COUNT, // Invalid use to index with
+		COUNT,
 	};
 	struct GamepadState
 	{
@@ -126,11 +126,17 @@ namespace DEngine::Application
 	};
 	Std::Opt<GamepadState> GetGamepad();
 
+	enum class LogSeverity
+	{
+		Debug,
+		Warning,
+		Error,
+	};
 	void Log(char const* msg);
 
-	class EventInterface;
-	void InsertEventInterface(EventInterface&);
-	void RemoveEventInterface(EventInterface&);
+	class EventForwarder;
+	void InsertEventInterface(EventForwarder&);
+	void RemoveEventInterface(EventForwarder&);
 
 	enum class SoftInputFilter : u8;
 	void OpenSoftInput(Std::Str text, SoftInputFilter inputFilter);
@@ -138,6 +144,70 @@ namespace DEngine::Application
 	void HideSoftInput();
 
 	class FileInputStream;
+
+	namespace impl { struct AppImpl; }
+
+	class Context
+	{
+	public:
+		Context(Context const&) = delete;
+		Context(Context&& other) noexcept :
+			data{ other.data }
+		{
+			other.data = nullptr;
+		}
+		~Context() noexcept;
+
+		Context& operator=(Context const&) = delete;
+		Context& operator=(Context&&) noexcept;
+
+		struct NewWindow_ReturnT
+		{
+			WindowID windowId = {};
+			Extent extent = {};
+			Math::Vec2Int position = {};
+			Extent visibleExtent = {};
+			Math::Vec2UInt visibleOffset = {};
+		};
+		[[nodiscard]] NewWindow_ReturnT NewWindow(
+			Std::Span<char const> title,
+			Extent extent);
+		[[nodiscard]] bool CanCreateNewWindow() const noexcept;
+		void DestroyWindow(WindowID) noexcept;
+		[[nodiscard]] u32 GetWindowCount() const noexcept;
+		[[nodiscard]] Extent GetWindowExtent(WindowID) const noexcept;
+		[[nodiscard]] Math::Vec2Int GetWindowPosition(WindowID) const noexcept;
+		[[nodiscard]] Extent GetWindowVisibleExtent(WindowID) const noexcept;
+		[[nodiscard]] Math::Vec2Int GetWindowVisibleOffset(WindowID) const noexcept;
+		[[nodiscard]] WindowEvents GetWindowEvents(WindowID) const noexcept;
+
+		struct CreateVkSurface_ReturnT
+		{
+			u32 vkResult;
+			uSize vkSurface;
+		};
+		[[nodiscard]] CreateVkSurface_ReturnT CreateVkSurface(
+			WindowID window,
+			uSize vkInstance,
+			void const* vkAllocationCallbacks) noexcept;
+
+		void Log(LogSeverity severity, Std::Span<char const> msg);
+
+		enum class SoftInputFilter : u8;
+		void OpenSoftInput(SoftInputFilter inputFilter, Std::Span<char const> text);
+		void UpdateCharInputContext(Std::Span<char const> text);
+		void HideSoftInput();
+
+		void InsertEventInterface(EventForwarder&);
+		void RemoveEventInterface(EventForwarder&);
+
+	private:
+		Context() = default;
+
+		void* data = nullptr;
+
+		friend impl::AppImpl;
+	};
 }
 
 namespace DEngine
@@ -150,9 +220,7 @@ enum class DEngine::Application::CursorType : DEngine::u8
 	Arrow,
 	HorizontalResize,
 	VerticalResize,
-#ifdef DENGINE_APPLICATION_CURSORTYPE_COUNT
 	COUNT,
-#endif
 };
 
 enum class DEngine::Application::Orientation : DEngine::u8
@@ -211,9 +279,8 @@ enum class DEngine::Application::Button : DEngine::u16
 	RightMouse,
 
 	Back,
-#ifdef DENGINE_APPLICATION_BUTTON_COUNT
+
 	COUNT
-#endif
 };
 
 struct DEngine::Application::CursorData
@@ -285,18 +352,20 @@ private:
 	alignas(8) char m_buffer[16] = {};
 };
 
-class DEngine::Application::EventInterface
+class DEngine::Application::EventForwarder
 {
 public:
-	inline virtual ~EventInterface() = 0;
+	inline virtual ~EventForwarder() = 0;
 
 	virtual void ButtonEvent(
+		WindowID windowId,
 		Button button,
 		bool state) {}
 	virtual void CharEnterEvent() {}
 	virtual void CharEvent(u32 utfValue) {}
 	virtual void CharRemoveEvent() {}
 	virtual void CursorMove(
+		WindowID windowId,
 		Math::Vec2Int position,
 		Math::Vec2Int positionDelta) {}
 	virtual void TouchEvent(
@@ -322,8 +391,6 @@ public:
 		Extent extent,
 		Math::Vec2Int visiblePos,
 		Extent visibleExtent) {}
-	
-	virtual void Log(char const* msg) {};
 };
 
-inline DEngine::Application::EventInterface::~EventInterface() {}
+inline DEngine::Application::EventForwarder::~EventForwarder() {}

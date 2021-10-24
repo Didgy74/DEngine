@@ -34,7 +34,7 @@ namespace DEngine::Editor
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect,
 			Math::Vec2Int cursorPos,
-			Gui::CursorClickEvent event) override;
+			Gui::CursorPressEvent event) override;
 
 		virtual bool CursorMove(
 			Gui::Context& ctx,

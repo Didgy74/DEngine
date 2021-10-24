@@ -27,7 +27,7 @@ namespace DEngine::Std
 		[[nodiscard]] constexpr Span<T> ToSpan() noexcept;
 		[[nodiscard]] constexpr Span<T const> ToSpan() const noexcept;
 		constexpr operator Span<T>() noexcept;
-		constexpr operator Span<T const>() noexcept;
+		constexpr operator Span<T const>() const noexcept;
 
 		[[nodiscard]] bool CanPushBack() const noexcept;
 		[[nodiscard]] static constexpr uSize Capacity() noexcept;
@@ -156,7 +156,7 @@ namespace DEngine::Std
 	}
 
 	template<typename T, uSize capacity>
-	constexpr StackVec<T, capacity>::operator Span<T const>() noexcept
+	constexpr StackVec<T, capacity>::operator Span<T const>() const noexcept
 	{
 		return ToSpan();
 	}

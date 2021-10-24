@@ -1,12 +1,12 @@
 #pragma once
 
-#define DENGINE_APPLICATION_CURSORTYPE_COUNT
-#define DENGINE_APPLICATION_BUTTON_COUNT
 #include <DEngine/Application.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
+#include <DEngine/Std/Containers/Vec.hpp>
 
 #include <chrono>
 #include <vector>
@@ -19,8 +19,6 @@
 
 namespace DEngine::Application::detail
 {
-	using LogCallback = void(*)(char const*);
-
 	struct EventCallbackJob
 	{
 		enum class Type : u8
@@ -39,10 +37,11 @@ namespace DEngine::Application::detail
 			WindowResize,
 		};
 		Type type = {};
-		EventInterface* ptr = nullptr;
+		EventForwarder* ptr = nullptr;
 
 		struct ButtonEvent
 		{
+			WindowID windowId;
 			Button btn;
 			bool state;
 		};
@@ -54,6 +53,7 @@ namespace DEngine::Application::detail
 		struct CharRemoveEvent {};
 		struct CursorMoveEvent
 		{
+			WindowID windowId;
 			Math::Vec2Int pos;
 			Math::Vec2Int delta;
 		};
@@ -63,6 +63,16 @@ namespace DEngine::Application::detail
 			u8 id;
 			f32 x; 
 			f32 y;
+		};
+		struct WindowCursorEnter
+		{
+			WindowID window;
+			bool entered;
+		};
+		struct WindowFocusEvent
+		{
+			WindowID window;
+			bool focusGained;
 		};
 		struct WindowMoveEvent
 		{
@@ -77,7 +87,9 @@ namespace DEngine::Application::detail
 			CharRemoveEvent charRemove;
 			CursorMoveEvent cursorMove;
 			TouchEvent touch;
+			WindowCursorEnter windowCursorEnter;
 			WindowMoveEvent windowMove;
+			WindowFocusEvent windowFocus;
 		};
 	};
 
@@ -85,7 +97,7 @@ namespace DEngine::Application::detail
 	{
 		Math::Vec2Int position = {};
 		Extent extent = {};
-		Math::Vec2Int visibleOffset = {};
+		Math::Vec2UInt visibleOffset = {};
 		Extent visibleExtent = {};
 
 		bool isMinimized = false;
@@ -96,7 +108,7 @@ namespace DEngine::Application::detail
 
 	struct AppData
 	{
-		LogCallback logCallback = nullptr;
+		void* backendData = nullptr;
 
 		u64 windowIdTracker = 0;
 		struct WindowNode
@@ -120,7 +132,7 @@ namespace DEngine::Application::detail
 		Std::Opt<CursorData> cursorOpt{};
 
 		Std::StackVec<TouchInput, maxTouchEventCount> touchInputs = {};
-		Std::StackVec<std::chrono::high_resolution_clock::time_point, decltype(touchInputs)::Capacity()> touchInputStartTime{};
+		Std::StackVec<std::chrono::high_resolution_clock::time_point, maxTouchEventCount> touchInputStartTime{};
 
 		// Time related stuff
 		u64 tickCount = 0;
@@ -137,21 +149,26 @@ namespace DEngine::Application::detail
 		// the event processing, as to not take up any unnecessary time
 		// from OS polling.
 		// Pending event callbacks are stored in a vector.
-		std::vector<EventInterface*> registeredEventCallbacks;
+		std::vector<EventForwarder*> registeredEventCallbacks;
+
+
 		std::vector<EventCallbackJob> queuedEventCallbacks;
 	};
 
 	extern AppData* pAppData;
 
-	bool Initialize() noexcept;
-	void ProcessEvents();
+	enum class PollMode
+	{
+		Immediate,
+		Wait,
+		COUNT,
+	};
+	void ProcessEvents(PollMode pollMode, Std::Opt<u64> timeoutNs = Std::nullOpt);
 
 	bool Backend_Initialize() noexcept;
-	void Backend_ProcessEvents();
+	void Backend_ProcessEvents(PollMode pollMode, Std::Opt<u64> timeoutNs);
 	void Backend_Log(char const* msg);
 	void Backend_DestroyWindow(AppData::WindowNode& windowNode);
-
-	void SetLogCallback(LogCallback callback);
 
 	AppData::WindowNode* GetWindowNode(AppData& appData, WindowID id);
 	AppData::WindowNode const* GetWindowNode(AppData const& appData, WindowID id);
@@ -224,6 +241,90 @@ namespace DEngine::Application::detail
 	void PushCharRemoveEvent();
 
 	[[nodiscard]] constexpr bool IsValid(CursorType);
+}
+
+namespace DEngine::Application::impl
+{
+	using EventCallbackJob = detail::EventCallbackJob;
+	using AppData = detail::AppData;
+	using WindowData = detail::WindowData;
+	using PollMode = detail::PollMode;
+}
+
+struct [[maybe_unused]] DEngine::Application::impl::AppImpl
+{
+	[[nodiscard]] static Context Initialize();
+	static void ProcessEvents(Context& ctx, PollMode pollMode, Std::Opt<u64> timeoutNs);
+};
+
+namespace DEngine::Application::impl
+{
+	[[nodiscard]] inline auto Initialize() { return AppImpl::Initialize(); }
+	inline void ProcessEvents(Context& ctx, PollMode pollMode, Std::Opt<u64> timeoutNs = Std::nullOpt)
+	{
+		return AppImpl::ProcessEvents(ctx, pollMode, timeoutNs);
+	}
+
+	[[nodiscard]] void* Backend_Initialize(AppData& appData);
+	void Backend_ProcessEvents(AppData& appData, PollMode pollMode, Std::Opt<u64> timeoutNs);
+	void Backend_Destroy(void* data);
+	struct Backend_NewWindow_ReturnT
+	{
+		WindowData windowData;
+		void* platormHandle;
+	};
+	[[nodiscard]] Backend_NewWindow_ReturnT Backend_NewWindow(
+		AppData& appData,
+		Std::Span<char const> title,
+		Extent extent);
+	[[nodiscard]] Context::CreateVkSurface_ReturnT Backend_CreateVkSurface(
+		void* platformHandle,
+		uSize vkInstance,
+		void const* vkAllocationCallbacks) noexcept;
+
+	void Backend_Log(LogSeverity severity, Std::Span<char const> msg);
+
+	[[nodiscard]] AppData::WindowNode* GetWindowNode(AppData& appData, WindowID id);
+	[[nodiscard]] AppData::WindowNode const* GetWindowNode(AppData const& appData, WindowID id);
+
+	[[nodiscard]] WindowID GetWindowId(AppData& appData, void* platformHandle);
+
+	// Should be called by the backend.
+	[[maybe_unused]] void UpdateWindowCursorEnter(
+		AppData& appData,
+		WindowID id,
+		bool entered);
+
+	// Should be called by the backend.
+	[[maybe_unused]] void UpdateWindowFocus(
+		AppData& appData,
+		WindowID id,
+		bool focusGained);
+
+	// Should be called by the backend.
+	[[maybe_unused]] void UpdateWindowPosition(
+		AppData& appData,
+		WindowID id,
+		Math::Vec2Int newPosition);
+
+	// Should be called by the backend.
+	[[maybe_unused]] void UpdateCursorPosition(
+		AppData& appData,
+		WindowID id,
+		Math::Vec2Int newRelativePosition,
+		Math::Vec2Int delta);
+
+	// Should be called by the backend.
+	[[maybe_unused]] void UpdateCursorPosition(
+		AppData& appData,
+		WindowID id,
+		Math::Vec2Int newRelativePosition);
+
+	[[maybe_unused]] void UpdateButton(
+		AppData& appData,
+		WindowID id,
+		Button button,
+		bool pressed);
 }
 
 constexpr bool DEngine::Application::detail::IsValid(CursorType in)

@@ -8,6 +8,8 @@ namespace DEngine::Std
 	class FrameAllocator
 	{
 	public:
+		static constexpr bool stateless = false;
+
 		static constexpr bool clearUnusedMemory = false;
 
 		FrameAllocator() noexcept = default;
@@ -24,7 +26,10 @@ namespace DEngine::Std
 		[[nodiscard]] bool Realloc(void* ptr, uSize newSize) noexcept;
 		void Free(void* in) noexcept;
 
+		// Reset allocated memory without freeing
 		void Reset() noexcept;
+
+		void ReleaseMemory() noexcept;
 
 	protected:
 		uSize offset = 0;
@@ -41,4 +46,6 @@ namespace DEngine::Std
 		Pool memoryPools[maxPoolCount] = {};
 		uSize poolCount = 0;
 	};
+
+	using FrameAlloc = FrameAllocator;
 }

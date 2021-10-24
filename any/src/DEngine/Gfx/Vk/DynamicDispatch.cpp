@@ -9,9 +9,35 @@ using namespace DEngine;
 using namespace DEngine::Gfx;
 using namespace DEngine::Gfx::Vk;
 
+PFN_vkGetInstanceProcAddr Vk::loadInstanceProcAddressPFN()
+{
+	PFN_vkGetInstanceProcAddr procAddr = nullptr;
+
+#if defined(__linux__)
+	void* m_library = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
+	if (m_library == nullptr)
+		throw std::runtime_error("Vulkan: Unable to load the system libvulkan.so for dynamic dispatching");
+	procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(m_library, "vkGetInstanceProcAddr"));
+	dlclose(m_library);
+#elif defined(_WIN32)
+	HMODULE m_library = LoadLibrary(TEXT("vulkan-1.dll"));
+	if (m_library == nullptr)
+		throw std::runtime_error("Vulkan: Unable to load the system vulkan-1.dll for dynamic dispatching");
+	procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(m_library, "vkGetInstanceProcAddr"));
+	FreeLibrary(m_library);
+#else
+#error Unsupported platform
+#endif
+
+	if (procAddr == nullptr)
+		throw std::runtime_error("Vulkan: Unable to load the vkGetInstanceProcAddr function pointer.");
+
+	return procAddr;
+}
+
 BaseDispatchRaw BaseDispatchRaw::Build(PFN_vkGetInstanceProcAddr getInstanceProcAddr)
 {
-	BaseDispatchRaw returnVal{};
+	BaseDispatchRaw returnVal = {};
 	returnVal.vkCreateInstance = (PFN_vkCreateInstance)getInstanceProcAddr(nullptr, "vkCreateInstance");
 	returnVal.vkEnumerateInstanceExtensionProperties = (PFN_vkEnumerateInstanceExtensionProperties)getInstanceProcAddr(nullptr, "vkEnumerateInstanceExtensionProperties");
 	returnVal.vkEnumerateInstanceLayerProperties = (PFN_vkEnumerateInstanceLayerProperties)getInstanceProcAddr(nullptr, "vkEnumerateInstanceLayerProperties");
@@ -354,32 +380,6 @@ void DebugUtilsDispatch::setDebugUtilsObjectNameEXT(
 	raw.vkSetDebugUtilsObjectNameEXT(
 		static_cast<VkDevice>(device),
 		reinterpret_cast<VkDebugUtilsObjectNameInfoEXT const*>(&nameInfo));
-}
-
-PFN_vkGetInstanceProcAddr Vk::loadInstanceProcAddressPFN()
-{
-	PFN_vkGetInstanceProcAddr procAddr = nullptr;
-
-#if defined(__linux__)
-	void* m_library = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
-	if (m_library == nullptr)
-		throw std::runtime_error("Vulkan: Unable to load the system libvulkan.so for dynamic dispatching");
-	procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(m_library, "vkGetInstanceProcAddr"));
-	dlclose(m_library);
-#elif defined(_WIN32)
-	HMODULE m_library = LoadLibrary(TEXT("vulkan-1.dll"));
-	if (m_library == nullptr)
-		throw std::runtime_error("Vulkan: Unable to load the system vulkan-1.dll for dynamic dispatching");
-	procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(m_library, "vkGetInstanceProcAddr"));
-	FreeLibrary(m_library);
-#else
-#error Unsupported platform
-#endif
-
-	if (procAddr == nullptr)
-		throw std::runtime_error("Vulkan: Unable to load the vkGetInstanceProcAddr function pointer.");
-
-	return procAddr;
 }
 
 void InstanceDispatch::destroy(

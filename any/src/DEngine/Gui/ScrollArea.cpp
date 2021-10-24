@@ -64,9 +64,9 @@ namespace DEngine::Gui::impl
 			if (factor < 1.f)
 				scrollbarRect.extent.height *= factor;
 
-			f32 test = (f32)position / (childHeight - widgetRect.extent.height);
+			f32 test = (f32)position / (f32)(childHeight - widgetRect.extent.height);
 
-			scrollbarRect.position.y += test * (widgetRect.extent.height - scrollbarRect.extent.height);
+			scrollbarRect.position.y += test * (f32)(widgetRect.extent.height - scrollbarRect.extent.height);
 		}
 		return scrollbarRect;
 	}
@@ -213,7 +213,7 @@ public:
 		{
 			auto childConsumed = false;
 
-			if constexpr (Std::Trait::isSame<T, CursorClickEvent>)
+			if constexpr (Std::Trait::isSame<T, CursorPressEvent>)
 			{
 				childConsumed = scrollArea.widget->CursorPress(
 					*params.ctx,
@@ -415,13 +415,13 @@ bool ScrollArea::CursorPress(
 	Rect widgetRect,
 	Rect visibleRect,
 	Math::Vec2Int cursorPos,
-	CursorClickEvent event)
+	CursorPressEvent event)
 {
 	impl::PointerPressEvent pointerPress = {};
 	pointerPress.id = impl::cursorPointerId;
 	pointerPress.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
 	pointerPress.type = impl::ToPointerType(event.button);
-	pointerPress.pressed = event.clicked;
+	pointerPress.pressed = event.pressed;
 
 	impl::PointerPress_Params<decltype(event)> params = {};
 	params.scrollArea = this;
@@ -528,4 +528,120 @@ void ScrollArea::CharEvent(Context& ctx, u32 utfValue)
 void ScrollArea::CharRemoveEvent(Context& ctx)
 {
 	widget->CharRemoveEvent(ctx);
+}
+
+SizeHint ScrollArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
+{
+	if (widget)
+	{
+		auto const& child = *widget;
+		child.GetSizeHint2(params);
+	}
+
+	SizeHint returnVal = {};
+
+	returnVal.preferred.width = 150;
+	returnVal.preferred.height = 150;
+
+	returnVal.expandX = true;
+	returnVal.expandY = true;
+
+	params.pusher.PushSizeHint(*this, returnVal);
+
+	return returnVal;
+}
+
+void ScrollArea::BuildChildRects(
+	Widget::BuildChildRects_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	if (widget)
+	{
+		auto const childSizeHint = params.builder.GetSizeHint(*widget);
+
+		auto correctedScrollbarPos = impl::GetCorrectedScrollbarPos(
+			widgetRect.extent.height,
+			childSizeHint.preferred.height,
+			currScrollbarPos);
+
+		auto const childRect = impl::GetChildRect(
+			widgetRect,
+			childSizeHint,
+			correctedScrollbarPos,
+			scrollbarThickness);
+
+		auto const childVisibleRect = Rect::Intersection(childRect, visibleRect);
+
+		auto const& child = *widget;
+
+		params.builder.PushRect(child, { childRect, childVisibleRect });
+		child.BuildChildRects(params, childRect, childVisibleRect);
+	}
+}
+
+void ScrollArea::Render2(
+	Widget::Render_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	if (Rect::Intersection(widgetRect, visibleRect).IsNothing())
+		return;
+
+	RectCombo childRectCombo = {};
+
+	if (widget)
+	{
+		auto const& child = *widget;
+
+		childRectCombo = params.rectCollection.GetRect(child);
+
+		if (!childRectCombo.visibleRect.IsNothing())
+		{
+			auto const scopedScissor = DrawInfo::ScopedScissor(
+				params.drawInfo,
+				childRectCombo.visibleRect);
+
+			child.Render2(
+				params,
+				childRectCombo.widgetRect,
+				childRectCombo.visibleRect);
+		}
+	}
+
+	auto correctedScrollbarPos = currScrollbarPos;
+	if (widget)
+	{
+		correctedScrollbarPos = impl::GetCorrectedScrollbarPos(
+			widgetRect.extent.height,
+			childRectCombo.widgetRect.extent.height,
+			currScrollbarPos);
+	}
+
+	// Draw scrollbar
+	auto const scrollBarRect = impl::GetScrollbarRect(
+		scrollbarThickness,
+		correctedScrollbarPos,
+		widgetRect,
+		childRectCombo.widgetRect.extent.height);
+
+	Math::Vec4 color = scrollbarInactiveColor;
+	if (scrollbarHeldData.HasValue())
+	{
+		color = { 1.f, 1.f, 1.f, 1.f };
+	}
+	else
+	{
+		color = scrollbarInactiveColor;
+		if (scrollbarHoveredByCursor)
+		{
+			for (auto i = 0; i < 3; i++)
+				color[i] += scrollbarHoverHighlight[i];
+		}
+	}
+
+	for (auto i = 0; i < 4; i++)
+		color[i] = Math::Clamp(color[i], 0.f, 1.f);
+
+	params.drawInfo.PushFilledQuad(scrollBarRect, color);
 }

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.18)
 
 project(dengine_any)
 
@@ -11,7 +11,7 @@ include(SourceFileList.cmake)
 
 set(DENGINE_ANY_TARGET_NAME dengine_any)
 
-
+#[[
 # Create main library
 add_library(${DENGINE_ANY_TARGET_NAME} STATIC ${DENGINE_ANY_SOURCE_FILES})
 
@@ -35,6 +35,40 @@ set_target_properties(${DENGINE_ANY_TARGET_NAME} PROPERTIES
 include(LinkDependencies.cmake)
 LinkDependencies(${DENGINE_ANY_TARGET_NAME})
 
+set(DENGINE_DEFAULT_ASSERT_SETTING ON)
+include(SetupAssertDefines.cmake)
+SetupAssertDefines(${DENGINE_ANY_TARGET_NAME} ${DENGINE_DEFAULT_ASSERT_SETTING})
+]]
+
+
+
+
+# Create main library
+add_library(${DENGINE_ANY_TARGET_NAME} STATIC ${DENGINE_ANY_SOURCE_FILES2})
+
+target_include_directories(${DENGINE_ANY_TARGET_NAME}
+		PUBLIC
+		"include")
+target_link_libraries(${DENGINE_ANY_TARGET_NAME}
+		PUBLIC
+		Threads::Threads
+		${CMAKE_DL_LIBS})
+target_sources(${DENGINE_ANY_TARGET_NAME}
+		PUBLIC
+		${DENGINE_HEADERS})
+target_compile_features(${DENGINE_ANY_TARGET_NAME} PRIVATE cxx_std_20)
+set_target_properties(${DENGINE_ANY_TARGET_NAME} PROPERTIES
+		CXX_STANDARD 20
+		CXX_EXTENSIONS OFF)
+#target_compile_options(dengine_any PUBLIC "-ftime-trace")
+
+if (NOT DEFINED DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT)
+	message(FATAL_ERROR "DEngine, developer bug: CMake variable 'DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT' not set.")
+endif()
+
+# Run script for linking dependencies
+include(LinkDependencies.cmake)
+DEngineAny_LinkDependencies(${DENGINE_ANY_TARGET_NAME} ${DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT})
 
 set(DENGINE_DEFAULT_ASSERT_SETTING ON)
 include(SetupAssertDefines.cmake)

@@ -22,6 +22,14 @@ namespace DEngine::Gui
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
 
+		virtual SizeHint GetSizeHint2(
+			GetSizeHint2_Params const& params) const override;
+
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+
 		virtual void Render(
 			Context const& ctx,
 			Extent framebufferExtent,
@@ -29,13 +37,18 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
+		virtual void Render2(
+			Render_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+
 		virtual bool CursorPress(
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
-			CursorClickEvent event) override;
+			CursorPressEvent event) override;
 
 		virtual bool CursorMove(
 			Context& ctx,

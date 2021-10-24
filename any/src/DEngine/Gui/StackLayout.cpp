@@ -7,6 +7,7 @@
 #include <DEngine/Math/Common.hpp>
 
 #include <DEngine/Std/Containers/Span.hpp>
+#include <DEngine/Std/Containers/Vec.hpp>
 #include <DEngine/Std/Trait.hpp>
 #include <DEngine/Std/Utility.hpp>
 
@@ -15,6 +16,108 @@ using namespace DEngine::Gui;
 
 namespace DEngine::Gui::impl
 {
+	// Contains references to stuff like Extent width and height based on
+	// the StackLayout direction. This is so we don't have
+	// to care whether the StackLayout is horizontal or vertical
+	template<class T>
+	struct StackLayoutDirRefs
+	{
+		T& dir;
+		T& nonDir;
+	};
+
+	[[nodiscard]] static auto GetDirRefs(StackLayout::Direction dir, Extent& in) noexcept -> StackLayoutDirRefs<decltype(in.width)>
+	{
+		if (dir == StackLayout::Direction::Horizontal)
+			return { in.width, in.height };
+		else
+			return { in.height, in.width };
+	}
+
+	[[nodiscard]] static auto GetDirRefs(StackLayout::Direction dir, Extent const& in) noexcept -> StackLayoutDirRefs<decltype(in.width) const>
+	{
+		if (dir == StackLayout::Direction::Horizontal)
+			return { in.width, in.height };
+		else
+			return { in.height, in.width };
+	}
+
+	[[nodiscard]] static auto GetDirRefs(StackLayout::Direction dir, Math::Vec2Int& in) noexcept -> StackLayoutDirRefs<decltype(in.x)>
+	{
+		if (dir == StackLayout::Direction::Horizontal)
+			return { in.x, in.y };
+		else
+			return { in.y, in.x };
+	}
+
+
+	[[nodiscard]] static Extent GetSizeHintExtentSum(
+		StackLayout::Direction dir,
+		Std::Span<SizeHint const> const& sizeHints) noexcept
+	{
+		Extent returnVal = {};
+
+		auto returnValRefs = GetDirRefs(dir, returnVal);
+
+		for (auto const& childSizeHint : sizeHints)
+		{
+			auto childRefs = GetDirRefs(dir, childSizeHint.preferred);
+			returnValRefs.dir += childRefs.dir;
+			returnValRefs.nonDir = Math::Max(returnValRefs.nonDir, childRefs.nonDir);
+		}
+
+		return returnVal;
+	}
+
+	[[nodiscard]] static Std::Vec<Rect, Std::FrameAllocator> BuildChildRects2(
+		Rect const& parentRect,
+		StackLayout::Direction dir,
+		u32 spacing,
+		Std::Span<SizeHint const> sizeHints,
+		Std::FrameAllocator& transientAlloc)
+	{
+		auto const parentRefs = GetDirRefs(dir, parentRect.extent);
+
+		auto const childCount = sizeHints.Size();
+
+		auto lengthUsableByChildren = parentRefs.dir;
+		if (childCount > 0)
+			lengthUsableByChildren -= spacing * (childCount - 1);
+
+		auto const sumChildPreferredExtent = GetSizeHintExtentSum(dir, sizeHints);
+		auto const sumChildPreferredRefs = GetDirRefs(dir, sumChildPreferredExtent);
+
+		auto const sizeRatio = (f32)(lengthUsableByChildren) / (f32)sumChildPreferredRefs.dir;
+
+		auto returnVal = Std::Vec<Rect, Std::FrameAllocator>{ transientAlloc };
+		returnVal.Resize(childCount);
+
+		auto remainingDirLength = lengthUsableByChildren;
+		auto childPos = parentRect.position;
+		auto const childPosRefs = GetDirRefs(dir, childPos);
+		for (uSize i = 0; i < childCount; i += 1)
+		{
+			auto& childRect = returnVal[i];
+			childRect.position = childPos;
+
+			auto childRefs = GetDirRefs(dir, childRect.extent);
+			auto childSizeHintRefs = GetDirRefs(dir, sizeHints[i].preferred);
+
+			if (i < childCount - 1)
+				childRefs.dir = (u32)((f32)childSizeHintRefs.dir * sizeRatio);
+			else
+				childRefs.dir = remainingDirLength;
+
+			childRefs.nonDir = parentRefs.nonDir;
+
+			remainingDirLength -= childRefs.dir;
+			childPosRefs.dir += childRefs.dir + spacing;
+		}
+
+		return returnVal;
+	}
+
+
 	static void BuildChildRects(
 		Std::Span<SizeHint const> sizeHints,
 		Rect rect,
@@ -40,18 +143,22 @@ namespace DEngine::Gui::impl
 			shouldAdd = shouldAdd || (dir == StackLayout::Direction::Vertical && !childSizeHint.expandY);
 			if (shouldAdd)
 			{
-				u32& directionLength = dir == StackLayout::Direction::Horizontal ?
+				u32& directionLength =
+					dir == StackLayout::Direction::Horizontal ?
 					sumChildPreferredSize.width :
 					sumChildPreferredSize.height;
-				u32 const& childDirectionLength = dir == StackLayout::Direction::Horizontal ?
+				u32 const& childDirectionLength =
+					dir == StackLayout::Direction::Horizontal ?
 					childSizeHint.preferred.width :
 					childSizeHint.preferred.height;
 				directionLength += childDirectionLength;
 
-				u32& nonDirectionLength = dir == StackLayout::Direction::Vertical ?
+				u32& nonDirectionLength =
+					dir == StackLayout::Direction::Vertical ?
 					sumChildPreferredSize.width :
 					sumChildPreferredSize.height;
-				u32 const& childNonDirectionLength = dir == StackLayout::Direction::Vertical ?
+				u32 const& childNonDirectionLength =
+					dir == StackLayout::Direction::Vertical ?
 					childSizeHint.preferred.width :
 					childSizeHint.preferred.height;
 				nonDirectionLength = Math::Max(nonDirectionLength, childNonDirectionLength);
@@ -91,7 +198,8 @@ namespace DEngine::Gui::impl
 			outChildRects[i] = childRect;
 
 			auto& childPosDir = dir == StackLayout::Direction::Horizontal ? childRect.position.x : childRect.position.y;
-			auto const& childExtentDir = dir == StackLayout::Direction::Horizontal ? childRect.extent.width : childRect.extent.height;
+			auto const& childExtentDir =
+				dir == StackLayout::Direction::Horizontal ? childRect.extent.width : childRect.extent.height;
 
 			childPosDir += childExtentDir + spacing;
 		}
@@ -108,7 +216,7 @@ public:
 		uSize index) noexcept
 	{
 		uSize returnVal = index;
-		for (auto const& job : jobs)
+		for (auto const& job: jobs)
 		{
 			switch (job.type)
 			{
@@ -164,6 +272,7 @@ public:
 			Widget_T& widget;
 			Rect childRect;
 		};
+
 		[[nodiscard]] Deref_T operator*() const noexcept;
 	};
 
@@ -178,7 +287,8 @@ public:
 		std::vector<Rect> childRects;
 
 		ItPair() noexcept = default;
-		ItPair(ItPair&& in) noexcept :
+
+		ItPair(ItPair&& in) noexcept:
 			layout(in.layout),
 			childRects(Std::Move(in.childRects))
 		{
@@ -217,7 +327,7 @@ public:
 			ItPair returnVal;
 			returnVal.layout = &layout;
 
-			uSize const childCount = (uSize)layout.children.size();
+			auto const childCount = (uSize) layout.children.size();
 
 			std::vector<SizeHint> childSizeHints;
 			childSizeHints.resize(childCount);
@@ -226,11 +336,11 @@ public:
 
 			returnVal.childRects.resize(childCount);
 			BuildChildRects(
-				{ childSizeHints.data(), childSizeHints.size() },
+				{childSizeHints.data(), childSizeHints.size()},
 				rect,
 				layout.direction,
 				layout.spacing,
-				{ returnVal.childRects.data(), returnVal.childRects.size() });
+				{returnVal.childRects.data(), returnVal.childRects.size()});
 
 			return returnVal;
 		}
@@ -257,7 +367,7 @@ typename Gui::impl::StackLayoutImpl::It<T>::Deref_T Gui::impl::StackLayoutImpl::
 	DENGINE_IMPL_GUI_ASSERT(widgetIndex < itPair->layout->children.size());
 	return Deref_T{
 		*itPair->layout->children[widgetIndex],
-		itPair->childRects[index] };
+		itPair->childRects[index]};
 }
 
 template<class T>
@@ -275,7 +385,7 @@ Gui::impl::StackLayoutImpl::It<T>& Gui::impl::StackLayoutImpl::It<T>::operator++
 		{
 			StackLayout const& layout = *itPair->layout;
 			auto indexOpt = GetModifiedWidgetIndex(
-				{ layout.insertionJobs.data(), layout.insertionJobs.size() },
+				{layout.insertionJobs.data(), layout.insertionJobs.size()},
 				index);
 			if (indexOpt.HasValue())
 			{
@@ -340,7 +450,7 @@ namespace DEngine::Gui::impl
 		auto innerRect = impl::BuildInnerRect(widgetRect, layout.padding);
 
 		auto itPair = impl::BuildItPair(layout, ctx, innerRect);
-		for (auto const& itItem : itPair)
+		for (auto const& itItem: itPair)
 		{
 			if constexpr (Std::Trait::isSame<T, CursorMoveEvent>)
 			{
@@ -382,27 +492,27 @@ namespace DEngine::Gui::impl
 		T const& event)
 	{
 		auto innerRect = impl::BuildInnerRect(widgetRect, layout.padding);
-		
+
 		bool pointerInWidget = innerRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
 		if (pointerPressed && !pointerInWidget)
 			return false;
 
 		auto itPair = impl::BuildItPair(layout, ctx, innerRect);
-		for (auto const& itItem : itPair)
+		for (auto const& itItem: itPair)
 		{
 			bool pointerInChild = itItem.childRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
 			if (pointerPressed && !pointerInChild)
 				continue;
-			
+
 			bool eventConsumed = false;
-			if constexpr (Std::Trait::isSame<T, CursorClickEvent>)
+			if constexpr (Std::Trait::isSame<T, CursorPressEvent>)
 			{
 				eventConsumed = itItem.widget.CursorPress(
 					ctx,
 					windowId,
 					itItem.childRect,
 					visibleRect,
-					{ (i32)pointerPos.x, (i32)pointerPos.y },
+					{(i32) pointerPos.x, (i32) pointerPos.y},
 					event);
 			}
 			else if constexpr (Std::Trait::isSame<T, TouchPressEvent>)
@@ -430,14 +540,14 @@ StackLayout::~StackLayout()
 
 uSize StackLayout::ChildCount() const
 {
-	return (uSize)children.size();
+	return (uSize) children.size();
 }
 
 Widget& StackLayout::At(uSize index)
 {
 	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
 	auto& child = children[index];
-	
+
 	DENGINE_IMPL_GUI_ASSERT(child);
 
 	return *child;
@@ -468,7 +578,7 @@ void StackLayout::AddWidget(Std::Box<Widget>&& in)
 	}
 }
 
-Std::Box<Widget> DEngine::Gui::StackLayout::ExtractChild(uSize index)
+Std::Box<Widget> StackLayout::ExtractChild(uSize index)
 {
 	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
 
@@ -527,9 +637,9 @@ void StackLayout::ClearChildren()
 SizeHint StackLayout::GetSizeHint(
 	Context const& ctx) const
 {
-	SizeHint returnVal{};
+	SizeHint returnVal = {};
 	u32 childCount = 0;
-	for (auto const& child : children)
+	for (auto const& child: children)
 	{
 		if (!child)
 			continue;
@@ -538,12 +648,16 @@ SizeHint StackLayout::GetSizeHint(
 
 		SizeHint const childSizeHint = child->GetSizeHint(ctx);
 
-		u32& directionLength = direction == Direction::Horizontal ? returnVal.preferred.width : returnVal.preferred.height;
-		u32 const& childDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.width : childSizeHint.preferred.height;
+		u32& directionLength =
+			direction == Direction::Horizontal ? returnVal.preferred.width : returnVal.preferred.height;
+		u32 const& childDirectionLength =
+			direction == Direction::Horizontal ? childSizeHint.preferred.width : childSizeHint.preferred.height;
 		directionLength += childDirectionLength;
 
-		u32& nonDirectionLength = direction == Direction::Horizontal ? returnVal.preferred.height : returnVal.preferred.width;
-		u32 const& childNonDirectionLength = direction == Direction::Horizontal ? childSizeHint.preferred.height : childSizeHint.preferred.width;
+		u32& nonDirectionLength =
+			direction == Direction::Horizontal ? returnVal.preferred.height : returnVal.preferred.width;
+		u32 const& childNonDirectionLength =
+			direction == Direction::Horizontal ? childSizeHint.preferred.height : childSizeHint.preferred.width;
 		nonDirectionLength = Math::Max(nonDirectionLength, childNonDirectionLength);
 	}
 	// Add spacing
@@ -568,7 +682,7 @@ SizeHint StackLayout::GetSizeHint(
 		else
 			DENGINE_IMPL_UNREACHABLE();
 	}
-	
+
 	// Add padding
 	returnVal.preferred.width += padding * 2;
 	returnVal.preferred.height += padding * 2;
@@ -595,7 +709,7 @@ void StackLayout::Render(
 	}
 
 	auto itPair = impl::BuildItPair(*this, ctx, innerRect);
-	for (auto const& item : itPair)
+	for (auto const& item: itPair)
 	{
 		Rect childVisibleRect = Rect::Intersection(item.childRect, visibleRect);
 		if (childVisibleRect.IsNothing())
@@ -613,21 +727,21 @@ void StackLayout::CharEnterEvent(Context& ctx)
 {
 	ParentType::CharEnterEvent(ctx);
 
-	for (auto& child : children)
+	for (auto& child: children)
 	{
 		child->CharEnterEvent(ctx);
 	}
 }
 
 void StackLayout::CharEvent(
-	Context& ctx, 
+	Context& ctx,
 	u32 utfValue)
 {
 	ParentType::CharEvent(
 		ctx,
 		utfValue);
 
-	for (auto& child : children)
+	for (auto& child: children)
 	{
 		child->CharEvent(ctx, utfValue);
 	}
@@ -637,7 +751,7 @@ void StackLayout::CharRemoveEvent(Context& ctx)
 {
 	ParentType::CharRemoveEvent(ctx);
 
-	for (auto& child : children)
+	for (auto& child: children)
 	{
 		child->CharRemoveEvent(ctx);
 	}
@@ -647,7 +761,7 @@ void StackLayout::InputConnectionLost()
 {
 	ParentType::InputConnectionLost();
 
-	for (auto& child : children)
+	for (auto& child: children)
 	{
 		child->InputConnectionLost();
 	}
@@ -659,7 +773,7 @@ bool StackLayout::CursorPress(
 	Rect widgetRect,
 	Rect visibleRect,
 	Math::Vec2Int cursorPos,
-	CursorClickEvent event)
+	CursorPressEvent event)
 {
 	return impl::PointerPress(
 		*this,
@@ -667,8 +781,8 @@ bool StackLayout::CursorPress(
 		windowId,
 		widgetRect,
 		visibleRect,
-		{ (f32)cursorPos.x, (f32)cursorPos.y },
-		event.clicked,
+		{(f32) cursorPos.x, (f32) cursorPos.y},
+		event.pressed,
 		event);
 }
 
@@ -686,7 +800,7 @@ bool StackLayout::CursorMove(
 		windowId,
 		widgetRect,
 		visibleRect,
-		{ (f32)event.position.x, (f32)event.position.y },
+		{(f32) event.position.x, (f32) event.position.y},
 		cursorOccluded,
 		event);
 }
@@ -726,4 +840,168 @@ bool StackLayout::TouchMoveEvent(
 		event.position,
 		occluded,
 		event);
+}
+
+SizeHint StackLayout::GetSizeHint2(GetSizeHint2_Params const& params) const
+{
+	uSize const childCount = children.size();
+
+	SizeHint returnVal = {};
+
+	auto childSizeHints = Std::Vec<SizeHint, Std::FrameAllocator>{ params.transientAlloc };
+	childSizeHints.Resize(childCount);
+	for (uSize i = 0; i < childCount; i += 1)
+		childSizeHints[i] = children[i]->GetSizeHint2(params);
+
+	returnVal.preferred = impl::GetSizeHintExtentSum(
+		direction,
+		childSizeHints.ToSpan());
+
+	auto returnValRefs = impl::GetDirRefs(direction, returnVal.preferred);
+
+	// Add spacing
+	if (childCount > 0)
+		returnValRefs.dir += spacing * (childCount - 1);
+
+	// Add padding
+	returnValRefs.dir += padding * 2;
+	returnValRefs.nonDir += padding * 2;
+
+	params.pusher.PushSizeHint(*this, returnVal);
+	return returnVal;
+}
+
+void StackLayout::BuildChildRects(
+	BuildChildRects_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	uSize const childCount = children.size();
+
+	auto childSizeHints = Std::Vec<SizeHint, Std::FrameAllocator>{ params.transientAlloc };
+	childSizeHints.Resize(childCount);
+	for (uSize i = 0; i < childCount; i += 1)
+		childSizeHints[i] = params.builder.GetSizeHint(*children[i]);
+
+	auto const innerRect = impl::BuildInnerRect(widgetRect, padding);
+
+	auto const childRects = impl::BuildChildRects2(
+		innerRect,
+		direction,
+		spacing,
+		childSizeHints.ToSpan(),
+		params.transientAlloc);
+
+	for (uSize i = 0; i < childCount; i += 1)
+	{
+		auto& child = *children[i];
+		params.builder.PushRect(child, { childRects[i], visibleRect });
+		child.BuildChildRects(
+			params,
+			childRects[i],
+			visibleRect);
+	}
+}
+
+void StackLayout::CursorExit(Context& ctx)
+{
+	DENGINE_IMPL_GUI_ASSERT(!currentlyIterating);
+	currentlyIterating = true;
+
+	uSize const childCount = children.size();
+	for (uSize i = 0; i < childCount; i += 1)
+	{
+		auto const index = impl::StackLayoutImpl::GetModifiedWidgetIndex({ insertionJobs.data(), insertionJobs.size() }, i);
+		if (!index.HasValue())
+			continue;
+
+		auto& child = *children[index.Value()];
+		child.CursorExit(ctx);
+	}
+
+	currentlyIterating = false;
+	insertionJobs.clear();
+}
+
+bool StackLayout::CursorPress2(CursorPressParams const& params)
+{
+	DENGINE_IMPL_GUI_ASSERT(!currentlyIterating);
+	currentlyIterating = true;
+
+	auto const rects = params.rectCollection.GetRect(*this);
+
+	uSize const childCount = children.size();
+	for (uSize i = 0; i < childCount; i += 1)
+	{
+		auto const index = impl::StackLayoutImpl::GetModifiedWidgetIndex({ insertionJobs.data(), insertionJobs.size() }, i);
+		if (!index.HasValue())
+			continue;
+
+		auto& child = *children[index.Value()];
+		child.CursorPress2(params);
+	}
+
+	currentlyIterating = false;
+	insertionJobs.clear();
+
+	return rects.widgetRect.PointIsInside(params.cursorPos) && rects.visibleRect.PointIsInside(params.cursorPos);
+}
+
+bool StackLayout::CursorMove(Widget::CursorMoveParams const& params, bool occluded)
+{
+	DENGINE_IMPL_GUI_ASSERT(!currentlyIterating);
+	currentlyIterating = true;
+
+	auto const rects = params.rectCollection.GetRect(*this);
+
+	uSize const childCount = children.size();
+	for (uSize i = 0; i < childCount; i += 1)
+	{
+		auto const index = impl::StackLayoutImpl::GetModifiedWidgetIndex({ insertionJobs.data(), insertionJobs.size() }, i);
+		if (!index.HasValue())
+			continue;
+
+		auto& child = *children[index.Value()];
+		child.CursorMove(params, occluded);
+	}
+
+	currentlyIterating = false;
+	insertionJobs.clear();
+
+	return
+		rects.widgetRect.PointIsInside(params.event.position) &&
+		rects.visibleRect.PointIsInside(params.event.position);
+}
+
+void StackLayout::Render2(
+	Render_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	auto const innerRect = impl::BuildInnerRect(widgetRect, padding);
+
+	if (Rect::Intersection(innerRect, visibleRect).IsNothing())
+		return;
+
+	// Only draw the quad of the layout if the alpha of the color is high enough to be visible.
+	if (color.w > 0.01f)
+	{
+		params.drawInfo.PushFilledQuad(innerRect, color);
+	}
+
+	auto const childCount = children.size();
+	for (uSize j = 0; j < childCount; j += 1)
+	{
+		auto const indexOpt = impl::StackLayoutImpl::GetModifiedWidgetIndex({insertionJobs.data(), insertionJobs.size()}, j);
+		if (!indexOpt.HasValue())
+			continue;
+
+		auto const& child = *children[indexOpt.Value()];
+		auto const& childRects = params.rectCollection.GetRect(child);
+
+		child.Render2(
+			params,
+			childRects.widgetRect,
+			childRects.visibleRect);
+	}
 }

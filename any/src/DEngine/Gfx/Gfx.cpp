@@ -14,21 +14,23 @@ Gfx::Context::Context(Context&& other) noexcept
 	texAssetInterface = other.texAssetInterface;
 	other.texAssetInterface = nullptr;
 
-	apiDataBuffer = other.apiDataBuffer;
-	other.apiDataBuffer = nullptr;
+	apiDataBase = other.apiDataBase;
+	other.apiDataBase = nullptr;
 }
 
 Gfx::Context::~Context()
 {
-	delete static_cast<APIDataBase*>(apiDataBuffer);
+	auto* apiData = static_cast<APIDataBase*>(apiDataBase);
+
+	if (apiData)
+		delete apiData;
 }
 
 namespace DEngine::Gfx::Vk
 {
-	bool InitializeBackend(
-		Context& gfxData, 
-		InitInfo const& initInfo, 
-		void*& apiDataBuffer);
+	APIDataBase* InitializeBackend(
+		Context& gfxData,
+		InitInfo const& initInfo);
 }
 
 Std::Opt<Gfx::Context> Gfx::Initialize(InitInfo const& initInfo)
@@ -38,7 +40,10 @@ Std::Opt<Gfx::Context> Gfx::Initialize(InitInfo const& initInfo)
 	returnVal.logger = initInfo.optional_logger;
 	returnVal.texAssetInterface = initInfo.texAssetInterface;
 
-	Vk::InitializeBackend(returnVal, initInfo, returnVal.apiDataBuffer);
+	returnVal.apiDataBase = Vk::InitializeBackend(returnVal, initInfo);
+	if (!returnVal.apiDataBase)
+		return Std::nullOpt;
+
 
 	return Std::Opt<Gfx::Context>{ Std::Move(returnVal) };
 }
@@ -46,26 +51,27 @@ Std::Opt<Gfx::Context> Gfx::Initialize(InitInfo const& initInfo)
 void Gfx::Context::Draw(DrawParams const& params)
 {
 	DENGINE_IMPL_GFX_ASSERT(!params.nativeWindowUpdates.empty());
-	static_cast<APIDataBase*>(this->apiDataBuffer)->Draw(params);
-}
 
-Gfx::NativeWindowID Gfx::Context::NewNativeWindow(WsiInterface& wsiConnection)
-{
-	return static_cast<APIDataBase*>(this->apiDataBuffer)->NewNativeWindow(wsiConnection);
+	auto& apiData = *static_cast<APIDataBase*>(apiDataBase);
+
+	apiData.Draw(params);
 }
 
 Gfx::ViewportRef Gfx::Context::NewViewport()
 {
 	ViewportRef returnVal{};
-	
-	static_cast<APIDataBase*>(this->apiDataBuffer)->NewViewport(returnVal.viewportID);
+
+	auto& apiData = *static_cast<APIDataBase*>(apiDataBase);
+
+	apiData.NewViewport(returnVal.viewportID);
 
 	return returnVal;
 }
 
 void Gfx::Context::DeleteViewport(ViewportID viewportID)
 {
-	static_cast<APIDataBase*>(this->apiDataBuffer)->DeleteViewport(viewportID);
+	auto& apiData = *static_cast<APIDataBase*>(apiDataBase);
+	apiData.DeleteViewport(viewportID);
 }
 
 void Gfx::Context::NewFontTexture(
@@ -75,10 +81,19 @@ void Gfx::Context::NewFontTexture(
 	u32 pitch,
 	Std::Span<std::byte const> data)
 {
-	return static_cast<APIDataBase*>(this->apiDataBuffer)->NewFontTexture(
+	auto& apiData = *static_cast<APIDataBase*>(apiDataBase);
+
+	return apiData.NewFontTexture(
 		id,
 		width,
 		height,
 		pitch,
 		data);
+}
+
+void Gfx::Context::AdoptNativeWindow(Gfx::NativeWindowID in)
+{
+	auto& apiData = *static_cast<APIDataBase*>(apiDataBase);
+
+	apiData.NewNativeWindow(in);
 }

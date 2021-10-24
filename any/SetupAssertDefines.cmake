@@ -21,7 +21,7 @@ function(SetupAssertDefines TARGET VALUE)
 	endif()
 
 	option(DENGINE_GUI_ENABLE_ASSERT "Asserts inside the GUI toolkit code" ${VALUE})
-	if (${DENGINE_GFX_ENABLE_ASSERT})
+	if (${DENGINE_GUI_ENABLE_ASSERT})
 		target_compile_definitions(${TARGET} PUBLIC DENGINE_GUI_ENABLE_ASSERT)
 	endif()
 

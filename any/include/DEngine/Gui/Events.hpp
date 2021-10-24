@@ -12,6 +12,12 @@ namespace DEngine::Gui
 		Rect visibleRect;
 	};
 
+	struct WindowFocusEvent
+	{
+		WindowID windowId;
+		bool gainedFocus;
+	};
+
 	struct WindowMoveEvent
 	{
 		WindowID windowId;
@@ -29,14 +35,14 @@ namespace DEngine::Gui
 		WindowID windowId;
 	};
 
-	struct WindowCursorEnterEvent
+	struct WindowCursorExitEvent
 	{
 		WindowID windowId;
-		bool entered;
 	};
 
 	struct CursorMoveEvent
 	{
+		WindowID windowId;
 		Math::Vec2Int position;
 		Math::Vec2Int positionDelta;
 	};
@@ -47,10 +53,11 @@ namespace DEngine::Gui
 		Secondary,
 		COUNT
 	};
-	struct CursorClickEvent
+	struct CursorPressEvent
 	{
+		WindowID windowId;
 		CursorButton button;
-		bool clicked;
+		bool pressed;
 	};
 
 	struct TouchPressEvent

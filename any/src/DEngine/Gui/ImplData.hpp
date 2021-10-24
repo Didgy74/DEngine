@@ -3,7 +3,9 @@
 #include <DEngine/Gui/Events.hpp>
 #include <DEngine/Gui/SizeHint.hpp>
 #include <DEngine/Gui/WindowHandler.hpp>
+#include <DEngine/Gui/SizeHintCollection.hpp>
 
+#include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
@@ -68,11 +70,10 @@ namespace DEngine::Gui::impl
 	struct WindowData
 	{
 		Rect rect = {};
-		Rect visibleRect = {};
+		Math::Vec2UInt visibleOffset = {};
+		Extent visibleExtent = {};
 		bool isMinimized = {};
 		Math::Vec4 clearColor = { 0, 0, 0, 1 };
-		u32 drawCmdOffset = {};
-		u32 drawCmdCount = {};
 		Std::Box<Widget> topLayout = {};
 	};
 
@@ -93,10 +94,20 @@ namespace DEngine::Gui::impl
 
 		Widget* inputConnectionWidget = nullptr;
 
+		// Windows are stored front to back in order of focus,
+		// with the first element being the
+		// frontmost window.
 		std::vector<WindowNode> windows;
 
+		// The absolute position of the cursor.
 		Math::Vec2Int cursorPosition = {};
+		// Stores which window the cursor is inside, if any.
+		Std::Opt<WindowID> cursorWindowId;
 
 		TextManager textManager;
+
+		Std::FrameAlloc transientAlloc;
+
+		SizeHintCollection sizeHintColl;
 	};
 }

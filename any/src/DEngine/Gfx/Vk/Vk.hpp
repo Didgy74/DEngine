@@ -63,7 +63,7 @@ namespace DEngine::Gfx::Vk
 		void InternalDraw(DrawParams const& drawParams);
 
 		// Thread safe
-		virtual NativeWindowID NewNativeWindow(WsiInterface& wsiConnection) override;
+		virtual void NewNativeWindow(NativeWindowID windowId) override;
 
 		// Thread safe
 		virtual void NewViewport(ViewportID& viewportID) override;
@@ -78,7 +78,6 @@ namespace DEngine::Gfx::Vk
 			u32 pitch,
 			Std::Span<std::byte const> data) override;
 
-		Gfx::LogInterface* logger = nullptr;
 		Gfx::TextureAssetInterface const* test_textureAssetInterface = nullptr;
 
 		u8 currInFlightIndex = 0;

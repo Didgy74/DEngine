@@ -157,8 +157,8 @@ void Button::Render(
 	if (pointerId.HasValue())
 	{
 		// We have a finger pressing on the button atm
-		currColor = pressedColor;
-		currTextColor = pressedTextColor;
+		currColor = colors.pressed;
+		currTextColor = colors.pressedText;
 	}
 	else
 	{
@@ -166,19 +166,19 @@ void Button::Render(
 		{
 			if (toggled)
 			{
-				currColor = toggledColor;
-				currTextColor = toggledTextColor;
+				currColor = colors.toggled;
+				currTextColor = colors.toggledText;
 			}
 			else
 			{
-				currColor = normalColor;
-				currTextColor = normalTextColor;
+				currColor = colors.normal;
+				currTextColor = colors.normalText;
 			}
 		}
 		else if (type == Type::Push)
 		{
-			currColor = normalColor;
-			currTextColor = normalTextColor;
+			currColor = colors.normal;
+			currTextColor = colors.normalText;
 		}
 		else
 			DENGINE_IMPL_UNREACHABLE();
@@ -219,7 +219,7 @@ bool Button::CursorPress(
 	Rect widgetRect,
 	Rect visibleRect,
 	Math::Vec2Int cursorPos,
-	CursorClickEvent event)
+	CursorPressEvent event)
 {
 	impl::PointerPress_Params params = {};
 	params.widget = this;
@@ -229,7 +229,7 @@ bool Button::CursorPress(
 	params.pointerId = impl::cursorPointerId;
 	params.pointerType = impl::ToPointerType(event.button);
 	params.pointerPos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	params.pointerPressed = event.clicked;
+	params.pointerPressed = event.pressed;
 
 	return impl::BtnImpl::PointerPress(params);
 }
@@ -292,4 +292,129 @@ bool Button::TouchMoveEvent(
 	params.pointerOccluded = occluded;
 
 	return impl::BtnImpl::PointerMove(params);
+}
+
+SizeHint Button::GetSizeHint2(
+	GetSizeHint2_Params const& params) const
+{
+	auto& implData = *static_cast<impl::ImplData*>(params.ctx.Internal_ImplData());
+
+	auto returnVal = impl::TextManager::GetSizeHint(
+		implData.textManager,
+		{ text.data(), text.size() });
+
+	returnVal.preferred.width += textMargin * 2;
+	returnVal.preferred.height += textMargin * 2;
+
+	params.pusher.PushSizeHint(*this, returnVal);
+
+	return returnVal;
+}
+
+void Button::CursorExit(Context& ctx)
+{
+	hoveredByCursor = false;
+	pointerId = Std::nullOpt;
+}
+
+bool Button::CursorPress2(Widget::CursorPressParams const& params)
+{
+	auto const& rects = params.rectCollection.GetRect(*this);
+
+	impl::PointerPress_Params temp = {};
+	temp.widget = this;
+	temp.ctx = &params.ctx;
+	temp.widgetRect = &rects.widgetRect;
+	temp.visibleRect = &rects.visibleRect;
+	temp.pointerId = impl::cursorPointerId;
+	temp.pointerType = impl::ToPointerType(params.event.button);
+	temp.pointerPos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	temp.pointerPressed = params.event.pressed;
+
+	return impl::BtnImpl::PointerPress(temp);
+}
+
+bool Button::CursorMove(
+	Widget::CursorMoveParams const& params,
+	bool occluded)
+{
+	auto const& rects = params.rectCollection.GetRect(*this);
+
+	impl::PointerMove_Params temp = {};
+	temp.widget = this;
+	temp.ctx = &params.ctx;
+	temp.widgetRect = &rects.widgetRect;
+	temp.visibleRect = &rects.visibleRect;
+	temp.pointerId = impl::cursorPointerId;
+	temp.pointerPos = { (f32)params.event.position.x, (f32)params.event.position.y };
+	temp.pointerOccluded = occluded;
+
+	return impl::BtnImpl::PointerMove(temp);
+}
+
+void Button::Render2(
+	Render_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	Math::Vec4 currColor = {};
+	Math::Vec4 currTextColor = {};
+
+	if (pointerId.HasValue())
+	{
+		// We have a finger pressing on the button atm
+		currColor = colors.pressed;
+		currTextColor = colors.pressedText;
+	}
+	else
+	{
+		if (type == Type::Toggle)
+		{
+			if (toggled)
+			{
+				currColor = colors.toggled;
+				currTextColor = colors.toggledText;
+			}
+			else
+			{
+				currColor = colors.normal;
+				currTextColor = colors.normalText;
+			}
+		}
+		else if (type == Type::Push)
+		{
+			currColor = colors.normal;
+			currTextColor = colors.normalText;
+		}
+		else
+			DENGINE_IMPL_UNREACHABLE();
+
+		if (hoveredByCursor)
+		{
+			for (auto i = 0; i < 3; i++)
+				currColor[i] += hoverOverlayColor[i];
+		}
+	}
+
+	for (auto i = 0; i < 4; i++)
+	{
+		currColor[i] = Math::Clamp(currColor[i], 0.f, 1.f);
+		currTextColor[i] = Math::Clamp(currTextColor[i], 0.f, 1.f);
+	}
+	params.drawInfo.PushFilledQuad(widgetRect, currColor);
+
+	auto& implData = *static_cast<impl::ImplData*>(params.ctx.Internal_ImplData());
+
+	auto textRect = widgetRect;
+	textRect.position.x += textMargin;
+	textRect.position.y += textMargin;
+	textRect.extent.width -= textMargin * 2;
+	textRect.extent.height -= textMargin * 2;
+
+	impl::TextManager::RenderText(
+		implData.textManager,
+		{ text.data(), text.length() },
+		currTextColor,
+		textRect,
+		params.drawInfo);
 }

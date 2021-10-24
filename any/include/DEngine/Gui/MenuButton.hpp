@@ -77,7 +77,7 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
-			CursorClickEvent eventd) override;
+			CursorPressEvent eventd) override;
 
 		virtual bool TouchPressEvent(
 			Context& ctx,

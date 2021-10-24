@@ -24,7 +24,7 @@
 
 namespace DEngine::Gfx::Vk
 {
-	bool InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& apiDataBuffer);
+	APIDataBase* InitializeBackend(Context& gfxData, InitInfo const& initInfo);
 
 	namespace Init
 	{
@@ -110,20 +110,22 @@ namespace DEngine::Gfx::Vk
 	}
 }
 
-bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& apiDataBuffer)
+APIDataBase* Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo)
 {
-	apiDataBuffer = new APIData;
-	APIData& apiData = *static_cast<APIData*>(apiDataBuffer);
+	auto* apiDataPtr = new APIData;
+
+	APIData& apiData = *apiDataPtr;
 	GlobUtils& globUtils = apiData.globUtils;
 
-	apiData.frameAllocator = Std::Move(Std::FrameAllocator::PreAllocate(1024 * 1024).Value());
+	apiData.frameAllocator = Std::FrameAllocator::PreAllocate(1024 * 1024).Value();
+	auto& transientAlloc = apiData.frameAllocator;
 
 	vk::Result vkResult{};
 	bool boolResult = false;
 
-	apiData.logger = initInfo.optional_logger;
 	apiData.globUtils.logger = initInfo.optional_logger;
 	apiData.test_textureAssetInterface = initInfo.texAssetInterface;
+	globUtils.wsiInterface = initInfo.wsiConnection;
 
 	globUtils.editorMode = true;
 	globUtils.inFlightCount = Constants::preferredInFlightCount;
@@ -132,16 +134,17 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 	PFN_vkGetInstanceProcAddr instanceProcAddr = Vk::loadInstanceProcAddressPFN();
 	BaseDispatch baseDispatch{};
 	BaseDispatch::BuildInPlace(baseDispatch, instanceProcAddr);
-	Init::CreateVkInstance_Return createVkInstanceResult = Init::CreateVkInstance(
+	auto const createVkInstanceResult = Init::CreateVkInstance(
 		initInfo.requiredVkInstanceExtensions, 
-		true, 
+		Constants::enableDebugUtils,
 		baseDispatch,
-		apiData.frameAllocator,
-		apiData.logger);
+		transientAlloc,
+		globUtils.logger);
 	InstanceDispatch::BuildInPlace(
 		globUtils.instance, 
 		createVkInstanceResult.instanceHandle, 
 		instanceProcAddr);
+	auto& instance = globUtils.instance;
 
 	// Enable DebugUtils functionality.
 	// If we enabled debug utils, we build the debug utils dispatch table and the debug utils messenger.
@@ -149,54 +152,61 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 	{
 		DebugUtilsDispatch::BuildInPlace(
 			globUtils.debugUtils,
-			globUtils.instance.handle, 
+			instance.handle,
 			instanceProcAddr);
 		globUtils.debugMessenger = Init::CreateLayerMessenger(
-			globUtils.instance.handle, 
+			instance.handle,
 			globUtils.DebugUtilsPtr(), 
 			initInfo.optional_logger);
 	}
+	auto* debugUtils = globUtils.DebugUtilsPtr();
 
-	// TODO: I don't think I like this code
-	// Create the VkSurface using the callback
+	// I fucking hate this code, but whatever
 	vk::SurfaceKHR surface{};
-	vk::Result surfaceCreateResult = (vk::Result)initInfo.initialWindowConnection->CreateVkSurface(
-		(uSize)static_cast<VkInstance>(globUtils.instance.handle), 
-		nullptr, 
-		*reinterpret_cast<u64*>(&surface));
-	if (surfaceCreateResult != vk::Result::eSuccess)
-		throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
+	{
+		auto surfaceCreateResult = globUtils.wsiInterface->CreateVkSurface(
+			initInfo.initialWindow,
+			(uSize)(VkInstance)instance.handle,
+			nullptr);
+		vkResult = (vk::Result)surfaceCreateResult.vkResult;
+		if (vkResult != vk::Result::eSuccess)
+			throw std::runtime_error("Unable to create VkSurfaceKHR object during initialization.");
+		surface = (vk::SurfaceKHR)(VkSurfaceKHR)surfaceCreateResult.vkSurface;
+	}
 
 	// Pick our phys device and load the info for it
-	apiData.globUtils.physDevice = Init::LoadPhysDevice(
-		globUtils.instance,
+	globUtils.physDevice = Init::LoadPhysDevice(
+		instance,
 		surface,
-		apiData.frameAllocator);
+		transientAlloc);
+	auto& physDevice = globUtils.physDevice;
 
 	SurfaceInfo::BuildInPlace(
 		globUtils.surfaceInfo,
 		surface,
-		globUtils.instance,
-		apiData.globUtils.physDevice.handle);
+		instance,
+		physDevice.handle);
 
-	PFN_vkGetDeviceProcAddr deviceProcAddr = (PFN_vkGetDeviceProcAddr)instanceProcAddr((VkInstance)globUtils.instance.handle, "vkGetDeviceProcAddr");
+	PFN_vkGetDeviceProcAddr deviceProcAddr = (PFN_vkGetDeviceProcAddr)instanceProcAddr(
+		(VkInstance)instance.handle,
+		"vkGetDeviceProcAddr");
 	// Create the device and the dispatch table for it.
 	vk::Device deviceHandle = Init::CreateDevice(
-		globUtils.instance,
-		globUtils.physDevice,
-		apiData.frameAllocator);
+		instance,
+		physDevice,
+		transientAlloc);
 	DeviceDispatch::BuildInPlace(
 		globUtils.device,
 		deviceHandle,
 		deviceProcAddr);
-
 	QueueData::Init(
 		globUtils.queues,
 		globUtils.device,
-		globUtils.physDevice.queueIndices,
-		globUtils.DebugUtilsPtr());
-
+		physDevice.queueIndices,
+		debugUtils);
 	globUtils.device.m_queueDataPtr = &globUtils.queues;
+	auto& device = globUtils.device;
+	auto& queues = globUtils.queues;
 
 	boolResult = DeletionQueue::Init(
 		globUtils.delQueue,
@@ -205,16 +215,17 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 		throw std::runtime_error("DEngine - Vulkan: Failed to initialize DeletionQueue");
 
 	// Init VMA
-	apiData.vma_trackingData.deviceHandle = globUtils.device.handle;
-	apiData.vma_trackingData.debugUtils = globUtils.DebugUtilsPtr();
-	vk::ResultValue<VmaAllocator> vmaResult = Init::InitializeVMA(
-		globUtils.instance,
-		globUtils.physDevice.handle,
-		globUtils.device,
+	apiData.vma_trackingData.deviceHandle = device.handle;
+	apiData.vma_trackingData.debugUtils = debugUtils;
+	auto const vmaResult = Init::InitializeVMA(
+		instance,
+		physDevice.handle,
+		device,
 		&apiData.vma_trackingData);
 	if (vmaResult.result != vk::Result::eSuccess)
 		throw std::runtime_error("DEngine - Vulkan: Failed to initialize VMA.");
 	globUtils.vma = vmaResult.value;
+	auto& vma = globUtils.vma;
 
 	// Initialize main cmd buffer
 	{
@@ -223,17 +234,17 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 		{
 			vk::CommandPoolCreateInfo cmdPoolInfo = {};
 			//cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
-			cmdPoolInfo.queueFamilyIndex = globUtils.queues.graphics.FamilyIndex();
-			auto cmdPool = globUtils.device.createCommandPool(cmdPoolInfo);
+			cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
+			auto cmdPool = device.createCommandPool(cmdPoolInfo);
 			if (cmdPool.result != vk::Result::eSuccess)
 				throw std::runtime_error("Unable to make command pool");
 			apiData.mainCmdPools[i] = cmdPool.value;
-			if (globUtils.UsingDebugUtils())
+			if (debugUtils)
 			{
 				std::string name = "Main CmdPool #";
 				name += std::to_string(i);
-				globUtils.debugUtils.Helper_SetObjectName(
-					globUtils.device.handle,
+				debugUtils->Helper_SetObjectName(
+					device.handle,
 					apiData.mainCmdPools[i],
 					name.c_str());
 			}
@@ -243,75 +254,61 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 			cmdBufferAllocInfo.commandPool = apiData.mainCmdPools[i];
 			cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
 			apiData.mainCmdBuffers.Resize(globUtils.inFlightCount);
-			vkResult = globUtils.device.allocateCommandBuffers(cmdBufferAllocInfo, &apiData.mainCmdBuffers[i]);
+			vkResult = device.allocateCommandBuffers(cmdBufferAllocInfo, &apiData.mainCmdBuffers[i]);
 			if (vkResult != vk::Result::eSuccess)
 				throw std::runtime_error("DEngine - Vulkan: Failed to initialize main commandbuffers.");
 			// We don't give the command buffers debug names here, because we need to rename them everytime we re-record anyways.
 		}
 	}
 
-	NativeWindowManager::Initialize(
-		apiData.nativeWindowManager,
-		globUtils.device,
-		globUtils.queues,
-		globUtils.DebugUtilsPtr());
+	NativeWindowManager::InitInfo windowManInfo = {
+		.manager = &apiData.nativeWindowManager,
+		.initialWindow = initInfo.initialWindow,
+		.device = &device,
+		.queues = &queues,
+		.optional_debugUtils = debugUtils };
+	NativeWindowManager::Initialize(windowManInfo);
 
 	boolResult = ViewportManager::Init(
 		apiData.viewportManager,
-		globUtils.device,
-		globUtils.physDevice.properties.limits.minUniformBufferOffsetAlignment,
-		globUtils.DebugUtilsPtr());
+		device,
+		physDevice.properties.limits.minUniformBufferOffsetAlignment,
+		debugUtils);
 	if (!boolResult)
 		throw std::runtime_error("DEngine - Vulkan: Failed to initialize ViewportManager.");
 
 	TextureManager::Init(
 		apiData.textureManager,
-		globUtils.device,
-		globUtils.queues,
-		globUtils.DebugUtilsPtr());
+		device,
+		queues,
+		debugUtils);
 
 	boolResult = ObjectDataManager::Init(
 		apiData.objectDataManager,
-		globUtils.physDevice.properties.limits.minUniformBufferOffsetAlignment,
+		physDevice.properties.limits.minUniformBufferOffsetAlignment,
 		globUtils.inFlightCount,
-		globUtils.vma,
-		globUtils.device,
-		globUtils.DebugUtilsPtr());
+		vma,
+		device,
+		debugUtils);
 	if (!boolResult)
 		throw std::runtime_error("DEngine - Vulkan: Failed to initialize ObjectDataManager.");
 
 
 	// Create our main fences
 	apiData.mainFences = Init::CreateMainFences(
-		globUtils.device,
+		device,
 		globUtils.inFlightCount,
-		globUtils.DebugUtilsPtr());
+		debugUtils);
 
 	
-	apiData.globUtils.guiRenderPass = Init::CreateGuiRenderPass(
-			globUtils.device,
-			globUtils.surfaceInfo.surfaceFormatToUse.format,
-			globUtils.DebugUtilsPtr());
-
-	NativeWindowManager::BuildInitialNativeWindow(
-		apiData.nativeWindowManager,
-		globUtils.instance,
-		globUtils.device,
-		globUtils.physDevice.handle,
-		globUtils.queues,
-		globUtils.delQueue,
-		globUtils.surfaceInfo,
-		globUtils.vma,
-		globUtils.inFlightCount,
-		*initInfo.initialWindowConnection,
-		surface,
-		globUtils.guiRenderPass,
-		globUtils.DebugUtilsPtr());
-
+	globUtils.guiRenderPass = Init::CreateGuiRenderPass(
+		device,
+		globUtils.surfaceInfo.surfaceFormatToUse.format,
+		debugUtils);
 
 	// Create the main render stuff
 	globUtils.gfxRenderPass = Init::BuildMainGfxRenderPass(
-		globUtils.device,
+		device,
 		true, 
 		globUtils.DebugUtilsPtr());
 
@@ -322,12 +319,12 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 
 	GuiResourceManager::Init(
 		apiData.guiResourceManager, 
-		globUtils.device,
-		globUtils.vma, 
+		device,
+		vma,
 		globUtils.inFlightCount, 
 		globUtils.guiRenderPass,
-		apiData.frameAllocator,
-		globUtils.DebugUtilsPtr());
+		transientAlloc,
+		debugUtils);
 
 	GizmoManager::InitInfo gizmoManagerInfo = {};
 	gizmoManagerInfo.apiData = &apiData;
@@ -345,7 +342,7 @@ bool Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo, void*& ap
 
 	apiData.renderingThread = std::thread(&RenderingThreadEntryPoint, &apiData);
 
-	return true;
+	return apiDataPtr;
 }
 
 void Vk::Init::InitTestPipeline(APIData& apiData, Std::FrameAllocator& frameAlloc)
@@ -369,7 +366,7 @@ void Vk::Init::InitTestPipeline(APIData& apiData, Std::FrameAllocator& frameAllo
 			"Test Pipelinelayout");
 	}
 
-	App::FileInputStream vertFile{ "data/vert.spv" };
+	App::FileInputStream vertFile { "data/vert.spv" };
 	if (!vertFile.IsOpen())
 		throw std::runtime_error("Could not open vertex shader file");
 	vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
@@ -379,11 +376,11 @@ void Vk::Init::InitTestPipeline(APIData& apiData, Std::FrameAllocator& frameAllo
 	vertCode.Resize((uSize)vertFileLength);
 	vertFile.Read(vertCode.Data(), vertFileLength);
 	
-	vk::ShaderModuleCreateInfo vertModCreateInfo{};
+	vk::ShaderModuleCreateInfo vertModCreateInfo = {};
 	vertModCreateInfo.codeSize = vertCode.Size();
-	vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
+	vertModCreateInfo.pCode = reinterpret_cast<u32 const*>(vertCode.Data());
 	vk::ShaderModule vertModule = apiData.globUtils.device.createShaderModule(vertModCreateInfo);
-	vk::PipelineShaderStageCreateInfo vertStageInfo{};
+	vk::PipelineShaderStageCreateInfo vertStageInfo = {};
 	vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
 	vertStageInfo.module = vertModule;
 	vertStageInfo.pName = "main";

@@ -21,9 +21,9 @@ namespace DEngine::Gfx::Vk
 	{
 		auto messageSeverity = static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>(messageSeverityIn);
 		auto messageType = static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypeIn);
-		auto pCallbackData = reinterpret_cast<vk::DebugUtilsMessengerCallbackDataEXT const*>(pCallbackDataIn);
+		auto* pCallbackData = reinterpret_cast<vk::DebugUtilsMessengerCallbackDataEXT const*>(pCallbackDataIn);
 
-		auto logger = static_cast<LogInterface*>(pUserData);
+		auto* logger = static_cast<LogInterface*>(pUserData);
 
 		if (logger != nullptr)
 		{
@@ -51,7 +51,7 @@ namespace DEngine::Gfx::Vk
 
 			msg += pCallbackData->pMessage;
 
-			logger->Log(LogInterface::Level::Fatal, msg.data());
+			logger->Log(LogInterface::Level::Fatal, { msg.data(), msg.size() });
 		}
 
 		return 0;

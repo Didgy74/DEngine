@@ -1,7 +1,9 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/Allocator.hpp>
 #include <DEngine/Std/Trait.hpp>
+#include <DEngine/Std/Containers/Span.hpp>
 
 namespace DEngine::Std::impl { struct VecPlacementNewTag {}; }
 constexpr void* operator new(
@@ -12,28 +14,60 @@ constexpr void* operator new(
 
 namespace DEngine::Std
 {
-	template<class T, class Allocator> requires (Trait::isMoveConstructible<T>)
+	template<class T, class Allocator = Std::DefaultAllocator> requires (Trait::isMoveConstructible<T>)
 	class Vec
 	{
 	public:
+		Vec() noexcept requires (Allocator::stateless)
+		{
+
+		}
+		Vec(Vec const&) = delete;
 		explicit Vec(Allocator& alloc) noexcept:
-			alloc{&alloc}
+			alloc{ &alloc }
 		{}
 
-		Vec(Vec&& other) noexcept = delete;
+		Vec(Vec&& other) noexcept :
+			data{ other.data },
+			count{ other.count },
+			capacity{ other.capacity },
+			alloc{ other.alloc }
+		{
+			other.data = nullptr;
+			//other.count = 0;
+			//other.capacity = 0;
+			//other.alloc = 0;
+		}
 
 		~Vec() noexcept
 		{
-			if (data)
-			{
-				for (uSize i = 0; i < count; i++)
-					data[i].~T();
+			Clear();
+		}
 
-				alloc->Free(data);
-			}
+		Vec& operator=(Vec const&) = delete;
+		Vec& operator=(Vec&& other) noexcept
+		{
+			Clear();
+
+			data = other.data;
+			count = other.count;
+			capacity = other.capacity;
+			alloc = other.alloc;
+
+			other.data = nullptr;
 		}
 
 		[[nodiscard]] bool Empty() const noexcept { return count == 0; }
+		void Clear() noexcept
+		{
+			if (data)
+			{
+				for (auto i = 0; i < count; i += 1)
+					data[i].~T();
+				alloc->Free(data);
+				data = nullptr;
+			}
+		}
 
 		void PushBack(T const& in) noexcept requires (Trait::isCopyConstructible<T>)
 		{
@@ -92,7 +126,6 @@ namespace DEngine::Std
 			count = newSize;
 		}
 
-
 		[[nodiscard]] T& At(uSize i) noexcept
 		{
 			DENGINE_IMPL_CONTAINERS_ASSERT(i < count);
@@ -113,6 +146,9 @@ namespace DEngine::Std
 			DENGINE_IMPL_CONTAINERS_ASSERT(i < count);
 			return data[i];
 		}
+
+		[[nodiscard]] Std::Span<T> ToSpan() noexcept { return { data, count }; }
+		[[nodiscard]] Std::Span<T const> ToSpan() const noexcept { return { data, count }; }
 
 		[[nodiscard]] T* Data() noexcept { return data; }
 		[[nodiscard]] T const* Data() const noexcept { return data; }

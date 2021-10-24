@@ -349,22 +349,17 @@ void Vk::APIData::Draw(
 	apiData.drawParamsCondVarWorker.notify_one();
 }
 
-#include <Tracy.hpp>
-#include <TracyC.h>
 void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 {
-	ZoneScopedNS("Render Thread", 32);
-
-	TracyCZoneNS(a, "Pre Fencewait", 32, true);
-
 	vk::Result vkResult = {};
 	APIData& apiData = *this;
 	DevDispatch const& device = globUtils.device;
-	auto& frameAlloc = apiData.frameAllocator;
+	auto& transientAlloc = apiData.frameAllocator;
 
 	NativeWindowManager::ProcessEvents(
 		apiData.nativeWindowManager,
 		globUtils,
+		transientAlloc,
 		{ drawParams.nativeWindowUpdates.data(), drawParams.nativeWindowUpdates.size() });
 	// Deletes and creates viewports when needed.
 	ViewportManager::ProcessEvents(
@@ -382,11 +377,9 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		globUtils,
 		drawParams,
 		*apiData.test_textureAssetInterface,
-		apiData.frameAllocator);
+		transientAlloc);
 
 	u8 const currentInFlightIndex = apiData.currInFlightIndex;
-
-	TracyCZoneEnd(a);
 
 	// Wait for fences, so we know the resources are available.
 	vkResult = globUtils.device.waitForFences(
@@ -396,8 +389,6 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("Vulkan: Failed to wait for cmd buffer fence.");
 	device.resetFences(apiData.mainFences[currentInFlightIndex]);
-
-	TracyCZoneNS(b, "Post Fencewait", 32, true);
 
 	// Update object-data
 	ObjectDataManager::Update(
@@ -457,30 +448,26 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 			apiData);
 	}
 
-	TracyCZoneEnd(b);
-
 	// Record all the GUI shit.
-	auto swapchainIndices = Std::Vec<u32, Std::FrameAllocator>(frameAlloc);
+	auto swapchainIndices = Std::Vec<u32, Std::FrameAllocator>{ transientAlloc };
 	swapchainIndices.Resize(drawParams.nativeWindowUpdates.size());
-	auto swapchains = Std::Vec<vk::SwapchainKHR, Std::FrameAllocator>(frameAlloc);
+	auto swapchains = Std::Vec<vk::SwapchainKHR, Std::FrameAllocator>{ transientAlloc };
 	swapchains.Resize(drawParams.nativeWindowUpdates.size());
-	auto swapchainImageReadySemaphores = Std::Vec<vk::Semaphore, Std::FrameAllocator>(frameAlloc);
+	auto swapchainImageReadySemaphores = Std::Vec<vk::Semaphore, Std::FrameAllocator>{ transientAlloc };
 	swapchainImageReadySemaphores.Resize(drawParams.nativeWindowUpdates.size());
-	auto swapchainImageReadyStages = Std::Vec<vk::PipelineStageFlags, Std::FrameAllocator>(frameAlloc);
+	auto swapchainImageReadyStages = Std::Vec<vk::PipelineStageFlags, Std::FrameAllocator>{ transientAlloc };
 	swapchainImageReadyStages.Resize(drawParams.nativeWindowUpdates.size());
 	for (auto& item : swapchainImageReadyStages)
 		item = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	for (uSize i = 0; i < drawParams.nativeWindowUpdates.size(); i += 1)
 	{
-		// First assert that this ID doesn't already exist?
-
 		auto const& windowUpdate = drawParams.nativeWindowUpdates[i];
 		// First find the window in the database
 		auto const windowDataIt = Std::FindIf(
-			apiData.nativeWindowManager.nativeWindows.begin(),
-			apiData.nativeWindowManager.nativeWindows.end(),
-			[&windowUpdate](auto const& node) -> bool { return node.id == windowUpdate.id; });
-		DENGINE_IMPL_GFX_ASSERT(windowDataIt != apiData.nativeWindowManager.nativeWindows.end());
+			apiData.nativeWindowManager.main.nativeWindows.begin(),
+			apiData.nativeWindowManager.main.nativeWindows.end(),
+			[&windowUpdate](auto const& node) { return node.id == windowUpdate.id; });
+		DENGINE_IMPL_GFX_ASSERT(windowDataIt != apiData.nativeWindowManager.main.nativeWindows.end());
 		auto const& nativeWindow = *windowDataIt;
 
 		if (!cmdBufferBegun)
@@ -553,7 +540,7 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	}
 
 
-	// Let the deletion-queue run it's tick.
+	// Let the deletion-queue run its tick.
 	DeletionQueue::ExecuteTick(
 		apiData.globUtils.delQueue,
 		globUtils,
@@ -563,12 +550,12 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	apiData.currInFlightIndex = (apiData.currInFlightIndex + 1) % apiData.globUtils.inFlightCount;
 }
 
-DEngine::Gfx::NativeWindowID DEngine::Gfx::Vk::APIData::NewNativeWindow(WsiInterface& wsiConnection)
+void Vk::APIData::NewNativeWindow(NativeWindowID windowId)
 {
 	APIData& apiData = *this;
 
 	return NativeWindowManager::PushCreateWindowJob(
 		apiData.nativeWindowManager,
-		wsiConnection);
+		windowId);
 }
 

@@ -22,6 +22,7 @@ namespace DEngine::Gfx::Vk
 		GlobUtils(GlobUtils&&) = delete;
 
 		Gfx::LogInterface* logger = nullptr;
+		Gfx::WsiInterface* wsiInterface = nullptr;
 
 		InstanceDispatch instance{};
 
