@@ -85,7 +85,7 @@ namespace DEngine::Gfx::Vk
 		static void Initialize(
 			InitInfo const& initInfo);
 
-		[[nodiscard]] static void PushCreateWindowJob(
+		static void PushCreateWindowJob(
 			NativeWindowManager& manager,
 			NativeWindowID windowId) noexcept;
 	};

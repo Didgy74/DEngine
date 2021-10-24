@@ -132,8 +132,8 @@ APIDataBase* Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo)
 
 	// Make the VkInstance
 	PFN_vkGetInstanceProcAddr instanceProcAddr = Vk::loadInstanceProcAddressPFN();
-	BaseDispatch baseDispatch{};
-	BaseDispatch::BuildInPlace(baseDispatch, instanceProcAddr);
+	BaseDispatch::BuildInPlace(globUtils.baseDispatch, instanceProcAddr);
+	auto& baseDispatch = globUtils.baseDispatch;
 	auto const createVkInstanceResult = Init::CreateVkInstance(
 		initInfo.requiredVkInstanceExtensions, 
 		Constants::enableDebugUtils,

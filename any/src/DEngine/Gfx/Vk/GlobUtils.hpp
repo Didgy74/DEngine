@@ -24,6 +24,7 @@ namespace DEngine::Gfx::Vk
 		Gfx::LogInterface* logger = nullptr;
 		Gfx::WsiInterface* wsiInterface = nullptr;
 
+		BaseDispatch baseDispatch{};
 		InstanceDispatch instance{};
 
 		DebugUtilsDispatch debugUtils{};

@@ -138,7 +138,7 @@ namespace DEngine::impl
 
 		virtual void WindowCursorEnter(
 			App::WindowID window,
-			bool entered)
+			bool entered) override
 		{
 			if (entered)
 				return;
@@ -407,7 +407,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	while (true)
 	{
-		App::impl::ProcessEvents(appCtx, App::impl::PollMode::Wait);
+		App::impl::ProcessEvents(appCtx, App::impl::PollMode::Immediate);
 		if (appCtx.GetWindowCount() == 0)
 			break;
 

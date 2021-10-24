@@ -4,6 +4,8 @@
 
 #include <DEngine/Gfx/impl/Assert.hpp>
 
+#include <limits>
+
 namespace DEngine::Gfx::Vk
 {
 	PFN_vkGetInstanceProcAddr loadInstanceProcAddressPFN();
@@ -173,20 +175,20 @@ namespace DEngine::Gfx::Vk
 			PFN_vkGetInstanceProcAddr procAddr);
 
 		BaseDispatchRaw raw;
-		[[nodiscard]] vk::Instance createInstance(
+		[[nodiscard]] vk::Instance CreateInstance(
 			vk::InstanceCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		[[nodiscard]] vk::Result enumerateInstanceExtensionProperties(
+		[[nodiscard]] vk::Result EnumerateInstanceExtensionProperties(
 			char const* pLayerName,
 			std::uint32_t* pPropertyCount,
 			vk::ExtensionProperties* pProperties) const;
 
-		[[nodiscard]] vk::Result enumerateInstanceLayerProperties(
+		[[nodiscard]] vk::Result EnumerateInstanceLayerProperties(
 			std::uint32_t* pPropertyCount,
 			vk::LayerProperties* pProperties) const;
 
-		[[nodiscard]] std::uint32_t enumerateInstanceVersion() const;
+		[[nodiscard]] std::uint32_t EnumerateInstanceVersion() const;
 	};
 
 	class DebugUtilsDispatch
@@ -255,7 +257,7 @@ namespace DEngine::Gfx::Vk
 			vk::DeviceCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		void destroy(vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::Result enumeratePhysicalDeviceExtensionProperties(
 			vk::PhysicalDevice physDevice,

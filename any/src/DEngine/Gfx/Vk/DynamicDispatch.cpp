@@ -195,7 +195,7 @@ void BaseDispatch::BuildInPlace(
 	dispatcher.raw = BaseDispatchRaw::Build(procAddr);
 }
 
-vk::Instance BaseDispatch::createInstance(
+vk::Instance BaseDispatch::CreateInstance(
 	vk::InstanceCreateInfo const& createInfo, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -209,7 +209,7 @@ vk::Instance BaseDispatch::createInstance(
 	return returnVal;
 }
 
-vk::Result BaseDispatch::enumerateInstanceExtensionProperties(
+vk::Result BaseDispatch::EnumerateInstanceExtensionProperties(
 	char const* pLayerName, 
 	std::uint32_t* pPropertyCount,
 	vk::ExtensionProperties* pProperties) const
@@ -220,7 +220,7 @@ vk::Result BaseDispatch::enumerateInstanceExtensionProperties(
 		reinterpret_cast<VkExtensionProperties*>(pProperties)));
 }
 
-vk::Result BaseDispatch::enumerateInstanceLayerProperties(
+vk::Result BaseDispatch::EnumerateInstanceLayerProperties(
 	std::uint32_t* pPropertyCount, 
 	vk::LayerProperties* pProperties) const
 {
@@ -229,9 +229,9 @@ vk::Result BaseDispatch::enumerateInstanceLayerProperties(
 		reinterpret_cast<VkLayerProperties*>(pProperties)));
 }
 
-std::uint32_t BaseDispatch::enumerateInstanceVersion() const
+std::uint32_t BaseDispatch::EnumerateInstanceVersion() const
 {
-	vk::Result vkResult{};
+	vk::Result vkResult = {};
 	std::uint32_t returnVal;
 	if (raw.vkEnumerateInstanceVersion)
 	{
@@ -271,7 +271,7 @@ vk::Device InstanceDispatch::createDevice(
 	return outDevice;
 }
 
-void InstanceDispatch::destroy(vk::Optional<vk::AllocationCallbacks> allocator) const
+void InstanceDispatch::Destroy(vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	raw.vkDestroyInstance(
 		static_cast<VkInstance>(handle),

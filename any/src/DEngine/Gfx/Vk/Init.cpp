@@ -62,7 +62,7 @@ using namespace DEngine;
 using namespace DEngine::Gfx;
 
 Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
-	Std::Span<char const*> requiredExtensions,
+	Std::Span<char const*> requiredExtensionsIn,
 	bool enableLayers,
 	BaseDispatch const& baseDispatch,
 	Std::FrameAllocator& frameAlloc,
@@ -72,17 +72,17 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	CreateVkInstance_Return returnValue = {};
 
 	// Build what extensions we are going to use
-	auto totalRequiredExtensions = Std::Vec<char const*, Std::FrameAllocator>(frameAlloc);
-	totalRequiredExtensions.Reserve(requiredExtensions.Size() + Constants::requiredInstanceExtensions.size());
+	auto extensionsToUse = Std::Vec<char const*, Std::FrameAllocator>{ frameAlloc };
+	extensionsToUse.Reserve(requiredExtensionsIn.Size() + Constants::requiredInstanceExtensions.size());
 	// First copy all required instance extensions
-	for (uSize i = 0; i < requiredExtensions.Size(); i++)
-		totalRequiredExtensions.PushBack(requiredExtensions[i]);
+	for (uSize i = 0; i < requiredExtensionsIn.Size(); i++)
+		extensionsToUse.PushBack(requiredExtensionsIn[i]);
 
 	// Next add extensions required by renderer, don't add duplicates
-	for (const char* requiredExtension : Constants::requiredInstanceExtensions)
+	for (auto requiredExtension : Constants::requiredInstanceExtensions)
 	{
 		bool extensionAlreadyPresent = false;
-		for (const char* existingExtension : totalRequiredExtensions)
+		for (auto existingExtension : extensionsToUse)
 		{
 			if (std::strcmp(requiredExtension, existingExtension) == 0)
 			{
@@ -91,18 +91,18 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 			}
 		}
 		if (!extensionAlreadyPresent)
-			totalRequiredExtensions.PushBack(requiredExtension);
+			extensionsToUse.PushBack(requiredExtension);
 	}
 
 	// Check if all the required extensions are also available
 	u32 instanceExtensionCount = 0;
-	vkResult = baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr);
+	vkResult = baseDispatch.EnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr);
 	if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 		throw std::runtime_error("Vulkan: Unable to enumerate available instance extension properties.");
-	auto availableExtensions = Std::Vec<vk::ExtensionProperties, Std::FrameAllocator>(frameAlloc);
+	auto availableExtensions = Std::Vec<vk::ExtensionProperties, Std::FrameAllocator>{ frameAlloc };
 	availableExtensions.Resize(instanceExtensionCount);
-	vkResult = baseDispatch.enumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableExtensions.Data());
-	for (const char* required : totalRequiredExtensions)
+	vkResult = baseDispatch.EnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableExtensions.Data());
+	for (const char* required : extensionsToUse)
 	{
 		bool requiredExtensionIsAvailable = false;
 		for (const auto& available : availableExtensions)
@@ -117,7 +117,7 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 			throw std::runtime_error("Required Vulkan instance extension is not available.");
 	}
 
-	Std::StackVec<const char*, 5> layersToUse{};
+	Std::StackVec<const char*, 5> layersToUse = {};
 	if constexpr (Constants::enableDebugUtils)
 	{
 		if (enableLayers)
@@ -134,12 +134,12 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 			}
 
 			u32 availableLayerCount = 0;
-			vkResult = baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, nullptr);
+			vkResult = baseDispatch.EnumerateInstanceLayerProperties(&availableLayerCount, nullptr);
 			if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 				throw std::runtime_error("Failed to enumerate instance layer properties during Vulkan instance creation.");
 			std::vector<vk::LayerProperties> availableLayers;
 			availableLayers.resize(availableLayerCount);
-			vkResult = baseDispatch.enumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data());
+			vkResult = baseDispatch.EnumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data());
 
 			if (!debugUtilsIsAvailable)
 			{
@@ -171,15 +171,15 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 					}
 				}
 
-				totalRequiredExtensions.PushBack(Constants::debugUtilsExtensionName);
+				extensionsToUse.PushBack(Constants::debugUtilsExtensionName);
 				returnValue.debugUtilsEnabled = true;
 			}
 		}
 	}
 
 	vk::InstanceCreateInfo instanceInfo{};
-	instanceInfo.enabledExtensionCount = (u32)totalRequiredExtensions.Size();
-	instanceInfo.ppEnabledExtensionNames = totalRequiredExtensions.Data();
+	instanceInfo.enabledExtensionCount = (u32)extensionsToUse.Size();
+	instanceInfo.ppEnabledExtensionNames = extensionsToUse.Data();
 	instanceInfo.enabledLayerCount = (u32)layersToUse.Size();
 	instanceInfo.ppEnabledLayerNames = layersToUse.Data();
 
@@ -209,7 +209,7 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 		instanceInfo.pNext = &messengerCreateInfo;
 	}
 
-	vk::Instance instance = baseDispatch.createInstance(instanceInfo);
+	vk::Instance instance = baseDispatch.CreateInstance(instanceInfo);
 
 	returnValue.instanceHandle = instance;
 
@@ -333,7 +333,7 @@ Vk::PhysDeviceInfo Vk::Init::LoadPhysDevice(
 		throw std::runtime_error("Vulkan: Unable to enumerate physical devices.");
 	if (physicalDeviceCount == 0)
 		throw std::runtime_error("Vulkan: Host machine has no Vulkan-capable devices.");
-	auto physDevices = Std::Vec<vk::PhysicalDevice, Std::FrameAllocator>(frameAlloc);
+	auto physDevices = Std::Vec<vk::PhysicalDevice, Std::FrameAllocator>{ frameAlloc };
 	physDevices.Resize(physicalDeviceCount);
 	vkResult = instance.enumeratePhysicalDevices(&physicalDeviceCount, physDevices.Data());
 	if (vkResult != vk::Result::eSuccess)
@@ -348,7 +348,7 @@ Vk::PhysDeviceInfo Vk::Init::LoadPhysDevice(
 		physDevice.handle,
 		&queueFamilyPropertyCount,
 		nullptr);
-	auto availableQueueFamilies = Std::Vec<vk::QueueFamilyProperties, Std::FrameAllocator>(frameAlloc);
+	auto availableQueueFamilies = Std::Vec<vk::QueueFamilyProperties, Std::FrameAllocator>{ frameAlloc };
 	availableQueueFamilies.Resize(queueFamilyPropertyCount);
 	instance.getPhysicalDeviceQueueFamilyProperties(
 		physDevice.handle, 
