@@ -24,25 +24,24 @@ namespace DEngine::Gui::impl
 
 	struct PointerPress_Params
 	{
-		Button* widget = nullptr;
-		Context* ctx = nullptr;
-		Rect const* widgetRect = nullptr;
-		Rect const* visibleRect = nullptr;
-		u8 pointerId = 0;
-		PointerType pointerType = {};
-		Math::Vec2 pointerPos = {};
-		bool pointerPressed = {};
+		Button& btn;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
+		u8 pointerId;
+		PointerType pointerType;
+		Math::Vec2 pointerPos;
+		bool pointerPressed;
+		bool pointerConsumed;
 	};
 
 	struct PointerMove_Params
 	{
-		Button* widget = nullptr;
-		Context* ctx = nullptr;
-		Rect const* widgetRect = nullptr;
-		Rect const* visibleRect = nullptr;
-		u8 pointerId = 0;
-		Math::Vec2 pointerPos = {};
-		bool pointerOccluded = {};
+		Button& btn;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
+		u8 pointerId;
+		Math::Vec2 pointerPos;
+		bool pointerOccluded;
 	};
 }
 
@@ -53,56 +52,64 @@ class [[maybe_unused]] Gui::impl::BtnImpl
 {
 public:
 	// Return true if the event is consumed.
-	[[nodiscard]] static bool PointerPress(PointerPress_Params const& params)
-	{
-		auto& widget = *params.widget;
+	[[nodiscard]] static bool PointerPress(PointerPress_Params const& params);
 
-		bool returnVal = false;
-
-		auto const pointerInside =
-			params.widgetRect->PointIsInside(params.pointerPos) &&
-			params.visibleRect->PointIsInside(params.pointerPos);
-
-		if (pointerInside)
-			returnVal = true;
-
-		if (params.pointerType != PointerType::Primary)
-			return returnVal;
-
-		if (widget.pointerId.HasValue())
-		{
-			auto const currPointerId = widget.pointerId.Value();
-			if (params.pointerId == currPointerId && !params.pointerPressed)
-			{
-				widget.pointerId = Std::nullOpt;
-
-				if (pointerInside)
-					widget.Activate();
-			}
-		}
-		else
-		{
-			if (pointerInside && params.pointerPressed)
-				widget.pointerId = params.pointerId;
-		}
-
-		return returnVal;
-	}
-
-	[[nodiscard]] static bool PointerMove(PointerMove_Params const& params)
-	{
-		auto const pointerInside =
-			params.widgetRect->PointIsInside(params.pointerPos) &&
-			params.visibleRect->PointIsInside(params.pointerPos);
-
-		if (params.pointerId == cursorPointerId)
-		{
-			params.widget->hoveredByCursor = pointerInside && !params.pointerOccluded;
-		}
-
-		return pointerInside;
-	}
+	[[nodiscard]] static bool PointerMove(PointerMove_Params const& params);
 };
+
+bool Gui::impl::BtnImpl::PointerPress(PointerPress_Params const& params)
+{
+	auto& widget = params.btn;
+	auto const& widgetRect = params.widgetRect;
+	auto const& visibleRect = params.visibleRect;
+
+	bool returnVal = params.pointerConsumed;
+
+	auto const pointerInside =
+		widgetRect.PointIsInside(params.pointerPos) &&
+		visibleRect.PointIsInside(params.pointerPos);
+
+	if (pointerInside)
+		returnVal = true;
+
+	if (params.pointerType != PointerType::Primary)
+		return returnVal;
+
+	if (widget.heldPointerId.HasValue())
+	{
+		auto const currPointerId = widget.heldPointerId.Value();
+		if (params.pointerId == currPointerId && !params.pointerPressed && !params.pointerConsumed)
+		{
+			widget.heldPointerId = Std::nullOpt;
+
+			if (pointerInside)
+				widget.Activate();
+		}
+	}
+	else
+	{
+		if (pointerInside && params.pointerPressed && !params.pointerConsumed)
+			widget.heldPointerId = params.pointerId;
+	}
+
+	return returnVal;
+}
+
+bool Gui::impl::BtnImpl::PointerMove(PointerMove_Params const& params)
+{
+	auto& widget = params.btn;
+	auto const& widgetRect = params.widgetRect;
+	auto const& visibleRect = params.visibleRect;
+
+	auto const pointerInside =
+		widgetRect.PointIsInside(params.pointerPos) &&
+		visibleRect.PointIsInside(params.pointerPos);
+
+	if (params.pointerId == cursorPointerId)
+		widget.hoveredByCursor = pointerInside && !params.pointerOccluded;
+
+	return pointerInside;
+}
 
 Button::Button()
 {
@@ -154,7 +161,7 @@ void Button::Render(
 	Math::Vec4 currColor = {};
 	Math::Vec4 currTextColor = {};
 
-	if (pointerId.HasValue())
+	if (heldPointerId.HasValue())
 	{
 		// We have a finger pressing on the button atm
 		currColor = colors.pressed;
@@ -221,11 +228,10 @@ bool Button::CursorPress(
 	Math::Vec2Int cursorPos,
 	CursorPressEvent event)
 {
-	impl::PointerPress_Params params = {};
-	params.widget = this;
-	params.ctx = &ctx;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
+	impl::PointerPress_Params params {
+		*this,
+		widgetRect,
+		visibleRect };
 	params.pointerId = impl::cursorPointerId;
 	params.pointerType = impl::ToPointerType(event.button);
 	params.pointerPos = { (f32)cursorPos.x, (f32)cursorPos.y };
@@ -242,11 +248,10 @@ bool Button::CursorMove(
 	CursorMoveEvent event,
 	bool cursorOccluded)
 {
-	impl::PointerMove_Params params = {};
-	params.widget = this;
-	params.ctx = &ctx;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
+	impl::PointerMove_Params params = {
+		*this,
+		widgetRect,
+		visibleRect };
 	params.pointerId = impl::cursorPointerId;
 	params.pointerPos = { (f32)event.position.x, (f32)event.position.y };
 	params.pointerOccluded = cursorOccluded;
@@ -261,11 +266,10 @@ bool Button::TouchPressEvent(
 	Rect visibleRect,
 	Gui::TouchPressEvent event)
 {
-	impl::PointerPress_Params params = {};
-	params.widget = this;
-	params.ctx = &ctx;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
+	impl::PointerPress_Params params {
+		*this,
+		widgetRect,
+		visibleRect };
 	params.pointerId = event.id;
 	params.pointerType = impl::PointerType::Primary;
 	params.pointerPos = event.position;
@@ -282,11 +286,10 @@ bool Button::TouchMoveEvent(
 	Gui::TouchMoveEvent event,
 	bool occluded)
 {
-	impl::PointerMove_Params params = {};
-	params.widget = this;
-	params.ctx = &ctx;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
+	impl::PointerMove_Params params = {
+		*this,
+		widgetRect,
+		visibleRect };
 	params.pointerId = event.id;
 	params.pointerPos = event.position;
 	params.pointerOccluded = occluded;
@@ -314,22 +317,24 @@ SizeHint Button::GetSizeHint2(
 void Button::CursorExit(Context& ctx)
 {
 	hoveredByCursor = false;
-	pointerId = Std::nullOpt;
+	heldPointerId = Std::nullOpt;
 }
 
-bool Button::CursorPress2(Widget::CursorPressParams const& params)
+bool Button::CursorPress2(
+	Widget::CursorPressParams const& params,
+	bool consumed)
 {
-	auto const& rects = params.rectCollection.GetRect(*this);
+	auto const& rectPair = params.rectCollection.GetRect(*this);
 
-	impl::PointerPress_Params temp = {};
-	temp.widget = this;
-	temp.ctx = &params.ctx;
-	temp.widgetRect = &rects.widgetRect;
-	temp.visibleRect = &rects.visibleRect;
+	impl::PointerPress_Params temp {
+		*this,
+		rectPair.widgetRect,
+		rectPair.widgetRect };
 	temp.pointerId = impl::cursorPointerId;
 	temp.pointerType = impl::ToPointerType(params.event.button);
 	temp.pointerPos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
 	temp.pointerPressed = params.event.pressed;
+	temp.pointerConsumed = consumed;
 
 	return impl::BtnImpl::PointerPress(temp);
 }
@@ -338,13 +343,12 @@ bool Button::CursorMove(
 	Widget::CursorMoveParams const& params,
 	bool occluded)
 {
-	auto const& rects = params.rectCollection.GetRect(*this);
+	auto const& rectPair = params.rectCollection.GetRect(*this);
 
-	impl::PointerMove_Params temp = {};
-	temp.widget = this;
-	temp.ctx = &params.ctx;
-	temp.widgetRect = &rects.widgetRect;
-	temp.visibleRect = &rects.visibleRect;
+	impl::PointerMove_Params temp = {
+		*this,
+		rectPair.widgetRect,
+		rectPair.widgetRect };
 	temp.pointerId = impl::cursorPointerId;
 	temp.pointerPos = { (f32)params.event.position.x, (f32)params.event.position.y };
 	temp.pointerOccluded = occluded;
@@ -360,7 +364,7 @@ void Button::Render2(
 	Math::Vec4 currColor = {};
 	Math::Vec4 currTextColor = {};
 
-	if (pointerId.HasValue())
+	if (heldPointerId.HasValue())
 	{
 		// We have a finger pressing on the button atm
 		currColor = colors.pressed;

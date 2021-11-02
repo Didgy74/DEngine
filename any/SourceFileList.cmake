@@ -32,6 +32,7 @@ set(DENGINE_GFX_SOURCE_FILES
 		src/DEngine/Gfx/Gfx.cpp
 		src/DEngine/Gfx/Vk/DeletionQueue.cpp
 		src/DEngine/Gfx/Vk/Draw.cpp
+		src/DEngine/Gfx/Vk/Draw_Gui.cpp
 		src/DEngine/Gfx/Vk/DynamicDispatch.cpp
 		src/DEngine/Gfx/Vk/Init.cpp
 		src/DEngine/Gfx/Vk/GizmoManager.cpp

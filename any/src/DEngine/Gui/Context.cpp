@@ -229,7 +229,7 @@ void Context::PushEvent(CursorPressEvent const& event)
 		params.event = event;
 
 		auto& widget = *windowNode.data.topLayout;
-		widget.CursorPress2(params);
+		widget.CursorPress2(params, false);
 	}
 }
 
@@ -419,6 +419,19 @@ void Context::AdoptWindow(
 	newNode.data.topLayout = Std::Move(widget);
 
 	implData.windows.emplace(implData.windows.begin(), Std::Move(newNode));
+}
+
+void Context::DestroyWindow(WindowID id)
+{
+	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& windows = implData.windows;
+	auto windowNodeIt = Std::FindIf(
+		windows.begin(),
+		windows.end(),
+		[id](auto const& element) { return element.id == id; });
+	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != windows.end());
+
+	windows.erase(windowNodeIt);
 }
 
 /*

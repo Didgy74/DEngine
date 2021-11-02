@@ -82,7 +82,9 @@ namespace DEngine::Gui
 			Math::Vec2Int cursorPos,
 			CursorPressEvent event) override;
 
-		virtual bool CursorPress2(CursorPressParams const& params) override;
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			bool consumed) override;
 
 		virtual bool CursorMove(
 			Context& ctx,
@@ -112,7 +114,7 @@ namespace DEngine::Gui
 
 	protected:
 		bool toggled = false;
-		Std::Opt<u8> pointerId;
+		Std::Opt<u8> heldPointerId;
 		bool hoveredByCursor = false;
 		
 		void Activate();

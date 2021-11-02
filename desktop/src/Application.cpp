@@ -49,6 +49,9 @@ namespace DEngine::Application::impl
 	static void Backend_GLFW_WindowCursorEnterCallback(
 		GLFWwindow* window,
 		int entered);
+
+	static void Backend_GLFW_WindowCloseCallback(
+		GLFWwindow* window);
 	static void Backend_GLFW_WindowFocusCallback(
 		GLFWwindow* window,
 		int focused);
@@ -56,6 +59,7 @@ namespace DEngine::Application::impl
 		GLFWwindow* window,
 		int xpos,
 		int ypos);
+
 	static void Backend_GLFW_CursorPosCallback(
 		GLFWwindow* window,
 		double xpos,
@@ -75,8 +79,6 @@ namespace DEngine::Application::impl
 		GLFWwindow* window,
 		int width,
 		int height);
-	static void Backend_GLFW_WindowCloseCallback(
-		GLFWwindow* window);
 	 */
 }
 
@@ -264,7 +266,7 @@ static void Application::detail::Backend_GLFW_ErrorCallback(
 	fputs(description, stderr);
 }
 
-void* Application::impl::Backend_Initialize(AppData& appData)
+void* Application::impl::Backend::Initialize(AppData& appData)
 {
 	bool glfwSuccess = glfwInit();
 	if (!glfwSuccess)
@@ -281,7 +283,7 @@ void* Application::impl::Backend_Initialize(AppData& appData)
 	return backendData;
 }
 
-void Application::impl::Backend_ProcessEvents(AppData& appData, PollMode pollMode, Std::Opt<u64> timeoutNs)
+void Application::impl::Backend::ProcessEvents(AppData& appData, PollMode pollMode, Std::Opt<u64> timeoutNs)
 {
 	if (pollMode == PollMode::Immediate)
 	{
@@ -293,22 +295,21 @@ void Application::impl::Backend_ProcessEvents(AppData& appData, PollMode pollMod
 	}
 }
 
-void Application::impl::Backend_Destroy(void* data)
+void Application::impl::Backend::Destroy(void* data)
 {
 	DENGINE_IMPL_APPLICATION_ASSERT(data);
 
 	auto* const backendData = static_cast<Backend_Data*>(data);
-
 
 	glfwTerminate();
 
 	delete backendData;
 }
 
-auto Application::impl::Backend_NewWindow(
+auto Application::impl::Backend::NewWindow(
 	AppData& appData,
 	Std::Span<char const> title,
-	Extent extent) -> Backend_NewWindow_ReturnT
+	Extent extent) -> NewWindow_ReturnT
 {
 	std::string titleString;
 	titleString.resize(title.Size());
@@ -342,15 +343,18 @@ auto Application::impl::Backend_NewWindow(
 	windowData.visibleExtent = windowData.extent;
 
 	glfwSetCursorEnterCallback(rawHandle, &impl::Backend_GLFW_WindowCursorEnterCallback);
+
+	glfwSetWindowCloseCallback(rawHandle, &impl::Backend_GLFW_WindowCloseCallback);
 	glfwSetWindowPosCallback(rawHandle, &impl::Backend_GLFW_WindowPosCallback);
 	glfwSetWindowFocusCallback(rawHandle, &impl::Backend_GLFW_WindowFocusCallback);
+
 	glfwSetCursorPosCallback(rawHandle, &impl::Backend_GLFW_CursorPosCallback);
 	glfwSetMouseButtonCallback(rawHandle, &impl::Backend_GLFW_MouseButtonCallback);
 	/*
 	glfwSetWindowSizeCallback(rawHandle, &impl::Backend_GLFW_WindowSizeCallback);
 	glfwSetWindowFocusCallback(rawHandle, &impl::Backend_GLFW_WindowFocusCallback);
 	glfwSetWindowIconifyCallback(rawHandle, &impl::Backend_GLFW_WindowMinimizeCallback);
-	glfwSetWindowCloseCallback(rawHandle, &impl::Backend_GLFW_WindowCloseCallback);
+
 
 	glfwSetCursorPosCallback(rawHandle, &impl::Backend_GLFW_CursorPosCallback);
 
@@ -362,14 +366,19 @@ auto Application::impl::Backend_NewWindow(
 	glfwSetWindowUserPointer(rawHandle, &appData);
 
 
-	Backend_NewWindow_ReturnT returnVal = {};
+	NewWindow_ReturnT returnVal = {};
 	returnVal.windowData = windowData;
 	returnVal.platormHandle = rawHandle;
 
 	return returnVal;
 }
 
-Context::CreateVkSurface_ReturnT Application::impl::Backend_CreateVkSurface(
+void Application::impl::Backend::DestroyWindow(AppData::WindowNode& windowNode)
+{
+	glfwDestroyWindow((GLFWwindow*)windowNode.platformHandle);
+}
+
+Context::CreateVkSurface_ReturnT Application::impl::Backend::CreateVkSurface(
 	void* platformHandle,
 	uSize vkInstance,
 	void const* vkAllocationCallbacks) noexcept
@@ -388,7 +397,7 @@ Context::CreateVkSurface_ReturnT Application::impl::Backend_CreateVkSurface(
 	return returnVal;
 }
 
-void Application::impl::Backend_Log(LogSeverity severity, Std::Span<char const> msg)
+void Application::impl::Backend::Log(LogSeverity severity, Std::Span<char const> msg)
 {
 	std::cout.write(msg.Data(), msg.Size()) << std::endl;
 }
@@ -401,10 +410,22 @@ void Application::impl::Backend_GLFW_WindowCursorEnterCallback(
 	DENGINE_IMPL_APPLICATION_ASSERT(appDataPtr);
 	auto& appData = *appDataPtr;
 
-	UpdateWindowCursorEnter(
+	BackendInterface::UpdateWindowCursorEnter(
 		appData,
 		GetWindowId(appData, window),
 		entered);
+}
+
+void Application::impl::Backend_GLFW_WindowCloseCallback(
+	GLFWwindow *window)
+{
+	auto appDataPtr = static_cast<AppData*>(glfwGetWindowUserPointer(window));
+	DENGINE_IMPL_APPLICATION_ASSERT(appDataPtr);
+	auto& appData = *appDataPtr;
+
+	BackendInterface::PushWindowCloseSignal(
+		appData,
+		GetWindowId(appData, window));
 }
 
 void Application::impl::Backend_GLFW_WindowFocusCallback(
@@ -415,7 +436,7 @@ void Application::impl::Backend_GLFW_WindowFocusCallback(
 	DENGINE_IMPL_APPLICATION_ASSERT(appDataPtr);
 	auto& appData = *appDataPtr;
 
-	UpdateWindowFocus(
+	BackendInterface::UpdateWindowFocus(
 		appData,
 		GetWindowId(appData, window),
 		focused);
@@ -430,7 +451,7 @@ void Application::impl::Backend_GLFW_WindowPosCallback(
 	DENGINE_IMPL_APPLICATION_ASSERT(appDataPtr);
 	auto& appData = *appDataPtr;
 
-	UpdateWindowPosition(
+	BackendInterface::UpdateWindowPosition(
 		appData,
 		GetWindowId(appData, window),
 		{ (i32)xpos, (i32)ypos });
@@ -445,7 +466,7 @@ void Application::impl::Backend_GLFW_CursorPosCallback(
 	DENGINE_IMPL_APPLICATION_ASSERT(appDataPtr);
 	auto& appData = *appDataPtr;
 
-	UpdateCursorPosition(
+	BackendInterface::UpdateCursorPosition(
 		appData,
 		GetWindowId(appData, window),
 		{ (i32)xpos, (i32)ypos });
@@ -468,7 +489,7 @@ void Application::impl::Backend_GLFW_MouseButtonCallback(
 	else if (action == GLFW_RELEASE)
 		wasPressed = false;
 
-	UpdateButton(
+	BackendInterface::UpdateButton(
 		appData,
 		GetWindowId(appData, window),
 		Backend_GLFW_MouseButtonToRawButton(button),

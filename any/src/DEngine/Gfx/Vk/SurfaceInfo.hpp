@@ -1,13 +1,12 @@
 #pragma once
 
 #include "VulkanIncluder.hpp"
+#include "ForwardDeclarations.hpp"
 
 #include <vector>
 
 namespace DEngine::Gfx::Vk
 {
-	class InstanceDispatch;
-
 	// Holds information we assume to be equal
 	// across all surfaces.
 	struct SurfaceInfo

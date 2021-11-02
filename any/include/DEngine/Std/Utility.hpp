@@ -2,12 +2,12 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Trait.hpp>
-#include <DEngine/Std/Containers/Str.hpp>
+#include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Std/Containers/Range.hpp>
 
 namespace DEngine::Std
 {
-	void NameThisThread(Str name);
+	void NameThisThread(Span<char const> name);
 	
 	template<typename T>
 	[[nodiscard]] constexpr Trait::RemoveRef<T>&& Move(T&& in) noexcept;

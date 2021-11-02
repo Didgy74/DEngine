@@ -10,7 +10,9 @@ constexpr void* operator new(
 	decltype(sizeof(int)) size,
 	void* data,
 	[[maybe_unused]] DEngine::Std::impl::VecPlacementNewTag) noexcept
-{ return data; }
+{
+	return data;
+}
 
 namespace DEngine::Std
 {
@@ -196,4 +198,7 @@ namespace DEngine::Std
 			return true;
 		}
 	};
+
+	template<class T, class Allocator>
+	inline Std::Vec<T, Allocator> MakeVec(Allocator& alloc) noexcept { return Std::Vec<T, Allocator>{ alloc }; }
 }

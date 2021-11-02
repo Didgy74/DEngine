@@ -5,6 +5,7 @@
 #include "VulkanIncluder.hpp"
 #include "Constants.hpp"
 #include "VMAIncluder.hpp"
+#include "ForwardDeclarations.hpp"
 
 #include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
@@ -15,16 +16,9 @@
 
 namespace DEngine::Gfx::Vk
 {
-	class InstanceDispatch;
-	class DeviceDispatch;
-	class DebugUtilsDispatch;
-	class DeletionQueue;
-	class QueueData;
-	class GlobUtils;
-	struct SurfaceInfo;
-
-	struct NativeWindowData
+	class NativeWinMgr_WindowData
 	{
+	public:
 		vk::SurfaceKHR surface = {};
 		vk::SwapchainKHR swapchain = {};
 		Std::StackVec<vk::Image, Const::maxSwapchainLength> swapchainImages;
@@ -33,60 +27,78 @@ namespace DEngine::Gfx::Vk
 		Std::StackVec<vk::Framebuffer, Const::maxSwapchainLength> framebuffers;
 	};
 
-	struct WindowGuiData
+	class NativeWinMgr_WindowGuiData
 	{
-		vk::Extent2D extent{};
+	public:
+		vk::Extent2D extent = {};
 		vk::SurfaceTransformFlagBitsKHR surfaceRotation = vk::SurfaceTransformFlagBitsKHR::eIdentity;
-		Math::Mat2 rotation{};
+		Math::Mat2 rotation = {};
 	};
 
-	struct NativeWindowManager
+	// Native Window Manager
+	class NativeWinMgr
 	{
+	public:
 		// Insertion job resources
 		struct CreateJob
+		{
+			NativeWindowID id;
+		};
+		struct DeleteJob
 		{
 			NativeWindowID id;
 		};
 		struct InsertionJobsT
 		{
 			std::mutex lock;
-			std::vector<CreateJob> queue;
+			std::vector<CreateJob> createQueue;
+			std::vector<DeleteJob> deleteQueue;
 		};
 		InsertionJobsT insertionJobs;
 		// Insertion locked resources end
 
 		struct Node
 		{
-			NativeWindowID id;
-			NativeWindowData windowData;
-			WindowGuiData gui;
+			NativeWindowID id = {};
+			NativeWinMgr_WindowData windowData = {};
+			NativeWinMgr_WindowGuiData gui = {};
 		};
 		struct MainT
 		{
-			std::mutex lock;
+			//std::mutex lock;
 			std::vector<Node> nativeWindows;
 		};
 		MainT main;
 
 		static void ProcessEvents(
-			NativeWindowManager& manager,
+			NativeWinMgr& manager,
 			GlobUtils const& globUtils,
+			DeletionQueue& delQueue,
 			Std::FrameAlloc& transientAlloc,
 			Std::Span<NativeWindowUpdate const> windowUpdates);
 
 		struct InitInfo
 		{
-			NativeWindowManager* manager;
-			NativeWindowID initialWindow = {};
-			DeviceDispatch const* device;
-			QueueData const* queues;
+			NativeWinMgr& manager;
+			NativeWindowID initialWindow;
+			DeviceDispatch const& device;
+			QueueData const& queues;
 			DebugUtilsDispatch const* optional_debugUtils;
 		};
 		static void Initialize(
 			InitInfo const& initInfo);
 
-		static void PushCreateWindowJob(
-			NativeWindowManager& manager,
-			NativeWindowID windowId) noexcept;
+		static void Destroy(
+			NativeWinMgr& manager,
+			InstanceDispatch const& instance,
+			DeviceDispatch const& device);
 	};
+
+	void NativeWinMgr_PushCreateWindowJob(
+		NativeWinMgr& manager,
+		NativeWindowID windowId);
+
+	void NativeWinMgr_PushDeleteWindowJob(
+		NativeWinMgr& manager,
+		NativeWindowID windowId);
 }

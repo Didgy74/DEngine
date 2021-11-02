@@ -44,6 +44,7 @@ namespace DEngine::Gfx::Vk
 		static void Update(
 			TextureManager& manager,
 			GlobUtils const& globUtils,
+			DelQueue& delQueue,
 			DrawParams const& drawParams,
 			Gfx::TextureAssetInterface const& texAssetInterface,
 			Std::FrameAllocator& frameAlloc);

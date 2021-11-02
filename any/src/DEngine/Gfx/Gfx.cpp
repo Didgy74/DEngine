@@ -44,7 +44,6 @@ Std::Opt<Gfx::Context> Gfx::Initialize(InitInfo const& initInfo)
 	if (!returnVal.apiDataBase)
 		return Std::nullOpt;
 
-
 	return Std::Opt<Gfx::Context>{ Std::Move(returnVal) };
 }
 
@@ -96,4 +95,11 @@ void Gfx::Context::AdoptNativeWindow(Gfx::NativeWindowID in)
 	auto& apiData = *static_cast<APIDataBase*>(apiDataBase);
 
 	apiData.NewNativeWindow(in);
+}
+
+void Gfx::Context::DeleteNativeWindow(Gfx::NativeWindowID in)
+{
+	auto& apiData = *static_cast<APIDataBase*>(apiDataBase);
+
+	apiData.DeleteNativeWindow(in);
 }

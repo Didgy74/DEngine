@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.18)
 
 option(DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT "Enable verbose CMake output for DEngine" ON)
 
-
 project(dengine_desktop)
 
 set(DENGINE_EXECUTABLE_NAME ${CMAKE_PROJECT_NAME})

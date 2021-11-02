@@ -65,7 +65,6 @@ set_target_properties(${DENGINE_ANY_TARGET_NAME} PROPERTIES
 if (NOT DEFINED DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT)
 	message(FATAL_ERROR "DEngine, developer bug: CMake variable 'DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT' not set.")
 endif()
-
 # Run script for linking dependencies
 include(LinkDependencies.cmake)
 DEngineAny_LinkDependencies(${DENGINE_ANY_TARGET_NAME} ${DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT})
@@ -73,3 +72,10 @@ DEngineAny_LinkDependencies(${DENGINE_ANY_TARGET_NAME} ${DENGINE_ENABLE_VERBOSE_
 set(DENGINE_DEFAULT_ASSERT_SETTING ON)
 include(SetupAssertDefines.cmake)
 SetupAssertDefines(${DENGINE_ANY_TARGET_NAME} ${DENGINE_DEFAULT_ASSERT_SETTING})
+
+
+# Rendering multi-threading switch
+set(DENGINE_GFX_ENABLE_DEDICATED_THREAD ON)
+if (${DENGINE_GFX_ENABLE_DEDICATED_THREAD})
+	target_compile_definitions(${DENGINE_ANY_TARGET_NAME} PUBLIC DENGINE_GFX_ENABLE_DEDICATED_THREAD)
+endif()

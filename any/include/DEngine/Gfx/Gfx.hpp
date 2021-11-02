@@ -13,6 +13,12 @@
 
 namespace DEngine::Gfx
 {
+#ifdef DENGINE_GFX_ENABLE_DEDICATED_THREAD
+	constexpr bool enableDedicatedThread = true;
+#else
+	constexpr bool enableDedicatedThread = false;
+#endif
+
 	class WsiInterface;
 	class LogInterface;
 	struct TextureAssetInterface;
@@ -204,11 +210,6 @@ namespace DEngine::Gfx
 	public:
 		virtual ~WsiInterface() = default;
 
-		// Return type is VkResult
-		//
-		// Argument #1: VkInstance - The Vulkan instance handle
-		// Argument #2: VkAllocationCallbacks const* - Allocation callbacks for surface creation.
-		// Argument #3: VkSurfaceKHR* - The output surface handle
 		struct CreateVkSurface_ReturnT
 		{
 			u32 vkResult;
@@ -225,8 +226,8 @@ namespace DEngine::Gfx
 	public:
 		ViewportRef() = default;
 
-		[[nodiscard]] bool IsValid() const { return viewportID != ViewportID::Invalid; }
-		[[nodiscard]] Gfx::ViewportID ViewportID() const { return viewportID; }
+		[[nodiscard]] bool IsValid() const noexcept { return viewportID != ViewportID::Invalid; }
+		[[nodiscard]] Gfx::ViewportID ViewportID() const noexcept { return viewportID; }
 
 	private:
 		Gfx::ViewportID viewportID = Gfx::ViewportID::Invalid;

@@ -148,10 +148,14 @@ namespace DEngine::Gui
 		/*
 			Return true if event has been consumed.
 
-			You can end dispatching early ONLY if the event is down-pressed.
-			Unpressed events should ordinarily be dispatched everywhere.
+		 	If the event was consumed already before this event was called,
+		 	you can disregard the return-value.
+
+		 	You can not end dispatching early. Pass all presses everywhere.
 		*/
-		virtual bool CursorPress2(CursorPressParams const& params)
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			bool consumed)
 		{
 			return false;
 		}

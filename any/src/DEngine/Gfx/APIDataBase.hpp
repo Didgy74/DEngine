@@ -20,6 +20,8 @@ namespace DEngine::Gfx
 
 		// Needs to be thread-safe
 		virtual void NewNativeWindow(NativeWindowID windowId) = 0;
+		// Needs to be thread-safe
+		virtual void DeleteNativeWindow(NativeWindowID windowId) = 0;
 
 		// Needs to be thread-safe
 		virtual void NewViewport(ViewportID& viewportID) = 0;

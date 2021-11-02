@@ -923,28 +923,38 @@ void StackLayout::CursorExit(Context& ctx)
 	insertionJobs.clear();
 }
 
-bool StackLayout::CursorPress2(CursorPressParams const& params)
+bool StackLayout::CursorPress2(
+	CursorPressParams const& params,
+	bool consumed)
 {
 	DENGINE_IMPL_GUI_ASSERT(!currentlyIterating);
 	currentlyIterating = true;
 
-	auto const rects = params.rectCollection.GetRect(*this);
+	auto const& rectPair = params.rectCollection.GetRect(*this);
 
-	uSize const childCount = children.size();
-	for (uSize i = 0; i < childCount; i += 1)
+	bool eventConsumed = consumed;
+
+	int const childCount = (int)children.size();
+	for (int i = 0; i < childCount; i += 1)
 	{
-		auto const index = impl::StackLayoutImpl::GetModifiedWidgetIndex({ insertionJobs.data(), insertionJobs.size() }, i);
+		auto const index = impl::StackLayoutImpl::GetModifiedWidgetIndex(
+			{ insertionJobs.data(), insertionJobs.size() },
+			i);
 		if (!index.HasValue())
 			continue;
 
 		auto& child = *children[index.Value()];
-		child.CursorPress2(params);
+
+		bool const newConsumed = child.CursorPress2(params, eventConsumed);
+		eventConsumed = eventConsumed || newConsumed;
 	}
 
 	currentlyIterating = false;
 	insertionJobs.clear();
 
-	return rects.widgetRect.PointIsInside(params.cursorPos) && rects.visibleRect.PointIsInside(params.cursorPos);
+	return
+		eventConsumed ||
+		(rectPair.widgetRect.PointIsInside(params.cursorPos) && rectPair.visibleRect.PointIsInside(params.cursorPos));
 }
 
 bool StackLayout::CursorMove(Widget::CursorMoveParams const& params, bool occluded)
@@ -952,12 +962,14 @@ bool StackLayout::CursorMove(Widget::CursorMoveParams const& params, bool occlud
 	DENGINE_IMPL_GUI_ASSERT(!currentlyIterating);
 	currentlyIterating = true;
 
-	auto const rects = params.rectCollection.GetRect(*this);
+	auto const& rectPair = params.rectCollection.GetRect(*this);
 
 	uSize const childCount = children.size();
 	for (uSize i = 0; i < childCount; i += 1)
 	{
-		auto const index = impl::StackLayoutImpl::GetModifiedWidgetIndex({ insertionJobs.data(), insertionJobs.size() }, i);
+		auto const index = impl::StackLayoutImpl::GetModifiedWidgetIndex(
+			{ insertionJobs.data(), insertionJobs.size() },
+			i);
 		if (!index.HasValue())
 			continue;
 
@@ -969,8 +981,8 @@ bool StackLayout::CursorMove(Widget::CursorMoveParams const& params, bool occlud
 	insertionJobs.clear();
 
 	return
-		rects.widgetRect.PointIsInside(params.event.position) &&
-		rects.visibleRect.PointIsInside(params.event.position);
+		rectPair.widgetRect.PointIsInside(params.event.position) &&
+		rectPair.visibleRect.PointIsInside(params.event.position);
 }
 
 void StackLayout::Render2(

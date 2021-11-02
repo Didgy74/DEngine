@@ -372,7 +372,8 @@ public:
 		u8 id,
 		TouchEventType type,
 		Math::Vec2 position) {}
-	virtual void WindowClose(
+	virtual void WindowCloseSignal(
+		Context& appCtx,
 		WindowID window) {}
 	virtual void WindowCursorEnter(
 		WindowID window,

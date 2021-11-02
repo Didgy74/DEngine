@@ -1,25 +1,35 @@
 #include "ObjectDataManager.hpp"
 #include "GlobUtils.hpp"
 
+#include "DeletionQueue.hpp"
+
 #include <DEngine/Math/Common.hpp>
 
 #include <DEngine/Gfx/impl/Assert.hpp>
 
 #include <string>
 
-void DEngine::Gfx::Vk::ObjectDataManager::HandleResizeEvent(
+using namespace DEngine;
+using namespace DEngine::Gfx;
+using namespace DEngine::Gfx::Vk;
+
+void ObjectDataManager::HandleResizeEvent(
 	ObjectDataManager& manager,
 	GlobUtils const& globUtils,
+	DelQueue& delQueue,
 	uSize dataCount)
 {
-	vk::Result vkResult{};
+	auto const& device = globUtils.device;
+	auto const* debugUtils = globUtils.DebugUtilsPtr();
+
+	vk::Result vkResult = {};
 
 	if (dataCount <= manager.capacity)
 		return;
 
 	// Queue previous stuff for deletion
-	globUtils.delQueue.Destroy(manager.descrPool);
-	globUtils.delQueue.Destroy(manager.vmaAlloc, manager.buffer);
+	delQueue.Destroy(manager.descrPool);
+	delQueue.Destroy(manager.vmaAlloc, manager.buffer);
 
 	manager.capacity *= 2;
 
@@ -42,14 +52,13 @@ void DEngine::Gfx::Vk::ObjectDataManager::HandleResizeEvent(
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("DEngine - Vulkan: VMA failed to allocate memory for object data.");
 	manager.mappedMem = vmaAllocResultInfo.pMappedData;
-	if (globUtils.UsingDebugUtils())
+	if (debugUtils)
 	{
-		globUtils.debugUtils.Helper_SetObjectName(
-			globUtils.device.handle,
+		debugUtils->Helper_SetObjectName(
+			device.handle,
 			manager.buffer,
 			"ObjectData - Buffer");
 	}
-
 
 	// Allocate the descriptor-set stuff
 	vk::DescriptorPoolSize descrPoolSize{};
@@ -61,11 +70,11 @@ void DEngine::Gfx::Vk::ObjectDataManager::HandleResizeEvent(
 	descrPoolInfo.poolSizeCount = 1;
 	descrPoolInfo.pPoolSizes = &descrPoolSize;
 
-	manager.descrPool = globUtils.device.createDescriptorPool(descrPoolInfo);
-	if (globUtils.UsingDebugUtils())
+	manager.descrPool = device.createDescriptorPool(descrPoolInfo);
+	if (debugUtils)
 	{
-		globUtils.debugUtils.Helper_SetObjectName(
-			globUtils.device.handle,
+		debugUtils->Helper_SetObjectName(
+			device.handle,
 			manager.descrPool,
 			"ObjectData - DescrPool");
 	}
@@ -77,10 +86,10 @@ void DEngine::Gfx::Vk::ObjectDataManager::HandleResizeEvent(
 	vkResult = globUtils.device.allocateDescriptorSets(descrSetAllocInfo, &manager.descrSet);
 	if (vkResult != vk::Result::eSuccess)
 		throw std::runtime_error("DEngine - Vulkan: Unable to allocate descriptor set for object-data.");
-	if (globUtils.UsingDebugUtils())
+	if (debugUtils)
 	{
-		globUtils.debugUtils.Helper_SetObjectName(
-			globUtils.device.handle,
+		debugUtils->Helper_SetObjectName(
+			device.handle,
 			manager.descrSet,
 			"ObjectData - DescrSet");
 	}
@@ -97,8 +106,7 @@ void DEngine::Gfx::Vk::ObjectDataManager::HandleResizeEvent(
 	write.dstBinding = 0;
 	write.dstSet = manager.descrSet;
 	write.pBufferInfo = &descrBuffInfo;
-	globUtils.device.updateDescriptorSets(write, nullptr);
-
+	device.updateDescriptorSets(write, nullptr);
 }
 
 void DEngine::Gfx::Vk::ObjectDataManager::Update(

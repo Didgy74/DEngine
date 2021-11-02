@@ -72,6 +72,9 @@ namespace DEngine::Gui
 			Extent visibleExtent,
 			Std::Box<Widget>&& widget);
 
+		void DestroyWindow(
+			WindowID id);
+
 		void TakeInputConnection(
 			Widget& widget,
 			SoftInputFilter softInputFilter,

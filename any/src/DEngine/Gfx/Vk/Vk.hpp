@@ -64,6 +64,8 @@ namespace DEngine::Gfx::Vk
 
 		// Thread safe
 		virtual void NewNativeWindow(NativeWindowID windowId) override;
+		// Thread safe
+		virtual void DeleteNativeWindow(NativeWindowID windowId) override;
 
 		// Thread safe
 		virtual void NewViewport(ViewportID& viewportID) override;
@@ -92,10 +94,11 @@ namespace DEngine::Gfx::Vk
 		GlobUtils globUtils = {};
 
 		Std::FrameAllocator frameAllocator;
+		DeletionQueue delQueue;
 
 		GizmoManager gizmoManager = {};
 		GuiResourceManager guiResourceManager = {};
-		NativeWindowManager nativeWindowManager = {};
+		NativeWinMgr nativeWindowManager = {};
 		ObjectDataManager objectDataManager = {};
 		TextureManager textureManager = {};
 		ViewportManager viewportManager = {};
@@ -103,12 +106,22 @@ namespace DEngine::Gfx::Vk
 		vk::PipelineLayout testPipelineLayout{};
 		vk::Pipeline testPipeline{};
 
-		std::thread renderingThread;
-
-		DrawParams drawParams;
-		bool drawParamsReady = false;
-		std::mutex drawParamsLock;
-		std::condition_variable drawParamsCondVarWorker;
-		std::condition_variable drawParamsCondVarProducer;
+		std::mutex threadLock;
+		struct Thread
+		{
+			std::thread renderingThread;
+			enum class NextCmd
+			{
+				Draw,
+				Shutdown,
+				Invalid,
+			};
+			NextCmd nextCmd = NextCmd::Invalid;
+			DrawParams drawParams;
+			bool drawParamsReady = false;
+			std::condition_variable drawParamsCondVarWorker;
+			std::condition_variable drawParamsCondVarProducer;
+		};
+		Thread thread;
 	};
 }

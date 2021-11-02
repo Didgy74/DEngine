@@ -131,10 +131,24 @@ namespace DEngine::impl
 
 	TempWindowHandler tempWindowHandler = {};
 
-	struct GfxGuiEventForwarder : public App::EventForwarder
+	class GfxGuiEventForwarder : public App::EventForwarder
 	{
 	public:
 		Gui::Context* guiCtx = nullptr;
+		Gfx::Context* gfxCtx = nullptr;
+
+		virtual void WindowCloseSignal(
+			App::Context& appCtx,
+			App::WindowID window) override
+		{
+			guiCtx->DestroyWindow((Gui::WindowID)window);
+
+			// Then destroy the window in the renderer.
+			gfxCtx->DeleteNativeWindow((Gfx::NativeWindowID)window);
+
+			// Then destroy the window in the app layer.
+			appCtx.DestroyWindow(window);
+		}
 
 		virtual void WindowCursorEnter(
 			App::WindowID window,
@@ -245,7 +259,7 @@ namespace DEngine::impl
 			layout->AddWidget(Std::Box{ scrollArea });
 
 			auto* middleLayout = new Gui::StackLayout;
-			scrollArea->widget = Std::Box{ middleLayout };
+			scrollArea->child = Std::Box{middleLayout };
 			//middleLayout->padding = 10;
 			middleLayout->spacing = 10;
 			//middleLayout->direction = Gui::StackLayout::Direction::Horizontal;
@@ -286,9 +300,6 @@ namespace DEngine::impl
 		{
 			std::cout << "B pressed" << std::endl;
 		};
-
-
-
 	}
 
 	void SetupWindowB(App::Context& appCtx, Gui::Context& guiCtx, Gfx::Context& gfxCtx)
@@ -370,7 +381,8 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
 
-	Std::NameThisThread("MainThread");
+	constexpr char mainThreadString[] = "MainThread";
+	Std::NameThisThread({ mainThreadString, sizeof(mainThreadString) - 1 });
 
 	auto appCtx = App::impl::Initialize();
 
@@ -396,10 +408,11 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	auto guiCtx = Gui::Context::Create(impl::tempWindowHandler, &gfxCtx);
 
 	impl::SetupWindowA(guiCtx, mainWindowInfo);
-	//impl::SetupWindowB(appCtx, guiCtx, gfxCtx);
+	impl::SetupWindowB(appCtx, guiCtx, gfxCtx);
 
 	impl::GfxGuiEventForwarder gfxGuiEventForwarder;
 	gfxGuiEventForwarder.guiCtx = &guiCtx;
+	gfxGuiEventForwarder.gfxCtx = &gfxCtx;
 	appCtx.InsertEventInterface(gfxGuiEventForwarder);
 
 	Gui::SizeHintCollection sizeHintCollection;
@@ -407,7 +420,9 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	while (true)
 	{
-		App::impl::ProcessEvents(appCtx, App::impl::PollMode::Immediate);
+		// This will in turn call the appropriate callbacks into the
+		// GfxGuiEventForwarder object.
+		App::impl::ProcessEvents(appCtx, App::impl::PollMode::Wait);
 		if (appCtx.GetWindowCount() == 0)
 			break;
 

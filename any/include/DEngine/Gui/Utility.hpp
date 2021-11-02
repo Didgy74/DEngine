@@ -5,7 +5,6 @@
 
 #include <DEngine/impl/Assert.hpp>
 
-#include <DEngine/Math/Common.hpp>
 #include <DEngine/Math/Vector.hpp>
 
 namespace DEngine::Gui

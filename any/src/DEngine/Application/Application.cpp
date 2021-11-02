@@ -37,13 +37,13 @@ namespace DEngine::Application::impl
 		return static_cast<unsigned int>(in) < static_cast<unsigned int>(PollMode::COUNT);
 	}
 
-	static void FlushQueuedEventCallbacks(AppData& appData);
+	static void FlushQueuedEventCallbacks(Context& appCtx, AppData& appData);
 }
 
 using namespace DEngine;
 using namespace DEngine::Application;
 
-static void Application::impl::FlushQueuedEventCallbacks(AppData& appData)
+static void Application::impl::FlushQueuedEventCallbacks(Context& appCtx, AppData& appData)
 {
 	for (auto const& job : appData.queuedEventCallbacks)
 	{
@@ -94,6 +94,13 @@ static void Application::impl::FlushQueuedEventCallbacks(AppData& appData)
 				job.ptr->WindowCursorEnter(
 					job.windowCursorEnter.window,
 					job.windowCursorEnter.entered);
+				break;
+			}
+
+
+			case Type::WindowCloseSignal:
+			{
+				job.ptr->WindowCloseSignal(appCtx, job.windowCloseSignal.window);
 				break;
 			}
 			case Type::WindowFocus:
@@ -411,7 +418,7 @@ auto Application::impl::AppImpl::Initialize() -> Context
 	auto* appData = new AppData;
 	ctx.data = appData;
 
-	appData->backendData = Backend_Initialize(*appData);
+	appData->backendData = Backend::Initialize(*appData);
 
 	return ctx;
 }
@@ -458,7 +465,7 @@ void Application::impl::AppImpl::ProcessEvents(Context& ctx, PollMode pollMode, 
 			appData.touchInputs[i].eventType = TouchEventType::Unchanged;
 	}
 
-	Backend_ProcessEvents(appData, pollMode, timeoutNs);
+	Backend::ProcessEvents(appData, pollMode, timeoutNs);
 
 	// Calculate duration for each button being held.
 	for (uSize i = 0; i < (uSize)Button::COUNT; i += 1)
@@ -474,8 +481,9 @@ void Application::impl::AppImpl::ProcessEvents(Context& ctx, PollMode pollMode, 
 		if (appData.touchInputs[i].eventType != TouchEventType::Up)
 			appData.touchInputs[i].duration = std::chrono::duration<f32>(appData.currentNow - appData.touchInputStartTime[i]).count();
 	}
+
 	// Flush queued event callbacks.
-	impl::FlushQueuedEventCallbacks(appData);
+	impl::FlushQueuedEventCallbacks(ctx, appData);
 
 	appData.tickCount += 1;
 }
@@ -487,7 +495,7 @@ Context::~Context() noexcept
 		auto* const appData = static_cast<impl::AppData*>(data);
 		if (appData->backendData)
 		{
-			impl::Backend_Destroy(appData->backendData);
+			impl::Backend::Destroy(appData->backendData);
 			appData->backendData = nullptr;
 		}
 
@@ -503,7 +511,7 @@ auto Context::NewWindow(
 {
 	auto& appData = *static_cast<impl::AppData*>(data);
 
-	auto newWindowInfo = impl::Backend_NewWindow(appData, title, extent);
+	auto newWindowInfo = impl::Backend::NewWindow(appData, title, extent);
 
 	impl::AppData::WindowNode newNode = {};
 
@@ -525,6 +533,22 @@ auto Context::NewWindow(
 	return returnVal;
 }
 
+void Context::DestroyWindow(WindowID id) noexcept
+{
+	auto& appData = *static_cast<impl::AppData*>(data);
+
+	auto const windowNodeIt = Std::FindIf(
+		appData.windows.begin(),
+		appData.windows.end(),
+		[id](auto const& element) { return element.id == id; });
+
+	auto windowNode = Std::Move(*windowNodeIt);
+
+	appData.windows.erase(windowNodeIt);
+
+	impl::Backend::DestroyWindow(windowNode);
+}
+
 u32 Context::GetWindowCount() const noexcept
 {
 	auto& appData = *static_cast<impl::AppData*>(data);
@@ -544,7 +568,7 @@ auto Context::CreateVkSurface(
 	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 
-	return impl::Backend_CreateVkSurface(
+	return impl::Backend::CreateVkSurface(
 		windowNode.platformHandle,
 		vkInstance,
 		vkAllocationCallbacks);
@@ -559,7 +583,7 @@ void Context::InsertEventInterface(EventForwarder& in)
 
 void Context::Log(LogSeverity severity, Std::Span<char const> msg)
 {
-	impl::Backend_Log(severity, msg);
+	impl::Backend::Log(severity, msg);
 }
 
 auto Application::impl::GetWindowNode(
@@ -602,7 +626,7 @@ WindowID Application::impl::GetWindowId(impl::AppData& appData, void* platformHa
 	return element.id;
 }
 
-void Application::impl::UpdateWindowCursorEnter(
+void Application::impl::BackendInterface::UpdateWindowCursorEnter(
 	AppData& appData,
 	WindowID id,
 	bool entered)
@@ -625,8 +649,28 @@ void Application::impl::UpdateWindowCursorEnter(
 	}
 }
 
-// Should be called by the backend.
-void Application::impl::UpdateWindowPosition(
+void Application::impl::BackendInterface::PushWindowCloseSignal(
+	AppData &appData,
+	WindowID id)
+{
+	auto windowNodePtr = impl::GetWindowNode(appData, id);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+
+	for (auto const& eventCallback : appData.registeredEventCallbacks)
+	{
+		using T = EventCallbackJob;
+		T job = {};
+		job.ptr = eventCallback;
+		job.type = T::Type::WindowCloseSignal;
+		T::WindowCloseSignal event = {};
+		event.window = windowNode.id;
+		job.windowCloseSignal = event;
+		appData.queuedEventCallbacks.push_back(job);
+	}
+}
+
+void Application::impl::BackendInterface::UpdateWindowPosition(
 	AppData& appData,
 	WindowID id,
 	Math::Vec2Int newPosition)
@@ -652,7 +696,7 @@ void Application::impl::UpdateWindowPosition(
 	}
 }
 
-void Application::impl::UpdateWindowFocus(
+void Application::impl::BackendInterface::UpdateWindowFocus(
 	AppData& appData,
 	WindowID id,
 	bool focusGained)
@@ -720,7 +764,7 @@ namespace DEngine::Application::impl
 	}
 }
 
-void Application::impl::UpdateCursorPosition(
+void Application::impl::BackendInterface::UpdateCursorPosition(
 	AppData& appData,
 	WindowID id,
 	Math::Vec2Int newRelativePosition,
@@ -736,7 +780,7 @@ void Application::impl::UpdateCursorPosition(
 		delta);
 }
 
-void Application::impl::UpdateCursorPosition(
+void Application::impl::BackendInterface::UpdateCursorPosition(
 	AppData& appData,
 	WindowID id,
 	Math::Vec2Int newRelativePosition)
@@ -750,7 +794,7 @@ void Application::impl::UpdateCursorPosition(
 		newRelativePosition);
 }
 
-void Application::impl::UpdateButton(
+void Application::impl::BackendInterface::UpdateButton(
 	AppData& appData,
 	WindowID id,
 	Button button,
@@ -920,10 +964,6 @@ void Application::detail::UpdateWindowClose(
 	AppData::WindowNode& windowNode)
 {
 	auto& appData = *detail::pAppData;
-
-	windowNode.windowData.shouldShutdown = true;
-	for (EventForwarder* eventCallback : appData.registeredEventCallbacks)
-		eventCallback->WindowClose(windowNode.id);
 }
 
 void Application::detail::UpdateWindowCursorEnter(

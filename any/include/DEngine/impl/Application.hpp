@@ -29,7 +29,7 @@ namespace DEngine::Application::detail
 			CharRemove,
 			CursorMove,
 			Touch,
-			WindowClose,
+			WindowCloseSignal,
 			WindowCursorEnter,
 			WindowFocus,
 			WindowMinimize,
@@ -69,6 +69,10 @@ namespace DEngine::Application::detail
 			WindowID window;
 			bool entered;
 		};
+		struct WindowCloseSignal
+		{
+			WindowID window;
+		};
 		struct WindowFocusEvent
 		{
 			WindowID window;
@@ -88,6 +92,7 @@ namespace DEngine::Application::detail
 			CursorMoveEvent cursorMove;
 			TouchEvent touch;
 			WindowCursorEnter windowCursorEnter;
+			WindowCloseSignal windowCloseSignal;
 			WindowMoveEvent windowMove;
 			WindowFocusEvent windowFocus;
 		};
@@ -265,66 +270,74 @@ namespace DEngine::Application::impl
 		return AppImpl::ProcessEvents(ctx, pollMode, timeoutNs);
 	}
 
-	[[nodiscard]] void* Backend_Initialize(AppData& appData);
-	void Backend_ProcessEvents(AppData& appData, PollMode pollMode, Std::Opt<u64> timeoutNs);
-	void Backend_Destroy(void* data);
-	struct Backend_NewWindow_ReturnT
+	// All these functions must be implemented by the backend.
+	namespace Backend
 	{
-		WindowData windowData;
-		void* platormHandle;
-	};
-	[[nodiscard]] Backend_NewWindow_ReturnT Backend_NewWindow(
-		AppData& appData,
-		Std::Span<char const> title,
-		Extent extent);
-	[[nodiscard]] Context::CreateVkSurface_ReturnT Backend_CreateVkSurface(
-		void* platformHandle,
-		uSize vkInstance,
-		void const* vkAllocationCallbacks) noexcept;
+		[[nodiscard]] void* Initialize(AppData& appData);
+		void ProcessEvents(AppData& appData, PollMode pollMode, Std::Opt<u64> timeoutNs);
+		void Destroy(void* data);
+		struct NewWindow_ReturnT
+		{
+			WindowData windowData = {};
+			void* platormHandle {};
+		};
+		[[nodiscard]] NewWindow_ReturnT NewWindow(
+			AppData& appData,
+			Std::Span<char const> title,
+			Extent extent);
+		void DestroyWindow(
+			AppData::WindowNode& windowNode);
+		[[nodiscard]] Context::CreateVkSurface_ReturnT CreateVkSurface(
+			void* platformHandle,
+			uSize vkInstance,
+			void const* vkAllocationCallbacks) noexcept;
 
-	void Backend_Log(LogSeverity severity, Std::Span<char const> msg);
+		void Log(LogSeverity severity, Std::Span<char const> msg);
+	}
 
 	[[nodiscard]] AppData::WindowNode* GetWindowNode(AppData& appData, WindowID id);
 	[[nodiscard]] AppData::WindowNode const* GetWindowNode(AppData const& appData, WindowID id);
 
 	[[nodiscard]] WindowID GetWindowId(AppData& appData, void* platformHandle);
 
-	// Should be called by the backend.
-	[[maybe_unused]] void UpdateWindowCursorEnter(
-		AppData& appData,
-		WindowID id,
-		bool entered);
+	namespace BackendInterface
+	{
+		[[maybe_unused]] void PushWindowCloseSignal(
+			AppData& appData,
+			WindowID id);
 
-	// Should be called by the backend.
-	[[maybe_unused]] void UpdateWindowFocus(
-		AppData& appData,
-		WindowID id,
-		bool focusGained);
+		[[maybe_unused]] void UpdateWindowCursorEnter(
+			AppData& appData,
+			WindowID id,
+			bool entered);
 
-	// Should be called by the backend.
-	[[maybe_unused]] void UpdateWindowPosition(
-		AppData& appData,
-		WindowID id,
-		Math::Vec2Int newPosition);
+		[[maybe_unused]] void UpdateWindowFocus(
+			AppData& appData,
+			WindowID id,
+			bool focusGained);
 
-	// Should be called by the backend.
-	[[maybe_unused]] void UpdateCursorPosition(
-		AppData& appData,
-		WindowID id,
-		Math::Vec2Int newRelativePosition,
-		Math::Vec2Int delta);
+		[[maybe_unused]] void UpdateWindowPosition(
+			AppData& appData,
+			WindowID id,
+			Math::Vec2Int newPosition);
 
-	// Should be called by the backend.
-	[[maybe_unused]] void UpdateCursorPosition(
-		AppData& appData,
-		WindowID id,
-		Math::Vec2Int newRelativePosition);
+		[[maybe_unused]] void UpdateCursorPosition(
+			AppData& appData,
+			WindowID id,
+			Math::Vec2Int newRelativePosition,
+			Math::Vec2Int delta);
 
-	[[maybe_unused]] void UpdateButton(
-		AppData& appData,
-		WindowID id,
-		Button button,
-		bool pressed);
+		[[maybe_unused]] void UpdateCursorPosition(
+			AppData& appData,
+			WindowID id,
+			Math::Vec2Int newRelativePosition);
+
+		[[maybe_unused]] void UpdateButton(
+			AppData& appData,
+			WindowID id,
+			Button button,
+			bool pressed);
+	}
 }
 
 constexpr bool DEngine::Application::detail::IsValid(CursorType in)

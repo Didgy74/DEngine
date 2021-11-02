@@ -8,16 +8,10 @@
 
 #include "VulkanIncluder.hpp"
 #include "VMAIncluder.hpp"
-#include "ViewportManager.hpp"
+#include "ForwardDeclarations.hpp"
 
 namespace DEngine::Gfx::Vk
 {
-	class APIData;
-	class DebugUtilsDispatch;
-	class DeletionQueue;
-	class DeviceDispatch;
-	class QueueData;
-
 	class GizmoManager
 	{
 	public:
@@ -51,7 +45,7 @@ namespace DEngine::Gfx::Vk
 			DeviceDispatch const* device;
 			QueueData const* queues;
 			VmaAllocator const* vma;
-			DeletionQueue const* delQueue;
+			DeletionQueue* delQueue;
 			Std::FrameAllocator* frameAlloc;
 			DebugUtilsDispatch const* debugUtils;
 			APIData const* apiData;
@@ -72,7 +66,7 @@ namespace DEngine::Gfx::Vk
 		static void DebugLines_RecordDrawCalls(
 			GizmoManager const& manager,
 			GlobUtils const& globUtils,
-			ViewportData const& viewportData,
+			ViewportMgr_ViewportData const& viewportData,
 			Std::Span<LineDrawCmd const> lineDrawCmds,
 			vk::CommandBuffer cmdBuffer,
 			u8 inFlightIndex) noexcept;
@@ -80,7 +74,7 @@ namespace DEngine::Gfx::Vk
 		static void Gizmo_RecordDrawCalls(
 			GizmoManager const& manager,
 			GlobUtils const& globUtils,
-			ViewportData const& viewportData,
+			ViewportMgr_ViewportData const& viewportData,
 			ViewportUpdate::Gizmo const& gizmo,
 			vk::CommandBuffer cmdBuffer,
 			u8 inFlightIndex) noexcept;

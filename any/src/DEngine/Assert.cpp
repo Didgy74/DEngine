@@ -2,6 +2,11 @@
 
 #include <iostream>
 
+#ifdef _MSC_VER
+#   include <intrin.h>
+#	define DENGINE_IMPL_BREAKPOINT() __debugbreak()
+#endif
+
 namespace DEngine::impl
 {
 	[[noreturn]] void Assert(
@@ -22,6 +27,9 @@ namespace DEngine::impl
 			std::cout << "Info: '" << msg << "'" << std::endl;
 		std::cout << std::endl;
 
+#ifdef DENGINE_IMPL_BREAKPOINT
+		DENGINE_IMPL_BREAKPOINT();
+#endif
 
 		std::abort();
 	}

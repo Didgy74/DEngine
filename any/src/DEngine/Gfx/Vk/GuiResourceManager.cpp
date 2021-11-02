@@ -15,7 +15,7 @@ using namespace DEngine::Gfx;
 
 namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 {
-	static constexpr Std::Array<vk::VertexInputAttributeDescription, 2> BuildShaderVertexInputAttrDescr()
+	static Std::Array<vk::VertexInputAttributeDescription, 2> BuildShaderVertexInputAttrDescr()
 	{
 		vk::VertexInputAttributeDescription position{};
 		position.binding = 0;
@@ -201,8 +201,8 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 				"GuiResourceManager - FilledMesh Pipeline");
 		}
 
-		device.destroy(vertModule);
-		device.destroy(fragModule);
+		device.Destroy(vertModule);
+		device.Destroy(fragModule);
 	}
 
 	static void CreateViewportShader(
@@ -380,8 +380,8 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 				"GuiResourceManager - Viewport Pipeline");
 		}
 
-		device.destroy(vertModule);
-		device.destroy(fragModule);
+		device.Destroy(vertModule);
+		device.Destroy(fragModule);
 	}
 
 	static void CreateTextShader(
@@ -588,8 +588,8 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 				"GuiResourceManager - Text Pipeline");
 		}
 
-		device.destroy(vertModule);
-		device.destroy(fragModule);
+		device.Destroy(vertModule);
+		device.Destroy(fragModule);
 	}
 }
 
@@ -916,8 +916,8 @@ void Vk::GuiResourceManager::NewFontTexture(
 		throw std::runtime_error("Unable to wait on fence after uploading glyph.");
 
 	vmaDestroyBuffer(globUtils.vma, (VkBuffer)tempBuffer, tempBufferVmaAlloc);
-	device.destroy(fence);
-	device.destroy(cmdPoolResult.value);
+	device.Destroy(fence);
+	device.Destroy(cmdPoolResult.value);
 
 	if (utfValue < lowUtfGlyphDatasSize)
 	{

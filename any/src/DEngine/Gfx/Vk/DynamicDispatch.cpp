@@ -362,7 +362,7 @@ vk::DebugUtilsMessengerEXT DebugUtilsDispatch::createDebugUtilsMessengerEXT(
 	return returnVal;
 }
 
-void DebugUtilsDispatch::destroyDebugUtilsMessengerEXT(
+void DebugUtilsDispatch::Destroy(
 	vk::Instance instance, 
 	vk::DebugUtilsMessengerEXT messenger,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
@@ -382,7 +382,7 @@ void DebugUtilsDispatch::setDebugUtilsObjectNameEXT(
 		reinterpret_cast<VkDebugUtilsObjectNameInfoEXT const*>(&nameInfo));
 }
 
-void InstanceDispatch::destroy(
+void InstanceDispatch::Destroy(
 	vk::SurfaceKHR in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -912,6 +912,11 @@ vk::Result DeviceDispatch::createGraphicsPipelines(
 		reinterpret_cast<VkPipeline*>(pPipelines)));
 }
 
+void DeviceDispatch::Destroy() const
+{
+	return raw.vkDestroyDevice((VkDevice)handle, nullptr);
+}
+
 #define DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(typeName) \
 	raw.vkDestroy ##typeName( \
 		static_cast<VkDevice>(handle), \
@@ -919,56 +924,63 @@ vk::Result DeviceDispatch::createGraphicsPipelines(
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator))); \
 		
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::CommandPool in,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(CommandPool)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::DescriptorPool in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(DescriptorPool)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::Fence in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Fence)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::Framebuffer in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Framebuffer)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::Image in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Image)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::ImageView in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(ImageView)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
+	vk::Semaphore in,
+	vk::Optional<vk::AllocationCallbacks> allocator) const
+{
+	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Semaphore)
+}
+
+void DeviceDispatch::Destroy(
 	vk::RenderPass in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(RenderPass)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::ShaderModule in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -1107,7 +1119,7 @@ vk::SwapchainKHR DeviceDispatch::createSwapchainKHR(
 	return outSwapchain;
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::SwapchainKHR in,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {

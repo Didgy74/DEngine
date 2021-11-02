@@ -1,6 +1,7 @@
 #include "TextureManager.hpp"
 
 #include "GlobUtils.hpp"
+#include "DeletionQueue.hpp"
 
 #include <DEngine/Std/Containers/Vec.hpp>
 
@@ -8,6 +9,10 @@
 #include <Texas/Tools.hpp>
 #include <Texas/VkTools.hpp>
 #include <DEngine/Application.hpp>
+
+using namespace DEngine;
+using namespace DEngine::Gfx;
+using namespace DEngine::Gfx::Vk;
 
 namespace DEngine::Gfx::Vk
 {
@@ -37,14 +42,18 @@ namespace DEngine::Gfx::Vk
 	};
 }
 
-void DEngine::Gfx::Vk::TextureManager::Update(
+void TextureManager::Update(
 	TextureManager& manager,
 	GlobUtils const& globUtils,
+	DelQueue& delQueue,
 	DrawParams const& drawParams,
 	Gfx::TextureAssetInterface const& texAssetInterface,
 	Std::FrameAllocator& frameAlloc)
 {
-	vk::Result vkResult{};
+	auto const* debugUtils = globUtils.DebugUtilsPtr();
+	auto const& device = globUtils.device;
+
+	vk::Result vkResult = {};
 
 	for (auto& item : manager.database)
 		item.second.isNeededHelper = false;
@@ -93,27 +102,26 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			if (vkResult != vk::Result::eSuccess)
 				throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate staging buffer for texture.");
 			// Queue the staging buffer up for deletion.
-			globUtils.delQueue.Destroy(stagingBufferVmaAlloc, stagingBuffer);
-			if (globUtils.UsingDebugUtils())
+			delQueue.Destroy(stagingBufferVmaAlloc, stagingBuffer);
+			if (debugUtils)
 			{
 				std::string name = "TextureManager - Texture #" + std::to_string((u64)textureID) + " - StagingBuffer";
-				globUtils.debugUtils.Helper_SetObjectName(
-					globUtils.device.handle,
+				debugUtils->Helper_SetObjectName(
+					device.handle,
 					stagingBuffer,
 					name.c_str());
 			}
-
 
 			auto workingMemory = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
 			if (texFileInfo.workingMemoryRequired() > 0)
 				workingMemory.Resize(texFileInfo.workingMemoryRequired());
 
 			Texas::ByteSpan dstImageDataSpan = {
-					(std::byte*)stagingBufferResultInfo.pMappedData,
-					static_cast<uSize>(buffInfo.size) };
+				(std::byte*)stagingBufferResultInfo.pMappedData,
+				static_cast<uSize>(buffInfo.size) };
 			Texas::ByteSpan workingMemSpan = {
-					reinterpret_cast<std::byte*>(workingMemory.Data()),
-					static_cast<uSize>(texFileInfo.workingMemoryRequired()) };
+				reinterpret_cast<std::byte*>(workingMemory.Data()),
+				static_cast<uSize>(texFileInfo.workingMemoryRequired()) };
 			Texas::Result loadImageDataResult = Texas::loadImageData(fileStream, texFileInfo, dstImageDataSpan, workingMemSpan);
 			if (!loadImageDataResult.isSuccessful())
 			{
@@ -144,11 +152,11 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 				nullptr);
 			if (vkResult != vk::Result::eSuccess)
 				throw std::runtime_error("DEngine - Vulkan: VMA was unable to allocate image.");
-			if (globUtils.UsingDebugUtils())
+			if (debugUtils)
 			{
 				std::string name = "TextureManager - Texture #" + std::to_string((u64)textureID) + " - Img";
-				globUtils.debugUtils.Helper_SetObjectName(
-					globUtils.device.handle,
+				debugUtils->Helper_SetObjectName(
+					device.handle,
 					newInner.img,
 					name.c_str());
 			}
@@ -159,14 +167,14 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
 			cmdBufferAllocInfo.commandBufferCount = 1;
 			vk::CommandBuffer cmdBuffer{};
-			vkResult = globUtils.device.allocateCommandBuffers(cmdBufferAllocInfo, &cmdBuffer);
+			vkResult = device.allocateCommandBuffers(cmdBufferAllocInfo, &cmdBuffer);
 			if (vkResult != vk::Result::eSuccess)
 				throw std::runtime_error("DEngine - Vulkan: Unable to allocate command buffer for copying texture.");
-			if (globUtils.UsingDebugUtils())
+			if (debugUtils)
 			{
 				std::string name = "TextureManager - Texture #" + std::to_string((u64)textureID) + " - CmdBuffer";
-				globUtils.debugUtils.Helper_SetObjectName(
-					globUtils.device.handle,
+				debugUtils->Helper_SetObjectName(
+					device.handle,
 					cmdBuffer,
 					name.c_str());
 			}
@@ -174,7 +182,7 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 
 			vk::CommandBufferBeginInfo cmdBeginInfo{};
 			cmdBeginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
-			globUtils.device.beginCommandBuffer(cmdBuffer, cmdBeginInfo);
+			device.beginCommandBuffer(cmdBuffer, cmdBeginInfo);
 
 			vk::BufferMemoryBarrier buffBarrier{};
 			buffBarrier.buffer = stagingBuffer;
@@ -190,7 +198,7 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			imgBarrierA.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
 			imgBarrierA.subresourceRange.layerCount = imgInfo.arrayLayers;
 			imgBarrierA.subresourceRange.levelCount = imgInfo.mipLevels;
-			globUtils.device.cmdPipelineBarrier(
+			device.cmdPipelineBarrier(
 				cmdBuffer,
 				vk::PipelineStageFlagBits::eBottomOfPipe,
 				vk::PipelineStageFlagBits::eTransfer,
@@ -200,19 +208,19 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 				imgBarrierA);
 
 			std::vector<vk::BufferImageCopy> buffImgCopies;
-			for (u8 i = 0; i < imgInfo.mipLevels; i++)
+			for (int i = 0; i < imgInfo.mipLevels; i++)
 			{
 				buffImgCopies.push_back({});
 				vk::BufferImageCopy& buffImgCopy = buffImgCopies.back();
 				buffImgCopy.bufferOffset = Texas::calculateMipOffset(texFileInfo.textureInfo(), i);
 				buffImgCopy.imageExtent = Texas::toVkExtent3D(Texas::calculateMipDimensions(
-						texFileInfo.textureInfo().baseDimensions, 
-						i));
+					texFileInfo.textureInfo().baseDimensions,
+					i));
 				buffImgCopy.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
 				buffImgCopy.imageSubresource.layerCount = imgInfo.arrayLayers;
 				buffImgCopy.imageSubresource.mipLevel = i;
 			}
-			globUtils.device.cmdCopyBufferToImage(
+			device.cmdCopyBufferToImage(
 				cmdBuffer,
 				stagingBuffer,
 				newInner.img,
@@ -228,7 +236,7 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			imgBarrierB.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
 			imgBarrierB.subresourceRange.layerCount = imgInfo.arrayLayers;
 			imgBarrierB.subresourceRange.levelCount = imgInfo.mipLevels;
-			globUtils.device.cmdPipelineBarrier(
+			device.cmdPipelineBarrier(
 				cmdBuffer,
 				vk::PipelineStageFlagBits::eTransfer,
 				vk::PipelineStageFlagBits::eFragmentShader,
@@ -237,7 +245,7 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 				nullptr,
 				imgBarrierB);
 
-			globUtils.device.endCommandBuffer(cmdBuffer);
+			device.endCommandBuffer(cmdBuffer);
 
 			vk::SubmitInfo submit{};
 			submit.commandBufferCount = 1;
@@ -245,7 +253,7 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			globUtils.queues.graphics.submit(submit, nullptr);
 			// I think we can do this without the fence, because we wait for this stuff
 			// in the graphics queue anyways...
-			globUtils.delQueue.Destroy(manager.cmdPool, { &cmdBuffer, 1 });
+			delQueue.Destroy(manager.cmdPool, { &cmdBuffer, 1 });
 
 
 			vk::ImageViewCreateInfo imgViewInfo{};
@@ -270,14 +278,14 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 			descrSetAllocInfo.descriptorPool = manager.descrPool;
 			descrSetAllocInfo.descriptorSetCount = 1;
 			descrSetAllocInfo.pSetLayouts = &manager.descrSetLayout;
-			vkResult = globUtils.device.allocateDescriptorSets(descrSetAllocInfo, &newInner.descrSet);
+			vkResult = device.allocateDescriptorSets(descrSetAllocInfo, &newInner.descrSet);
 			if (vkResult != vk::Result::eSuccess)
 				throw std::runtime_error("DEngine - Vulkan: Could not allocate descriptor set.");
-			if (globUtils.UsingDebugUtils())
+			if (debugUtils)
 			{
 				std::string name = "TextureManager - Texture #" + std::to_string((u64)textureID) + " - DescrSet";
-				globUtils.debugUtils.Helper_SetObjectName(
-					globUtils.device.handle,
+				debugUtils->Helper_SetObjectName(
+					device.handle,
 					newInner.descrSet,
 					name.c_str());
 			}
@@ -296,17 +304,10 @@ void DEngine::Gfx::Vk::TextureManager::Update(
 
 			manager.database.insert({ textureID, newInner });
 		}
-
-		// Delete unneeded stuff
-		for (auto iter = manager.database.begin(); iter != manager.database.end(); iter++)
-		{
-			//auto& item = *iter;
-
-		}
 	}
 }
 
-void DEngine::Gfx::Vk::TextureManager::Init(
+void TextureManager::Init(
 	TextureManager& manager,
 	DeviceDispatch const& device,
 	QueueData const& queues,

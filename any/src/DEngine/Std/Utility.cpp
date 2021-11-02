@@ -49,18 +49,20 @@ f32 Std::RandRange(f32 a, f32 b)
 	return dis(gen);
 }
 
-void Std::NameThisThread(Str name)
+void Std::NameThisThread(Span<char const> name)
 {
 	// Maximum size set by POSIX.
 	// This includes the null-terminator.
 	[[maybe_unused]] constexpr u32 maxThreadNameLength = 16;
-	
-	DENGINE_IMPL_ASSERT(name.Size() < maxThreadNameLength);
+
+	// This accounts for null-terminator
+	DENGINE_IMPL_ASSERT(name.Size() < maxThreadNameLength - 1);
 
 #if defined(DENGINE_OS_WINDOWS)
 	wchar_t tempString[maxThreadNameLength] = {};
 	for (u8 i = 0; i < (u8)name.Size(); i += 1)
 		tempString[i] = name[i];
+	tempString[maxThreadNameLength - 1] = 0;
 
 	[[maybe_unused]] HRESULT r = SetThreadDescription(
 		GetCurrentThread(),
@@ -69,6 +71,7 @@ void Std::NameThisThread(Str name)
 	char tempString[maxThreadNameLength] = {};
 	for (u8 i = 0; i < (u8)name.Size(); i += 1)
 		tempString[i] = name[i];
+	tempString[maxThreadNameLength - 1] = 0;
 
 	pthread_setname_np(pthread_self(), tempString);
 #endif

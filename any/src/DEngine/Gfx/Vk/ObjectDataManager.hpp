@@ -5,15 +5,12 @@
 
 #include <DEngine/Math/Matrix.hpp>
 
-#include "DynamicDispatch.hpp"
-
 #include "VulkanIncluder.hpp"
 #include "VMAIncluder.hpp"
+#include "ForwardDeclarations.hpp"
 
 namespace DEngine::Gfx::Vk
-{ 
-	class GlobUtils;
-
+{
 	struct ObjectDataManager
 	{
 		// Contains minimum capacity of amount of elements.
@@ -36,6 +33,7 @@ namespace DEngine::Gfx::Vk
 		static void HandleResizeEvent(
 			ObjectDataManager& manager,
 			GlobUtils const& globUtils,
+			DelQueue& delQueue,
 			uSize dataCount);
 
 		static void Update(

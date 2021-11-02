@@ -213,7 +213,7 @@ namespace DEngine::Gfx::Vk
 			vk::DebugUtilsMessengerCreateInfoEXT const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		void destroyDebugUtilsMessengerEXT(
+		void Destroy(
 			vk::Instance instance,
 			vk::DebugUtilsMessengerEXT messenger,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
@@ -281,7 +281,7 @@ namespace DEngine::Gfx::Vk
 
 
 		KHR_SurfaceDispatchRaw surfaceRaw{};
-		void destroy(
+		void Destroy(
 			vk::SurfaceKHR in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
@@ -505,31 +505,32 @@ namespace DEngine::Gfx::Vk
 			vk::ShaderModuleCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		void destroy(
+		void Destroy() const;
+		void Destroy(
 			vk::CommandPool in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::DescriptorPool in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::Framebuffer in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::Fence in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::Image in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::ImageView in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::RenderPass in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
-			vk::Semaphore semaphore,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
+			vk::Semaphore in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
 			vk::ShaderModule in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
@@ -585,7 +586,7 @@ namespace DEngine::Gfx::Vk
 			vk::SwapchainCreateInfoKHR const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		void destroy(
+		void Destroy(
 			vk::SwapchainKHR in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 

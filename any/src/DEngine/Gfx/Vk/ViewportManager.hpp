@@ -1,36 +1,34 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Std/Containers/Pair.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
 
 #include "Constants.hpp"
-#include "DynamicDispatch.hpp"
 #include "VulkanIncluder.hpp"
 #include "VMAIncluder.hpp"
+#include "ForwardDeclarations.hpp"
 
 #include <vector>
 #include <mutex>
 
 namespace DEngine::Gfx::Vk
 {
-	class GlobUtils;
-	class GuiResourceManager;
-
-	struct GfxRenderTarget
+	struct ViewportMgr_GfxRenderTarget
 	{
-		vk::Extent2D extent{};
-		VmaAllocation vmaAllocation{};
-		vk::Image img{};
-		vk::ImageView imgView{};
-		vk::Framebuffer framebuffer{};
+		vk::Extent2D extent = {};
+		VmaAllocation vmaAllocation = {};
+		vk::Image img = {};
+		vk::ImageView imgView = {};
+		vk::Framebuffer framebuffer = {};
 	};
 
-	struct ViewportData
+	struct ViewportMgr_ViewportData
 	{
-		GfxRenderTarget renderTarget{};
+		ViewportMgr_GfxRenderTarget renderTarget = {};
 
 		vk::DescriptorPool cameraDescrPool{};
 		Std::StackVec<vk::DescriptorSet, Constants::maxInFlightCount> camDataDescrSets{};
@@ -66,7 +64,7 @@ namespace DEngine::Gfx::Vk
 		struct Node
 		{
 			ViewportID id;
-			ViewportData viewport;
+			ViewportMgr_ViewportData viewport;
 		};
 		// Unsorted vector holding viewport-data and their ID.
 		std::vector<Node> viewportNodes{};
@@ -94,8 +92,10 @@ namespace DEngine::Gfx::Vk
 		// Making it static made it more explicit.
 		// Easier to identify in the main loop
 		static void ProcessEvents(
-			ViewportManager& viewportManager,
+			ViewportManager& manager,
 			GlobUtils const& globUtils,
+			DelQueue& delQueue,
+			Std::FrameAlloc& transientAlloc,
 			Std::Span<ViewportUpdate const> viewportUpdates,
 			GuiResourceManager const& guiResourceManager);
 

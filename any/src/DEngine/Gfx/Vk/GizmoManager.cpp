@@ -24,7 +24,23 @@ namespace DEngine::Gfx::Vk::impl
 		VmaAllocator vma = {};
 		VmaAllocation alloc = {};
 
-		void Release() noexcept { handle = vk::Buffer{}; }
+		struct Release_ReturnT
+		{
+			vk::Buffer handle;
+			VmaAllocator vma;
+			VmaAllocation alloc;
+		};
+		[[nodiscard]] Release_ReturnT Release() noexcept
+		{
+			Release_ReturnT returnValue;
+			returnValue.handle = handle;
+			returnValue.alloc = alloc;
+			returnValue.vma = vma;
+
+			handle = vk::Buffer{};
+
+			return returnValue;
+		}
 
 		~BoxVkBuffer() noexcept
 		{
@@ -45,13 +61,18 @@ namespace DEngine::Gfx::Vk::impl
 		vk::CommandPool handle = {};
 		DeviceDispatch const* device = nullptr;
 
-		void Release() noexcept { handle = vk::CommandPool{}; }
+		[[nodiscard]] vk::CommandPool Release() noexcept
+		{
+			auto returnValue = handle;
+			handle = vk::CommandPool{};
+			return returnValue;
+		}
 
 		~BoxVkCmdPool() noexcept
 		{
 			if (handle != vk::CommandPool{})
 			{
-				device->destroy(handle);
+				device->Destroy(handle);
 			}
 		}
 	};
@@ -68,7 +89,7 @@ namespace DEngine::Gfx::Vk::impl
 		DevDispatch const& device,
 		VmaAllocator vma,
 		QueueData const& queues,
-		DeletionQueue const& delQueue,
+		DeletionQueue& delQueue,
 		Std::Span<char const> bytes) noexcept
 	{
 		GizmoManager_Helper_TestReturn returnVal = {};
@@ -180,30 +201,14 @@ namespace DEngine::Gfx::Vk::impl
 		vk::Fence fence = device.createFence({});
 		queues.graphics.submit(submit, fence);
 
-		struct DestroyData
-		{
-			vk::Buffer vtxBuffer_Staging;
-			VmaAllocation vtxVmaAlloc_Staging;
-			vk::CommandPool cmdPool;
-		};
-		DestroyData destroyData = {};
-		destroyData.vtxBuffer_Staging = vtxBuffer_Staging.handle;
-		destroyData.vtxVmaAlloc_Staging = vtxBuffer_Staging.alloc;
-		vtxBuffer_Staging.Release();
-		destroyData.cmdPool = cmdPool.handle;
-		cmdPool.Release();
-		DeletionQueue::TestCallback<DestroyData> destroyCallback = [](
-			GlobUtils const& globUtils,
-			DestroyData destroyData)
-		{
-			vmaDestroyBuffer(globUtils.vma, (VkBuffer)destroyData.vtxBuffer_Staging, destroyData.vtxVmaAlloc_Staging);
-			globUtils.device.destroy(destroyData.cmdPool);
-		};
-		delQueue.DestroyTest(fence, destroyCallback, destroyData);
 
-		returnVal.buffer = dstBuffer.handle;
-		returnVal.alloc = dstBuffer.alloc;
-		dstBuffer.Release();
+		delQueue.Destroy(cmdPool.Release());
+		auto vtxBufferStagingRelease = vtxBuffer_Staging.Release();
+		delQueue.Destroy(vtxBufferStagingRelease.alloc, vtxBufferStagingRelease.handle);
+
+		auto dstBufferRelease = dstBuffer.Release();
+		returnVal.buffer = dstBufferRelease.handle;
+		returnVal.alloc = dstBufferRelease.alloc;
 		return returnVal;
 	}
 
@@ -212,7 +217,7 @@ namespace DEngine::Gfx::Vk::impl
 		DeviceDispatch const& device,
 		QueueData const& queues,
 		VmaAllocator vma,
-		DeletionQueue const& delQueue,
+		DeletionQueue& delQueue,
 		DebugUtilsDispatch const* debugUtils,
 		Std::Span<Math::Vec3 const> arrowMesh)
 	{
@@ -243,7 +248,7 @@ namespace DEngine::Gfx::Vk::impl
 		DeviceDispatch const& device,
 		QueueData const& queues,
 		VmaAllocator vma,
-		DeletionQueue const& delQueue,
+		DeletionQueue& delQueue,
 		DebugUtilsDispatch const* debugUtils,
 		Std::Span<Math::Vec3 const> circleLineMesh)
 	{
@@ -274,7 +279,7 @@ namespace DEngine::Gfx::Vk::impl
 		DeviceDispatch const& device,
 		QueueData const& queues,
 		VmaAllocator vma,
-		DeletionQueue const& delQueue,
+		DeletionQueue& delQueue,
 		DebugUtilsDispatch const* debugUtils,
 		Std::Span<Math::Vec3 const> scaleArrow2d)
 	{
@@ -467,8 +472,8 @@ namespace DEngine::Gfx::Vk::impl
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to make graphics pipeline.");
 
-		apiData.globUtils.device.destroy(vertModule);
-		apiData.globUtils.device.destroy(fragModule);
+		apiData.globUtils.device.Destroy(vertModule);
+		apiData.globUtils.device.Destroy(fragModule);
 	}
 
 	static void GizmoManager_InitializeQuadShader(
@@ -604,8 +609,8 @@ namespace DEngine::Gfx::Vk::impl
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to make graphics pipeline.");
 
-		device.destroy(vertModule);
-		device.destroy(fragModule);
+		device.Destroy(vertModule);
+		device.Destroy(fragModule);
 	}
 
 	static void GizmoManager_InitializeLineShader(
@@ -746,8 +751,8 @@ namespace DEngine::Gfx::Vk::impl
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to make graphics pipeline.");
 
-		apiData.globUtils.device.destroy(vertModule);
-		apiData.globUtils.device.destroy(fragModule);
+		apiData.globUtils.device.Destroy(vertModule);
+		apiData.globUtils.device.Destroy(fragModule);
 	}
 
 	static void GizmoManager_InitializeLineVtxBuffer(
@@ -757,7 +762,7 @@ namespace DEngine::Gfx::Vk::impl
 		VmaAllocator const& vma,
 		DebugUtilsDispatch const* debugUtils)
 	{
-		vk::Result vkResult{};
+		vk::Result vkResult = {};
 
 		vk::BufferCreateInfo vtxBufferInfo{};
 		vtxBufferInfo.sharingMode = vk::SharingMode::eExclusive;
@@ -793,7 +798,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_RecordTranslateGizmoDrawCalls(
 		GlobUtils const& globUtils,
 		GizmoManager const& gizmoManager,
-		ViewportData const& viewportData,
+		ViewportMgr_ViewportData const& viewportData,
 		ViewportUpdate::Gizmo const& gizmo,
 		vk::CommandBuffer cmdBuffer,
 		u8 inFlightIndex)
@@ -906,7 +911,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_RotateGizmo_RecordoDrawCalls(
 		GlobUtils const& globUtils,
 		GizmoManager const& gizmoManager,
-		ViewportData const& viewportData,
+		ViewportMgr_ViewportData const& viewportData,
 		ViewportUpdate::Gizmo const& gizmo,
 		vk::CommandBuffer cmdBuffer,
 		u8 inFlightIndex)
@@ -953,7 +958,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_ScaleGizmo_RecordDrawCalls(
 		GlobUtils const& globUtils,
 		GizmoManager const& manager,
-		ViewportData const& viewportData,
+		ViewportMgr_ViewportData const& viewportData,
 		ViewportUpdate::Gizmo const& gizmo,
 		vk::CommandBuffer cmdBuffer,
 		u8 inFlightIndex)
@@ -1141,14 +1146,13 @@ void Vk::GizmoManager::UpdateLineVtxBuffer(
 
 	u8* ptr = manager.lineVtxBufferMappedMem.Data() + ptrOffset;
 
-
 	std::memcpy(ptr, vertices.Data(), manager.lineVtxElementSize * vertices.Size());
 }
 
 void Vk::GizmoManager::DebugLines_RecordDrawCalls(
 	GizmoManager const& manager,
 	GlobUtils const& globUtils,
-	ViewportData const& viewportData,
+	ViewportMgr_ViewportData const& viewportData,
 	Std::Span<LineDrawCmd const> lineDrawCmds,
 	vk::CommandBuffer cmdBuffer,
 	u8 inFlightIndex) noexcept
@@ -1215,8 +1219,8 @@ void Vk::GizmoManager::DebugLines_RecordDrawCalls(
 
 void Vk::GizmoManager::Gizmo_RecordDrawCalls(
 	GizmoManager const& gizmoManager,
-	GlobUtils const& globUtils, 
-	ViewportData const& viewportData,
+	GlobUtils const& globUtils,
+	ViewportMgr_ViewportData const& viewportData,
 	ViewportUpdate::Gizmo const& gizmo,
 	vk::CommandBuffer cmdBuffer, 
 	u8 inFlightIndex) noexcept

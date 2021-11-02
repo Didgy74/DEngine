@@ -2,6 +2,7 @@
 
 #include "VulkanIncluder.hpp"
 #include "VMAIncluder.hpp"
+#include "ForwardDeclarations.hpp"
 
 #include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
@@ -19,10 +20,6 @@ namespace DEngine::Gfx
 
 namespace DEngine::Gfx::Vk
 {
-	class DebugUtilsDispatch;
-	class DeviceDispatch;
-	class GlobUtils;
-	
 	class GuiResourceManager
 	{
 	public:
@@ -106,6 +103,5 @@ namespace DEngine::Gfx::Vk
 			u32 height,
 			u32 pitch,
 			Std::Span<std::byte const> data);
-
 	};
 }

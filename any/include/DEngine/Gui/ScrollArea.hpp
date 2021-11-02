@@ -14,13 +14,11 @@ namespace DEngine::Gui
 	public:
 		using ParentType = Widget;
 
-		Std::Box<Widget> widget;
+		Std::Box<Widget> child;
 
 		static constexpr Math::Vec3 scrollbarHoverHighlight = { 0.1f, 0.1f, 0.1f };
 		Math::Vec4 scrollbarInactiveColor = { 0.3f, 0.3f, 0.3f, 1.f };
 
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override;
 
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
@@ -30,17 +28,34 @@ namespace DEngine::Gui
 			Rect const& widgetRect,
 			Rect const& visibleRect) const override;
 
+		virtual void Render2(
+			Render_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+
+		virtual void CursorExit(
+			Context& ctx) override;
+
+		virtual bool CursorMove(
+			CursorMoveParams const& params,
+			bool occluded) override;
+
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			bool consumed) override;
+
+
+
+
+		[[nodiscard]] virtual SizeHint GetSizeHint(
+			Context const& ctx) const override;
+
 		virtual void Render(
 			Context const& ctx,
 			Extent framebufferExtent,
 			Rect widgetRect,
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
-
-		virtual void Render2(
-			Render_Params const& params,
-			Rect const& widgetRect,
-			Rect const& visibleRect) const override;
 
 		virtual bool CursorPress(
 			Context& ctx,
@@ -96,7 +111,7 @@ namespace DEngine::Gui
 			u8 pointerId;
 			f32 pointerRelativePosY;
 		};
-		Std::Opt<Scrollbar_Pressed_T> scrollbarHeldData;
+		Std::Opt<Scrollbar_Pressed_T> scrollbarHoldData;
 
 		bool scrollbarHoveredByCursor = false;
 	};
