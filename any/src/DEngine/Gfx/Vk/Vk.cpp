@@ -20,6 +20,7 @@
 #include <stdexcept>
 #include <string>
 
+#include <DEngine/Std/Containers/Defer.hpp>
 
 //vk::DispatchLoaderDynamic vk::defaultDispatchLoaderDynamic;
 
@@ -178,11 +179,15 @@ APIDataBase* Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo)
 {
 	Std::Box<APIData> apiDataPtr{ new APIData };
 
-	APIData& apiData = *apiDataPtr;
-	GlobUtils& globUtils = apiData.globUtils;
+	auto& apiData = *apiDataPtr;
+	auto& globUtils = apiData.globUtils;
 
 	apiData.frameAllocator = Std::FrameAllocator::PreAllocate(1024 * 1024).Value();
 	auto& transientAlloc = apiData.frameAllocator;
+	Std::Defer allocCleanup { [&transientAlloc]() {
+		transientAlloc.Reset();
+	} };
+
 
 	vk::Result vkResult{};
 	bool boolResult = false;
@@ -197,6 +202,7 @@ APIDataBase* Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo)
 	// Make the VkInstance
 	PFN_vkGetInstanceProcAddr instanceProcAddr = Vk::loadInstanceProcAddressPFN();
 	BaseDispatch::BuildInPlace(globUtils.baseDispatch, instanceProcAddr);
+
 	auto& baseDispatch = globUtils.baseDispatch;
 	auto const createVkInstanceResult = Init::CreateVkInstance(
 		initInfo.requiredVkInstanceExtensions,
@@ -204,6 +210,7 @@ APIDataBase* Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo)
 		baseDispatch,
 		transientAlloc,
 		globUtils.logger);
+
 	InstanceDispatch::BuildInPlace(
 		globUtils.instance,
 		createVkInstanceResult.instanceHandle,
@@ -292,40 +299,6 @@ APIDataBase* Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo)
 	globUtils.vma = vmaResult.value;
 	auto& vma = globUtils.vma;
 
-	// Initialize main cmd buffer
-	{
-		apiData.mainCmdPools.Resize(globUtils.inFlightCount);
-		for (uSize i = 0; i < globUtils.inFlightCount; i += 1)
-		{
-			vk::CommandPoolCreateInfo cmdPoolInfo = {};
-			//cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
-			cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
-			auto cmdPool = device.createCommandPool(cmdPoolInfo);
-			if (cmdPool.result != vk::Result::eSuccess)
-				throw std::runtime_error("Unable to make command pool");
-			apiData.mainCmdPools[i] = cmdPool.value;
-			if (debugUtils)
-			{
-				std::string name = "Main CmdPool #";
-				name += std::to_string(i);
-				debugUtils->Helper_SetObjectName(
-					device.handle,
-					apiData.mainCmdPools[i],
-					name.c_str());
-			}
-
-			vk::CommandBufferAllocateInfo cmdBufferAllocInfo = {};
-			cmdBufferAllocInfo.commandBufferCount = 1;
-			cmdBufferAllocInfo.commandPool = apiData.mainCmdPools[i];
-			cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
-			apiData.mainCmdBuffers.Resize(globUtils.inFlightCount);
-			vkResult = device.allocateCommandBuffers(cmdBufferAllocInfo, &apiData.mainCmdBuffers[i]);
-			if (vkResult != vk::Result::eSuccess)
-				throw std::runtime_error("DEngine - Vulkan: Failed to initialize main commandbuffers.");
-			// We don't give the command buffers debug names here, because we need to rename them everytime we re-record anyways.
-		}
-	}
-
 	NativeWinMgr::InitInfo windowManInfo = {
 		.manager = apiData.nativeWindowManager,
 		.initialWindow = initInfo.initialWindow,
@@ -358,6 +331,41 @@ APIDataBase* Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo)
 	if (!boolResult)
 		throw std::runtime_error("DEngine - Vulkan: Failed to initialize ObjectDataManager.");
 
+
+	// Initialize main cmd buffer
+	{
+		apiData.mainCmdPools.Resize(globUtils.inFlightCount);
+		for (uSize i = 0; i < globUtils.inFlightCount; i += 1)
+		{
+			vk::CommandPoolCreateInfo cmdPoolInfo = {};
+			//cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+			cmdPoolInfo.queueFamilyIndex = queues.graphics.FamilyIndex();
+			auto cmdPool = device.createCommandPool(cmdPoolInfo);
+			if (cmdPool.result != vk::Result::eSuccess)
+				throw std::runtime_error("Unable to make command pool");
+			apiData.mainCmdPools[i] = cmdPool.value;
+			if (debugUtils)
+			{
+				std::string name = "Main CmdPool #";
+				name += std::to_string(i);
+				debugUtils->Helper_SetObjectName(
+					device.handle,
+					apiData.mainCmdPools[i],
+					name.c_str());
+			}
+
+			vk::CommandBufferAllocateInfo cmdBufferAllocInfo = {};
+			cmdBufferAllocInfo.commandBufferCount = 1;
+			cmdBufferAllocInfo.commandPool = apiData.mainCmdPools[i];
+			cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
+			apiData.mainCmdBuffers.Resize(globUtils.inFlightCount);
+			vkResult = device.allocateCommandBuffers(cmdBufferAllocInfo, &apiData.mainCmdBuffers[i]);
+			if (vkResult != vk::Result::eSuccess)
+				throw std::runtime_error("DEngine - Vulkan: Failed to initialize main commandbuffers.");
+			// We don't give the command buffers debug names here,
+			// because we need to rename them everytime we re-record anyways.
+		}
+	}
 
 	// Create our main fences
 	apiData.mainFences = Init::CreateMainFences(

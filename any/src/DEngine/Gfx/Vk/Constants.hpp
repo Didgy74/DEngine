@@ -29,7 +29,7 @@ namespace DEngine::Gfx::Vk::Constants
 		"VK_KHR_surface"
 	};
 
-	constexpr bool enableDebugUtils = true;
+	constexpr bool enableDebugUtils = false;
 	constexpr char const* debugUtilsExtensionName{ "VK_EXT_debug_utils" };
 
 	constexpr std::array<const char*, 1> requiredDeviceExtensions

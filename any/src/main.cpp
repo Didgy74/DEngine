@@ -7,6 +7,7 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
+#include <DEngine/Std/Containers/Fn.hpp>
 #include <DEngine/Std/Utility.hpp>
 #include <DEngine/Math/Vector.hpp>
 #include <DEngine/Math/UnitQuaternion.hpp>
@@ -18,7 +19,11 @@
 
 #include <Tracy.hpp>
 
-void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
+void DEngine::Move::Update(
+	App::Context& appCtx,
+	Entity entity,
+	Scene& scene,
+	f32 deltaTime) const
 {
 	auto const rbPtr = scene.GetComponent<Physics::Rigidbody2D>(entity);
 	b2Body* physBodyPtr = nullptr;
@@ -31,7 +36,7 @@ void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 		return;
 	auto& physBody = *physBodyPtr;
 
-	auto const gamepadOpt = App::GetGamepad();
+	auto const gamepadOpt = appCtx.GetGamepad(0);
 	if (!gamepadOpt.HasValue())
 		return;
 
@@ -41,7 +46,7 @@ void DEngine::Move::Update(Entity entity, Scene& scene, f32 deltaTime) const
 		physBody.ApplyLinearImpulseToCenter({ 0.f, 5.f }, true);
 	}
 
-	auto leftStickX = gamepadState.GetGamepadAxisValue(App::GamepadAxis::LeftX);
+	auto leftStickX = gamepadState.GetAxisValue(App::GamepadAxis::LeftX);
 	if (Math::Abs(leftStickX) > gamepadState.stickDeadzone)
 	{
 		leftStickX *= 2.f;
@@ -57,9 +62,11 @@ namespace DEngine::impl
 	class GfxLogger : public Gfx::LogInterface
 	{
 	public:
-		virtual void Log(Gfx::LogInterface::Level level, const char* msg) override
+		App::Context* appCtx = nullptr;
+
+		virtual void Log(Level level, Std::Span<char const> msg) override
 		{
-			App::Log(msg);
+			appCtx->Log(App::LogSeverity::Error, msg);
 		}
 
 		virtual ~GfxLogger() override
@@ -75,8 +82,8 @@ namespace DEngine::impl
 			switch ((int)id)
 			{
 				case 0:
-					return "data/01.ktx";
-				case 1:
+					//return "data/01.ktx";
+				//case 1:
 					return "data/Crate.png";
 				case 2:
 					return "data/02.png";
@@ -88,23 +95,22 @@ namespace DEngine::impl
 
 	struct GfxWsiConnection : public Gfx::WsiInterface
 	{
-		App::WindowID appWindowID{};
+		App::Context* appCtx = nullptr;
 
-		// Return type is VkResult
-		//
-		// Argument #1: VkInstance - The Vulkan instance handle
-		// Argument #2: VkAllocationCallbacks const* - Allocation callbacks for surface creation.
-		// Argument #3: VkSurfaceKHR* - The output surface handle
-		virtual i32 CreateVkSurface(uSize vkInstance, void const* allocCallbacks, u64& outSurface) override
+		virtual CreateVkSurface_ReturnT CreateVkSurface(
+			Gfx::NativeWindowID windowId,
+			uSize vkInstance,
+			void const* allocCallbacks) noexcept override
 		{
-			auto resultOpt = App::CreateVkSurface(appWindowID, vkInstance, nullptr);
-			if (resultOpt.HasValue())
-			{
-				outSurface = resultOpt.Value();
-				return 0; // 0 is VK_RESULT_SUCCESS
-			}
-			else
-				return -1;
+			auto const result = appCtx->CreateVkSurface(
+				(App::WindowID)windowId,
+				vkInstance,
+				allocCallbacks);
+
+			CreateVkSurface_ReturnT returnValue = {};
+			returnValue.vkResult = result.vkResult;
+			returnValue.vkSurface = result.vkSurface;
+			return returnValue;
 		}
 	};
 
@@ -115,7 +121,7 @@ namespace DEngine::impl
 		Std::Span<char const*> requiredVkInstanceExtensions)
 	{
 		Gfx::InitInfo rendererInitInfo = {};
-		rendererInitInfo.initialWindowConnection = &wsiConnection;
+		rendererInitInfo.wsiConnection = &wsiConnection;
 		rendererInitInfo.texAssetInterface = &textureAssetConnection;
 		rendererInitInfo.optional_logger = &logger;
 		rendererInitInfo.requiredVkInstanceExtensions = requiredVkInstanceExtensions;
@@ -139,7 +145,8 @@ namespace DEngine::impl
 	
 	void SubmitRendering(
 		Gfx::Context& gfxData,
-		Editor::Context& editorData,
+		App::Context& appCtx,
+		Editor::Context& editorCtx,
 		Scene& scene);
 }
 
@@ -286,24 +293,27 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
 
-	Std::NameThisThread("MainThread");
+	constexpr char mainThreadName[] = "MainThread";
+	Std::NameThisThread({ mainThreadName, sizeof(mainThreadName) - 1 });
 
 	Time::Initialize();
-	App::detail::Initialize();
 
-	App::WindowID mainWindow = App::CreateWindow(
-		"Main window",
+	auto appCtx = App::impl::Initialize();
+
+	constexpr char mainWindow[] = "Main window";
+	auto mainWindowCreateResult = appCtx.NewWindow(
+		{ mainWindow, sizeof(mainWindow) - 1 },
 		{ 1280, 800 });
 
-	auto gfxWsiConnection = new impl::GfxWsiConnection;
-	gfxWsiConnection->appWindowID = mainWindow;
+	impl::GfxWsiConnection gfxWsiConnection = {};
+	gfxWsiConnection.appCtx = &appCtx;
 
 	// Initialize the renderer
 	auto requiredInstanceExtensions = App::RequiredVulkanInstanceExtensions();
 	impl::GfxLogger gfxLogger = {};
 	impl::GfxTexAssetInterfacer gfxTexAssetInterfacer{};
 	Gfx::Context gfxCtx = impl::CreateGfxContext(
-		*gfxWsiConnection,
+		gfxWsiConnection,
 		gfxTexAssetInterfacer,
 		gfxLogger,
 		requiredInstanceExtensions);
@@ -352,16 +362,23 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		myScene.AddComponent(ent, move);
 	}
 
-	Editor::Context editorCtx = Editor::Context::Create(
-		mainWindow,
-		&myScene,
-		&gfxCtx);
+	Editor::Context::CreateInfo editorCreateInfo = {
+		.appCtx = appCtx,
+		.gfxCtx = gfxCtx,
+		.scene = myScene };
+	editorCreateInfo.mainWindow = mainWindowCreateResult.windowId;
+	editorCreateInfo.windowPos = mainWindowCreateResult.position;
+	editorCreateInfo.windowExtent = mainWindowCreateResult.extent;
+	editorCreateInfo.windowSafeAreaOffset = mainWindowCreateResult.visibleOffset;
+	editorCreateInfo.windowSafeAreaExtent = mainWindowCreateResult.visibleExtent;
+	Editor::Context editorCtx = Editor::Context::Create(editorCreateInfo);
 
 	while (true)
 	{
 		Time::TickStart();
-		App::detail::ProcessEvents();
-		if (App::GetWindowCount() == 0)
+
+		App::impl::ProcessEvents(appCtx, App::impl::PollMode::Immediate);
+		if (appCtx.GetWindowCount() == 0)
 			break;
 
 		editorCtx.ProcessEvents();
@@ -379,14 +396,15 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 			//Physics::Update(myScene, Time::Delta());
 
 			for (auto const& [entity, moveComponent] : scene.GetAllComponents<Move>())
-				moveComponent.Update(entity, scene, Time::Delta());
+				moveComponent.Update(appCtx, entity, scene, Time::Delta());
 
 			impl::RunPhysicsStep(scene);
 		}
 
 
 		impl::SubmitRendering(
-			gfxCtx, 
+			gfxCtx,
+			appCtx,
 			editorCtx, 
 			*renderedScene);
 
@@ -435,6 +453,7 @@ void DEngine::impl::RunPhysicsStep(
 
 void DEngine::impl::SubmitRendering(
 	Gfx::Context& gfxData,
+	App::Context& appCtx,
 	Editor::Context& editorCtx,
 	Scene& scene)
 {
@@ -466,6 +485,13 @@ void DEngine::impl::SubmitRendering(
 	params.viewportUpdates = editorDrawData.viewportUpdates;
 	params.lineVertices = editorDrawData.lineVertices;
 	params.lineDrawCmds = editorDrawData.lineDrawCmds;
+	for (auto& windowUpdate : params.nativeWindowUpdates)
+	{
+		auto const windowEvents = appCtx.GetWindowEvents((App::WindowID)windowUpdate.id);
+		if (windowEvents.resize)
+			windowUpdate.event = Gfx::NativeWindowEvent::Resize;
+	}
+
 
 
 	if (!params.nativeWindowUpdates.empty())

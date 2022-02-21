@@ -10,43 +10,31 @@
 #include <string>
 #include <vector>
 
-namespace DEngine::Gui::impl { struct MenuButtonImpl; }
+namespace DEngine::Gui::impl { struct MenuBtnImpl; }
 
 namespace DEngine::Gui
 {
 	class MenuButton : public Widget
 	{
 	public:
-		struct Line;
+		struct Line
+		{
+			std::string title;
+			std::function<void(Line&, Context*)> callback;
+			bool toggled = false;
+			bool togglable = false;
+		};
 		struct Submenu
 		{
 			std::vector<Line> lines;
 			Std::Opt<uSize> activeSubmenu;
-			struct PressedLine
+			struct PressedLineData
 			{
-				uSize lineIndex = 0;
 				u8 pointerId = 0;
+				uSize lineIndex = 0;
 			};
-			Std::Opt<PressedLine> pressedLine;
-			Std::Opt<uSize> hoveredLineCursor;
-		};
-		struct LineButton
-		{
-			std::function<void(LineButton&)> callback;
-			bool toggled = false;
-			bool togglable = false;
-		};
-		struct LineEmpty {};
-		struct Line
-		{
-			Line() = default;
-			Line(Line&&) = default;
-			Line(LineButton&& button) noexcept : data{ Std::Move(button) } {}
-
-			Line& operator=(Line&&) = default;
-
-			std::string title;
-			Std::Variant<Submenu, LineButton, LineEmpty> data = LineEmpty{};
+			Std::Opt<PressedLineData> pressedLineOpt;
+			Std::Opt<uSize> cursorHoveredLineOpt;
 		};
 
 		std::string title;
@@ -57,19 +45,36 @@ namespace DEngine::Gui
 		struct Colors
 		{
 			Math::Vec4 normal = { 0.f, 0.f, 0.f, 0.f };
+			Math::Vec4 hovered = { 1.f, 1.f, 1.f, 0.25f };
 			Math::Vec4 active = { 0.25f, 0.25f, 0.25f, 1.f };
 		};
 		Colors colors = {};
 
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override;
+		virtual SizeHint GetSizeHint2(
+			GetSizeHint2_Params const& params) const override;
+		virtual void Render2(
+			Render_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
 
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
+		virtual void CursorExit(
+			Context& ctx) override;
+
+		virtual bool CursorMove(
+			CursorMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool occluded) override;
+
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+
+
+
+
 
 		virtual bool CursorPress(
 			Context& ctx,
@@ -77,7 +82,7 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			Math::Vec2Int cursorPos,
-			CursorPressEvent eventd) override;
+			CursorPressEvent event) override;
 
 		virtual bool TouchPressEvent(
 			Context& ctx,
@@ -89,8 +94,8 @@ namespace DEngine::Gui
 	private:
 		// Determines whether the button is currently pressed and should be showing the submenu.
 		bool active = false;
-		Std::Opt<u8> pointerId;
+		bool hoveredByCursor = false;
 
-		friend impl::MenuButtonImpl;
+		friend impl::MenuBtnImpl;
 	};
 }

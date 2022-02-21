@@ -48,8 +48,8 @@ namespace DEngine::Editor
 			auto newEntityButton = new Gui::Button;
 			topElementLayout->AddWidget(Std::Box{ newEntityButton });
 			newEntityButton->text = "New";
-			newEntityButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
-			newEntityButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
+			newEntityButton->colors.normal =  Settings::GetColor(Settings::Color::Button_Normal);
+			newEntityButton->colors.toggled = Settings::GetColor(Settings::Color::Button_Active);
 			newEntityButton->textMargin = Editor::Settings::defaultTextMargin;
 			newEntityButton->activateFn = [this](
 				Gui::Button& btn)
@@ -61,8 +61,8 @@ namespace DEngine::Editor
 			auto entityDeleteButton = new Gui::Button;
 			topElementLayout->AddWidget(Std::Box{ entityDeleteButton });
 			entityDeleteButton->text = "Delete";
-			entityDeleteButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
-			entityDeleteButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
+			entityDeleteButton->colors.normal = Settings::GetColor(Settings::Color::Button_Normal);
+			entityDeleteButton->colors.toggled = Settings::GetColor(Settings::Color::Button_Active);
 			entityDeleteButton->textMargin = Editor::Settings::defaultTextMargin;
 			entityDeleteButton->activateFn = [this](
 				Gui::Button& btn)
@@ -82,8 +82,8 @@ namespace DEngine::Editor
 			auto deselectButton = new Gui::Button;
 			topElementLayout->AddWidget(Std::Box{ deselectButton });
 			deselectButton->text = "Deselect";
-			deselectButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
-			deselectButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
+			deselectButton->colors.normal = Settings::GetColor(Settings::Color::Button_Normal);
+			deselectButton->colors.toggled = Settings::GetColor(Settings::Color::Button_Active);
 			deselectButton->textMargin = Editor::Settings::defaultTextMargin;
 			deselectButton->activateFn = [this](
 				Gui::Button& btn)
@@ -99,18 +99,18 @@ namespace DEngine::Editor
 			entityListScrollArea->scrollbarInactiveColor = Settings::GetColor(Settings::Color::Scrollbar_Normal);
 
 			entitiesList = new Gui::LineList();
-			entityListScrollArea->widget = Std::Box<Gui::Widget>{ entitiesList };
+			entityListScrollArea->child = Std::Box<Gui::Widget>{ entitiesList };
 			entitiesList->textMargin = Settings::defaultTextMargin;
-			entitiesList->selectedLineChangedFn = [this](
-				Gui::LineList& widget)
+			entitiesList->selectedLineChangedFn = [&editorImpl](
+				Gui::LineList& widget, Gui::Context* ctx)
 			{
 				if (widget.selectedLine.HasValue())
 				{
-					auto lineText = widget.lines[widget.selectedLine.Value()].c_str();
-					this->editorImpl->SelectEntity((Entity)std::atoi(lineText));
+					auto const& lineText = widget.lines[widget.selectedLine.Value()];
+					editorImpl.SelectEntity_MidDispatch((Entity)std::atoi(lineText.c_str()), *ctx);
 				}
 				else
-					this->editorImpl->UnselectEntity();
+					editorImpl.UnselectEntity();
 			};
 
 			auto entities = editorImpl.scene->GetEntities();
@@ -130,10 +130,8 @@ namespace DEngine::Editor
 			DENGINE_IMPL_ASSERT(editorImpl->entityIdList == this);
 			editorImpl->entityIdList = nullptr;
 
-			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Entities].data;
-			DENGINE_IMPL_ASSERT(submenuLine.IsA<Gui::MenuButton::LineButton>());
-			auto& lineButton = submenuLine.Get<Gui::MenuButton::LineButton>();
-			lineButton.toggled = false;
+			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Entities];
+			submenuLine.toggled = false;
 		}
 
 		void AddEntityToList(Entity id)
@@ -190,7 +188,7 @@ namespace DEngine::Editor
 			scrollbarInactiveColor = Settings::GetColor(Settings::Color::Scrollbar_Normal);
 
 			outerLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Vertical);
-			this->widget = Std::Box<Gui::Widget>{ outerLayout };
+			this->child = Std::Box<Gui::Widget>{ outerLayout };
 			outerLayout->padding = 5;
 			outerLayout->spacing = 10;
 			//outerLayout->expandNonDirection = true;
@@ -206,10 +204,8 @@ namespace DEngine::Editor
 			DENGINE_IMPL_ASSERT(editorImpl->componentList == this);
 			editorImpl->componentList = nullptr;
 
-			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Components].data;
-			DENGINE_IMPL_ASSERT(submenuLine.IsA<Gui::MenuButton::LineButton>());
-			auto& lineButton = submenuLine.Get<Gui::MenuButton::LineButton>();
-			lineButton.toggled = false;
+			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Components];
+			submenuLine.toggled = false;
 		}
 
 		void EntitySelected(Entity id)
@@ -229,35 +225,31 @@ namespace DEngine::Editor
 			outerLayout->AddWidget(Std::Box{ box2DWidget });
 		}
 
+		void EntitySelected_MidDispatch(Entity id, Gui::Context& ctx)
+		{
+			outerLayout->ClearChildren();
+
+			auto job = [this](Gui::Context& ctx) {
+				moveWidget = new MoveWidget(*editorImpl);
+				outerLayout->AddWidget(Std::Box{ moveWidget });
+
+				transformWidget = new TransformWidget(*editorImpl);
+				outerLayout->AddWidget(Std::Box{ transformWidget });
+
+				spriteRendererWidget = new SpriteRenderer2DWidget(*editorImpl);
+				outerLayout->AddWidget(Std::Box{ spriteRendererWidget });
+
+				box2DWidget = new RigidbodyWidget(*editorImpl);
+				outerLayout->AddWidget(Std::Box{ box2DWidget });
+			};
+
+			ctx.PushPostEventJob(job);
+		}
+
 		void Tick(Scene const& scene, Entity id)
 		{
 			if (auto ptr = scene.GetComponent<Transform>(id))
 				transformWidget->Update(*ptr);
-		}
-	};
-}
-
-namespace DEngine::Editor::detail
-{
-	struct Gfx_App_Connection : public Gfx::WsiInterface
-	{
-		App::WindowID appWindowID = {};
-
-		// Return type is VkResult
-		//
-		// Argument #1: VkInstance - The Vulkan instance handle
-		// Argument #2: VkAllocationCallbacks const* - Allocation callbacks for surface creation.
-		// Argument #3: VkSurfaceKHR* - The output surface handle
-		virtual i32 CreateVkSurface(uSize vkInstance, void const* allocCallbacks, u64& outSurface) override
-		{
-			auto resultOpt = App::CreateVkSurface(appWindowID, vkInstance, nullptr);
-			if (resultOpt.HasValue())
-			{
-				outSurface = resultOpt.Value();
-				return 0; // 0 is VK_RESULT_SUCCESS
-			}
-			else
-				return -1;
 		}
 	};
 }
@@ -282,55 +274,63 @@ namespace DEngine::Editor
 		menuButton->title = "Menu";
 		{
 			// Create button for Entities window
-			Gui::MenuButton::LineButton btn = {};
-			btn.toggled = true;
-			btn.togglable = true;
-			btn.callback = [&editorImpl](Gui::MenuButton::LineButton& btn) {
-				if (btn.toggled)
-				{
-					editorImpl.dockArea->AddWindow(
-						"Entities",
-						Settings::GetColor(Settings::Color::Window_Entities),
-						Std::Box{ new EntityIdList(editorImpl) });
-				}
-				btn.toggled = true;
-			};
-			Gui::MenuButton::Line line = { Std::Move(btn) };
+			Gui::MenuButton::Line line {};
 			line.title = "Entities";
+			line.toggled = true;
+			line.togglable = true;
+			line.callback = [&editorImpl](Gui::MenuButton::Line& line, Gui::Context* ctx) {
+				if (line.toggled)
+				{
+					auto job = [&editorImpl](Gui::Context& ctx) {
+						editorImpl.dockArea->AddWindow(
+							"Entities",
+							Settings::GetColor(Settings::Color::Window_Entities),
+							Std::Box{ new EntityIdList(editorImpl) });
+					};
+					ctx->PushPostEventJob(job);
+				}
+				line.toggled = true;
+			};
 			menuButton->submenu.lines[(int)FileMenuEnum::Entities] = Std::Move(line);
 		}
 		{
 			// Create button for Components window
-			Gui::MenuButton::LineButton btn = {};
-			btn.toggled = true;
-			btn.togglable = true;
-			btn.callback = [&editorImpl](Gui::MenuButton::LineButton& btn) {
-				if (btn.toggled)
-				{
-					editorImpl.dockArea->AddWindow(
-						"Components",
-						Settings::GetColor(Settings::Color::Window_Components),
-						Std::Box{ new ComponentList(editorImpl) });
-				}
-				btn.toggled = true;
-			};
-			Gui::MenuButton::Line line = { Std::Move(btn) };
+			Gui::MenuButton::Line line {};
 			line.title = "Components";
+			line.toggled = true;
+			line.togglable = true;
+			line.callback = [&editorImpl](Gui::MenuButton::Line& line, Gui::Context* ctx) {
+				if (line.toggled)
+				{
+					auto job = [&editorImpl](Gui::Context& ctx) {
+						editorImpl.dockArea->AddWindow(
+							"Components",
+							Settings::GetColor(Settings::Color::Window_Components),
+							Std::Box{ new ComponentList(editorImpl) });
+					};
+					ctx->PushPostEventJob(job);
+				}
+				line.toggled = true;
+			};
 			menuButton->submenu.lines[(int)FileMenuEnum::Components] = Std::Move(line);
 		}
 		{
 			// Create button for adding viewport
-			Gui::MenuButton::LineButton btn = {};
-			btn.toggled = false;
-			btn.togglable = false;
-			btn.callback = [&editorImpl](Gui::MenuButton::LineButton& btn) {
-				editorImpl.dockArea->AddWindow(
-					"Viewport",
-					Settings::GetColor(Settings::Color::Window_Viewport),
-					Std::Box{ new ViewportWidget(editorImpl) });
-			};
-			Gui::MenuButton::Line line = { Std::Move(btn) };
+			Gui::MenuButton::Line line {};
 			line.title = "New viewport";
+			line.toggled = false;
+			line.togglable = false;
+			line.callback = [&editorImpl](Gui::MenuButton::Line& line, Gui::Context* ctx) {
+
+				auto job = [&editorImpl](Gui::Context& ctx) {
+					editorImpl.dockArea->AddWindow(
+						"Viewport",
+						Settings::GetColor(Settings::Color::Window_Viewport),
+						Std::Box{ new ViewportWidget(editorImpl)});
+				};
+
+				ctx->PushPostEventJob(job);
+			};
 			menuButton->submenu.lines[(int)FileMenuEnum::NewViewport] = Std::Move(line);
 		}
 
@@ -339,12 +339,13 @@ namespace DEngine::Editor
 		stackLayout->AddWidget(Std::Box{ deltaText });
 		editorImpl.test_fpsText = deltaText;
 		deltaText->margin = Editor::Settings::defaultTextMargin;
-		deltaText->String_Set("Child text");
+		deltaText->text = "Child text";
+		deltaText->expandX = false;
 
 		auto playButton = new Gui::Button;
 		stackLayout->AddWidget(Std::Box{ playButton });
-		playButton->normalColor = Settings::GetColor(Settings::Color::Button_Normal);
-		playButton->toggledColor = Settings::GetColor(Settings::Color::Button_Active);
+		playButton->colors.normal = Settings::GetColor(Settings::Color::Button_Normal);
+		playButton->colors.toggled = Settings::GetColor(Settings::Color::Button_Active);
 		playButton->text = "Play";
 		playButton->textMargin = Editor::Settings::defaultTextMargin;
 		playButton->type = Gui::Button::Type::Toggle;
@@ -363,8 +364,8 @@ namespace DEngine::Editor
 		auto gizmoBtnGroup = new Gui::ButtonGroup;
 		editorImpl.gizmoTypeBtnGroup = gizmoBtnGroup;
 		stackLayout->AddWidget(Std::Box{ gizmoBtnGroup });
-		gizmoBtnGroup->inactiveColor = Settings::GetColor(Settings::Color::Button_Normal);
-		gizmoBtnGroup->activeColor = Settings::GetColor(Settings::Color::Button_Active);
+		gizmoBtnGroup->colors.inactiveColor = Settings::GetColor(Settings::Color::Button_Normal);
+		gizmoBtnGroup->colors.activeColor = Settings::GetColor(Settings::Color::Button_Active);
 		gizmoBtnGroup->margin = Editor::Settings::defaultTextMargin;
 		gizmoBtnGroup->AddButton("Translate");
 		gizmoBtnGroup->AddButton("Rotate");
@@ -375,18 +376,18 @@ namespace DEngine::Editor
 }
 
 Editor::Context Editor::Context::Create(
-	App::WindowID mainWindow,
-	Scene* scene,
-	Gfx::Context* gfxCtx)
+	CreateInfo const& createInfo)
 {
 	Context newCtx;
 
-	newCtx.implData = new EditorImpl;
-	EditorImpl& implData = *newCtx.implData;
-	
-	implData.gfxCtx = gfxCtx;
-	implData.scene = scene;
-	App::InsertEventInterface(implData);
+	newCtx.m_implData = new EditorImpl;
+	EditorImpl& implData = *newCtx.m_implData;
+
+	implData.appCtx = &createInfo.appCtx;
+	implData.gfxCtx = &createInfo.gfxCtx;
+	implData.scene = &createInfo.scene;
+
+	implData.appCtx->InsertEventForwarder(implData);
 
 	auto outmostLayout = new Gui::StackLayout(Gui::StackLayout::Dir::Vertical);
 
@@ -406,106 +407,50 @@ Editor::Context Editor::Context::Create(
 		"Components",
 		Settings::GetColor(Settings::Color::Window_Components),
 		Std::Box{ new ComponentList(implData) });
-		
+
 	dockArea->AddWindow(
 		"Viewport",
 		Settings::GetColor(Settings::Color::Window_Viewport),
 		Std::Box{ new ViewportWidget(implData) });
-	
+
+
 	Gui::WindowHandler& guiWinHandler = implData;
-	implData.guiCtx = Std::Box{ new Gui::Context(Gui::Context::Create(guiWinHandler, gfxCtx)) };
+	implData.guiCtx = Std::Box{ new Gui::Context(Gui::Context::Create(guiWinHandler, implData.appCtx, implData.gfxCtx)) };
 
 	auto const clearColor = Settings::GetColor(Settings::Color::Background);
-	auto windowExtent = App::GetWindowExtent(mainWindow);
-	auto windowPos = App::GetWindowPosition(mainWindow);
-	auto visibleExtent = App::GetWindowVisibleExtent(mainWindow);
-	auto visibleOffset = App::GetWindowVisibleOffset(mainWindow);
 	implData.guiCtx->AdoptWindow(
-		(Gui::WindowID)mainWindow,
+		(Gui::WindowID)createInfo.mainWindow,
 		clearColor,
-		{ windowPos, { windowExtent.width, windowExtent.height } },
-		{ windowPos + visibleOffset, { visibleExtent.width, visibleExtent.height } },
+		{ createInfo.windowPos, { createInfo.windowExtent.width, createInfo.windowExtent.height } },
+		createInfo.windowSafeAreaOffset,
+		{ createInfo.windowSafeAreaExtent.width, createInfo.windowSafeAreaExtent.height },
 		Std::Box{ outmostLayout });
 
 	return newCtx;
 }
 
-void Editor::EditorImpl::FlushQueuedEvents()
-{
-	for (auto const& event : queuedGuiEvents)
-	{
-		using EventT = Std::Trait::RemoveCVRef<decltype(event)>;
-
-		switch (event.GetIndex())
-		{
-			case EventT::indexOf<Gui::CharEnterEvent>:
-				guiCtx->PushEvent(event.Get<Gui::CharEnterEvent>());
-				break;
-			case EventT::indexOf<Gui::CharEvent>:
-				guiCtx->PushEvent(event.Get<Gui::CharEvent>());
-				break;
-			case EventT::indexOf<Gui::CharRemoveEvent>:
-				guiCtx->PushEvent(event.Get<Gui::CharRemoveEvent>());
-				break;
-			case EventT::indexOf<Gui::CursorClickEvent>:
-				guiCtx->PushEvent(event.Get<Gui::CursorClickEvent>());
-				break;
-			case EventT::indexOf<Gui::CursorMoveEvent>:
-				guiCtx->PushEvent(event.Get<Gui::CursorMoveEvent>());
-				break;
-			case EventT::indexOf<Gui::TouchPressEvent>:
-				guiCtx->PushEvent(event.Get<Gui::TouchPressEvent>());
-				break;
-			case EventT::indexOf<Gui::TouchMoveEvent>:
-				guiCtx->PushEvent(event.Get<Gui::TouchMoveEvent>());
-				break;
-			case EventT::indexOf<Gui::WindowCloseEvent>:
-				guiCtx->PushEvent(event.Get<Gui::WindowCloseEvent>());
-				break;
-			case EventT::indexOf<Gui::WindowCursorEnterEvent>:
-				guiCtx->PushEvent(event.Get<Gui::WindowCursorEnterEvent>());
-				break;
-			case EventT::indexOf<Gui::WindowMinimizeEvent>:
-				guiCtx->PushEvent(event.Get<Gui::WindowMinimizeEvent>());
-				break;
-			case EventT::indexOf<Gui::WindowMoveEvent>:
-				guiCtx->PushEvent(event.Get<Gui::WindowMoveEvent>());
-				break;
-			case EventT::indexOf<Gui::WindowResizeEvent>:
-				guiCtx->PushEvent(event.Get<Gui::WindowResizeEvent>());
-				break;
-
-			default:
-				DENGINE_IMPL_UNREACHABLE();
-				break;
-		}
-		InvalidateRendering();
-	}
-	queuedGuiEvents.clear();
-}
-
 void Editor::Context::ProcessEvents()
 {
-	auto& implData = this->ImplData();
+	auto& implData = GetImplData();
 
-	if (App::TickCount() == 1)
+	if (implData.appCtx->TickCount() == 1)
 		implData.InvalidateRendering();
-	
-	implData.FlushQueuedEvents();
+
+	implData.FlushQueuedEventsToGui();
 
 	for (auto viewportPtr : implData.viewportWidgets)
 	{
 		viewportPtr->Tick(Time::Delta());
 	}
-	if (App::TickCount() % 60 == 0)
+	if (implData.appCtx->TickCount() % 60 == 0)
 	{
 		std::string temp;
 		//temp += std::to_string(1.f / Time::Delta()) + " - ";
 		temp += std::to_string(Time::Delta());
-		implData.test_fpsText->String_Set(temp.c_str());
+		implData.test_fpsText->text = temp;
 		implData.InvalidateRendering();
 	}
-	if (App::TickCount() % 10 == 0)
+	if (implData.appCtx->TickCount() % 10 == 0)
 	{
 		if (implData.componentList && implData.GetSelectedEntity().HasValue())
 		{
@@ -527,11 +472,14 @@ void Editor::Context::ProcessEvents()
 		implData.indices.clear();
 		implData.drawCmds.clear();
 		implData.windowUpdates.clear();
-		implData.guiCtx->Render(
-			implData.vertices,
-			implData.indices,
-			implData.drawCmds,
-			implData.windowUpdates);
+		Gui::Context::Render2_Params renderParams {
+			.rectCollection = implData.guiRectCollection,
+			.transientAlloc = implData.guiTransientAlloc,
+			.vertices = implData.vertices,
+			.indices = implData.indices,
+			.drawCmds = implData.drawCmds,
+			.windowUpdates = implData.windowUpdates };
+		implData.guiCtx->Render2(renderParams);
 
 		for (auto viewportPtr : implData.viewportWidgets)
 		{
@@ -542,24 +490,26 @@ void Editor::Context::ProcessEvents()
 }
 
 Editor::Context::Context(Context&& other) noexcept :
-	implData{ other.implData }
+	m_implData{other.m_implData }
 {
-	other.implData = nullptr;
+	other.m_implData = nullptr;
 }
 
 Editor::Context::~Context()
 {
-	if (this->implData)
+	if (this->m_implData)
 	{
-		EditorImpl& implData = this->ImplData();
-		App::RemoveEventInterface(implData);
+		auto& implData = GetImplData();
+
+		implData.appCtx->RemoveEventForwarder(implData);
+
 		delete &implData;
 	}
 }
 
 Editor::DrawInfo Editor::Context::GetDrawInfo() const
 {
-	EditorImpl& implData = this->ImplData();
+	auto& implData = this->GetImplData();
 
 	DrawInfo returnVal;
 	
@@ -579,7 +529,6 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 			DENGINE_IMPL_ASSERT(viewportWidget.viewport->newExtent.width > 0 && viewportWidget.viewport->newExtent.height > 0);
 
 			Gfx::ViewportUpdate update = viewportWidget.viewport->GetViewportUpdate(
-				*this,
 				returnVal.lineVertices,
 				returnVal.lineDrawCmds);
 			
@@ -592,13 +541,13 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 
 bool Editor::Context::IsSimulating() const
 {
-	EditorImpl& implData = this->ImplData();
-	return implData.tempScene;
+	auto& implData = GetImplData();
+	return implData.tempScene.Get();
 }
 
-Scene& Editor::Context::GetActiveScene() const
+Scene& Editor::Context::GetActiveScene()
 {
-	EditorImpl& implData = this->ImplData();
+	auto& implData = this->GetImplData();
 	return implData.GetActiveScene();
 }
 
@@ -617,6 +566,19 @@ void Editor::EditorImpl::SelectEntity(Entity id)
 	// Update the component list
 	if (componentList)
 		componentList->EntitySelected(id);
+}
+
+void EditorImpl::SelectEntity_MidDispatch(Entity id, Gui::Context& ctx)
+{
+	if (selectedEntity.HasValue() && selectedEntity.Value() == id)
+		return;
+
+	Std::Opt<Entity> prevEntity = selectedEntity;
+	selectedEntity = id;
+
+	// Update the component list
+	if (componentList)
+		componentList->EntitySelected_MidDispatch(id, ctx);
 }
 
 void Editor::EditorImpl::UnselectEntity()
@@ -640,13 +602,6 @@ Editor::GizmoType Editor::EditorImpl::GetCurrentGizmoType() const
 }
 
 Scene& Editor::EditorImpl::GetActiveScene()
-{
-	if (tempScene)
-		return *tempScene;
-	return *scene;
-}
-
-Scene const& Editor::EditorImpl::GetActiveScene() const
 {
 	if (tempScene)
 		return *tempScene;

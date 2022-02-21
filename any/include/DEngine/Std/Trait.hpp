@@ -59,6 +59,9 @@ namespace DEngine::Std::Trait::impl
 	struct IsTriviallyConstructible : public BoolValue<__is_trivially_constructible(T)> {};
 
 	template<class T>
+	struct IsTriviallyDestructible : public BoolValue<__is_trivially_destructible(T)> {};
+
+	template<class T>
 	struct IsCopyAssignable : public BoolValue<__is_assignable(T&, T const&)> {};
 	template<class T>
 	struct IsMoveAssignable : public BoolValue<__is_assignable(T&, T&&)> {};
@@ -145,6 +148,8 @@ namespace DEngine::Std::Trait
 	constexpr bool isTriviallyDefaultConstructible = impl::IsTriviallyDefaultConstructible<T>::value;
 	template<class T>
 	constexpr bool isMoveConstructible = impl::IsMoveConstructible<T>::value;
+	template<class T>
+	constexpr bool isTriviallyDestructible = impl::IsTriviallyDestructible<T>::value;
 
 	template<class T>
 	constexpr bool isTrivial = impl::IsTriviallyConstructible<T>::value && impl::IsTriviallyCopyable<T>::value;

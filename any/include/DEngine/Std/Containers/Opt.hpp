@@ -4,9 +4,11 @@
 #include <DEngine/Std/Trait.hpp>
 
 namespace DEngine::Std::impl { struct OptPlacementNewTag {}; }
-constexpr void* operator new(decltype(sizeof(int)) size, void* data, DEngine::Std::impl::OptPlacementNewTag) noexcept { return data; }
+template<class T>
+constexpr void* operator new(decltype(sizeof(int)) size, T* data, DEngine::Std::impl::OptPlacementNewTag) noexcept { return data; }
 // Having this delete operator silences a compiler warning.
 [[maybe_unused]] constexpr void operator delete(void* data, DEngine::Std::impl::OptPlacementNewTag) noexcept {}
+
 
 namespace DEngine::Std
 {
@@ -20,7 +22,7 @@ namespace DEngine::Std
 	public:
 		using ValueType = T;
 
-		Opt(NullOpt_T = nullOpt) noexcept;
+		Opt([[maybe_unused]] NullOpt_T = nullOpt) noexcept;
 
 		Opt(Opt const& other) noexcept requires (Std::Trait::isCopyConstructible<T>) :
 			hasValue{ other.hasValue }
@@ -53,7 +55,15 @@ namespace DEngine::Std
 
 		~Opt() noexcept;
 
+		template<class... Ts>
+		void Emplace(Ts&&... in) noexcept
+		{
+			if (hasValue)
+				Clear();
 
+			new(&value, impl::OptPlacementNewTag{}) T(in...);
+			hasValue = true;
+		}
 
 
 		Opt& operator=(Opt const& other) noexcept requires (Std::Trait::isCopyAssignable<T>)
@@ -122,9 +132,7 @@ namespace DEngine::Std
 			return *this;
 		}
 
-
-
-
+		Opt& operator=([[maybe_unused]] NullOpt_T) noexcept;
 
 		[[nodiscard]] bool HasValue() const noexcept;
 
@@ -165,12 +173,19 @@ namespace DEngine::Std
 	};
 
 	template<typename T>
-	Opt<T>::Opt(NullOpt_T) noexcept {}
+	Opt<T>::Opt([[maybe_unused]] NullOpt_T) noexcept {}
 
 	template<typename T>
 	Opt<T>::~Opt() noexcept
 	{
 		Clear();
+	}
+
+	template<typename T>
+	Opt<T>& Opt<T>::operator=([[maybe_unused]] NullOpt_T) noexcept
+	{
+		Clear();
+		return *this;
 	}
 
 	template<typename T>
@@ -196,7 +211,9 @@ namespace DEngine::Std
 	{
 		if (hasValue)
 		{
-			value.~T();
+			if constexpr (!Trait::isTriviallyDestructible<T>)
+				value.~T();
+
 			hasValue = false;
 		}
 	}

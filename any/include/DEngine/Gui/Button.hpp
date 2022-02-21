@@ -7,11 +7,6 @@
 #include <functional>
 #include <string>
 
-namespace DEngine::Gui::impl
-{
-	class BtnImpl;
-}
-
 namespace DEngine::Gui
 {
 	class Context;
@@ -27,7 +22,7 @@ namespace DEngine::Gui
 		virtual ~Button() override {}
 
 		std::string text;
-		u32 textMargin = 20;
+		u32 textMargin = 10;
 		
 		enum class Type
 		{
@@ -53,49 +48,36 @@ namespace DEngine::Gui
 		void SetToggled(bool toggled);
 		[[nodiscard]] bool GetToggled() const;
 
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override;
 
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
 
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
 
 		virtual void Render2(
 			Render_Params const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect) const override;
 
-		virtual void CursorExit(
-			Context& ctx) override;
-
-		virtual bool CursorPress(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorPressEvent event) override;
+		virtual bool CursorMove(
+			CursorMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool occluded) override;
 
 		virtual bool CursorPress2(
 			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool consumed) override;
 
-		virtual bool CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event,
-			bool cursorOccluded) override;
-		virtual bool CursorMove(
-			CursorMoveParams const& params,
-			bool occluded) override;
+		virtual void CursorExit(
+			Context& ctx) override;
+
+
 
 		virtual bool TouchMoveEvent(
 			Context& ctx,
@@ -119,6 +101,7 @@ namespace DEngine::Gui
 		
 		void Activate();
 
-		friend impl::BtnImpl;
+		struct Impl;
+		friend Impl;
 	};
 }

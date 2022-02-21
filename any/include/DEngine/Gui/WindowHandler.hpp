@@ -31,4 +31,10 @@ namespace DEngine::Gui
 	};
 
 	inline WindowHandler::~WindowHandler() noexcept {}
+
+
+	struct WindowHandlerCapabilities
+	{
+		bool lockCursor;
+	};
 }

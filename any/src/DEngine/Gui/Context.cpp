@@ -2,81 +2,178 @@
 #include "ImplData.hpp"
 
 #include <DEngine/Std/Containers/Box.hpp>
+#include <DEngine/Std/Containers/Defer.hpp>
 #include <DEngine/Std/Utility.hpp>
 
 #include <DEngine/Gui/Layer.hpp>
 #include <DEngine/Gui/Widget.hpp>
-#include <DEngine/Gui/SizeHintCollection.hpp>
-
-#include <DEngine/Application.hpp>
+#include <DEngine/Gui/RectCollection.hpp>
+#include <DEngine/Gui/TextManager.hpp>
 
 #include <vector>
-#include <stdexcept>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
 
+Context::Impl& Context::Internal_ImplData()
+{
+	DENGINE_IMPL_GUI_ASSERT(pImplData);
+	return *pImplData;
+}
+Context::Impl const& Context::Internal_ImplData() const
+{
+	DENGINE_IMPL_GUI_ASSERT(pImplData);
+	return *pImplData;
+}
+
 namespace DEngine::Gui::impl
 {
-	void ImplData_PreDispatchStuff(ImplData& implData)
+	[[nodiscard]] auto GetWindowNodeIt(decltype(Context::Impl::windows)& windows, WindowID id)
+	{
+		auto windowIt = Std::FindIf(
+			windows.begin(),
+			windows.end(),
+			[&id](auto const& item) { return item.id == id; });
+		return windowIt;
+	}
+
+	[[nodiscard]] auto GetWindowNodeIt(decltype(Context::Impl::windows) const& windows, WindowID id)
+	{
+		auto windowIt = Std::FindIf(
+			windows.begin(),
+			windows.end(),
+			[&id](auto const& item) { return item.id == id; });
+		return windowIt;
+	}
+
+	[[nodiscard]] WindowNode* GetWindowNodePtr(Context::Impl& implData, WindowID id)
+	{
+		auto& windows = implData.windows;
+		auto windowIt = GetWindowNodeIt(windows, id);
+		if (windowIt != windows.end())
+			return &*windowIt;
+		else
+			return nullptr;
+	}
+
+	[[nodiscard]] WindowNode const* GetWindowNodePtr(Context::Impl const& implData, WindowID id)
+	{
+		auto& windows = implData.windows;
+		auto windowIt = GetWindowNodeIt(windows, id);
+		if (windowIt != windows.end())
+			return &*windowIt;
+		else
+			return nullptr;
+	}
+
+	void ImplData_PreDispatchStuff(Context::Impl& implData)
 	{
 		implData.transientAlloc.Reset();
+	}
 
-		implData.sizeHintColl.Clear();
+	void ImplData_FlushPostEventJobs(Context& ctx)
+	{
+		auto& implData = ctx.Internal_ImplData();
+		for (auto const& job : implData.postEventJobs)
+			job.invokeFn(job.ptr, ctx);
+		auto const length = (int)implData.postEventJobs.size();
+		for (int i = length; i != 0 ; i -= 1)
+			implData.postEventAlloc.Free(implData.postEventJobs[i - 1].ptr);
+
+		implData.postEventJobs.clear();
+		implData.postEventAlloc.Reset();
 	}
 
 	// All rects should be relative to window position, not visible rect
-	void BuildSizeHintCollection(
+	void BuildRectCollection(
 		Context const& ctx,
-		ImplData const& implData,
-		SizeHintCollection& sizeHintColl,
-		Std::FrameAllocator& transientAlloc)
+		TextManager& textManager,
+		RectCollection& rectCollection,
+		bool includeRendering,
+		Std::FrameAlloc& transientAlloc)
 	{
-		sizeHintColl.Clear();
+		auto& implData = ctx.Internal_ImplData();
+
+		rectCollection.Prepare(includeRendering);
 
 		for (auto& windowNode : implData.windows)
 		{
 			if (!windowNode.data.topLayout)
 				continue;
-
-			SizeHintCollection::Pusher sizeHintPusher{ sizeHintColl };
-			Widget::GetSizeHint2_Params params = {
-				.ctx = ctx,
-				.transientAlloc = transientAlloc,
-				.pusher = sizeHintPusher };
-
-			auto& widget = *windowNode.data.topLayout;
-			widget.GetSizeHint2(params);
-
-			transientAlloc.Reset();
-		}
-
-		sizeHintColl.rects.resize(sizeHintColl.widgets.size());
-
-		for (auto& windowNode : implData.windows)
-		{
-			if (!windowNode.data.topLayout)
-				continue;
-
-			SizeHintCollection::Pusher2 sizeHintPusher2 { sizeHintColl };
-
-			//Widget::BuildChildRects_Params params{ *this, sizeHintPusher2, transientAlloc };
-			Widget::BuildChildRects_Params params {
-				.ctx = ctx,
-				.builder = sizeHintPusher2,
-				.transientAlloc = transientAlloc };
 
 			auto const& windowRect = windowNode.data.rect;
 			auto const& visibleOffset = windowNode.data.visibleOffset;
 			auto const& visibleExtent = windowNode.data.visibleExtent;
 			Rect const visibleRect = Rect::Intersection(
-				{{}, windowRect.extent},
-				{{(i32) visibleOffset.x, (i32) visibleOffset.y}, visibleExtent});
+				{ {}, windowRect.extent },
+				{ { (i32)visibleOffset.x, (i32)visibleOffset.y }, visibleExtent });
+
+			RectCollection::SizeHintPusher sizeHintPusher { rectCollection };
+
+			if (windowNode.frontmostLayer)
+			{
+				Layer::BuildSizeHints_Params params = {
+					.ctx = ctx,
+					.textManager = textManager,
+					.transientAlloc = transientAlloc,
+					.pusher = sizeHintPusher };
+				params.windowRect = visibleRect;
+				params.safeAreaRect = visibleRect;
+
+				auto const& layer = *windowNode.frontmostLayer;
+				layer.BuildSizeHints(params);
+			}
+
+			Widget::GetSizeHint2_Params params = {
+				.ctx = ctx,
+				.textManager = textManager,
+				.transientAlloc = transientAlloc,
+				.pusher = sizeHintPusher, };
+
+			auto const& widget = *windowNode.data.topLayout;
+			widget.GetSizeHint2(params);
+
+			transientAlloc.Reset();
+		}
+
+
+		// Then build rects
+		for (auto& windowNode : implData.windows)
+		{
+			if (!windowNode.data.topLayout)
+				continue;
+
+			auto const& windowRect = windowNode.data.rect;
+			auto const& visibleOffset = windowNode.data.visibleOffset;
+			auto const& visibleExtent = windowNode.data.visibleExtent;
+			Rect const visibleRect = Rect::Intersection(
+				{ {}, windowRect.extent },
+				{ { (i32)visibleOffset.x, (i32)visibleOffset.y }, visibleExtent});
+
+			RectCollection::RectPusher rectPusher {rectCollection };
+
+			if (windowNode.frontmostLayer)
+			{
+				auto& layer = *windowNode.frontmostLayer;
+				Layer::BuildRects_Params buildRectsParams {
+					.ctx = ctx,
+					.transientAlloc = transientAlloc,
+					.pusher = rectPusher };
+				buildRectsParams.windowRect = visibleRect;
+				buildRectsParams.visibleRect = visibleRect;
+
+				layer.BuildRects(buildRectsParams);
+			}
+
+			//Widget::BuildChildRects_Params params{ *this, sizeHintPusher2, transientAlloc };
+			Widget::BuildChildRects_Params params {
+				.ctx = ctx,
+				.textManager = textManager,
+				.transientAlloc = transientAlloc,
+				.pusher = rectPusher, };
 
 			auto& widget = *windowNode.data.topLayout;
-			params.builder.PushRect(
-				widget,
-				{visibleRect, visibleRect});
+			params.pusher.Push(widget, { visibleRect, visibleRect });
 			widget.BuildChildRects(
 				params,
 				visibleRect,
@@ -89,16 +186,19 @@ namespace DEngine::Gui::impl
 
 Context Context::Create(
 	WindowHandler& windowHandler,
+	App::Context* appCtx,
 	Gfx::Context* gfxCtx)
 {
 	Context newCtx;
-	newCtx.pImplData = new impl::ImplData;
-	auto& implData = *static_cast<impl::ImplData*>(newCtx.pImplData);
+	newCtx.pImplData = new Impl;
+	auto& implData = *newCtx.pImplData;
 	
 	implData.windowHandler = &windowHandler;
 
-	impl::TextManager::Initialize(
-		implData.textManager,
+	implData.textManager = new TextManager;
+	impl::InitializeTextManager(
+		*implData.textManager,
+		appCtx,
 		gfxCtx);
 
 	return static_cast<Context&&>(newCtx);
@@ -115,7 +215,7 @@ void Context::TakeInputConnection(
 	SoftInputFilter softInputFilter,
 	Std::Span<char const> currentText)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = Internal_ImplData();
 	if (implData.inputConnectionWidget)
 	{
 		implData.inputConnectionWidget->InputConnectionLost();
@@ -129,7 +229,7 @@ void Context::TakeInputConnection(
 void Context::ClearInputConnection(
 	Widget& widget)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = Internal_ImplData();
 	DENGINE_IMPL_GUI_ASSERT(&widget == implData.inputConnectionWidget);
 
 	implData.windowHandler->HideSoftInput();
@@ -139,7 +239,7 @@ void Context::ClearInputConnection(
 
 WindowHandler& Context::GetWindowHandler() const
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = Internal_ImplData();
 	return *implData.windowHandler;
 }
 
@@ -147,21 +247,19 @@ void Context::SetFrontmostLayer(
 	WindowID windowId,
 	Std::Box<Layer>&& layer)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = Internal_ImplData();
 
-	auto const windowNodeIt = Std::FindIf(
-		implData.windows.begin(),
-		implData.windows.end(),
-		[windowId](auto const& val) -> bool { return windowId == val.id; });
-	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != implData.windows.end());
-	auto& windowNode = *windowNodeIt;
+	auto* windowNodePtr = impl::GetWindowNodePtr(implData, windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
 
 	windowNode.frontmostLayer = static_cast<Std::Box<Layer>&&>(layer);
 }
 
 void Context::PushEvent(CharEnterEvent const& event)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = Internal_ImplData();
+
 	for (auto& windowNode : implData.windows)
 	{
 		if (!windowNode.data.topLayout)
@@ -173,7 +271,7 @@ void Context::PushEvent(CharEnterEvent const& event)
 
 void Context::PushEvent(CharEvent const& event)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = Internal_ImplData();
 	for (auto& windowNode : implData.windows)
 	{
 		if (!windowNode.data.topLayout)
@@ -187,70 +285,132 @@ void Context::PushEvent(CharEvent const& event)
 
 void Context::PushEvent(CharRemoveEvent const& event)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
-	for (auto& windowNode : implData.windows)
-	{
-		if (!windowNode.data.topLayout)
-			continue;
+	auto& implData = Internal_ImplData();
+	auto& transientAlloc = implData.transientAlloc;
+	Std::Defer _allocCleanup = [&]() { transientAlloc.Reset(); };
 
-		windowNode.data.topLayout->CharRemoveEvent(*this);
+	auto* windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+
+	if (windowNode.data.topLayout)
+	{
+		//windowNode.data.topLayout->CharRemoveEvent(*this, transientAlloc);
+	}
+}
+
+void Context::PushEvent(TextInputEvent const& event)
+{
+	auto& implData = Internal_ImplData();
+
+	auto& transientAlloc = implData.transientAlloc;
+	Std::Defer _allocCleanup = [&]() { transientAlloc.Reset(); };
+
+	auto* windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+	if (windowNode.data.topLayout)
+	{
+		windowNode.data.topLayout->TextInput(
+			*this,
+			transientAlloc,
+			event);
 	}
 }
 
 void Context::PushEvent(CursorPressEvent const& event)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
-	auto& windows = implData.windows;
+	auto& implData = Internal_ImplData();
+	auto& textManager = *implData.textManager;
+	auto& rectCollection = implData.rectCollection;
+	auto& transientAlloc = implData.transientAlloc;
 
-	auto windowIt = Std::FindIf(
-		windows.begin(),
-		windows.end(),
-		[&event](auto const& item) { return item.id == event.windowId; });
-	DENGINE_IMPL_GUI_ASSERT(windowIt != windows.end());
-	auto& windowNode = *windowIt;
+	auto windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
 
 	implData.cursorWindowId = event.windowId;
 
 	impl::ImplData_PreDispatchStuff(implData);
-	impl::BuildSizeHintCollection(
+	impl::BuildRectCollection(
 		*this,
-		implData,
-		implData.sizeHintColl,
-		implData.transientAlloc);
+		textManager,
+		rectCollection,
+		false,
+		transientAlloc);
 
 	if (windowNode.data.topLayout)
 	{
-		RectCollection rectCollection { implData.sizeHintColl };
-		Widget::CursorPressParams params {
+		auto const localCursorPos = implData.cursorPosition - windowNode.data.rect.position;
+
+		Rect const& windowRect = { {}, windowNode.data.rect.extent };
+		auto const& visibleOffset = windowNode.data.visibleOffset;
+		auto const& visibleExtent = windowNode.data.visibleExtent;
+		Rect const visibleRect = Rect::Intersection(
+			windowRect,
+			{ { (i32)visibleOffset.x, (i32)visibleOffset.y }, visibleExtent });
+
+		bool eventConsumed = false;
+		Layer::Press_Return pressReturn = {};
+		if (windowNode.frontmostLayer)
+		{
+			Layer::CursorPressParams layerParams {
+				.ctx = *this,
+				.textManager = textManager,
+				.rectCollection = rectCollection,
+				.event = event, };
+			layerParams.windowRect = windowRect;
+			layerParams.safeAreaRect = visibleRect;
+			layerParams.cursorPos = localCursorPos;
+
+			auto& layer = *windowNode.frontmostLayer;
+			pressReturn = layer.CursorPress(layerParams, eventConsumed);
+			eventConsumed = eventConsumed || pressReturn.eventConsumed;
+		}
+		if (pressReturn.destroyLayer)
+		{
+			windowNode.frontmostLayer = {};
+		}
+
+		Widget::CursorPressParams widgetParams {
 			.ctx = *this,
-			.rectCollection = rectCollection };
-		params.windowId = windowNode.id;
-		params.cursorPos = implData.cursorPosition - windowNode.data.rect.position;
-		params.event = event;
+			.rectCollection = rectCollection,
+			.textManager = textManager,
+			.transientAlloc =  transientAlloc };
+		widgetParams.windowId = windowNode.id;
+		widgetParams.cursorPos = localCursorPos;
+		widgetParams.event = event;
 
 		auto& widget = *windowNode.data.topLayout;
-		widget.CursorPress2(params, false);
+
+		widget.CursorPress2(
+			widgetParams,
+			visibleRect,
+			visibleRect,
+			eventConsumed);
 	}
+
+	impl::ImplData_FlushPostEventJobs(*this);
 }
 
 void Context::PushEvent(CursorMoveEvent const& event)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
-	auto& windows = implData.windows;
+	auto& implData = Internal_ImplData();
+	auto& textManager = *implData.textManager;
+	auto& rectCollection = implData.rectCollection;
+	auto& transientAlloc = implData.transientAlloc;
 
-	auto windowIt = Std::FindIf(
-		implData.windows.begin(),
-		implData.windows.end(),
-		[&event](auto const& item) { return item.id == event.windowId; });
-	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
-	auto& windowNode = *windowIt;
+	auto windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
 
 	impl::ImplData_PreDispatchStuff(implData);
-	impl::BuildSizeHintCollection(
+	impl::BuildRectCollection(
 		*this,
-		implData,
-		implData.sizeHintColl,
-		implData.transientAlloc);
+		textManager,
+		rectCollection,
+		false,
+		transientAlloc);
 
 	// Update the globally stored cursor position
 	implData.cursorPosition = event.position + windowNode.data.rect.position;
@@ -260,33 +420,57 @@ void Context::PushEvent(CursorMoveEvent const& event)
 	{
 		auto& widget = *windowNode.data.topLayout;
 
-		RectCollection rectCollection { implData.sizeHintColl };
-
 		auto modifiedEvent = event;
 		modifiedEvent.position = implData.cursorPosition - windowNode.data.rect.position;
 
-		Widget::CursorMoveParams params {
-			.ctx = *this,
-			.rectCollection = rectCollection };
-		params.windowId = windowNode.id;
-		params.event = modifiedEvent;
+		auto const& windowRect = windowNode.data.rect;
+		auto const& visibleOffset = windowNode.data.visibleOffset;
+		auto const& visibleExtent = windowNode.data.visibleExtent;
+		Rect const visibleRect = Rect::Intersection(
+			{{}, windowRect.extent},
+			{{(i32) visibleOffset.x, (i32) visibleOffset.y}, visibleExtent});
 
-		widget.CursorMove(params, false);
+		bool cursorOccluded = false;
+		if (windowNode.frontmostLayer)
+		{
+			Layer::CursorMoveParams layerParams {
+				.ctx = *this,
+				.textManager = textManager,
+				.rectCollection = rectCollection,
+				.event = modifiedEvent };
+			layerParams.windowRect = windowRect;
+			layerParams.safeAreaRect = visibleRect;
+
+			auto& layer = *windowNode.frontmostLayer;
+			bool const newOccluded = layer.CursorMove(
+				layerParams,
+				cursorOccluded);
+			cursorOccluded = cursorOccluded || newOccluded;
+		}
+
+		Widget::CursorMoveParams widgetParams {
+			.ctx = *this,
+			.rectCollection = rectCollection,
+			.textManager = textManager,
+			.transientAlloc = transientAlloc };
+		widgetParams.windowId = windowNode.id;
+		widgetParams.event = modifiedEvent;
+
+		widget.CursorMove(
+			widgetParams,
+			visibleRect,
+			visibleRect,
+			cursorOccluded);
 	}
 }
 
 void Context::PushEvent(WindowCursorExitEvent const& event)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
-	auto& windowNodes = implData.windows;
+	auto& implData = Internal_ImplData();
 
-	auto const windowNodeIt = Std::FindIf(
-		windowNodes.begin(),
-		windowNodes.end(),
-		[event](auto const& node) { return node.id == event.windowId; });
-	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != windowNodes.end());
-
-	auto& windowNode = *windowNodeIt;
+	auto windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
 
 	if (implData.cursorWindowId.HasValue())
 	{
@@ -307,13 +491,10 @@ void Context::PushEvent(WindowCursorExitEvent const& event)
 
 void Context::PushEvent(WindowFocusEvent const& event)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = Internal_ImplData();
 	auto& windowNodes = implData.windows;
 
-	auto const windowNodeIt = Std::FindIf(
-		windowNodes.begin(),
-		windowNodes.end(),
-		[event](auto const& node) { return node.id == event.windowId; });
+	auto const windowNodeIt = impl::GetWindowNodeIt(windowNodes, event.windowId);
 	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != windowNodes.end());
 
 	if (event.gainedFocus)
@@ -329,36 +510,48 @@ void Context::PushEvent(WindowFocusEvent const& event)
 
 void Context::PushEvent(WindowMoveEvent const& event)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = Internal_ImplData();
 	auto& windowNodes = implData.windows;
 
-	auto const windowNodeIt = Std::FindIf(
-		windowNodes.begin(),
-		windowNodes.end(),
-		[event](auto const& node) { return node.id == event.windowId; });
-	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != windowNodes.end());
+	auto windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
 
-	auto& windowNode = *windowNodeIt;
 	windowNode.data.rect.position = event.position;
+}
+
+void Context::PushEvent(WindowResizeEvent const& event)
+{
+	auto& implData = Internal_ImplData();
+	auto& windowNodes = implData.windows;
+
+	auto windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+
+	windowNode.data.rect.extent = event.extent;
+	windowNode.data.visibleOffset = event.safeAreaOffset;
+	windowNode.data.visibleExtent = event.safeAreaExtent;
 }
 
 void Context::Render2(Render2_Params const& params) const
 {
-	auto const& implData = *static_cast<impl::ImplData const*>(pImplData);
-	auto& sizeHintColl = params.sizeHintCollection;
+	auto& implData = Internal_ImplData();
+	auto& textManager = *implData.textManager;
+	auto& rectCollection = params.rectCollection;
 	auto& transientAlloc = params.transientAlloc;
 
-	impl::BuildSizeHintCollection(
+	impl::BuildRectCollection(
 		*this,
-		implData,
-		sizeHintColl,
+		textManager,
+		rectCollection,
+		true,
 		transientAlloc);
 
 	for (auto const& windowNode : implData.windows)
 	{
 		if (windowNode.data.isMinimized || !windowNode.data.topLayout)
 			continue;
-		auto& widget = *windowNode.data.topLayout;
 
 		auto const& windowRect = windowNode.data.rect;
 		auto const& visibleOffset = windowNode.data.visibleOffset;
@@ -373,12 +566,14 @@ void Context::Render2(Render2_Params const& params) const
 			params.indices,
 			params.drawCmds };
 
-		RectCollection const rectCollection { sizeHintColl };
+		auto& widget = *windowNode.data.topLayout;
 
 		Widget::Render_Params const renderParams {
 			.ctx = *this,
+			.textManager = textManager,
 			.rectCollection = rectCollection,
 			.framebufferExtent = windowNode.data.rect.extent,
+			.transientAlloc = transientAlloc,
 			.drawInfo = drawInfo };
 
 		u32 const drawCmdOffset = params.drawCmds.size();
@@ -387,6 +582,20 @@ void Context::Render2(Render2_Params const& params) const
 			renderParams,
 			visibleRect,
 			visibleRect);
+
+		if (windowNode.frontmostLayer)
+		{
+			auto const& frontLayer = *windowNode.frontmostLayer;
+
+			Layer::Render_Params layerRenderParams {
+				.ctx = *this,
+				.textManager = textManager,
+				.windowRect = windowRect,
+				.safeAreaRect = visibleRect,
+				.rectCollection = rectCollection,
+				.drawInfo = drawInfo };
+			frontLayer.Render(layerRenderParams);
+		}
 
 		u32 const drawCmdCount = params.drawCmds.size() - drawCmdOffset;
 
@@ -408,7 +617,7 @@ void Context::AdoptWindow(
 	Extent visibleExtent,
 	Std::Box<Widget>&& widget)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = Internal_ImplData();
 
 	impl::WindowNode newNode = {};
 	newNode.id = id;
@@ -423,15 +632,29 @@ void Context::AdoptWindow(
 
 void Context::DestroyWindow(WindowID id)
 {
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
+	auto& implData = Internal_ImplData();
 	auto& windows = implData.windows;
-	auto windowNodeIt = Std::FindIf(
-		windows.begin(),
-		windows.end(),
-		[id](auto const& element) { return element.id == id; });
+	auto windowNodeIt = impl::GetWindowNodeIt(windows, id);
 	DENGINE_IMPL_GUI_ASSERT(windowNodeIt != windows.end());
 
 	windows.erase(windowNodeIt);
+}
+
+void Context::PushPostEventJob_Inner(
+	int size,
+	int alignment,
+	PostEventJob_InvokeFnT invokeFn,
+	void const* callablePtr,
+	PostEventJob_InitCallableFnT initCallableFn)
+{
+	auto& implData = Internal_ImplData();
+	Impl::PostEventJob newJob = {};
+	newJob.invokeFn = invokeFn;
+	newJob.ptr = implData.postEventAlloc.Alloc(size, alignment);
+	// Initialize the memory
+	initCallableFn(newJob.ptr, callablePtr);
+
+	implData.postEventJobs.emplace_back(newJob);
 }
 
 /*
@@ -655,172 +878,3 @@ void Context::Render(
 	}
 }
 */
-
-namespace DEngine::Gui::impl
-{
-	TextManager::GlyphData LoadNewGlyph(
-		TextManager& manager,
-		u32 utfValue)
-	{
-		if (utfValue == 0)
-			return TextManager::GlyphData{};
-
-		// Load glyph data
-		FT_UInt glyphIndex = FT_Get_Char_Index(manager.face, utfValue);
-		if (glyphIndex == 0) // 0 is an error index
-			//throw std::runtime_error("Unable to load glyph index");
-			return TextManager::GlyphData{};
-
-		FT_Error ftError = FT_Load_Glyph(
-			manager.face,
-			glyphIndex,
-			FT_LOAD_DEFAULT);
-		if (ftError != FT_Err_Ok)
-			throw std::runtime_error("Unable to load glyph");
-
-		ftError = FT_Render_Glyph(manager.face->glyph, FT_RENDER_MODE_NORMAL);
-		if (ftError != FT_Err_Ok)
-			throw std::runtime_error("Unable to render glyph");
-
-		if (manager.face->glyph->bitmap.buffer != nullptr)
-		{
-			manager.gfxCtx->NewFontTexture(
-				utfValue,
-				manager.face->glyph->bitmap.width,
-				manager.face->glyph->bitmap.rows,
-				manager.face->glyph->bitmap.pitch,
-				{ (std::byte const*)manager.face->glyph->bitmap.buffer,
-					(uSize)manager.face->glyph->bitmap.pitch * manager.face->glyph->bitmap.rows });
-		}
-
-		TextManager::GlyphData newData{};
-		newData.hasBitmap = manager.face->glyph->bitmap.buffer != nullptr;
-		newData.bitmapWidth = manager.face->glyph->bitmap.width;
-		newData.bitmapHeight = manager.face->glyph->bitmap.rows;
-		newData.advanceX = manager.face->glyph->advance.x / 64;
-		newData.posOffset = Math::Vec2Int{ (i32)manager.face->glyph->metrics.horiBearingX / 64, (i32)-manager.face->glyph->metrics.horiBearingY / 64 };
-		return newData;
-	}
-
-	TextManager::GlyphData const& GetGlyphData(
-		TextManager& manager,
-		u32 utfValue)
-	{
-		if (utfValue < manager.lowGlyphDatas.Size())
-		{
-			// ASCII values are already loaded, so don't need to check if it is.
-			return manager.lowGlyphDatas[utfValue];
-		}
-		else
-		{
-			auto glyphDataIt = manager.glyphDatas.find(utfValue);
-			if (glyphDataIt == manager.glyphDatas.end())
-			{
-				glyphDataIt = manager.glyphDatas.insert(std::pair{ utfValue, LoadNewGlyph(manager, utfValue) }).first;
-			}
-
-			return glyphDataIt->second;
-		}
-	}
-}
-
-void Gui::impl::TextManager::Initialize(
-	TextManager& manager,
-	Gfx::Context* gfxCtx)
-{
-	manager.gfxCtx = gfxCtx;
-	FT_Error ftError = FT_Init_FreeType(&manager.ftLib);
-	if (ftError != FT_Err_Ok)
-		throw std::runtime_error("DEngine - Editor: Unable to initialize FreeType");
-
-	App::FileInputStream fontFile("data/gui/Roboto-Regular.ttf");
-	if (!fontFile.IsOpen())
-		throw std::runtime_error("DEngine - Editor: Unable to open font file.");
-	fontFile.Seek(0, App::FileInputStream::SeekOrigin::End);
-	u64 fileSize = fontFile.Tell().Value();
-	manager.fontFileData.resize(fileSize);
-	fontFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-	fontFile.Read((char*)manager.fontFileData.data(), fileSize);
-	fontFile.Close();
-
-	ftError = FT_New_Memory_Face(
-		manager.ftLib,
-		(FT_Byte const*)manager.fontFileData.data(),
-		(FT_Long)fileSize,
-		0,
-		&manager.face);
-	if (ftError != FT_Err_Ok)
-		throw std::runtime_error("DEngine - Editor: Unable to load font");
-
-	ftError = FT_Set_Char_Size(
-		manager.face,    /* handle to face object           */
-		0,       /* char_width in 1/64th of points  */
-		52 * 64,   /* char_height in 1/64th of points */
-		0,     /* horizontal device resolution    */
-		0);   /* vertical device resolution      */
-	if (ftError != FT_Err_Ok)
-		throw std::runtime_error("DEngine - Editor: Unable to set pixel sizes");
-
-	manager.lineheight = manager.face->size->metrics.height / 64;
-	manager.lineMinY = Math::Abs((i32)manager.face->bbox.yMin / 64);
-
-
-	// Load all ASCII characters.
-	for (uSize i = 0; i < manager.lowGlyphDatas.Size(); i += 1)
-		manager.lowGlyphDatas[i] = impl::LoadNewGlyph(manager, (u32)i);
-}
-
-void Gui::impl::TextManager::RenderText(
-	TextManager& manager,
-	Std::Span<char const> string,
-	Math::Vec4 color,
-	Rect widgetRect,
-	DrawInfo& drawInfo)
-{
-	Math::Vec2Int penPos = widgetRect.position;
-	penPos.y += manager.lineheight;
-	penPos.y -= manager.lineMinY;
-
-	for (uSize i = 0; i < string.Size(); i += 1)
-	{
-		u32 glyphChar = string[i];
-		GlyphData const& glyphData = GetGlyphData(manager, glyphChar);
-		if (glyphData.hasBitmap)
-		{
-			// This holds the top-left position of the glyph.
-			Math::Vec2Int glyphPos = penPos;
-			glyphPos += glyphData.posOffset;
-
-			Gfx::GuiDrawCmd cmd = {};
-			cmd.type = Gfx::GuiDrawCmd::Type::TextGlyph;
-			cmd.textGlyph.utfValue = glyphChar;
-			cmd.textGlyph.color = color;
-			cmd.rectPosition.x = (f32)glyphPos.x / drawInfo.GetFramebufferExtent().width;
-			cmd.rectPosition.y = (f32)glyphPos.y / drawInfo.GetFramebufferExtent().height;
-			cmd.rectExtent.x = (f32)glyphData.bitmapWidth / drawInfo.GetFramebufferExtent().width;
-			cmd.rectExtent.y = (f32)glyphData.bitmapHeight / drawInfo.GetFramebufferExtent().height;
-
-			drawInfo.drawCmds->push_back(cmd);
-		}
-
-		penPos.x += glyphData.advanceX;
-	}
-}
-
-SizeHint Gui::impl::TextManager::GetSizeHint(
-	TextManager& manager,
-	Std::Span<char const> str)
-{
-	SizeHint returnVar = {};
-	returnVar.preferred.height = manager.lineheight;
-	
-	// Iterate over the string, find the bounding box width
-	for (uSize i = 0; i < str.Size(); i += 1)
-	{
-		u32 glyphChar = str[i];
-		GlyphData const& glyphData = GetGlyphData(manager, glyphChar);
-		returnVar.preferred.width += glyphData.advanceX;
-	}
-
-	return returnVar;
-}

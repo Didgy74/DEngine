@@ -50,13 +50,17 @@ set(DENGINE_GFX_SOURCE_FILES
 # Gui
 set(DENGINE_GUI_SOURCE_FILES
 
+		src/DEngine/Gui/Context.cpp
+		src/DEngine/Gui/TextManager.cpp
+
+		# Widgets
 		src/DEngine/Gui/AnchorArea.cpp
 		src/DEngine/Gui/Button.cpp
 		src/DEngine/Gui/ButtonGroup.cpp
 		src/DEngine/Gui/CollapsingHeader.cpp
-		src/DEngine/Gui/Context.cpp
 		src/DEngine/Gui/DockArea.cpp
 		src/DEngine/Gui/Dropdown.cpp
+		src/DEngine/Gui/Grid.cpp
 		src/DEngine/Gui/Image.cpp
 		src/DEngine/Gui/LineEdit.cpp
 		src/DEngine/Gui/LineFloatEdit.cpp
@@ -65,6 +69,7 @@ set(DENGINE_GUI_SOURCE_FILES
 		src/DEngine/Gui/ScrollArea.cpp
 		src/DEngine/Gui/StackLayout.cpp
 		src/DEngine/Gui/Text.cpp
+
 
 		)
 
@@ -124,10 +129,5 @@ set(DENGINE_ANY_SOURCE_FILES2
 		${DENGINE_GFX_SOURCE_FILES}
 		${DENGINE_MATH_SOURCE_FILES}
 		${DENGINE_STD_SOURCE_FILES}
-
-		src/DEngine/Gui/Context.cpp
-		src/DEngine/Gui/Button.cpp
-		src/DEngine/Gui/ScrollArea.cpp
-		src/DEngine/Gui/StackLayout.cpp
-
+		${DENGINE_GUI_SOURCE_FILES}
 		)

@@ -9,6 +9,7 @@
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
+#include <DEngine/Std/Containers/Fn.hpp>
 #include <DEngine/Std/Containers/Variant.hpp>
 
 #include <DEngine/Application.hpp>
@@ -27,10 +28,11 @@ namespace DEngine::Editor
 			Gui::CharRemoveEvent,
 			Gui::CursorPressEvent,
 			Gui::CursorMoveEvent,
+			Gui::TextInputEvent,
 			Gui::TouchPressEvent,
 			Gui::TouchMoveEvent,
 			Gui::WindowCloseEvent,
-			Gui::WindowCursorEnterEvent,
+			Gui::WindowCursorExitEvent,
 			Gui::WindowMinimizeEvent,
 			Gui::WindowMoveEvent,
 			Gui::WindowResizeEvent>;
@@ -44,25 +46,38 @@ namespace DEngine::Editor
 	class EditorImpl : public App::EventForwarder, public Gui::WindowHandler
 	{
 	public:
+		App::Context* appCtx = nullptr;
 		Std::Box<Gui::Context> guiCtx;
+		Std::FrameAlloc guiTransientAlloc = Std::FrameAlloc::PreAllocate(1024 * 1024).Value();
+		Gui::RectCollection guiRectCollection;
 
-		void FlushQueuedEvents();
+		void FlushQueuedEventsToGui();
 
 		// Override app-interface methods
 		virtual void ButtonEvent(
+			App::WindowID windowId,
 			App::Button button,
 			bool state) override;
 		virtual void CharEnterEvent() override;
 		virtual void CharEvent(u32 utfValue) override;
-		virtual void CharRemoveEvent() override;
+		virtual void CharRemoveEvent(App::WindowID windowId) override;
 		virtual void CursorMove(
+			App::Context& appCtx,
+			App::WindowID windowId,
 			Math::Vec2Int position,
 			Math::Vec2Int positionDelta) override;
+		virtual void TextInputEvent(
+			App::Context& ctx,
+			App::WindowID windowId,
+			uSize oldIndex,
+			uSize oldCount,
+			Std::Span<u32 const> newString) override;
 		virtual void TouchEvent(
 			u8 id,
 			App::TouchEventType type,
 			Math::Vec2 position) override;
-		virtual void WindowClose(
+		virtual bool WindowCloseSignal(
+			App::Context& appCtx,
 			App::WindowID window) override;
 		virtual void WindowCursorEnter(
 			App::WindowID window,
@@ -74,18 +89,20 @@ namespace DEngine::Editor
 			App::WindowID window,
 			Math::Vec2Int position) override;
 		virtual void WindowResize(
+			App::Context& appCtx,
 			App::WindowID window,
 			App::Extent extent,
-			Math::Vec2Int visiblePos,
+			Math::Vec2UInt visibleOffset,
 			App::Extent visibleExtent) override;
-		
+
 		std::vector<impl::GuiEvent_T> queuedGuiEvents;
+		std::vector<u32> guiQueuedTextInputData;
 
 		// Override window-handler methods
 		virtual void CloseWindow(Gui::WindowID) override;
 		virtual void SetCursorType(Gui::WindowID, Gui::CursorType) override;
 		virtual void HideSoftInput() override;
-		virtual void OpenSoftInput(Std::Str, Gui::SoftInputFilter) override;
+		virtual void OpenSoftInput(Std::Span<char const>, Gui::SoftInputFilter) override;
 
 
 		std::vector<Gfx::GuiVertex> vertices;
@@ -102,12 +119,11 @@ namespace DEngine::Editor
 		Scene* scene = nullptr;
 		Std::Box<Scene> tempScene;
 		Scene& GetActiveScene();
-		Scene const& GetActiveScene() const;
 		void BeginSimulating();
 		void StopSimulating();
 
 		Gui::Text* test_fpsText = nullptr;
-		
+
 		EntityIdList* entityIdList = nullptr;
 		ComponentList* componentList = nullptr;
 		Gui::MenuButton* viewMenuButton = nullptr;
@@ -115,6 +131,7 @@ namespace DEngine::Editor
 		Gui::ButtonGroup* gizmoTypeBtnGroup = nullptr;
 		std::vector<ViewportWidget*> viewportWidgets;
 		void SelectEntity(Entity id);
+		void SelectEntity_MidDispatch(Entity id, Gui::Context& ctx);
 		void UnselectEntity();
 		[[nodiscard]] Std::Opt<Entity> const& GetSelectedEntity() const { return selectedEntity; }
 

@@ -5,7 +5,12 @@
 #include <DEngine/Std/Trait.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 
-namespace DEngine::Std::impl { struct VecPlacementNewTag {}; }
+namespace DEngine::Std::impl
+{
+	struct VecPlacementNewTag {};
+	template<class T>
+	constexpr bool Vec_isMovable = Trait::isMoveConstructible<T> && Trait::isMoveAssignable<T>;
+}
 constexpr void* operator new(
 	decltype(sizeof(int)) size,
 	void* data,
@@ -16,16 +21,13 @@ constexpr void* operator new(
 
 namespace DEngine::Std
 {
-	template<class T, class Allocator = Std::DefaultAllocator> requires (Trait::isMoveConstructible<T>)
+	template<class T, class AllocatorT = Std::DefaultAllocator> requires (impl::Vec_isMovable<T>)
 	class Vec
 	{
 	public:
-		Vec() noexcept requires (Allocator::stateless)
-		{
-
-		}
+		Vec() noexcept requires (AllocatorT::stateless) {}
 		Vec(Vec const&) = delete;
-		explicit Vec(Allocator& alloc) noexcept:
+		explicit Vec(AllocatorT& alloc) noexcept:
 			alloc{ &alloc }
 		{}
 
@@ -36,9 +38,9 @@ namespace DEngine::Std
 			alloc{ other.alloc }
 		{
 			other.data = nullptr;
-			//other.count = 0;
-			//other.capacity = 0;
-			//other.alloc = 0;
+			other.count = 0;
+			other.capacity = 0;
+			other.alloc = nullptr;
 		}
 
 		~Vec() noexcept
@@ -59,13 +61,18 @@ namespace DEngine::Std
 			other.data = nullptr;
 		}
 
+		[[nodiscard]] AllocatorT const& Allocator() const noexcept { return *alloc; }
+
 		[[nodiscard]] bool Empty() const noexcept { return count == 0; }
 		void Clear() noexcept
 		{
 			if (data)
 			{
-				for (auto i = 0; i < count; i += 1)
-					data[i].~T();
+				if constexpr (!Trait::isTriviallyDestructible<T>)
+				{
+					for (auto i = 0; i < count; i += 1)
+						data[i].~T();
+				}
 				alloc->Free(data);
 				data = nullptr;
 			}
@@ -116,16 +123,51 @@ namespace DEngine::Std
 
 			if (newSize > count)
 			{
-				for (uSize i = count; i < newSize; i += 1)
-					new(data + i, impl::VecPlacementNewTag{}) T;
+				if constexpr (!Trait::isTriviallyDefaultConstructible<T>)
+				{
+					for (uSize i = count; i < newSize; i += 1)
+						new(data + i, impl::VecPlacementNewTag{}) T;
+				}
 			}
 			else if (newSize < count)
 			{
-				for (uSize i = newSize; i < count; i += 1)
-					data[i].~T();
+				if constexpr (!Trait::isTriviallyDestructible<T>)
+				{
+					for (uSize i = newSize; i < count; i += 1)
+						data[i].~T();
+				}
 			}
 
 			count = newSize;
+		}
+
+		void EraseBack() noexcept
+		{
+			DENGINE_IMPL_CONTAINERS_ASSERT(count > 0);
+			if constexpr (!Trait::isTriviallyDestructible<T>)
+				data[count - 1].~T();
+			count -= 1;
+		}
+
+		void Erase(uSize index) noexcept
+		{
+			DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
+				index < count,
+				"Attempted to .Erase() a Vec with an out-of-bounds index.");
+			for (uSize i = index; i < count - 1; i += 1)
+				data[i] = static_cast<T&&>(data[i + 1]);
+			if constexpr (!Trait::isTriviallyDestructible<T>)
+				data[count - 1].~T();
+			count -= 1;
+		}
+
+		void EraseUnsorted(uSize i) noexcept
+		{
+			DENGINE_IMPL_CONTAINERS_ASSERT(i < count);
+			data[i] = static_cast<T&&>(data[count - 1]);
+			if constexpr (!Trait::isTriviallyDestructible<T>)
+				data[count - 1].~T();
+			count -= 1;
 		}
 
 		[[nodiscard]] T& At(uSize i) noexcept
@@ -165,7 +207,7 @@ namespace DEngine::Std
 		T* data = nullptr;
 		uSize count = 0;
 		uSize capacity = 0;
-		Allocator* alloc = nullptr;
+		AllocatorT* alloc = nullptr;
 
 		bool Grow(uSize newCapacity) noexcept
 		{
@@ -187,7 +229,8 @@ namespace DEngine::Std
 					for (uSize i = 0; i < count; i++)
 					{
 						new(data + i, impl::VecPlacementNewTag{}) T(static_cast<T&&>(oldData[i]));
-						oldData[i].~T();
+						if constexpr (!Trait::isTriviallyDestructible<T>)
+							oldData[i].~T();
 					}
 					alloc->Free(oldData);
 				}
@@ -199,6 +242,6 @@ namespace DEngine::Std
 		}
 	};
 
-	template<class T, class Allocator>
-	inline Std::Vec<T, Allocator> MakeVec(Allocator& alloc) noexcept { return Std::Vec<T, Allocator>{ alloc }; }
+	template<class T, class AllocatorT>
+	inline Std::Vec<T, AllocatorT> MakeVec(AllocatorT& alloc) noexcept { return Std::Vec<T, AllocatorT>{ alloc }; }
 }

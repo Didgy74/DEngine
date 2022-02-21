@@ -3,14 +3,17 @@
 using namespace DEngine;
 using namespace DEngine::Editor;
 
+
+
 void Editor::EditorImpl::ButtonEvent(
+	App::WindowID windowId,
 	App::Button button,
 	bool state)
 {
 	if (button == App::Button::LeftMouse || button == App::Button::RightMouse)
 	{
-		Gui::CursorClickEvent event = {};
-		event.clicked = state;
+		Gui::CursorPressEvent event = {};
+		event.pressed = state;
 
 		if (button == App::Button::LeftMouse)
 			event.button = Gui::CursorButton::Primary;
@@ -35,19 +38,44 @@ void Editor::EditorImpl::CharEvent(
 	queuedGuiEvents.emplace_back(event);
 }
 
-void Editor::EditorImpl::CharRemoveEvent()
+void Editor::EditorImpl::CharRemoveEvent(App::WindowID windowId)
 {
 	Gui::CharRemoveEvent event = {};
-	queuedGuiEvents.push_back(event);
+	event.windowId = (Gui::WindowID)windowId;
+	queuedGuiEvents.emplace_back(event);
 }
 
 void Editor::EditorImpl::CursorMove(
+	App::Context& appCtx,
+	App::WindowID windowId,
 	Math::Vec2Int position,
 	Math::Vec2Int positionDelta)
 {
 	Gui::CursorMoveEvent event = {};
 	event.position = position;
 	event.positionDelta = positionDelta;
+	queuedGuiEvents.emplace_back(event);
+}
+
+void EditorImpl::TextInputEvent(
+	App::Context& ctx,
+	App::WindowID windowId,
+	uSize oldIndex,
+	uSize oldCount,
+	Std::Span<u32 const> newString)
+{
+	auto oldSize = guiQueuedTextInputData.size();
+	guiQueuedTextInputData.resize(oldSize + newString.Size());
+	for (int i = 0; i < newString.Size(); i += 1)
+		guiQueuedTextInputData[i + oldSize] = newString[i];
+
+	Gui::TextInputEvent event = {};
+	event.windowId = (Gui::WindowID)windowId;
+	event.oldIndex = oldIndex;
+	event.oldCount = oldCount;
+	event.newTextData = (u32 const*)oldSize;
+	event.newTextSize = newString.Size();
+
 	queuedGuiEvents.emplace_back(event);
 }
 
@@ -73,21 +101,27 @@ void Editor::EditorImpl::TouchEvent(
 	}
 }
 
-void Editor::EditorImpl::WindowClose(App::WindowID windowId)
+bool Editor::EditorImpl::WindowCloseSignal(
+	App::Context& appCtx,
+	App::WindowID window)
 {
 	Gui::WindowCloseEvent event = {};
-	event.windowId = (Gui::WindowID)windowId;
+	event.windowId = (Gui::WindowID)window;
 	queuedGuiEvents.emplace_back(event);
+
+	return false;
 }
 
 void Editor::EditorImpl::WindowCursorEnter(
 	App::WindowID window,
 	bool entered)
 {
-	Gui::WindowCursorEnterEvent event = {};
-	event.windowId = (Gui::WindowID)window;
-	event.entered = entered;
-	queuedGuiEvents.emplace_back(event);
+	if (!entered)
+	{
+		Gui::WindowCursorExitEvent event = {};
+		event.windowId = (Gui::WindowID)window;
+		queuedGuiEvents.emplace_back(event);
+	}
 }
 
 void Editor::EditorImpl::WindowMinimize(
@@ -111,26 +145,28 @@ void Editor::EditorImpl::WindowMove(
 }
 
 void Editor::EditorImpl::WindowResize(
+	App::Context& appCtx,
 	App::WindowID window,
-	App::Extent newExtent,
-	Math::Vec2Int visiblePos,
-	App::Extent visibleSize)
+	App::Extent extent,
+	Math::Vec2UInt visibleOffset,
+	App::Extent visibleExtent)
 {
 	Gui::WindowResizeEvent event = {};
 	event.windowId = (Gui::WindowID)window;
-	event.extent = Gui::Extent{ newExtent.width, newExtent.height };
-	event.visibleRect = Gui::Rect{ visiblePos, Gui::Extent{ visibleSize.width, visibleSize.height } };
+	event.extent = { extent.width, extent.height };
+	event.safeAreaOffset = visibleOffset;
+	event.safeAreaExtent = { visibleExtent.width, visibleExtent.height };
 	queuedGuiEvents.emplace_back(event);
 }
 
 void Editor::EditorImpl::CloseWindow(Gui::WindowID id)
 {
-	App::DestroyWindow((App::WindowID)id);
+	appCtx->DestroyWindow((App::WindowID)id);
 }
 
 void Editor::EditorImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursorType)
 {
-	App::CursorType appCursorType{};
+	App::CursorType appCursorType = {};
 	switch (cursorType)
 	{
 	case Gui::CursorType::Arrow:
@@ -146,16 +182,17 @@ void Editor::EditorImpl::SetCursorType(Gui::WindowID id, Gui::CursorType cursorT
 		DENGINE_IMPL_UNREACHABLE();
 		break;
 	}
-	App::SetCursor((App::WindowID)id, appCursorType);
+
+	appCtx->SetCursor((App::WindowID)id, appCursorType);
 }
 
 void Editor::EditorImpl::HideSoftInput()
 {
-	App::HideSoftInput();
+	appCtx->StopTextInputSession();
 }
 
 void Editor::EditorImpl::OpenSoftInput(
-	Std::Str currentText,
+	Std::Span<char const> text,
 	Gui::SoftInputFilter inputFilter)
 {
 	App::SoftInputFilter filter{};
@@ -176,5 +213,69 @@ void Editor::EditorImpl::OpenSoftInput(
 	default:
 		DENGINE_IMPL_UNREACHABLE();
 	}
-	App::OpenSoftInput(currentText, filter);
+
+	appCtx->StartTextInputSession(filter, text);
+}
+
+void Editor::EditorImpl::FlushQueuedEventsToGui()
+{
+	for (auto const& event : queuedGuiEvents)
+	{
+		using EventT = Std::Trait::RemoveCVRef<decltype(event)>;
+
+		switch (event.GetIndex())
+		{
+			case EventT::indexOf<Gui::CharEnterEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CharEnterEvent>());
+				break;
+			case EventT::indexOf<Gui::CharEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CharEvent>());
+				break;
+			case EventT::indexOf<Gui::CharRemoveEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CharRemoveEvent>());
+				break;
+			case EventT::indexOf<Gui::CursorPressEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CursorPressEvent>());
+				break;
+			case EventT::indexOf<Gui::CursorMoveEvent>:
+				guiCtx->PushEvent(event.Get<Gui::CursorMoveEvent>());
+				break;
+			case EventT::indexOf<Gui::TextInputEvent>:
+			{
+				auto test = event.Get<Gui::TextInputEvent>();
+				test.newTextData = guiQueuedTextInputData.data() + (uSize)test.newTextData;
+				guiCtx->PushEvent(test);
+				break;
+			}
+			case EventT::indexOf<Gui::TouchPressEvent>:
+				//guiCtx->PushEvent(event.Get<Gui::TouchPressEvent>());
+				break;
+			case EventT::indexOf<Gui::TouchMoveEvent>:
+				//guiCtx->PushEvent(event.Get<Gui::TouchMoveEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowCloseEvent>:
+				//guiCtx->PushEvent(event.Get<Gui::WindowCloseEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowCursorExitEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowCursorExitEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowMinimizeEvent>:
+				//guiCtx->PushEvent(event.Get<Gui::WindowMinimizeEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowMoveEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowMoveEvent>());
+				break;
+			case EventT::indexOf<Gui::WindowResizeEvent>:
+				guiCtx->PushEvent(event.Get<Gui::WindowResizeEvent>());
+				break;
+
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				break;
+		}
+
+		InvalidateRendering();
+	}
+	queuedGuiEvents.clear();
+	guiQueuedTextInputData.clear();
 }

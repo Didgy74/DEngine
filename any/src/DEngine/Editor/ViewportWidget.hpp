@@ -8,6 +8,7 @@
 #include <DEngine/Gui/StackLayout.hpp>
 #include <DEngine/Gui/Widget.hpp>
 #include <DEngine/Gui/Button.hpp>
+#include <DEngine/Gui/AnchorArea.hpp>
 
 #include <DEngine/Std/Utility.hpp>
 
@@ -65,18 +66,20 @@ namespace DEngine::Editor
 			Gui::Extent viewportSize) noexcept;
 	}
 
-	class InternalViewportWidget : public Gui::Widget
+	class InternalViewportWidget;
+
+	class ViewportWidget : public Gui::AnchorArea
 	{
 	public:
-		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
+		ViewportWidget(EditorImpl& implData);
+		~ViewportWidget();
+
 		EditorImpl* editorImpl = nullptr;
+		InternalViewportWidget* viewport = nullptr;
+		Joystick* leftJoystick = nullptr;
+		Joystick* rightJoystick = nullptr;
 
-		mutable bool isVisible = false;
-
-		Gui::Extent currentExtent = {};
-		mutable Gui::Extent newExtent = {};
-		mutable bool currentlyResizing = false;
-		u32 extentCorrectTickCounter = 0;
+		f32 joystickMovementSpeed = 2.5f;
 
 		enum class BehaviorState : u8
 		{
@@ -84,7 +87,7 @@ namespace DEngine::Editor
 			FreeLooking,
 			Gizmo,
 		};
-		BehaviorState state = BehaviorState::Normal;
+
 		struct HoldingGizmoData
 		{
 			u8 pointerId;
@@ -98,7 +101,6 @@ namespace DEngine::Editor
 			// Current rotation offset from the pointer. In radians [-pi, pi]
 			f32 rotationOffset;
 		};
-		Std::Opt<HoldingGizmoData> holdingGizmoData;
 
 		struct Camera
 		{
@@ -106,7 +108,28 @@ namespace DEngine::Editor
 			Math::UnitQuat rotation = Math::UnitQuat::FromEulerAngles(0, 180.f, 0.f);
 			f32 verticalFov = 60.f;
 		};
-		Camera cam = {};
+
+		void Tick(float deltaTime) noexcept;
+	};
+
+	class InternalViewportWidget : public Gui::Widget
+	{
+	public:
+		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
+		EditorImpl* editorImpl = nullptr;
+
+		mutable bool isVisible = false;
+
+		Gui::Extent currentExtent = {};
+		mutable Gui::Extent newExtent = {};
+		mutable bool currentlyResizing = false;
+		u32 extentCorrectTickCounter = 0;
+
+		ViewportWidget::BehaviorState state = ViewportWidget::BehaviorState::Normal;
+
+		Std::Opt<ViewportWidget::HoldingGizmoData> holdingGizmoData;
+
+		ViewportWidget::Camera cam = {};
 
 		InternalViewportWidget(EditorImpl& implData);
 
@@ -124,9 +147,15 @@ namespace DEngine::Editor
 		void Tick() noexcept;
 
 		Gfx::ViewportUpdate GetViewportUpdate(
-			Context const& editor,
 			std::vector<Math::Vec3>& lineVertices,
 			std::vector<Gfx::LineDrawCmd>& lineDrawCmds) const noexcept;
+
+		virtual Gui::SizeHint GetSizeHint2(
+			GetSizeHint2_Params const& params) const override;
+		virtual void Render2(
+			Render_Params const& params,
+			Gui::Rect const& widgetRect,
+			Gui::Rect const& visibleRect) const override;
 
 		virtual bool CursorPress(
 			Gui::Context& ctx,
@@ -168,21 +197,5 @@ namespace DEngine::Editor
 			Gui::Rect widgetRect,
 			Gui::Rect visibleRect,
 			Gui::DrawInfo& drawInfo) const override;
-	};
-
-	class ViewportWidget : public Gui::StackLayout 
-	{
-	public:
-		ViewportWidget(EditorImpl& implData);
-		~ViewportWidget();
-
-		EditorImpl* editorImpl = nullptr;
-		InternalViewportWidget* viewport = nullptr;
-		Joystick* leftJoystick = nullptr;
-		Joystick* rightJoystick = nullptr;
-
-		f32 joystickMovementSpeed = 2.5f;
-
-		void Tick(float deltaTime) noexcept;
 	};
 }

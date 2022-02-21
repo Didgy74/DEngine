@@ -200,8 +200,11 @@ namespace DEngine::Std
 	template<typename T, uSize capacity>
 	void StackVec<T, capacity>::Clear()
 	{
-		for (uSize i = 0; i < size; i += 1)
-			values[i].~T();
+		if constexpr (!Trait::isTriviallyDestructible<T>)
+		{
+			for (uSize i = 0; i < size; i += 1)
+				values[i].~T();
+		}
 		size = 0;
 	}
 
@@ -213,7 +216,8 @@ namespace DEngine::Std
 			"Attempted to .Erase() a StackVec with an out-of-bounds index.");
 		for (uSize i = index; i < size - 1; i += 1)
 			values[i] = static_cast<T&&>(values[i + 1]);
-		values[size - 1].~T();
+		if constexpr (!Trait::isTriviallyDestructible<T>)
+			values[size - 1].~T();
 		size -= 1;
 	}
 

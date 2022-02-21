@@ -1,4 +1,4 @@
-function(SetupAssertDefines TARGET VALUE)
+function(DEngineAny_SetupAssertDefines TARGET VALUE)
 
 	option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ${VALUE})
 	if (${DENGINE_ENABLE_ASSERT})

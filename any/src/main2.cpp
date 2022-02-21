@@ -2,9 +2,10 @@
 #include <DEngine/Gfx/Gfx.hpp>
 
 #include <DEngine/Gui/Context.hpp>
-#include <DEngine/Gui/Button.hpp>
+#include <DEngine/Gui/Grid.hpp>
+#include <DEngine/Gui/Text.hpp>
+#include <DEngine/Gui/LineEdit.hpp>
 #include <DEngine/Gui/StackLayout.hpp>
-#include <DEngine/Gui/ScrollArea.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
@@ -137,7 +138,7 @@ namespace DEngine::impl
 		Gui::Context* guiCtx = nullptr;
 		Gfx::Context* gfxCtx = nullptr;
 
-		virtual void WindowCloseSignal(
+		virtual bool WindowCloseSignal(
 			App::Context& appCtx,
 			App::WindowID window) override
 		{
@@ -146,8 +147,8 @@ namespace DEngine::impl
 			// Then destroy the window in the renderer.
 			gfxCtx->DeleteNativeWindow((Gfx::NativeWindowID)window);
 
-			// Then destroy the window in the app layer.
-			appCtx.DestroyWindow(window);
+			// We return true to tell the appCtx to destroy the window.
+			return true;
 		}
 
 		virtual void WindowCursorEnter(
@@ -184,6 +185,21 @@ namespace DEngine::impl
 			guiCtx->PushEvent(event);
 		}
 
+		virtual void WindowResize(
+			App::Context& ctx,
+			App::WindowID window,
+			App::Extent extent,
+			Math::Vec2UInt visibleOffset,
+			App::Extent visibleExtent) override
+		{
+			Gui::WindowResizeEvent event = {};
+			event.windowId = (Gui::WindowID)window;
+			event.extent = { extent.width, extent.height };
+			event.safeAreaOffset = visibleOffset;
+			event.safeAreaExtent = { visibleExtent.width, visibleExtent.height };
+			guiCtx->PushEvent(event);
+		}
+
 		virtual void ButtonEvent(
 			App::WindowID windowId,
 			App::Button button,
@@ -200,6 +216,7 @@ namespace DEngine::impl
 		}
 
 		virtual void CursorMove(
+			App::Context& ctx,
 			App::WindowID windowId,
 			Math::Vec2Int position,
 			Math::Vec2Int positionDelta) override
@@ -216,12 +233,8 @@ namespace DEngine::impl
 		Gui::Context& guiCtx,
 		App::Context::NewWindow_ReturnT const& windowInfo)
 	{
-		auto* layout = new Gui::StackLayout;
-		//layout->direction = Gui::StackLayout::Direction::Vertical;
-		layout->direction = Gui::StackLayout::Direction::Horizontal;
-		//layout->padding = 25;
-		//layout->padding = 5;
-		layout->spacing = 10;
+		auto* outerGrid = new Gui::Grid;
+		outerGrid->SetWidth(4);
 
 		Gui::Rect windowRect = {
 			{ windowInfo.position.x, windowInfo.position.y },
@@ -234,72 +247,35 @@ namespace DEngine::impl
 			windowRect,
 			windowInfo.visibleOffset,
 			visibleExtent,
-			Std::Box{ layout });
-
-		auto* btnA = new Gui::Button;
-		layout->AddWidget(Std::Box{ btnA });
-		btnA->text = "A";
-		btnA->activateFn = [layout](Gui::Button& btn)
-		{
-			std::cout << "A pressed" << std::endl;
-
-			//layout->RemoveItem(1);
-
-			auto* midA = new Gui::Button;
-			layout->InsertWidget(1, Std::Box{ midA });
-			midA->text = "A";
-			midA->activateFn = [](auto& btn)
-			{
-				std::cout << "New pressed" << std::endl;
-			};
-		};
+			Std::Box{ outerGrid });
 
 		{
-			auto* scrollArea = new Gui::ScrollArea;
-			layout->AddWidget(Std::Box{ scrollArea });
+			auto rowIndex = outerGrid->PushBackRow();
 
-			auto* middleLayout = new Gui::StackLayout;
-			scrollArea->child = Std::Box{middleLayout };
-			//middleLayout->padding = 10;
-			middleLayout->spacing = 10;
-			//middleLayout->direction = Gui::StackLayout::Direction::Horizontal;
-			middleLayout->direction = Gui::StackLayout::Direction::Vertical;
+			auto* a = new Gui::Text;
+			outerGrid->SetChild(0, rowIndex, Std::Box{ a });
+			a->text = "Text A:";
+			a->expandX = false;
 
-			auto* midA = new Gui::Button;
-			middleLayout->AddWidget(Std::Box{ midA });
-			midA->text = "AAAAAAA";
-			midA->activateFn = [](Gui::Button& btn)
+			for (int i = 1; i < 4; i += 1)
 			{
-				std::cout << "Middle A pressed" << std::endl;
-			};
-
-			auto* midB = new Gui::Button;
-			middleLayout->AddWidget(Std::Box{ midB });
-			midB->text = "A";
-			midB->activateFn = [](Gui::Button& btn)
-			{
-				std::cout << "Middle B pressed" << std::endl;
-			};
-
-			for (int i = 0; i < 5; i++)
-			{
-				auto* midB = new Gui::Button;
-				middleLayout->AddWidget(Std::Box{ midB });
-				midB->text = std::to_string(i);
-				midB->activateFn = [i](Gui::Button& btn)
-				{
-					std::cout << "Middle " << i << "pressed" << std::endl;
-				};
+				auto* temp = new Gui::LineEdit;
+				outerGrid->SetChild(i, rowIndex, Std::Box{ temp });
+				temp->text = "0.000";
 			}
 		}
-
-		auto* btnB = new Gui::Button;
-		layout->AddWidget(Std::Box{ btnB });
-		btnB->text = "ASSSSSSeeeeeeexxx";
-		btnB->activateFn = [](Gui::Button& btn)
 		{
-			std::cout << "B pressed" << std::endl;
-		};
+			auto rowIndex = outerGrid->PushBackRow();
+
+			auto* a = new Gui::Text;
+			outerGrid->SetChild(0, rowIndex, Std::Box{ a });
+			a->text = "B:";
+			a->expandX = false;
+
+			auto* temp = new Gui::LineEdit;
+			outerGrid->SetChild(1, rowIndex, Std::Box{ temp });
+			temp->text = "0.000";
+		}
 	}
 
 	void SetupWindowB(App::Context& appCtx, Gui::Context& guiCtx, Gfx::Context& gfxCtx)
@@ -314,66 +290,6 @@ namespace DEngine::impl
 		//layout->padding = 5;
 		layout->spacing = 10;
 
-		guiCtx.AdoptWindow(
-			(Gui::WindowID)windowInfo.windowId,
-			{ 0.f, 0.25f, 0.f, 1.f },
-			{ windowInfo.position, { windowInfo.extent.width, windowInfo.extent.height } },
-			{ (u32)windowInfo.visibleOffset.x, (u32)windowInfo.visibleOffset.y },
-			{ windowInfo.visibleExtent.width, windowInfo.visibleExtent.height },
-			Std::Box{ layout });
-
-		gfxCtx.AdoptNativeWindow((Gfx::NativeWindowID) windowInfo.windowId);
-
-		auto* btnA = new Gui::Button;
-		layout->AddWidget(Std::Box{ btnA });
-		btnA->text = "A";
-		btnA->activateFn = [layout](Gui::Button& btn)
-		{
-			std::cout << "A pressed" << std::endl;
-
-			//layout->RemoveItem(1);
-
-			auto* midA = new Gui::Button;
-			layout->InsertWidget(1, Std::Box{ midA });
-			midA->text = "A";
-			midA->activateFn = [](auto& btn)
-			{
-				std::cout << "New pressed" << std::endl;
-			};
-		};
-
-		{
-			auto* middleLayout = new Gui::StackLayout;
-			layout->AddWidget(Std::Box{ middleLayout });
-			//middleLayout->padding = 10;
-			middleLayout->spacing = 10;
-			middleLayout->direction = Gui::StackLayout::Direction::Horizontal;
-			//middleLayout->direction = Gui::StackLayout::Direction::Vertical;
-
-			auto* midA = new Gui::Button;
-			middleLayout->AddWidget(Std::Box{ midA });
-			midA->text = "AAAAAAA";
-			midA->activateFn = [](Gui::Button& btn)
-			{
-				std::cout << "Middle A pressed" << std::endl;
-			};
-
-			auto* midB = new Gui::Button;
-			middleLayout->AddWidget(Std::Box{ midB });
-			midB->text = "A";
-			midB->activateFn = [](Gui::Button& btn)
-			{
-				std::cout << "Middle B pressed" << std::endl;
-			};
-		}
-
-		auto* btnB = new Gui::Button;
-		layout->AddWidget(Std::Box{ btnB });
-		btnB->text = "ASSSSSSeeeeeeexxx";
-		btnB->activateFn = [](Gui::Button& btn)
-		{
-			std::cout << "B pressed" << std::endl;
-		};
 	}
 }
 
@@ -386,9 +302,11 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	auto appCtx = App::impl::Initialize();
 
-	App::Extent windowExtent = { 900, 200 };
+	App::Extent windowExtent = { 900, 900 };
 	constexpr char mainWindowTitle[] = "Main window";
-	auto mainWindowInfo = appCtx.NewWindow({ mainWindowTitle, sizeof(mainWindowTitle) - 1 }, windowExtent);
+	auto mainWindowInfo = appCtx.NewWindow(
+		{ mainWindowTitle, sizeof(mainWindowTitle) - 1 }, // Title
+		windowExtent);
 
 	// Initialize the renderer
 	auto gfxWsiConnection = impl::MyGfxWsiInterfacer{};
@@ -404,18 +322,17 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		gfxLogger,
 		requiredInstanceExtensions);
 
-
-	auto guiCtx = Gui::Context::Create(impl::tempWindowHandler, &gfxCtx);
+	auto guiCtx = Gui::Context::Create(impl::tempWindowHandler, &appCtx, &gfxCtx);
 
 	impl::SetupWindowA(guiCtx, mainWindowInfo);
-	impl::SetupWindowB(appCtx, guiCtx, gfxCtx);
+	//impl::SetupWindowB(appCtx, guiCtx, gfxCtx);
 
 	impl::GfxGuiEventForwarder gfxGuiEventForwarder;
 	gfxGuiEventForwarder.guiCtx = &guiCtx;
 	gfxGuiEventForwarder.gfxCtx = &gfxCtx;
-	appCtx.InsertEventInterface(gfxGuiEventForwarder);
+	appCtx.InsertEventForwarder(gfxGuiEventForwarder);
 
-	Gui::SizeHintCollection sizeHintCollection;
+	Gui::RectCollection sizeHintCollection;
 	Std::FrameAllocator transientAlloc;
 
 	while (true)
@@ -433,7 +350,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		std::vector<Gfx::NativeWindowUpdate> windowUpdates;
 
 		Gui::Context::Render2_Params renderParams {
-			.sizeHintCollection = sizeHintCollection,
+			.rectCollection = sizeHintCollection,
 			.transientAlloc = transientAlloc,
 			.vertices = vertices,
 			.indices = indices,
@@ -446,6 +363,12 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		drawParams.guiIndices = indices;
 		drawParams.guiVertices = vertices;
 		drawParams.nativeWindowUpdates = windowUpdates;
+		for (auto& windowUpdate : drawParams.nativeWindowUpdates)
+		{
+			auto const windowEvents = appCtx.GetWindowEvents((App::WindowID)windowUpdate.id);
+			if (windowEvents.resize)
+				windowUpdate.event = Gfx::NativeWindowEvent::Resize;
+		}
 		gfxCtx.Draw(drawParams);
 	}
 

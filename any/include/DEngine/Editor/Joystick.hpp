@@ -25,8 +25,15 @@ namespace DEngine::Editor
 		{
 			if (pressedData.HasValue())
 				return pressedData.Value().currPos;
-			return { 0.f, 0.f };
+			return {0.f, 0.f};
 		}
+
+		virtual Gui::SizeHint GetSizeHint2(
+			GetSizeHint2_Params const& params) const override;
+		virtual void Render2(
+			Render_Params const& params,
+			Gui::Rect const& widgetRect,
+			Gui::Rect const& visibleRect) const override;
 
 		virtual bool CursorPress(
 			Gui::Context& ctx,

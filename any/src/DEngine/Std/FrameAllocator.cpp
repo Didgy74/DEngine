@@ -10,34 +10,76 @@
 
 using namespace DEngine;
 
-Std::FrameAllocator::FrameAllocator(Std::FrameAllocator&& other) noexcept :
-	offset{ other.offset },
-	lastAllocOffset{ Std::Move(other.lastAllocOffset) },
-	poolCount{ other.poolCount }
+struct DEngine::Std::FrameAllocator::Impl
 {
-	for (uSize i = 0; i < other.poolCount; i += 1)
-		memoryPools[i] = other.memoryPools[i];
+public:
+	struct RAIIPtr
+	{
+		void* ptr = nullptr;
+		~RAIIPtr() noexcept
+		{
+			if (ptr)
+			{
+				free(ptr);
+				ptr = nullptr;
+			}
+		}
+	};
 
-	other.poolCount = 0;
+	static void FreeBlockListElements(BlockList& in) noexcept
+	{
+		if (in.ptr)
+		{
+			DENGINE_IMPL_CONTAINERS_ASSERT(in.capacity != 0);
+			for (uSize i = 0; i < in.count; i++)
+			{
+				auto& block = in.ptr[i];
+				DENGINE_IMPL_CONTAINERS_ASSERT(block.data);
+				DENGINE_IMPL_CONTAINERS_ASSERT(block.allocCount == 0);
+
+				free(block.data);
+				block = {};
+			}
+			in.count = 0;
+		}
+	}
+
+	static void FreeBlockList(BlockList& in) noexcept
+	{
+		FreeBlockListElements(in);
+
+		if (in.ptr)
+		{
+			free(in.ptr);
+			in = {};
+		}
+	}
+};
+
+Std::FrameAllocator::FrameAllocator(Std::FrameAllocator&& other) noexcept :
+	prevAllocOffset{ Std::Move(other.prevAllocOffset) },
+	activeBlock{ other.activeBlock },
+	blockList{ other.blockList }
+{
+	other.activeBlock = {};
+	other.blockList = {};
 }
 
 Std::FrameAllocator::~FrameAllocator() noexcept
 {
-	ReleaseMemory();
+	ReleaseAllMemory();
 }
 
 Std::FrameAllocator& Std::FrameAllocator::operator=(Std::FrameAllocator&& other) noexcept
 {
-	ReleaseMemory();
+	ReleaseAllMemory();
 
-	offset = other.offset;
-	lastAllocOffset = Std::Move(other.lastAllocOffset);
-	poolCount = other.poolCount;
+	prevAllocOffset = Std::Move(other.prevAllocOffset);
 
-	for (uSize i = 0; i < other.poolCount; i += 1)
-		memoryPools[i] = other.memoryPools[i];
-
-	other.poolCount = 0;
+	activeBlock = other.activeBlock;
+	other.activeBlock = {};
+	blockList = other.blockList;
+	other.blockList = {};
 
 	return *this;
 }
@@ -47,122 +89,150 @@ Std::Opt<Std::FrameAllocator> Std::FrameAllocator::PreAllocate(uSize size) noexc
 	FrameAllocator returnVal;
 
 	auto ptr = malloc(size);
-	if (ptr)
+	if (!ptr)
+		// Just in case the allocation failed.
+		return Std::nullOpt;
+	else
 	{
-		auto& pool = returnVal.memoryPools[0];
-		pool.data = static_cast<Pool::DataPtrT*>(ptr);
-		pool.totalSize = size;
-
-		returnVal.poolCount = 1;
+		auto& block = returnVal.activeBlock;
+		block.data = static_cast<Block::DataPtrT*>(ptr);
+		block.size = size;
 
 		if constexpr (clearUnusedMemory)
 		{
-			for (uSize i = 0; i < pool.totalSize; i += 0)
-				pool.data[i] = 0;
+			for (uSize i = 0; i < block.size; i += 0)
+				block.data[i] = 0;
 		}
 
 		return returnVal;
 	}
-	else
-		return Std::nullOpt;
 }
 
 void* Std::FrameAllocator::Alloc(uSize size, uSize alignment) noexcept
 {
-	void* returnVal = nullptr;
-
-	auto getAlignedOffset = [](Pool::DataPtrT const* ptr, uSize offsetIn, uSize alignment) {
-		auto const asInt = (uintptr_t)ptr + offsetIn;
-		auto const alignedInt = Math::CeilToMultiple(asInt,  alignment);
-		auto const alignedOffset = offsetIn + (alignedInt - asInt);
-		DENGINE_IMPL_CONTAINERS_ASSERT((((uintptr_t)ptr + alignedOffset) % alignment) == 0);
+	auto getAlignedOffset = [](Block::DataPtrT const* ptr, uSize offset, uSize alignment) {
+		auto const asInt = (uintptr_t)ptr + offset;
+		auto const alignedAsInt = Math::CeilToMultiple(asInt, alignment);
+		DENGINE_IMPL_CONTAINERS_ASSERT((alignedAsInt % alignment) == 0);
+		auto const alignedOffset = offset + alignedAsInt - asInt;
 		return alignedOffset;
 	};
-	auto updatePoolState_SetReturn = [=, &returnVal](Pool& pool, uSize alignedOffset) {
-		pool.allocCount += 1;
 
-		lastAllocOffset = alignedOffset;
-		offset = alignedOffset + size;
+	bool allocActiveBlock = false;
+	uSize allocActiveBlockSize = 0;
 
-		returnVal = pool.data + alignedOffset;
-	};
-	auto makePoolFn = [=](uSize poolSize)
-		{
-			Pool newPool = {};
-			newPool.data = static_cast<Pool::DataPtrT*>(malloc(poolSize));
-			newPool.totalSize = poolSize;
-
-			// For testing purposes
-			if constexpr (clearUnusedMemory)
-			{
-				for (uSize i = 0; i < newPool.totalSize; i += 1)
-					newPool.data[i] = 0;
-			}
-
-			memoryPools[poolCount] = newPool;
-			auto& pool =  memoryPools[poolCount];
-			poolCount += 1;
-
-			auto const alignedOffset = getAlignedOffset(pool.data, offset, alignment);
-
-			DENGINE_IMPL_CONTAINERS_ASSERT(alignedOffset + size <= pool.totalSize);
-
-			updatePoolState_SetReturn(pool, alignedOffset);
-		};
-
-
-	if (poolCount > 0)
+	if (activeBlock.data)
 	{
-		auto& pool = memoryPools[poolCount - 1];
+		DENGINE_IMPL_CONTAINERS_ASSERT(activeBlock.size != 0);
 
-		auto const alignedOffset = getAlignedOffset(pool.data, offset, alignment);
+		auto& block = activeBlock;
 
-		// Check if there is enough remaining space in the pool
-		if (alignedOffset + size <= pool.totalSize)
+		auto const alignedOffset = getAlignedOffset(activeBlock.data, activeBlock.offset, alignment);
+		// Check if there is enough remaining space in the block
+		if (alignedOffset + size <= block.size)
 		{
-			updatePoolState_SetReturn(pool, alignedOffset);
+			// There is enough remaining space. Allocate here.
+			activeBlock.allocCount += 1;
+			prevAllocOffset = activeBlock.offset;
+			activeBlock.offset = alignedOffset + size;
+			return block.data + alignedOffset;
 		}
 		else
 		{
-			DENGINE_IMPL_CONTAINERS_ASSERT(poolCount < maxPoolCount - 1);
+			allocActiveBlock = true;
+			allocActiveBlockSize = Math::Max(size, activeBlock.size * 2);
 
-			// We ran out of space, allocate a new pool.
-			auto const newSize = Math::Max(pool.totalSize * 2, pool.totalSize + size);
-			makePoolFn(newSize);
+			// First move the active block onto the prev-block-array
+			if (blockList.ptr)
+			{
+				// Check if we can fit the current block onto our block-list.
+				if (blockList.capacity == blockList.count)
+				{
+					// We need to fit more space for the block.
+					// Allocate new space and move the data over.
+					auto const newCapacity = sizeof(Block) * blockList.capacity * 2;
+
+					Impl::RAIIPtr newArray = {};
+					newArray.ptr = malloc(newCapacity);
+					if (!newArray.ptr)
+						return nullptr;
+
+					for (int i = 0; i < blockList.count; i++)
+						static_cast<Block*>(newArray.ptr)[i] = blockList.ptr[i];
+
+					// Delete our old one and assign our new one.
+					free(blockList.ptr);
+					blockList.ptr = static_cast<Block*>(newArray.ptr);
+					newArray.ptr = nullptr;
+					blockList.capacity = newCapacity;
+				}
+
+				// We can fit the current active block. Push it to the end.
+				blockList.ptr[blockList.count] = activeBlock;
+				activeBlock = {};
+				blockList.count += 1;
+			}
+			else
+			{
+				// Allocate space for the previous block-structs.
+				uSize blockListCapacity = BlockList::minCapacity;
+				blockList.ptr = static_cast<Block*>(malloc(sizeof(Block) * blockListCapacity));
+				if (!blockList.ptr)
+					return nullptr;
+				blockList.capacity = blockListCapacity;
+
+				blockList.ptr[0] = activeBlock;
+				activeBlock = {};
+				blockList.count += 1;
+			}
 		}
 	}
 	else
 	{
-		auto const newSize = size;
-		makePoolFn(newSize);
+		allocActiveBlock = true;
+		allocActiveBlockSize = size;
 	}
 
-	return returnVal;
+	if (allocActiveBlock)
+	{
+		// Allocate data on the active block
+
+		auto* newMem = malloc(allocActiveBlockSize);
+		if (!newMem)
+			return nullptr;
+
+		activeBlock.data = static_cast<Block::DataPtrT*>(newMem);
+		activeBlock.size = allocActiveBlockSize;
+
+		activeBlock.allocCount = 1;
+		activeBlock.offset = size;
+		prevAllocOffset = 0;
+		return activeBlock.data;
+	}
+
+	return nullptr;
 }
 
 bool Std::FrameAllocator::Realloc(void* ptr, uSize newSize) noexcept
 {
-	DENGINE_IMPL_CONTAINERS_ASSERT(poolCount > 0);
-
-	auto& pool = memoryPools[poolCount - 1];
-
-	DENGINE_IMPL_CONTAINERS_ASSERT(pool.allocCount > 0);
+	DENGINE_IMPL_CONTAINERS_ASSERT(activeBlock.data);
+	DENGINE_IMPL_CONTAINERS_ASSERT(activeBlock.allocCount > 0);
 
 	bool returnVal = false;
-	if (lastAllocOffset.HasValue())
+	if (prevAllocOffset.HasValue())
 	{
-		auto const lastAllocOffsetVal = lastAllocOffset.Value();
-		auto const oldSize = offset - lastAllocOffsetVal;
+		auto const lastAllocOffsetVal = prevAllocOffset.Value();
+		auto const oldSize = activeBlock.offset - lastAllocOffsetVal;
 		returnVal =
 			// First we check that the ptr is the most recent allocation
-			ptr == pool.data + lastAllocOffsetVal &&
+			ptr == activeBlock.data + lastAllocOffsetVal &&
 			// Then we check that the newSize is bigger than the old size
 			oldSize < newSize &&
-			// Now we check if the new size can fit our pool.
-			lastAllocOffsetVal + newSize <= pool.totalSize;
+			// Now we check if the new size can fit our block.
+			lastAllocOffsetVal + newSize <= activeBlock.size;
 
 		if (returnVal)
-			offset = lastAllocOffsetVal + newSize;
+			activeBlock.offset = lastAllocOffsetVal + newSize;
 	}
 
 	return returnVal;
@@ -170,46 +240,59 @@ bool Std::FrameAllocator::Realloc(void* ptr, uSize newSize) noexcept
 
 void Std::FrameAllocator::Free(void* in) noexcept
 {
-	DENGINE_IMPL_CONTAINERS_ASSERT(poolCount > 0);
+	if constexpr (!checkForAllocFoundOnFree)
+		return;
 
-	bool allocFound = false;
+	// Ideally we shouldn't have to confirm this on a release
+	// build. In a release build, all of this could be skipped.
 
-	auto poolCheckFn = [=, &allocFound](Pool& pool)
-		{
-			auto const ptrOffset = (uintptr_t)in - (uintptr_t)pool.data;
-			if (ptrOffset >= 0 && ptrOffset < pool.totalSize)
-			{
-				allocFound = true;
-				pool.allocCount -= 1;
-			}
-		};
+	[[maybe_unused]] bool allocFound = false;
 
-	// Check most recent pool first
 	{
-		auto& pool = memoryPools[poolCount - 1];
-		poolCheckFn(pool);
-
-		if (pool.allocCount == 0)
+		// Check the active block first.
+		DENGINE_IMPL_CONTAINERS_ASSERT(activeBlock.data);
+		// Check if the pointer is within range of our allocated data
+		auto const ptrOffset = (intptr_t)in - (intptr_t)activeBlock.data;
+		if (0 <= ptrOffset && ptrOffset < activeBlock.offset)
 		{
-			offset = 0;
-			lastAllocOffset = Std::nullOpt;
-		}
-		else if (lastAllocOffset.HasValue() && in == pool.data + lastAllocOffset.Value())
-		{
-			offset = lastAllocOffset.Value();
-			lastAllocOffset = Std::nullOpt;
+			allocFound = true;
+			activeBlock.allocCount -= 1;
+			if (activeBlock.allocCount == 0)
+			{
+				activeBlock.offset = 0;
+				prevAllocOffset = Std::nullOpt;
+			}
 		}
 	}
 
-	if (!allocFound)
+	if (prevAllocOffset.HasValue())
+	{
+		auto const lastAllocOffsetValue = prevAllocOffset.Value();
+		// If the freed pointer was the previously allocated
+		// memory, then we pop the allocation so we can reuse it
+		// immediately
+		if (in == activeBlock.data + lastAllocOffsetValue)
+		{
+			activeBlock.offset = lastAllocOffsetValue;
+			prevAllocOffset = Std::nullOpt;
+		}
+	}
+
+
+	if (!allocFound && blockList.ptr)
 	{
 		// Then check the other pools
-		for (uSize i = 0; i < poolCount - 1; i += 1)
+		for (uSize i = 0; i < blockList.count; i += 1)
 		{
-			auto& pool = memoryPools[i];
-			poolCheckFn(pool);
-			if (allocFound)
+			auto& block = blockList.ptr[i];
+			// Check if the pointer is within range of our allocated data
+			auto const ptrOffset = (intptr_t)in - (intptr_t)block.data;
+			if (ptrOffset >= 0 && ptrOffset < block.offset)
+			{
+				allocFound = true;
+				block.allocCount -= 1;
 				break;
+			}
 		}
 	}
 
@@ -218,54 +301,29 @@ void Std::FrameAllocator::Free(void* in) noexcept
 
 void Std::FrameAllocator::Reset() noexcept
 {
-	if (poolCount == 0)
-		return;
+	Impl::FreeBlockListElements(blockList);
 
-	// Check that all active pools are valid and no longer have any allocs
-	DENGINE_IMPL_CONTAINERS_ASSERT(Std::AllOf(
-		&memoryPools[0],
-		&memoryPools[poolCount],
-		[](auto const& item) { return item.allocCount == 0 && item.data; }));
-
-	// Clear all pools except the last one and move the last one to the front.
-	if (poolCount > 1)
-	{
-		for (uSize i = 0; i < poolCount - 1; i += 1)
-		{
-			auto& pool = memoryPools[i];
-
-			free(pool.data);
-
-			// Clear the struct for good measure.
-			pool = {};
-		}
-
-		auto& firstPool = memoryPools[0];
-		firstPool = memoryPools[poolCount - 1];
-		memoryPools[poolCount - 1] = {};
-		poolCount = 1;
-	}
-
-	memoryPools[0].allocCount = 0;
-	offset = 0;
+	DENGINE_IMPL_CONTAINERS_ASSERT(activeBlock.allocCount == 0);
+	activeBlock.allocCount = 0;
+	activeBlock.offset = 0;
+	prevAllocOffset = Std::nullOpt;
 
 	// For testing purposes
 	if constexpr (clearUnusedMemory)
 	{
-		auto& firstPool = memoryPools[0];
-		for (uSize i = 0; i < firstPool.totalSize; i += 1)
-			firstPool.data[i] = 0;
+		for (uSize i = 0; i < activeBlock.size; i += 1)
+			activeBlock.data[i] = 0;
 	}
 }
 
-void Std::FrameAllocator::ReleaseMemory() noexcept
+void Std::FrameAllocator::ReleaseAllMemory()
 {
-	for (uSize i = 0; i < poolCount; i++)
+	if (activeBlock.data)
 	{
-		auto& pool = memoryPools[i];
-		DENGINE_IMPL_CONTAINERS_ASSERT(pool.data);
-
-		free(pool.data);
+		DENGINE_IMPL_CONTAINERS_ASSERT(activeBlock.allocCount == 0);
+		free(activeBlock.data);
+		activeBlock = {};
 	}
-	poolCount = 0;
+
+	Impl::FreeBlockList(blockList);
 }

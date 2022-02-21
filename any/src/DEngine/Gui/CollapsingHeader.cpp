@@ -1,57 +1,25 @@
 #include <DEngine/Gui/CollapsingHeader.hpp>
-
+#include <DEngine/Gui/TextManager.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
 
-#include <DEngine/Gui/Context.hpp>
-#include "ImplData.hpp"
+#include <DEngine/Std/Containers/Vec.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
 
-namespace DEngine::Gui::impl
+struct CollapsingHeader::Impl
 {
-	enum class PointerType : u8 { Primary, Secondary };
-	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
+public:
+	struct CustomData
 	{
-		switch (in)
+		explicit CustomData(RectCollection::AllocT& alloc) :
+			glyphRects{ alloc }
 		{
-			case CursorButton::Primary: return PointerType::Primary;
-			case CursorButton::Secondary: return PointerType::Secondary;
-			default: break;
 		}
-		DENGINE_IMPL_UNREACHABLE();
-		return {};
-	}
 
-	static constexpr u8 cursorPointerId = (u8)-1;
-
-	struct PointerPress_Params
-	{
-		Context* ctx = nullptr;
-		WindowID windowId = {};
-		CollapsingHeader* widget = nullptr;
-		Rect const* widgetRect = nullptr;
-		Rect const* visibleRect = nullptr;
-		u8 pointerId = {};
-		PointerType pointerType = {};
-		Math::Vec2 pointerPos = {};
-		bool pointerPressed = {};
-		CursorClickEvent const* cursorClick = nullptr;
-		TouchPressEvent const* touchPress = nullptr;
-	};
-
-	struct PointerMove_Params
-	{
-		Context* ctx = nullptr;
-		WindowID windowId = {};
-		CollapsingHeader* widget = nullptr;
-		Rect const* widgetRect = nullptr;
-		Rect const* visibleRect = nullptr;
-		u8 pointerId = {};
-		Math::Vec2 pointerPos = {};
-		bool pointerOccluded = {};
-		CursorMoveEvent const* cursorMove = nullptr;
-		TouchMoveEvent const* touchMove = nullptr;
+		Extent titleTextOuterExtent = {};
+		// Only included when rendering.
+		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
 	};
 
 	[[nodiscard]] static Rect BuildHeaderRect(
@@ -73,25 +41,64 @@ namespace DEngine::Gui::impl
 	{
 		Rect returnVal = headerRect;
 		returnVal.position.y += returnVal.extent.height;
-		returnVal.extent.height = widgetHeight - headerRect.extent.height;
+
+		i32 temp = (i32)widgetHeight - (i32)headerRect.extent.height;
+		temp = Math::Max(temp, 0);
+
+		returnVal.extent.height = temp;
 		return returnVal;
 	}
-}
 
-struct [[maybe_unused]] Gui::impl::CH_Impl
-{
-public:
+	enum class PointerType : u8 { Primary, Secondary };
+	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
+	{
+		switch (in)
+		{
+			case CursorButton::Primary: return PointerType::Primary;
+			case CursorButton::Secondary: return PointerType::Secondary;
+			default: break;
+		}
+		DENGINE_IMPL_UNREACHABLE();
+		return {};
+	}
+
+	static constexpr u8 cursorPointerId = (u8)-1;
+
+	struct PointerPress_Pointer
+	{
+		u8 id;
+		PointerType type;
+		Math::Vec2 pos;
+		bool pressed;
+		bool consumed;
+	};
+	struct PointerPress_Params
+	{
+		Context& ctx;
+		RectCollection const& rectCollection;
+		CollapsingHeader& widget;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
+		PointerPress_Pointer const& pointer;
+		Widget::CursorPressParams const* eventParams_cursorPress;
+	};
+
 	[[nodiscard]] static bool PointerPress(PointerPress_Params const& params)
 	{
-		auto& ctx = *params.ctx;
-		auto& widget = *params.widget;
-		auto& widgetRect = *params.widgetRect;
-		auto& visibleRect = *params.visibleRect;
+		auto& ctx = params.ctx;
+		auto& rectCollection = params.rectCollection;
+		auto& widget = params.widget;
+		auto& widgetRect = params.widgetRect;
+		auto& visibleRect = params.visibleRect;
+		auto& pointer = params.pointer;
 
-		bool pressEventConsumed = false;
+		auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(widget);
+		DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+		auto& customData = *customDataPtr;
 
-		auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-		auto const textHeight = implData.textManager.lineheight;
+		bool newEventConsumed = pointer.consumed;
+
+		auto const textHeight = customData.titleTextOuterExtent.height;
 
 		// Check if we are inside the header.
 		auto const headerRect = BuildHeaderRect(
@@ -101,16 +108,15 @@ public:
 			widget.titleMargin);
 
 		auto const insideHeader =
-			visibleRect.PointIsInside(params.pointerPos) &&
-			headerRect.PointIsInside(params.pointerPos);
+			visibleRect.PointIsInside(pointer.pos) &&
+			headerRect.PointIsInside(pointer.pos);
 
 		auto const oldCollapsed = widget.collapsed;
 
-		if (widget.headerPointerId.HasValue() &&
-			params.pointerType == PointerType::Primary)
+		if (widget.headerPointerId.HasValue() && pointer.type == PointerType::Primary)
 		{
 			u8 heldPointerId = widget.headerPointerId.Value();
-			if (heldPointerId == params.pointerId && !params.pointerPressed)
+			if (heldPointerId == pointer.id && !pointer.pressed)
 			{
 				widget.headerPointerId = Std::nullOpt;
 				if (insideHeader)
@@ -123,11 +129,12 @@ public:
 		}
 		else if (!widget.headerPointerId.HasValue() &&
 				 insideHeader &&
-				 params.pointerPressed &&
-				 params.pointerType == PointerType::Primary)
+				 pointer.pressed &&
+				 pointer.type == PointerType::Primary &&
+		         !newEventConsumed)
 		{
-			widget.headerPointerId = params.pointerId;
-			pressEventConsumed = true;
+			widget.headerPointerId = pointer.id;
+			newEventConsumed = true;
 		}
 
 
@@ -139,51 +146,68 @@ public:
 				headerRect,
 				widgetRect.extent.height);
 			auto const insideContent =
-				childRect.PointIsInside(params.pointerPos) &&
-				visibleRect.PointIsInside(params.pointerPos);
-			if (insideContent)
-				pressEventConsumed = true;
+				childRect.PointIsInside(pointer.pos) &&
+				visibleRect.PointIsInside(pointer.pos);
+			auto const childVisibleRect = Rect::Intersection(childRect, visibleRect);
 
 			// We only want to forward the event if it's currently not collapsed.
 			if (!widget.collapsed && widget.child)
 			{
 				auto childEventConsumed = false;
-				if (params.pointerId == cursorPointerId)
+
+				if (pointer.id == cursorPointerId)
 				{
-					childEventConsumed = widget.child->CursorPress(
-						*params.ctx,
-						params.windowId,
+					childEventConsumed = widget.child->CursorPress2(
+						*params.eventParams_cursorPress,
 						childRect,
-						visibleRect,
-						{ (i32)params.pointerPos.x, (i32)params.pointerPos.y },
-						*params.cursorClick);
+						childVisibleRect,
+						newEventConsumed);
 				}
 				else
 				{
-					childEventConsumed = widget.child->TouchPressEvent(
-						*params.ctx,
-						params.windowId,
-						childRect,
-						visibleRect,
-						*params.touchPress);
+					DENGINE_IMPL_GUI_UNREACHABLE();
+
 				}
 
-				pressEventConsumed = pressEventConsumed || childEventConsumed;
+				newEventConsumed = newEventConsumed || childEventConsumed || insideContent;
 			}
 		}
 
-		return pressEventConsumed;
+		newEventConsumed = newEventConsumed || insideHeader;
+		return newEventConsumed;
 	}
+
+	struct PointerMove_Pointer
+	{
+		u8 id;
+		Math::Vec2 pos;
+		bool occluded;
+	};
+	struct PointerMove_Params
+	{
+		Context& ctx;
+		CollapsingHeader& widget;
+		RectCollection const& rectCollection;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
+		PointerMove_Pointer const& pointer;
+		Widget::CursorMoveParams const* eventParams_cursorMove;
+	};
 
 	[[nodiscard]] static bool PointerMove(PointerMove_Params const& params)
 	{
-		auto& ctx = *params.ctx;
-		auto& widget = *params.widget;
-		auto& widgetRect = *params.widgetRect;
-		auto& visibleRect = *params.visibleRect;
+		auto& ctx = params.ctx;
+		auto& widget = params.widget;
+		auto& rectCollection = params.rectCollection;
+		auto& widgetRect = params.widgetRect;
+		auto& visibleRect = params.visibleRect;
+		auto& pointer = params.pointer;
 
-		auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-		auto const textHeight = implData.textManager.lineheight;
+		auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(widget);
+		DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+		auto& customData = *customDataPtr;
+
+		auto const textHeight = customData.titleTextOuterExtent.height;
 
 		// Check if we are inside the header.
 		auto const headerRect = BuildHeaderRect(
@@ -193,30 +217,30 @@ public:
 			widget.titleMargin);
 
 		auto const insideHeader =
-			visibleRect.PointIsInside(params.pointerPos) &&
-			headerRect.PointIsInside(params.pointerPos);
+			visibleRect.PointIsInside(pointer.pos) &&
+			headerRect.PointIsInside(pointer.pos);
 
-		if (params.pointerId == cursorPointerId)
+		if (pointer.id == cursorPointerId)
 		{
-			widget.hoveredByCursor = insideHeader && !params.pointerOccluded;
+			widget.hoveredByCursor = insideHeader && !pointer.occluded;
 		}
 
 		if (widget.child && !widget.collapsed)
 		{
-			auto const occludedForChild = params.pointerOccluded || insideHeader;
+			auto const occludedForChild = pointer.occluded || insideHeader;
 			auto const childRect = BuildChildRect(headerRect, widgetRect.extent.height);
-			if (params.pointerId == cursorPointerId)
+			if (pointer.id == cursorPointerId)
 			{
 				widget.child->CursorMove(
-					ctx,
-					params.windowId,
+					*params.eventParams_cursorMove,
 					childRect,
 					visibleRect,
-					*params.cursorMove,
 					occludedForChild);
 			}
 			else
 			{
+				DENGINE_IMPL_GUI_UNREACHABLE();
+				/*
 				widget.child->TouchMoveEvent(
 					ctx,
 					params.windowId,
@@ -224,12 +248,13 @@ public:
 					visibleRect,
 					*params.touchMove,
 					occludedForChild);
+				 */
 			}
 		}
 
 		auto const pointerOccluded =
-			widgetRect.PointIsInside(params.pointerPos) &&
-			visibleRect.PointIsInside(params.pointerPos);
+			widgetRect.PointIsInside(pointer.pos) &&
+			visibleRect.PointIsInside(pointer.pos);
 		return pointerOccluded;
 	}
 };
@@ -242,6 +267,7 @@ CollapsingHeader::CollapsingHeader()
 SizeHint CollapsingHeader::GetSizeHint(
 	Context const& ctx) const
 {
+/*
 	SizeHint returnVal = {};
 
 	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
@@ -250,23 +276,26 @@ SizeHint CollapsingHeader::GetSizeHint(
 		implData.textManager,
 		{ title.data(), title.size() });
 
-	returnVal.preferred.width += textRectInner.preferred.width;
-	returnVal.preferred.height += textRectInner.preferred.height;
+	returnVal.minimum.width += textRectInner.minimum.width;
+	returnVal.minimum.height += textRectInner.minimum.height;
 
-	returnVal.preferred.width += titleMargin * 2;
-	returnVal.preferred.height += titleMargin * 2;
+	returnVal.minimum.width += titleMargin * 2;
+	returnVal.minimum.height += titleMargin * 2;
 
 	// Add the child if there is one
 	if (!collapsed && child)
 	{
 		auto const childHint = child->GetSizeHint(ctx);
-		returnVal.preferred.width = Math::Max(
-			returnVal.preferred.width,
-			childHint.preferred.width);
-		returnVal.preferred.height += childHint.preferred.height;
+		returnVal.minimum.width = Math::Max(
+			returnVal.minimum.width,
+			childHint.minimum.width);
+		returnVal.minimum.height += childHint.minimum.height;
 	}
 
 	return returnVal;
+*/
+
+	return {};
 }
 
 void CollapsingHeader::Render(
@@ -276,17 +305,207 @@ void CollapsingHeader::Render(
 	Rect visibleRect,
 	DrawInfo& drawInfo) const
 {
-	if (Rect::Intersection(widgetRect, visibleRect).IsNothing())
-		return;
 
-	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-	auto const textHeight = implData.textManager.lineheight;
+}
 
-	auto const headerRect = impl::BuildHeaderRect(
+void CollapsingHeader::CharRemoveEvent(
+	Context& ctx,
+	Std::FrameAlloc& transientAlloc)
+{
+	if (!collapsed && child)
+		child->CharRemoveEvent(ctx, transientAlloc);
+}
+
+void CollapsingHeader::InputConnectionLost()
+{
+	if (!collapsed && child)
+		child->InputConnectionLost();
+}
+
+
+
+SizeHint CollapsingHeader::GetSizeHint2(
+	Widget::GetSizeHint2_Params const& params) const
+{
+	auto& pusher = params.pusher;
+	auto& textManager = params.textManager;
+
+	SizeHint returnValue = {};
+
+	auto const& pusherIt = pusher.AddEntry(*this);
+
+	auto customData = Impl::CustomData{ pusher.Alloc() };
+
+	if (pusher.IncludeRendering())
+	{
+		customData.glyphRects.Resize(title.size());
+
+		customData.titleTextOuterExtent = textManager.GetOuterExtent(
+			{ title.data(), title.size() },
+			{},
+			customData.glyphRects.Data());
+	}
+	else
+	{
+		customData.titleTextOuterExtent = textManager.GetOuterExtent({ title.data(), title.size() });
+	}
+
+	returnValue.minimum = customData.titleTextOuterExtent;
+	returnValue.minimum.width += titleMargin * 2;
+	returnValue.minimum.height += titleMargin * 2;
+
+	// Add the child if there is one
+	if (!collapsed && child)
+	{
+		auto const childHint = child->GetSizeHint2(params);
+		returnValue.minimum.width = Math::Max(
+			returnValue.minimum.width,
+			childHint.minimum.width);
+
+		returnValue.minimum.height += childHint.minimum.height;
+	}
+
+	pusher.AttachCustomData(pusherIt, Std::Move(customData));
+	pusher.SetSizeHint(pusherIt, returnValue);
+
+	return returnValue;
+}
+
+void CollapsingHeader::BuildChildRects(
+	Widget::BuildChildRects_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	auto& pusher = params.pusher;
+	auto& textManager = params.textManager;
+
+	auto* customDataPtr = pusher.GetCustomData2<Impl::CustomData>(*this);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+	auto& customData = *customDataPtr;
+
+	auto textHeight = customData.titleTextOuterExtent.height;
+
+	if (pusher.IncludeRendering())
+	{
+		for (auto& item : customData.glyphRects)
+		{
+			item.position += widgetRect.position;
+			item.position.x += titleMargin;
+			item.position.y += titleMargin;
+		}
+	}
+
+	auto const headerRect = Impl::BuildHeaderRect(
 		widgetRect.position,
 		widgetRect.extent.width,
 		textHeight,
 		titleMargin);
+
+	if (!collapsed && child)
+	{
+		auto& childWidget = *child;
+
+		auto const childRect = Impl::BuildChildRect(
+			headerRect,
+			widgetRect.extent.height);
+		auto childVisibleRect = Rect::Intersection(visibleRect, childRect);
+
+		pusher.Push(childWidget, { childRect, childVisibleRect });
+		childWidget.BuildChildRects(
+			params,
+			childRect,
+			childVisibleRect);
+	}
+}
+
+bool CollapsingHeader::CursorMove(
+	Widget::CursorMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	Impl::PointerMove_Pointer pointer = {};
+	pointer.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
+	pointer.occluded = occluded;
+	pointer.id = Impl::cursorPointerId;
+
+	Impl::PointerMove_Params temp = {
+		.ctx = params.ctx,
+		.widget = *this,
+		.rectCollection = params.rectCollection,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.eventParams_cursorMove = &params,
+	};
+
+	return Impl::PointerMove(temp);
+}
+
+bool CollapsingHeader::CursorPress2(
+	Widget::CursorPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	pointer.consumed = consumed;
+	pointer.id = Impl::cursorPointerId;
+	pointer.type = Impl::ToPointerType(params.event.button);
+	pointer.pressed = params.event.pressed;
+
+	Impl::PointerPress_Params temp = {
+		.ctx = params.ctx,
+		.rectCollection = params.rectCollection,
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.eventParams_cursorPress = &params,
+	};
+
+	return Impl::PointerPress(temp);
+}
+
+void CollapsingHeader::Render2(
+	Widget::Render_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	auto& rectCollection = params.rectCollection;
+	auto& drawInfo = params.drawInfo;
+	auto& framebufferExtent = params.framebufferExtent;
+
+	if (Rect::Intersection(widgetRect, visibleRect).IsNothing())
+		return;
+
+	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+	auto& customData = *customDataPtr;
+
+	DENGINE_IMPL_GUI_ASSERT(customData.glyphRects.Size() == title.size());
+
+	auto const textHeight = customData.titleTextOuterExtent.height;
+
+	auto const headerRect = Impl::BuildHeaderRect(
+		widgetRect.position,
+		widgetRect.extent.width,
+		textHeight,
+		titleMargin);
+
+	auto const childRect = Impl::BuildChildRect(
+		headerRect,
+		widgetRect.extent.height);
+	if (!collapsed && child && !childRect.IsNothing())
+	{
+		auto scissorGuard = DrawInfo::ScopedScissor(drawInfo, childRect);
+		drawInfo.PushFilledQuad(childRect, { 1.f, 1.f, 1.f, 0.3f });
+		child->Render2(
+			params,
+			childRect,
+			visibleRect);
+	}
 
 	Math::Vec4 headerBgColor;
 	Math::Vec4 textColor = { 1.f, 1.f, 1.f, 1.f };
@@ -314,139 +533,17 @@ void CollapsingHeader::Render(
 	}
 	drawInfo.PushFilledQuad(headerRect, headerBgColor);
 
-	auto textRectInner = headerRect;
-	textRectInner.position.x += titleMargin;
-	textRectInner.position.y += titleMargin;
-	textRectInner.extent.height = textHeight;
-
-	impl::TextManager::RenderText(
-		implData.textManager,
+	drawInfo.PushText(
 		{ title.data(), title.size() },
-		textColor,
-		textRectInner,
-		drawInfo);
-
-	if (!collapsed && child)
-	{
-		auto const childRect = impl::BuildChildRect(
-			headerRect,
-			widgetRect.extent.height);
-
-		auto scissorGuard = DrawInfo::ScopedScissor(drawInfo, childRect);
-
-		drawInfo.PushFilledQuad(childRect, { 1.f, 1.f, 1.f, 0.3f });
-
-		child->Render(
-			ctx,
-			framebufferExtent,
-			childRect,
-			visibleRect,
-			drawInfo);
-	}
+		customData.glyphRects.Data(),
+		textColor);
 }
 
-void CollapsingHeader::CharEnterEvent(
-	Context& ctx)
+void CollapsingHeader::TextInput(
+	Context& ctx,
+	Std::FrameAlloc& transientAlloc,
+	TextInputEvent const& event)
 {
 	if (!collapsed && child)
-		child->CharEnterEvent(ctx);
-}
-
-void CollapsingHeader::CharEvent(
-	Context& ctx,
-	u32 utfValue)
-{
-	if (!collapsed && child)
-		child->CharEvent(ctx, utfValue);
-}
-
-void CollapsingHeader::CharRemoveEvent(
-	Context& ctx)
-{
-	if (!collapsed && child)
-		child->CharRemoveEvent(ctx);
-}
-
-void CollapsingHeader::InputConnectionLost()
-{
-	if (!collapsed && child)
-		child->InputConnectionLost();
-}
-
-bool CollapsingHeader::CursorMove(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	CursorMoveEvent event,
-	bool occluded)
-{
-	impl::PointerMove_Params params = {};
-	params.ctx = &ctx;
-	params.cursorMove = &event;
-	params.widget = this;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
-	params.windowId = windowId;
-	params.pointerId = impl::cursorPointerId;
-	params.pointerPos = { (f32)event.position.x, (f32)event.position.y };
-	params.pointerOccluded = occluded;
-
-	return impl::CH_Impl::PointerMove(params);
-}
-
-bool CollapsingHeader::CursorPress(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Math::Vec2Int cursorPos,
-	CursorClickEvent event)
-{
-	impl::PointerPress_Params params = {};
-	params.ctx = &ctx;
-	params.windowId = windowId;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
-	params.pointerId = impl::cursorPointerId;
-	params.pointerPos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	params.pointerType = impl::ToPointerType(event.button);
-	params.pointerPressed = event.clicked;
-	params.widget = this;
-	params.cursorClick = &event;
-
-	return impl::CH_Impl::PointerPress(params);
-}
-
-bool CollapsingHeader::TouchPressEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchPressEvent event)
-{
-	impl::PointerPress_Params params = {};
-	params.ctx = &ctx;
-	params.windowId = windowId;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
-	params.pointerId = event.id;
-	params.pointerPos = event.position;
-	params.pointerType = impl::PointerType::Primary;
-	params.pointerPressed = event.pressed;
-	params.widget = this;
-	params.touchPress = &event;
-
-	return impl::CH_Impl::PointerPress(params);
-}
-
-bool CollapsingHeader::TouchMoveEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchMoveEvent event,
-	bool occluded)
-{
-	return false;
+		child->TextInput(ctx, transientAlloc, event);
 }

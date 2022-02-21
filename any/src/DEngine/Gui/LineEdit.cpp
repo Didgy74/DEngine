@@ -1,10 +1,28 @@
 #include <DEngine/Gui/LineEdit.hpp>
-
+#include <DEngine/Gui/TextManager.hpp>
+#include <DEngine/Gui/DrawInfo.hpp>
 #include <DEngine/Gui/Context.hpp>
-#include "ImplData.hpp"
 
-namespace DEngine::Gui::impl
+#include <DEngine/Std/Containers/Vec.hpp>
+
+using namespace DEngine;
+using namespace DEngine::Gui;
+
+struct LineEdit::Impl
 {
+	struct CustomData
+	{
+		explicit CustomData(RectCollection::AllocT& alloc) :
+			glyphRects{ alloc }
+		{
+
+		}
+
+
+		Extent textOuterExtent = {};
+		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
+	};
+
 	enum class PointerType : u8 { Primary, Secondary };
 	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
 	{
@@ -18,25 +36,27 @@ namespace DEngine::Gui::impl
 		return {};
 	}
 
-	constexpr u8 cursorPointerId = ~static_cast<u8>(0);
+	static constexpr u8 cursorPointerId = ~static_cast<u8>(0);
+
+	struct PointerPress_Pointer
+	{
+		u8 id;
+		Math::Vec2 pos;
+		PointerType type;
+		bool pressed;
+		bool consumed;
+	};
 
 	struct PointerPress_Params
 	{
-		Context* ctx = {};
-		LineEdit* widget = {};
-		Rect widgetRect = {};
-		Rect visibleRect = {};
-
-		u8 pointerId = {};
-		Math::Vec2 pointerPos = {};
-		bool pointerPressed = {};
-		PointerType pointerType = {};
+		Context& ctx;
+		RectCollection const& rectCollection;
+		LineEdit& widget;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
+		PointerPress_Pointer const& pointer;
 	};
-}
 
-struct DEngine::Gui::impl::LineEditImpl
-{
-public:
 	static void BeginInputSession(LineEdit& widget, Context& ctx)
 	{
 		SoftInputFilter filter = {};
@@ -56,65 +76,103 @@ public:
 		widget.inputConnectionCtx = &ctx;
 	}
 
-	[[nodiscard]] static bool PointerPressed(PointerPress_Params const& in) noexcept
+	[[nodiscard]] static bool PointerPress(PointerPress_Params const& in) noexcept
 	{
-		auto pointerInside =
-			in.widgetRect.PointIsInside(in.pointerPos) &&
-			in.visibleRect.PointIsInside(in.pointerPos);
+		auto& widget = in.widget;
+		auto& ctx = in.ctx;
+		auto& pointer = in.pointer;
+		auto& widgetRect = in.widgetRect;
+		auto& visibleRect = in.visibleRect;
+
+		bool eventConsumed = pointer.consumed;
+
+		auto const pointerInside =
+			widgetRect.PointIsInside(pointer.pos) &&
+			visibleRect.PointIsInside(pointer.pos);
 
 		// The field is currently being held.
-		if (in.widget->pointerId.HasValue())
+		if (widget.pointerId.HasValue())
 		{
-			auto const pointerId = in.widget->pointerId.Value();
+			auto const currPointerId = widget.pointerId.Value();
 
-			// It's a developer bug if we received a click down on a pointer id
-			// that's already holding this widget.
-			DENGINE_IMPL_GUI_ASSERT(!(pointerId == in.pointerId && in.pointerPressed));
+			// It's a integration error if we received a click down on a pointer id
+			// that's already holding this widget. I think?
+			DENGINE_IMPL_GUI_ASSERT(!(currPointerId == pointer.id && pointer.pressed));
 
-			if (pointerInside &&
-				pointerId == in.pointerId &&
-				!in.pointerPressed &&
-				in.pointerType == PointerType::Primary)
+			if (currPointerId == pointer.id &&
+				!pointer.pressed)
 			{
-				in.widget->pointerId = Std::nullOpt;
-
-				BeginInputSession(*in.widget, *in.ctx);
+				widget.pointerId = Std::nullOpt;
 			}
-			else if (!pointerInside && pointerId == in.pointerId && !in.pointerPressed)
+
+			if (!eventConsumed &&
+				pointerInside &&
+				currPointerId == pointer.id &&
+				!pointer.pressed &&
+				pointer.type == PointerType::Primary)
 			{
-				in.widget->pointerId = Std::nullOpt;
+				BeginInputSession(widget, ctx);
+				eventConsumed = true;
 			}
 		}
-		else
-		{
-			if (pointerInside && in.pointerType == PointerType::Primary)
+		else {
+			if (widget.HasInputSession())
 			{
-				in.widget->pointerId = in.pointerId;
+				bool shouldEndInputSession = false;
+
+				shouldEndInputSession = shouldEndInputSession ||
+					eventConsumed &&
+					pointer.pressed;
+
+				shouldEndInputSession = shouldEndInputSession ||
+					!eventConsumed &&
+					pointer.pressed &&
+					!pointerInside;
+
+				if (shouldEndInputSession)
+				{
+					widget.inputConnectionCtx->ClearInputConnection(widget);
+					widget.inputConnectionCtx = nullptr;
+					eventConsumed = true;
+				}
+			}
+			else
+			{
+				if (!eventConsumed &&
+					pointer.pressed &&
+					pointerInside &&
+					pointer.type == PointerType::Primary)
+				{
+					widget.pointerId = pointer.id;
+				}
 			}
 		}
 
-		return pointerInside;
+		eventConsumed = eventConsumed || pointerInside;
+		return eventConsumed;
 	}
 };
 
-using namespace DEngine;
-using namespace DEngine::Gui;
-
 LineEdit::~LineEdit()
 {
-	if (CurrentlyBeingEdited())
+	if (HasInputSession())
 		ClearInputConnection();
 }
 
 SizeHint LineEdit::GetSizeHint(Context const& ctx) const
 {
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+/*
+	auto& implData = *static_cast<impl::ImplData const*>(ctx.Internal_ImplData());
+	auto& textManager = implData.GetTextManager();
+
 	auto returnVal = impl::TextManager::GetSizeHint(
-		implData.textManager,
+		textManager,
 		{ text.data(), text.size() });
-	returnVal.preferred.width += margin * 2;
-	returnVal.preferred.height += margin * 2;
+	returnVal.minimum.width += margin * 2;
+	returnVal.minimum.height += margin * 2;
 	return returnVal;
+*/
+	return {};
 }
 
 void LineEdit::Render(
@@ -124,24 +182,10 @@ void LineEdit::Render(
 	Rect visibleRect,
 	DrawInfo& drawInfo) const
 {
-	drawInfo.PushFilledQuad(widgetRect, backgroundColor);
 
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-
-	auto textRect = widgetRect;
-	textRect.position.x += margin;
-	textRect.position.y += margin;
-	textRect.extent.width -= margin * 2;
-	textRect.extent.height -= margin * 2;
-
-	impl::TextManager::RenderText(
-		implData.textManager,
-		{ text.data(), text.size() },
-		{ 1.f, 1.f, 1.f, 1.f },
-		textRect,
-		drawInfo);
 }
 
+/*
 void LineEdit::CharEnterEvent(Context& ctx)
 {
 	if (inputConnectionCtx)
@@ -216,14 +260,17 @@ void LineEdit::CharEvent(Context& ctx, u32 charEvent)
 		}
 	}
 }
+ */
 
-void LineEdit::CharRemoveEvent(Context& ctx)
+void LineEdit::CharRemoveEvent(
+	Context& ctx,
+	Std::FrameAlloc& transientAlloc)
 {
 	if (inputConnectionCtx && !text.empty())
 	{
 		text.pop_back();
 		auto const& string = text;
-		if (string != "" && string != "-" && string != "." && string != "-.")
+		if (!string.empty() && string != "-" && string != "." && string != "-.")
 		{
 			if (textChangedFn)
 				textChangedFn(*this);
@@ -239,27 +286,6 @@ void LineEdit::InputConnectionLost()
 	}
 }
 
-bool LineEdit::CursorPress(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Math::Vec2Int cursorPos,
-	CursorClickEvent event)
-{
-	impl::PointerPress_Params temp = {};
-	temp.ctx = &ctx;
-	temp.pointerId = impl::cursorPointerId;
-	temp.pointerPos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	temp.pointerPressed = event.clicked;
-	temp.pointerType = impl::ToPointerType(event.button);
-	temp.visibleRect = visibleRect;
-	temp.widgetRect = widgetRect;
-	temp.widget = this;
-
-	return impl::LineEditImpl::PointerPressed(temp);
-}
-
 bool LineEdit::TouchPressEvent(
 	Context& ctx,
 	WindowID windowId,
@@ -267,6 +293,7 @@ bool LineEdit::TouchPressEvent(
 	Rect visibleRect,
 	Gui::TouchPressEvent event)
 {
+	/*
 	impl::PointerPress_Params temp = {};
 	temp.ctx = &ctx;
 	temp.pointerId = impl::cursorPointerId;
@@ -278,6 +305,8 @@ bool LineEdit::TouchPressEvent(
 	temp.widget = this;
 
 	return impl::LineEditImpl::PointerPressed(temp);
+	*/
+	return false;
 }
 
 void LineEdit::ClearInputConnection()
@@ -285,4 +314,124 @@ void LineEdit::ClearInputConnection()
 	DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx);
 	this->inputConnectionCtx->ClearInputConnection(*this);
 	this->inputConnectionCtx = nullptr;
+}
+
+
+SizeHint LineEdit::GetSizeHint2(
+	Widget::GetSizeHint2_Params const& params) const
+{
+	auto& textManager = params.textManager;
+	auto& pusher = params.pusher;
+
+	auto const pusherIt = pusher.AddEntry(*this);
+
+	SizeHint returnValue = {};
+
+	if (pusher.IncludeRendering())
+	{
+		auto customData = Impl::CustomData{ pusher.Alloc() };
+
+		customData.glyphRects.Resize(text.size());
+
+		customData.textOuterExtent = textManager.GetOuterExtent(
+			{ text.data(), text.size() },
+			{},
+			customData.glyphRects.Data());
+		returnValue.minimum = customData.textOuterExtent;
+
+		pusher.AttachCustomData(pusherIt, Std::Move(customData));
+	}
+	else
+	{
+		returnValue.minimum = textManager.GetOuterExtent({ text.data(), text.size() });
+	}
+
+	returnValue.minimum.width += margin * 2;
+	returnValue.minimum.height += margin * 2;
+	returnValue.expandX = true;
+
+	pusher.SetSizeHint(pusherIt, returnValue);
+	return returnValue;
+}
+
+void LineEdit::BuildChildRects(
+	Widget::BuildChildRects_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	auto& pusher = params.pusher;
+
+	if (pusher.IncludeRendering())
+	{
+		auto* customDataPtr = pusher.GetCustomData2<Impl::CustomData>(*this);
+		DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+		auto& customData = *customDataPtr;
+
+		for (auto& glyphRect : customData.glyphRects)
+		{
+			glyphRect.position += widgetRect.position;
+			glyphRect.position.x += (i32)widgetRect.extent.width;
+			glyphRect.position.x -= (i32)customData.textOuterExtent.width;
+			glyphRect.position.x -= (i32)margin;
+			glyphRect.position.y += (i32)margin;
+		}
+	}
+}
+
+void LineEdit::Render2(
+	Widget::Render_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	auto const intersection = Rect::Intersection(widgetRect, visibleRect);
+	if (intersection.IsNothing())
+		return;
+
+	auto& drawInfo = params.drawInfo;
+	auto& rectCollection = params.rectCollection;
+
+	drawInfo.PushFilledQuad(widgetRect, backgroundColor);
+
+	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+	auto& customData = *customDataPtr;
+
+	DENGINE_IMPL_GUI_ASSERT(customData.glyphRects.Size() == text.size());
+
+	auto const textIsBiggerThanExtent =
+		(customData.textOuterExtent.width + margin * 2)  > widgetRect.extent.width ||
+		customData.textOuterExtent.height > widgetRect.extent.height;
+
+	Std::Opt<DrawInfo::ScopedScissor> scissor;
+	if (textIsBiggerThanExtent)
+		scissor = DrawInfo::ScopedScissor(drawInfo, intersection);
+
+	drawInfo.PushText(
+		{ text.data(), text.size() },
+		customData.glyphRects.Data(),
+		{ 1.f, 1.f, 1.f, 1.f });
+}
+
+bool LineEdit::CursorPress2(
+	Widget::CursorPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.id = Impl::cursorPointerId;
+	pointer.pressed = params.event.pressed;
+	pointer.type = Impl::ToPointerType(params.event.button);
+	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	pointer.consumed = consumed;
+
+	Impl::PointerPress_Params temp = {
+		.ctx = params.ctx,
+		.rectCollection = params.rectCollection,
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer, };
+
+	return Impl::PointerPress(temp);
 }

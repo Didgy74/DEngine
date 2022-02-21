@@ -28,7 +28,7 @@ namespace DEngine::impl
 		std::cout << std::endl;
 
 #ifdef DENGINE_IMPL_BREAKPOINT
-		DENGINE_IMPL_BREAKPOINT();
+		//DENGINE_IMPL_BREAKPOINT();
 #endif
 
 		std::abort();

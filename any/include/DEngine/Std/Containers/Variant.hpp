@@ -36,7 +36,6 @@ namespace DEngine::Std
 	}
 	*/
 
-
 	// Using a moved-from Variant is UB.
 	template<class ...Ts>
 	class Variant

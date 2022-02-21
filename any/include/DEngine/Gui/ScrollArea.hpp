@@ -15,10 +15,11 @@ namespace DEngine::Gui
 		using ParentType = Widget;
 
 		Std::Box<Widget> child;
+		static constexpr bool defaultExpandChild = true;
+		bool expandChild = defaultExpandChild;
 
 		static constexpr Math::Vec3 scrollbarHoverHighlight = { 0.1f, 0.1f, 0.1f };
-		Math::Vec4 scrollbarInactiveColor = { 0.3f, 0.3f, 0.3f, 1.f };
-
+		Math::Vec4 scrollbarInactiveColor = { 0.4f, 0.4f, 0.4f, 1.f };
 
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
@@ -38,11 +39,20 @@ namespace DEngine::Gui
 
 		virtual bool CursorMove(
 			CursorMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool occluded) override;
 
 		virtual bool CursorPress2(
 			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool consumed) override;
+
+		virtual void TextInput(
+			Context& ctx,
+			Std::FrameAlloc& transientAlloc,
+			TextInputEvent const& event) override;
 
 
 
@@ -57,48 +67,11 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		virtual bool CursorPress(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorPressEvent event) override;
-
-		virtual bool CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event,
-			bool occluded) override;
-
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
-
-		virtual bool TouchMoveEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchMoveEvent event,
-			bool occluded) override;
-
 		virtual void InputConnectionLost() override;
 
-		virtual void CharEnterEvent(
-			Context& ctx) override;
-
-		virtual void CharEvent(
-			Context& ctx,
-			u32 utfValue) override;
-
 		virtual void CharRemoveEvent(
-			Context& ctx) override;
+			Context& ctx,
+			Std::FrameAlloc& transientAlloc) override;
 
 	private:
 		friend impl::SA_Impl;

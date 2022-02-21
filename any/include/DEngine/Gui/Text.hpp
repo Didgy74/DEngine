@@ -14,29 +14,26 @@ namespace DEngine::Gui
 	public:
 		using ParentType = Widget;
 
+		std::string text;
 		Math::Vec4 color = Math::Vec4::One();
 		u32 margin = 0;
+		bool expandX = true;
 		
 		virtual ~Text() override {}
 
-		void String_Set(char const* string);
-		void String_PushBack(u8 value);
-		void String_PopBack();
-		[[nodiscard]] Std::Str StringView() const;
-
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override;
-
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
+		virtual SizeHint GetSizeHint2(
+			GetSizeHint2_Params const& params) const override;
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual void Render2(
+			Render_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
 
 	private:
-		mutable bool invalidated = true;
-		mutable Gui::SizeHint cachedSizeHint{};
-		std::string text;
+		struct Impl;
+		friend Impl;
 	};
 }

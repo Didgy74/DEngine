@@ -29,7 +29,7 @@ namespace DEngine::Editor
 	public:
 		using ComponentType = Transform;
 
-		Gui::LineEdit* positionInputFields[3] = {};
+		Gui::LineFloatEdit* positionInputFields[3] = {};
 		Gui::LineEdit* rotationInput = nullptr;
 		Gui::LineEdit* scaleInputFields[2] = {};
 

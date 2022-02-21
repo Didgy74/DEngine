@@ -8,8 +8,8 @@ namespace DEngine::Gui
 {
 	struct SizeHint
 	{
-		Extent preferred{};
-		bool expandX = false;
-		bool expandY = false;
+		Extent minimum;
+		bool expandX;
+		bool expandY;
 	};
 }

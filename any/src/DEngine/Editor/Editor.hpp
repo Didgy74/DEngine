@@ -87,7 +87,7 @@ namespace DEngine::Editor
 		}
 
 		constexpr auto inputFieldPrecision = 3;
-		constexpr auto defaultTextMargin = 15;
+		constexpr auto defaultTextMargin = 10;
 	}
 
 	struct DrawInfo
@@ -112,25 +112,36 @@ namespace DEngine::Editor
 		Context& operator=(Context&&) noexcept;
 		virtual ~Context();
 
-		[[nodiscard]] EditorImpl& ImplData() const { return *implData; }
+		[[nodiscard]] constexpr EditorImpl const& GetImplData() const noexcept { return *m_implData; }
+		[[nodiscard]] constexpr EditorImpl& GetImplData() noexcept { return *m_implData; }
 
 		void ProcessEvents();
 
 		[[nodiscard]] DrawInfo GetDrawInfo() const;
 
 		[[nodiscard]] bool IsSimulating() const;
-		[[nodiscard]] Scene& GetActiveScene() const;
+		[[nodiscard]] Scene& GetActiveScene();
 
+
+		struct CreateInfo
+		{
+			App::Context& appCtx;
+			Gfx::Context& gfxCtx;
+			Scene& scene;
+			App::WindowID mainWindow;
+			Math::Vec2Int windowPos;
+			App::Extent windowExtent;
+			Math::Vec2UInt windowSafeAreaOffset;
+			App::Extent windowSafeAreaExtent;
+		};
 		[[nodiscard]] static Context Create(
-			App::WindowID mainWindow,
-			Scene* scene,
-			Gfx::Context* gfxCtx);
+			CreateInfo const& createInfo);
 
 
 	protected:
 		Context() = default;
 
-		EditorImpl* implData = nullptr;
+		EditorImpl* m_implData = nullptr;
 	};
 
 	[[nodiscard]] std::vector<Math::Vec3> BuildGizmoArrowMesh3D();

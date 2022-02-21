@@ -9,6 +9,7 @@
 #include <DEngine/Std/Utility.hpp>
 
 // Temp
+#include <DEngine/Application.hpp>
 #include <DEngine/Math/Vector.hpp>
 #include <DEngine/Math/UnitQuaternion.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
@@ -23,7 +24,11 @@ namespace DEngine
 
 	struct Move
 	{
-		void Update(Entity entity, Scene& scene, f32 deltaTime) const;
+		void Update(
+			App::Context& appCtx,
+			Entity entity,
+			Scene& scene,
+			f32 deltaTime) const;
 	};
 
 	class Transform

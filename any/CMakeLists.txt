@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.18)
 
+option(DENGINE_GFX_ENABLE_DEDICATED_THREAD "Enables a dedicated thread to handle the renderer." ON)
+set(DENGINE_GFX_ENABLE_DEDICATED_THREAD ON)
+
+
 project(dengine_any)
 
 find_package(Threads REQUIRED)
@@ -11,7 +15,8 @@ include(SourceFileList.cmake)
 
 set(DENGINE_ANY_TARGET_NAME dengine_any)
 
-#[[
+
+
 # Create main library
 add_library(${DENGINE_ANY_TARGET_NAME} STATIC ${DENGINE_ANY_SOURCE_FILES})
 
@@ -33,31 +38,35 @@ set_target_properties(${DENGINE_ANY_TARGET_NAME} PROPERTIES
 
 # Run script for linking dependencies
 include(LinkDependencies.cmake)
-LinkDependencies(${DENGINE_ANY_TARGET_NAME})
+DEngineAny_LinkDependencies(${DENGINE_ANY_TARGET_NAME} ${DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT})
 
 set(DENGINE_DEFAULT_ASSERT_SETTING ON)
 include(SetupAssertDefines.cmake)
-SetupAssertDefines(${DENGINE_ANY_TARGET_NAME} ${DENGINE_DEFAULT_ASSERT_SETTING})
-]]
+DEngineAny_SetupAssertDefines(${DENGINE_ANY_TARGET_NAME} ${DENGINE_DEFAULT_ASSERT_SETTING})
+
+# Rendering multi-threading switch
+if (${DENGINE_GFX_ENABLE_DEDICATED_THREAD})
+	target_compile_definitions(${DENGINE_ANY_TARGET_NAME} PUBLIC DENGINE_GFX_ENABLE_DEDICATED_THREAD)
+endif()
 
 
 
-
+set(DENGINE_ANY_TARGET_NAME2 dengine_any2)
 # Create main library
-add_library(${DENGINE_ANY_TARGET_NAME} STATIC ${DENGINE_ANY_SOURCE_FILES2})
+add_library(${DENGINE_ANY_TARGET_NAME2} STATIC ${DENGINE_ANY_SOURCE_FILES2})
 
-target_include_directories(${DENGINE_ANY_TARGET_NAME}
+target_include_directories(${DENGINE_ANY_TARGET_NAME2}
 		PUBLIC
 		"include")
-target_link_libraries(${DENGINE_ANY_TARGET_NAME}
+target_link_libraries(${DENGINE_ANY_TARGET_NAME2}
 		PUBLIC
 		Threads::Threads
 		${CMAKE_DL_LIBS})
-target_sources(${DENGINE_ANY_TARGET_NAME}
+target_sources(${DENGINE_ANY_TARGET_NAME2}
 		PUBLIC
 		${DENGINE_HEADERS})
-target_compile_features(${DENGINE_ANY_TARGET_NAME} PRIVATE cxx_std_20)
-set_target_properties(${DENGINE_ANY_TARGET_NAME} PROPERTIES
+target_compile_features(${DENGINE_ANY_TARGET_NAME2} PRIVATE cxx_std_20)
+set_target_properties(${DENGINE_ANY_TARGET_NAME2} PROPERTIES
 		CXX_STANDARD 20
 		CXX_EXTENSIONS OFF)
 #target_compile_options(dengine_any PUBLIC "-ftime-trace")
@@ -67,15 +76,13 @@ if (NOT DEFINED DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT)
 endif()
 # Run script for linking dependencies
 include(LinkDependencies.cmake)
-DEngineAny_LinkDependencies(${DENGINE_ANY_TARGET_NAME} ${DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT})
+DEngineAny_LinkDependencies(${DENGINE_ANY_TARGET_NAME2} ${DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT})
 
 set(DENGINE_DEFAULT_ASSERT_SETTING ON)
 include(SetupAssertDefines.cmake)
-SetupAssertDefines(${DENGINE_ANY_TARGET_NAME} ${DENGINE_DEFAULT_ASSERT_SETTING})
-
+DEngineAny_SetupAssertDefines(${DENGINE_ANY_TARGET_NAME2} ${DENGINE_DEFAULT_ASSERT_SETTING})
 
 # Rendering multi-threading switch
-set(DENGINE_GFX_ENABLE_DEDICATED_THREAD ON)
 if (${DENGINE_GFX_ENABLE_DEDICATED_THREAD})
-	target_compile_definitions(${DENGINE_ANY_TARGET_NAME} PUBLIC DENGINE_GFX_ENABLE_DEDICATED_THREAD)
+	target_compile_definitions(${DENGINE_ANY_TARGET_NAME2} PUBLIC DENGINE_GFX_ENABLE_DEDICATED_THREAD)
 endif()

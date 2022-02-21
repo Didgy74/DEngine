@@ -11,9 +11,10 @@ namespace DEngine::Gui
 {
 	struct Extent
 	{
-		u32 width = {};
-		u32 height = {};
+		u32 width;
+		u32 height;
 
+		[[nodiscard]] constexpr bool IsNothing() const noexcept;
 		[[nodiscard]] constexpr f32 Aspect() const noexcept;
 
 		// Gets the minimum of both directions
@@ -49,8 +50,8 @@ namespace DEngine::Gui
 	// Represents a rectangle in UI space. Includes position and extent.
 	struct Rect
 	{
-		Math::Vec2Int position = {};
-		Extent extent = {};
+		Math::Vec2Int position;
+		Extent extent;
 
 		[[nodiscard]] constexpr i32 Top() const noexcept;
 		[[nodiscard]] constexpr i32 Bottom() const noexcept;
@@ -69,6 +70,7 @@ namespace DEngine::Gui
 	};
 }
 
+constexpr bool DEngine::Gui::Extent::IsNothing() const noexcept { return width == 0 || height == 0; }
 constexpr DEngine::f32 DEngine::Gui::Extent::Aspect() const noexcept { return (f32)width / (f32)height; }
 
 constexpr auto DEngine::Gui::Extent::Min(Extent const& a, Extent const& b) noexcept -> Extent
@@ -94,7 +96,7 @@ constexpr DEngine::i32 DEngine::Gui::Rect::Bottom() const noexcept { return (i32
 constexpr DEngine::i32 DEngine::Gui::Rect::Left() const noexcept { return (i32)position.x; }
 constexpr DEngine::i32 DEngine::Gui::Rect::Right() const noexcept { return (i32)position.x + (i32)extent.width; }
 
-constexpr bool DEngine::Gui::Rect::IsNothing() const noexcept { return extent.width == 0 || extent.height == 0; }
+constexpr bool DEngine::Gui::Rect::IsNothing() const noexcept { return extent.IsNothing(); }
 
 constexpr bool DEngine::Gui::Rect::PointIsInside(Math::Vec2Int point) const noexcept
 {

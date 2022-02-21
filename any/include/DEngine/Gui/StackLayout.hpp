@@ -7,11 +7,6 @@
 
 #include <vector>
 
-namespace DEngine::Gui::impl
-{
-	class StackLayoutImpl;
-}
-
 namespace DEngine::Gui
 {
 	class StackLayout : public Widget
@@ -40,9 +35,9 @@ namespace DEngine::Gui
 
 		bool expandNonDirection = false;
 
-		uSize ChildCount() const;
-		Widget& At(uSize index);
-		Widget const& At(uSize index) const;
+		[[nodiscard]] uSize ChildCount() const;
+		[[nodiscard]] Widget& At(uSize index);
+		[[nodiscard]] Widget const& At(uSize index) const;
 		void AddWidget(Std::Box<Widget>&& in);
 		Std::Box<Widget> ExtractChild(uSize index);
 		void InsertWidget(uSize index, Std::Box<Widget>&& in);
@@ -53,70 +48,44 @@ namespace DEngine::Gui
 
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
-
 		virtual void BuildChildRects(
 			BuildChildRects_Params const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect) const override;
-
 		virtual void Render2(
 			Render_Params const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect) const override;
-
 		virtual void CursorExit(
 			Context& ctx) override;
-
 		virtual bool CursorPress2(
 			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool consumed) override;
-
 		virtual bool CursorMove(
 			CursorMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool occluded) override;
-
-
-
-
-
-
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override;
-
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
-
-		virtual void CharEnterEvent(
-			Context& ctx) override;
-
-		virtual void CharEvent(
+		virtual void TextInput(
 			Context& ctx,
-			u32 utfValue) override;
+			Std::FrameAlloc& transientAlloc,
+			TextInputEvent const& event) override;
 
 		virtual void CharRemoveEvent(
-			Context& ctx) override;
+			Context& ctx,
+			Std::FrameAlloc& transientAlloc) override;
+
+
+
+
+
+
+
+
 
 		virtual void InputConnectionLost() override;
-
-		virtual bool CursorPress(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorPressEvent event) override;
-
-		virtual bool CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event,
-			bool occluded) override;
 
 		virtual bool TouchPressEvent(
 			Context& ctx,
@@ -158,7 +127,8 @@ namespace DEngine::Gui
 		};
 		std::vector<InsertRemoveJob> insertionJobs;
 		bool currentlyIterating = false;
-		
-		friend impl::StackLayoutImpl;
+
+		struct Impl;
+		friend Impl;
 	};
 }

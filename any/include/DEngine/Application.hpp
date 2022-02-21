@@ -37,33 +37,11 @@ namespace DEngine::Application
 		bool minimize;
 		bool restore;
 	};
-	
-	WindowID CreateWindow(
-		char const* title,
-		Extent extents);
-	void DestroyWindow(WindowID) noexcept;
-	u32 GetWindowCount() noexcept;
-	Extent GetWindowExtent(WindowID) noexcept;
-	Extent GetWindowVisibleExtent(WindowID) noexcept;
-	Math::Vec2Int GetWindowPosition(WindowID) noexcept;
-	// Gets the offset of the visible extent, relative to the window's position.
-	Math::Vec2Int GetWindowVisibleOffset(WindowID) noexcept;
-	bool GetWindowMinimized(WindowID) noexcept;
-	WindowEvents GetWindowEvents(WindowID) noexcept;
 	Std::StackVec<char const*, 5> RequiredVulkanInstanceExtensions() noexcept;
-	Std::Opt<u64> CreateVkSurface(
-		WindowID window,
-		uSize vkInstance,
-		void const* vkAllocationCallbacks);
 
 	enum class CursorType : u8;
-	void SetCursor(WindowID window, CursorType cursor) noexcept;
 
 	enum class Orientation : u8;
-	Orientation GetOrientation();
-	bool GetOrientationEvent();
-
-	u64 TickCount();
 
 	enum class OS : u8;
 	enum class Platform : u8;
@@ -75,13 +53,8 @@ namespace DEngine::Application
 		Unpressed,
 		Pressed,
 	};
-	bool ButtonValue(Button input) noexcept;
-	KeyEventType ButtonEvent(Button input) noexcept;
-	f32 ButtonDuration(Button input) noexcept;
 
 	struct CursorData;
-	Std::Opt<CursorData> Cursor() noexcept;
-	void LockCursor(bool state);
 
 	constexpr uSize maxTouchEventCount = 10;
 	enum class TouchEventType : u8;
@@ -120,11 +93,10 @@ namespace DEngine::Application
 		[[nodiscard]] KeyEventType GetKeyEvent(GamepadKey btn) const noexcept;
 
 		Std::Array<f32, (int)GamepadAxis::COUNT> axisValues = {};
-		[[nodiscard]] f32 GetGamepadAxisValue(GamepadAxis axis) const noexcept;
+		[[nodiscard]] f32 GetAxisValue(GamepadAxis axis) const noexcept;
 
 		f32 stickDeadzone = 0.1f;
 	};
-	Std::Opt<GamepadState> GetGamepad();
 
 	enum class LogSeverity
 	{
@@ -132,34 +104,26 @@ namespace DEngine::Application
 		Warning,
 		Error,
 	};
-	void Log(char const* msg);
-
 	class EventForwarder;
-	void InsertEventInterface(EventForwarder&);
-	void RemoveEventInterface(EventForwarder&);
-
 	enum class SoftInputFilter : u8;
-	void OpenSoftInput(Std::Str text, SoftInputFilter inputFilter);
-	void UpdateCharInputContext(Std::Str text);
-	void HideSoftInput();
-
 	class FileInputStream;
-
-	namespace impl { struct AppImpl; }
 
 	class Context
 	{
 	public:
 		Context(Context const&) = delete;
 		Context(Context&& other) noexcept :
-			data{ other.data }
+			m_implData{ other.m_implData }
 		{
-			other.data = nullptr;
+			other.m_implData = nullptr;
 		}
 		~Context() noexcept;
 
 		Context& operator=(Context const&) = delete;
 		Context& operator=(Context&&) noexcept;
+
+		// Thread safe within a frame
+		[[nodiscard]] u64 TickCount() const noexcept;
 
 		struct NewWindow_ReturnT
 		{
@@ -169,16 +133,20 @@ namespace DEngine::Application
 			Extent visibleExtent = {};
 			Math::Vec2UInt visibleOffset = {};
 		};
+		// Thread-safe
 		[[nodiscard]] NewWindow_ReturnT NewWindow(
 			Std::Span<char const> title,
 			Extent extent);
 		[[nodiscard]] bool CanCreateNewWindow() const noexcept;
+		// Thread-safe
 		void DestroyWindow(WindowID) noexcept;
+		// Thread-safe
 		[[nodiscard]] u32 GetWindowCount() const noexcept;
 		[[nodiscard]] Extent GetWindowExtent(WindowID) const noexcept;
 		[[nodiscard]] Math::Vec2Int GetWindowPosition(WindowID) const noexcept;
 		[[nodiscard]] Extent GetWindowVisibleExtent(WindowID) const noexcept;
 		[[nodiscard]] Math::Vec2Int GetWindowVisibleOffset(WindowID) const noexcept;
+		// Thread-safe
 		[[nodiscard]] WindowEvents GetWindowEvents(WindowID) const noexcept;
 
 		struct CreateVkSurface_ReturnT
@@ -186,27 +154,46 @@ namespace DEngine::Application
 			u32 vkResult;
 			uSize vkSurface;
 		};
+		// Thread-safe
 		[[nodiscard]] CreateVkSurface_ReturnT CreateVkSurface(
 			WindowID window,
 			uSize vkInstance,
 			void const* vkAllocationCallbacks) noexcept;
 
+
+		[[nodiscard]] Std::Opt<CursorData> Cursor() noexcept;
+		void LockCursor(bool state);
+		void SetCursor(WindowID window, CursorType cursor) noexcept;
+
+		// Thread safe within a frame
+		[[nodiscard]] Std::Opt<GamepadState> GetGamepad(uSize index) const noexcept;
+
 		void Log(LogSeverity severity, Std::Span<char const> msg);
 
-		enum class SoftInputFilter : u8;
-		void OpenSoftInput(SoftInputFilter inputFilter, Std::Span<char const> text);
+		void StartTextInputSession(SoftInputFilter inputFilter, Std::Span<char const> text);
 		void UpdateCharInputContext(Std::Span<char const> text);
-		void HideSoftInput();
+		void StopTextInputSession();
 
-		void InsertEventInterface(EventForwarder&);
-		void RemoveEventInterface(EventForwarder&);
+		// NOT thread safe
+		void InsertEventForwarder(EventForwarder&);
+		// NOT thread safe
+		void RemoveEventForwarder(EventForwarder&);
 
-	private:
+		// Internal stuff, don't use it.
+		struct Impl;
+		friend Impl;
+		[[nodiscard]] Impl& GetImplData() noexcept;
+		[[nodiscard]] Impl const& GetImplData() const noexcept;
+
+	protected:
 		Context() = default;
 
-		void* data = nullptr;
+		struct Backend;
+		friend Backend;
+		struct BackendInterface;
+		friend BackendInterface;
 
-		friend impl::AppImpl;
+		Impl* m_implData = nullptr;
 	};
 }
 
@@ -352,6 +339,7 @@ private:
 	alignas(8) char m_buffer[16] = {};
 };
 
+// Modifications to the App::Context should generally not happen during the event-callbacks
 class DEngine::Application::EventForwarder
 {
 public:
@@ -363,18 +351,27 @@ public:
 		bool state) {}
 	virtual void CharEnterEvent() {}
 	virtual void CharEvent(u32 utfValue) {}
-	virtual void CharRemoveEvent() {}
+	virtual void CharRemoveEvent(WindowID windowId) {}
 	virtual void CursorMove(
+		Context& appCtx,
 		WindowID windowId,
 		Math::Vec2Int position,
 		Math::Vec2Int positionDelta) {}
+	virtual void TextInputEvent(
+		Context& ctx,
+		WindowID windowId,
+		uSize oldIndex,
+		uSize oldCount,
+		Std::Span<u32 const> newString) {}
 	virtual void TouchEvent(
 		u8 id,
 		TouchEventType type,
 		Math::Vec2 position) {}
-	virtual void WindowCloseSignal(
+
+	// Return true if window should be closed.
+	[[nodiscard]] virtual bool WindowCloseSignal(
 		Context& appCtx,
-		WindowID window) {}
+		WindowID window) { return false; }
 	virtual void WindowCursorEnter(
 		WindowID window,
 		bool entered) {}
@@ -388,9 +385,10 @@ public:
 		WindowID window, 
 		Math::Vec2Int position) {}
 	virtual void WindowResize(
+		Context& appCtx,
 		WindowID window,
 		Extent extent,
-		Math::Vec2Int visiblePos,
+		Math::Vec2UInt visibleOffset,
 		Extent visibleExtent) {}
 };
 

@@ -5,6 +5,19 @@
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Std/Containers/Range.hpp>
 
+// This implements a placement-new operator without having to include <new> or <cstddef>
+namespace DEngine::Std
+{
+	struct PlacementNewTagT {};
+	constexpr auto placementNewTag = PlacementNewTagT{};
+}
+constexpr void* operator new(decltype(sizeof(int)) size, void* ptr, DEngine::Std::PlacementNewTagT) noexcept
+{
+	return ptr;
+}
+
+constexpr void operator delete(void* ptr, DEngine::Std::PlacementNewTagT) noexcept {}
+
 namespace DEngine::Std
 {
 	void NameThisThread(Span<char const> name);

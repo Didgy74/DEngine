@@ -1,6 +1,7 @@
 #include "Vk.hpp"
 #include <DEngine/Gfx/impl/Assert.hpp>
 
+#include <DEngine/Std/Containers/Defer.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
 #include <DEngine/Std/Utility.hpp>
@@ -152,7 +153,9 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	auto const& device = globUtils.device;
 	auto& delQueue = apiData.delQueue;
 	auto& transientAlloc = apiData.frameAllocator;
-	transientAlloc.Reset();
+	Std::Defer allocCleanup { [&transientAlloc]() {
+		transientAlloc.Reset();
+	}};
 
 	NativeWinMgr::ProcessEvents(
 		apiData.nativeWindowManager,

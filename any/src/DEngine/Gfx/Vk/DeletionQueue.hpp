@@ -39,7 +39,7 @@ namespace DEngine::Gfx::Vk
 			TestCallback<T> callback, 
 			T const& customData);
 
-		using CallbackPFN = void(*)(GlobUtils const& globUtils, Std::Span<u8 const> customData);
+		using CallbackPFN = void(*)(GlobUtils const& globUtils, Std::Span<char const> customData);
 
 		// Do NOT call this, only if you're initializing the entire shit
 		[[nodiscard]] static bool Init(
@@ -58,7 +58,7 @@ namespace DEngine::Gfx::Vk
 		// Custom data is mem-copied.
 		void Destroy(
 			CallbackPFN callback, 
-			Std::Span<u8 const> customData);
+			Std::Span<char const> customData);
 
 		// Waits for a fence to be signalled and then executes
 		// the job, and afterwards destroys the Fence.
@@ -66,7 +66,7 @@ namespace DEngine::Gfx::Vk
 		void Destroy(
 			vk::Fence fence,
 			CallbackPFN callback,
-			Std::Span<u8 const> customData);
+			Std::Span<char const> customData);
 
 		void Destroy(VmaAllocation alloc, vk::Image img);
 		void Destroy(vk::Fence fence, VmaAllocation alloc, vk::Image img);
@@ -106,7 +106,7 @@ namespace DEngine::Gfx::Vk
 		struct InFlightQueue
 		{
 			std::vector<Job> jobs;
-			std::vector<u8> customData;
+			std::vector<char> customData;
 		};
 		Std::StackVec<InFlightQueue, Const::maxInFlightCount> jobQueues;
 		InFlightQueue tempQueue;
@@ -119,7 +119,7 @@ namespace DEngine::Gfx::Vk
 		struct FencedJobQueue
 		{
 			std::vector<FencedJob> jobs;
-			std::vector<u8> customData;
+			std::vector<char> customData;
 		};
 		static constexpr int fencedJobQueueCount = 2;
 		FencedJobQueue fencedJobQueues[fencedJobQueueCount];
@@ -143,18 +143,19 @@ namespace DEngine::Gfx::Vk
 		TempData tempData {
 			.callback = callback,
 			.customData = customData };
-		CallbackPFN wrapperFunc = [](GlobUtils const& globUtils, Std::Span<u8 const> customData)
+		CallbackPFN wrapperFunc = [](GlobUtils const& globUtils, Std::Span<char const> customData)
 		{
 			DENGINE_IMPL_GFX_ASSERT(reinterpret_cast<uSize>(customData.Data()) % alignof(TempData) == 0);
 			DENGINE_IMPL_GFX_ASSERT(sizeof(TempData) == customData.Size());
 			auto const& tempData = *reinterpret_cast<TempData const*>(customData.Data());
 			tempData.callback(globUtils, tempData.customData);
 		};
-		Std::Span<u8 const> span = { reinterpret_cast<u8 const*>(&tempData), sizeof(tempData) };
-		Destroy(wrapperFunc, span);
+
+		Std::Span span = { &tempData, 1 };
+		Destroy(wrapperFunc, span.ToConstByteSpan());
 	}
 
-	template<typename T>
+	template<class T>
 	inline void DeletionQueue::DestroyTest(
 		vk::Fence fence,
 		TestCallback<T> callback, 
@@ -168,14 +169,14 @@ namespace DEngine::Gfx::Vk
 		TempData tempData {
 			.callback = callback,
 			.customData = customData };
-		CallbackPFN wrapperFunc = [](GlobUtils const& globUtils, Std::Span<u8 const> customData)
+		CallbackPFN wrapperFunc = [](GlobUtils const& globUtils, Std::Span<char const> customData)
 		{
 			DENGINE_IMPL_GFX_ASSERT(reinterpret_cast<uSize>(customData.Data()) % alignof(TempData) == 0);
 			DENGINE_IMPL_GFX_ASSERT(sizeof(TempData) == customData.Size());
-			TempData& tempData = *reinterpret_cast<TempData*>(customData.Data());
+			auto& tempData = *reinterpret_cast<TempData const*>(customData.Data());
 			tempData.callback(globUtils, tempData.customData);
 		};
-		Std::Span<u8 const> span = { &tempData, sizeof(tempData) };
-		Destroy(fence, wrapperFunc, span);
+		Std::Span span = { &tempData, 1 };
+		Destroy(fence, wrapperFunc, span.ToConstByteSpan());
 	}
 }

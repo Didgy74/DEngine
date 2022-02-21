@@ -8,27 +8,21 @@ using namespace DEngine::Gui;
 
 namespace DEngine::Gui::impl
 {
-	[[nodiscard]] static constexpr Extent GetChildExtent(
-		Extent const& scrollAreaExtent,
+	[[nodiscard]] static constexpr Extent BuildChildRect(
+		Extent const& contentArea,
 		u32 scrollbarThickness,
 		SizeHint const& childSizeHint)
 	{
 		Extent childRect = {};
-		if (childSizeHint.expandX)
-		{
-			childRect.width = scrollAreaExtent.width - scrollbarThickness;
-		}
-		else
-		{
-			childRect.width = scrollAreaExtent.width - scrollbarThickness;
-		}
+		childRect.width = contentArea.width - scrollbarThickness;
+
 		if (childSizeHint.expandY)
 		{
-			childRect.height = scrollAreaExtent.height;
+			childRect.height = Math::Max(childSizeHint.minimum.height, contentArea.height);
 		}
 		else
 		{
-			childRect.height = Math::Max(childSizeHint.preferred.height, scrollAreaExtent.height);
+			childRect.height = childSizeHint.minimum.height;
 		}
 		return childRect;
 	}
@@ -52,7 +46,7 @@ namespace DEngine::Gui::impl
 	{
 		Rect childRect = {};
 		childRect.position = widgetRect.position;
-		childRect.extent = GetChildExtent(widgetRect.extent, scrollbarThickness, childSizeHint);
+		childRect.extent = BuildChildRect(widgetRect.extent, scrollbarThickness, childSizeHint);
 		if (!childSizeHint.expandY && (childRect.extent.height > widgetRect.extent.height))
 			childRect.position.y -= scrollbarPos;
 		return childRect;
@@ -65,14 +59,6 @@ namespace DEngine::Gui::impl
 		f32 factor = (f32)contentAreaHeight / (f32)childHeight;
 		factor = Math::Min(factor, 1.f);
 		return (u32)Math::Round((f32)contentAreaHeight * factor);
-	}
-
-	[[nodiscard]] static u32 GetScrollbarPosY(
-		i32 scrollAreaPosY,
-		u32 scrollbarPos,
-		u32 childHeight)
-	{
-
 	}
 
 	[[nodiscard]] static Rect GetScrollbarRect(
@@ -130,33 +116,66 @@ namespace DEngine::Gui::impl
 		DENGINE_IMPL_UNREACHABLE();
 		return {};
 	}
+}
 
+SizeHint ScrollArea::GetSizeHint(
+	Context const& ctx) const
+{
+	SizeHint returnVal = {};
+	returnVal.minimum = { 50, 50 };
+	returnVal.expandX = true;
+	returnVal.expandY = true;
+
+	Gui::SizeHint childSizeHint = child->GetSizeHint(ctx);
+	returnVal.minimum.width = childSizeHint.minimum.width;
+
+	returnVal.minimum.width += scrollbarThickness;
+
+	return returnVal;
+}
+
+void ScrollArea::Render(
+	Context const& ctx,
+	Extent framebufferExtent,
+	Rect widgetRect,
+	Rect visibleRect,
+	DrawInfo& drawInfo) const
+{
+}
+
+void ScrollArea::InputConnectionLost()
+{
+	child->InputConnectionLost();
+}
+
+void ScrollArea::CharRemoveEvent(
+	Context& ctx,
+	Std::FrameAlloc& transientAlloc)
+{
+	if (child)
+	{
+		child->CharRemoveEvent(ctx, transientAlloc);
+	}
+}
+
+namespace DEngine::Gui::impl
+{
 	struct PointerPressEvent
 	{
 		u8 id;
 		PointerType type;
 		Math::Vec2 pos;
 		bool pressed;
-		bool consumed;
 	};
 
 	template<class T>
 	struct PointerPress_Params
 	{
-		ScrollArea* scrollArea = nullptr;
-		Context* ctx = nullptr;
-		WindowID windowId = {};
-		Rect const* widgetRect = nullptr;
-		Rect const* visibleRect = nullptr;
-		PointerPressEvent const* pointer = nullptr;
-		T const* event = nullptr;
-	};
-
-	struct PointerPress_Params2
-	{
 		ScrollArea& scrollArea;
 		RectCollection const& rectCollection;
 		PointerPressEvent const& pointer;
+		bool eventConsumed;
+		T const& eventParams;
 	};
 
 	struct PointerMoveEvent
@@ -169,18 +188,6 @@ namespace DEngine::Gui::impl
 	template<class T>
 	struct PointerMove_Params
 	{
-		ScrollArea* scrollArea = nullptr;
-		Context* ctx = nullptr;
-		WindowID windowId = {};
-		Rect const* widgetRect = nullptr;
-		Rect const* visibleRect = nullptr;
-		PointerMoveEvent const* pointer = nullptr;
-		T const* event = nullptr;
-	};
-
-	template<class T>
-	struct PointerMove_Params2
-	{
 		ScrollArea& scrollArea;
 		RectCollection const& rectCollection;
 		PointerMoveEvent const& pointer;
@@ -191,203 +198,24 @@ namespace DEngine::Gui::impl
 class Gui::impl::SA_Impl
 {
 public:
-	// T should either be CursorPressEvent or TouchPressEvent.
-	//
-	// Returns true if the event was consumed.
-	template<class T>
-	[[nodiscard]] static bool PointerPress(PointerPress_Params<T> const& params)
-	{
-		auto& scrollArea = *params.scrollArea;
-		auto& widgetRect = *params.widgetRect;
-		auto& visibleRect = *params.visibleRect;
-		auto& pointer = *params.pointer;
-
-		SizeHint childSizeHint = {};
-		if (scrollArea.child)
-			childSizeHint = scrollArea.child->GetSizeHint(*params.ctx);
-
-		auto const childExtent = GetChildExtent(widgetRect.extent, scrollArea.scrollbarThickness, childSizeHint);
-
-		auto eventConsumed = false;
-
-		auto const pointerInside =
-			widgetRect.PointIsInside(pointer.pos) &&
-			visibleRect.PointIsInside(pointer.pos);
-
-		if (pointerInside && pointer.pressed)
-			eventConsumed = true;
-
-		auto const scrollbarRect = impl::GetScrollbarRect(
-			scrollArea.scrollbarThickness,
-			scrollArea.currScrollbarPos,
-			widgetRect,
-			childExtent.height);
-
-		auto const pointerInsideScrollbar =
-			scrollbarRect.PointIsInside(pointer.pos) &&
-			visibleRect.PointIsInside(pointer.pos);
-
-		if (scrollArea.scrollbarHoldData.HasValue())
-		{
-			auto const heldData = scrollArea.scrollbarHoldData.Value();
-			if (heldData.pointerId == pointer.id && !pointer.pressed)
-			{
-				scrollArea.scrollbarHoldData = Std::nullOpt;
-			}
-		}
-		else
-		{
-			if (pointerInsideScrollbar && pointer.pressed)
-			{
-				ScrollArea::Scrollbar_Pressed_T newPressedData = {};
-				newPressedData.pointerId = pointer.id;
-				newPressedData.pointerRelativePosY = pointer.pos.y - scrollbarRect.position.y;
-				scrollArea.scrollbarHoldData = newPressedData;
-			}
-		}
-
-		Rect const childRect = impl::GetChildRect(
-			widgetRect,
-			childSizeHint,
-			scrollArea.currScrollbarPos,
-			scrollArea.scrollbarThickness);
-
-		if (scrollArea.child)
-		{
-			auto childConsumed = false;
-
-			if constexpr (Std::Trait::isSame<T, CursorPressEvent>)
-			{
-				childConsumed = scrollArea.child->CursorPress(
-					*params.ctx,
-					params.windowId,
-					childRect,
-					Rect::Intersection(childRect, visibleRect),
-					{ (i32)pointer.pos.x, (i32)pointer.pos.y },
-					*params.event);
-
-
-			}
-			else if constexpr (Std::Trait::isSame<T, TouchPressEvent>)
-			{
-				childConsumed = scrollArea.child->TouchPressEvent(
-					*params.ctx,
-					params.windowId,
-					childRect,
-					Rect::Intersection(childRect, visibleRect),
-					*params.event);
-
-			}
-
-			eventConsumed = eventConsumed || childConsumed;
-		}
-
-		return eventConsumed;
-	}
-
-	// T should either be CursorMoveEvent or TouchMoveEvent.
-	//
 	// Returns true if the pointer is occluded.
 	template<class T>
-	static bool PointerMove(PointerMove_Params<T> const& params)
-	{
-		auto& scrollArea = *params.scrollArea;
-		auto& widgetRect = *params.widgetRect;
-		auto& visibleRect = *params.visibleRect;
-		auto& pointer = *params.pointer;
-
-		SizeHint childSizeHint = {};
-		if (scrollArea.child)
-			childSizeHint = scrollArea.child->GetSizeHint(*params.ctx);
-
-		auto const pointerInside =
-			 widgetRect.PointIsInside(pointer.pos) &&
-			 visibleRect.PointIsInside(pointer.pos);
-
-		auto const childRect = impl::GetChildRect(
-			widgetRect,
-			childSizeHint,
-			scrollArea.currScrollbarPos,
-			scrollArea.scrollbarThickness);
-
-		if (pointer.id == cursorPointerId)
-		{
-			auto const childExtent = GetChildExtent(widgetRect.extent, scrollArea.scrollbarThickness, childSizeHint);
-
-			auto const scrollbarRect = impl::GetScrollbarRect(
-				scrollArea.scrollbarThickness,
-				scrollArea.currScrollbarPos,
-				widgetRect,
-				childExtent.height);
-
-			auto const pointerInsideScrollbar =
-				scrollbarRect.PointIsInside(pointer.pos) &&
-				visibleRect.PointIsInside(pointer.pos);
-
-			scrollArea.scrollbarHoveredByCursor = pointerInsideScrollbar && !pointer.occluded;
-		}
-
-		if (scrollArea.scrollbarHoldData.HasValue())
-		{
-			auto const& heldData = scrollArea.scrollbarHoldData.Value();
-			if (heldData.pointerId == pointer.id && widgetRect.extent.height < childRect.extent.height)
-			{
-				// The scroll-bar is currently pressed so we need to move it with the pointer.
-
-				// Find out where mouse is relative to the scroll bar position
-				i32 test = pointer.pos.y - widgetRect.position.y - heldData.pointerRelativePosY;
-				u32 scrollBarHeight = (f32)widgetRect.extent.height * (f32)widgetRect.extent.height / (f32)childRect.extent.height;
-				f32 factor = (f32)test / (f32)(widgetRect.extent.height - scrollBarHeight);
-				factor = Math::Clamp(factor, 0.f, 1.f);
-				scrollArea.currScrollbarPos = u32(factor * (f32)(childRect.extent.height - widgetRect.extent.height));
-			}
-		}
-
-		// We only want one of either.
-		if constexpr (Std::Trait::isSame<T, CursorMoveEvent>)
-		{
-			scrollArea.child->CursorMove(
-				*params.ctx,
-				params.windowId,
-				childRect,
-				Rect::Intersection(childRect, visibleRect),
-				*params.event,
-				pointer.occluded);
-		}
-		else if constexpr (Std::Trait::isSame<T, TouchMoveEvent>)
-		{
-			scrollArea.child->TouchMoveEvent(
-				*params.ctx,
-				params.windowId,
-				childRect,
-				Rect::Intersection(childRect, visibleRect),
-				*params.event,
-				pointer.occluded);
-		}
-
-		return pointerInside;
-	}
-
-	// Returns true if the pointer is occluded.
-	template<class T>
-	static bool PointerMove(PointerMove_Params2<T> const& params);
+	static bool PointerMove(PointerMove_Params<T> const& params);
 
 	// Returns true if the event was consumed.
-	[[nodiscard]] static bool PointerPress(PointerPress_Params2 const& params);
+	template<class T>
+	[[nodiscard]] static bool PointerPress(PointerPress_Params<T> const& params);
 };
 
 template<class T>
-bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params2<T> const& params)
+bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params<T> const& params)
 {
 	auto& scrollArea = params.scrollArea;
-	auto const& rectPair = params.rectCollection.GetRect(scrollArea);
+	auto& rectCollection = params.rectCollection;
+	auto const& rectPair = rectCollection.GetRect(scrollArea);
 	auto& widgetRect = rectPair.widgetRect;
 	auto& visibleRect = rectPair.visibleRect;
 	auto& pointer = params.pointer;
-
-	auto const pointerInside =
-		widgetRect.PointIsInside(pointer.pos) &&
-		visibleRect.PointIsInside(pointer.pos);
 
 	auto const contentArea = impl::GetContentArea(widgetRect, scrollArea.scrollbarThickness);
 
@@ -429,7 +257,7 @@ bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params2<T> const& params)
 				widgetRect,
 				childRect.extent.height);
 			auto const pointerInsideScrollbar = scrollbarRect.PointIsInside(pointer.pos);
-			if (pointerInsideScrollbar && pointer.id == impl::cursorPointerId)
+			if (!pointer.occluded && pointerInsideScrollbar && pointer.id == impl::cursorPointerId)
 			{
 				scrollArea.scrollbarHoveredByCursor = true;
 			}
@@ -449,16 +277,25 @@ bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params2<T> const& params)
 		scrollArea.scrollbarHoveredByCursor = false;
 	}
 
+	auto const pointerInside =
+		widgetRect.PointIsInside(pointer.pos) &&
+		visibleRect.PointIsInside(pointer.pos);
+
 	// Pass down the event
 	if (scrollArea.child)
 	{
 		auto const pointerInsideScrollbarArea = pointerInside && !contentArea.PointIsInside(pointer.pos);
 		auto const pointerOccludedForChild = pointer.occluded || pointerInsideScrollbarArea;
 
+		auto& child = *scrollArea.child;
+		auto const& childRectPair = rectCollection.GetRect(child);
+
 		if constexpr (Std::Trait::isSame<T, Widget::CursorMoveParams>)
 		{
-			scrollArea.child->CursorMove(
+			child.CursorMove(
 				params.eventParams,
+				childRectPair.widgetRect,
+				contentArea,
 				pointerOccludedForChild);
 		}
 	}
@@ -466,10 +303,12 @@ bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params2<T> const& params)
 	return pointerInside;
 }
 
-bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params2 const& params)
+template<class T>
+bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params<T> const& params)
 {
 	auto& scrollArea = params.scrollArea;
-	auto const& rectPair = params.rectCollection.GetRect(scrollArea);
+	auto& rectCollection = params.rectCollection;
+	auto const& rectPair = rectCollection.GetRect(scrollArea);
 	auto& widgetRect = rectPair.widgetRect;
 	auto& visibleRect = rectPair.visibleRect;
 	auto& pointer = params.pointer;
@@ -477,6 +316,8 @@ bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params2 const& params)
 	auto const pointerInside =
 		widgetRect.PointIsInside(pointer.pos) &&
 		visibleRect.PointIsInside(pointer.pos);
+
+	bool newConsumed = params.eventConsumed;
 
 	auto const contentArea = impl::GetContentArea(widgetRect, scrollArea.scrollbarThickness);
 
@@ -505,7 +346,7 @@ bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params2 const& params)
 				scrollArea.scrollbarHoldData = Std::nullOpt;
 			}
 		}
-		else if (pointer.pressed && !pointer.consumed)
+		else if (pointer.pressed && !newConsumed)
 		{
 			// We are not holding the scrollbar. If this pointer was pressed and not already consumed, check if we
 			// hit the scrollbar.
@@ -524,6 +365,8 @@ bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params2 const& params)
 				newPressedData.pointerId = pointer.id;
 				newPressedData.pointerRelativePosY = pointer.pos.y - (f32)scrollbarRect.position.y;
 				scrollArea.scrollbarHoldData = newPressedData;
+
+				newConsumed = true;
 			}
 		}
 	}
@@ -535,217 +378,38 @@ bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params2 const& params)
 		scrollArea.scrollbarHoveredByCursor = false;
 	}
 
-
 	scrollArea.currScrollbarPos = correctedScrollbarPos;
 
-	return pointerInside;
-}
 
-SizeHint ScrollArea::GetSizeHint(
-	Context const& ctx) const
-{
-	SizeHint returnVal = {};
-	returnVal.preferred = { 50, 50 };
-	returnVal.expandX = true;
-	returnVal.expandY = true;
-
-	Gui::SizeHint childSizeHint = child->GetSizeHint(ctx);
-	returnVal.preferred.width = childSizeHint.preferred.width;
-
-	returnVal.preferred.width += scrollbarThickness;
-
-	return returnVal;
-}
-
-void ScrollArea::Render(
-	Context const& ctx,
-	Extent framebufferExtent,
-	Rect widgetRect,
-	Rect visibleRect,
-	DrawInfo& drawInfo) const
-{
-	if (Rect::Intersection(widgetRect, visibleRect).IsNothing())
-		return;
-
-	auto childSizeHint = child->GetSizeHint(ctx);
-
-	auto childExtent = impl::GetChildExtent(widgetRect.extent, scrollbarThickness, childSizeHint);
-	
-	auto scrollbarPos = impl::GetCorrectedScrollbarPos(
-		widgetRect.extent.height,
-		childExtent.height,
-		this->currScrollbarPos);
-
-	auto childRect = impl::GetChildRect(
-		widgetRect,
-		childSizeHint,
-		scrollbarPos,
-		scrollbarThickness);
-
-	auto childVisibleRect = Rect::Intersection(childRect, visibleRect);
-
-	if (child && !childVisibleRect.IsNothing())
+	// Dispatch to child.
+	if (scrollArea.child)
 	{
-		auto scopedScissor = DrawInfo::ScopedScissor(drawInfo, childVisibleRect);
-		child->Render(
-			ctx,
-			framebufferExtent,
-			childRect,
-			childVisibleRect,
-			drawInfo);
-	}
+		auto const pointerInsideScrollbarArea =
+			pointerInside &&
+			!contentArea.PointIsInside(pointer.pos);
+		newConsumed = newConsumed || pointerInsideScrollbarArea;
 
-	// Draw scrollbar
-	auto scrollBarRect = impl::GetScrollbarRect(
-		scrollbarThickness,
-		scrollbarPos,
-		widgetRect,
-		childRect.extent.height);
-
-	Math::Vec4 color = scrollbarInactiveColor;
-	if (scrollbarHoldData.HasValue())
-	{
-		color = { 1.f, 1.f, 1.f, 1.f };
-	}
-	else
-	{
-		color = scrollbarInactiveColor;
-		if (scrollbarHoveredByCursor)
+		auto& child = *scrollArea.child;
+		auto const& childRectPair = rectCollection.GetRect(child);
+		if constexpr (Std::Trait::isSame<T, Widget::CursorPressParams>)
 		{
-			for (auto i = 0; i < 3; i++)
-				color[i] += scrollbarHoverHighlight[i];
+			auto const childConsumed = child.CursorPress2(
+				params.eventParams,
+				childRectPair.widgetRect,
+				contentArea,
+				newConsumed);
+			newConsumed = newConsumed || childConsumed;
 		}
 	}
 
-	for (auto i = 0; i < 4; i++)
-		color[i] = Math::Clamp(color[i], 0.f, 1.f);
-
-	drawInfo.PushFilledQuad(scrollBarRect, color);
-}
-
-bool ScrollArea::CursorPress(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Math::Vec2Int cursorPos,
-	CursorPressEvent event)
-{
-	impl::PointerPressEvent pointerPress = {};
-	pointerPress.id = impl::cursorPointerId;
-	pointerPress.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	pointerPress.type = impl::ToPointerType(event.button);
-	pointerPress.pressed = event.pressed;
-
-	impl::PointerPress_Params<decltype(event)> params = {};
-	params.scrollArea = this;
-	params.ctx = &ctx;
-	params.windowId = windowId;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
-	params.pointer = &pointerPress;
-	params.event = &event;
-
-	return impl::SA_Impl::PointerPress(params);
-}
-
-bool ScrollArea::CursorMove(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	CursorMoveEvent event,
-	bool occluded)
-{
-	impl::PointerMoveEvent pointerMove = {};
-	pointerMove.id = impl::cursorPointerId;
-	pointerMove.occluded = occluded;
-	pointerMove.pos = { (f32)event.position.x, (f32)event.position.y };
-
-	impl::PointerMove_Params<decltype(event)> params = {};
-	params.scrollArea = this;
-	params.ctx = &ctx;
-	params.windowId = windowId;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
-	params.pointer = &pointerMove;
-	params.event = &event;
-
-	return impl::SA_Impl::PointerMove(params);
-}
-
-bool ScrollArea::TouchPressEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchPressEvent event)
-{
-	impl::PointerPressEvent pointerPress = {};
-	pointerPress.id = event.id;
-	pointerPress.pos = event.position;
-	pointerPress.type = impl::PointerType::Primary;
-	pointerPress.pressed = event.pressed;
-
-	impl::PointerPress_Params<decltype(event)> params = {};
-	params.scrollArea = this;
-	params.ctx = &ctx;
-	params.windowId = windowId;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
-	params.pointer = &pointerPress;
-	params.event = &event;
-
-	return impl::SA_Impl::PointerPress(params);
-}
-
-bool ScrollArea::TouchMoveEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchMoveEvent event,
-	bool occluded)
-{
-	impl::PointerMoveEvent pointerMove = {};
-	pointerMove.id = event.id;
-	pointerMove.occluded = occluded;
-	pointerMove.pos = event.position;
-
-	impl::PointerMove_Params<decltype(event)> params = {};
-	params.scrollArea = this;
-	params.ctx = &ctx;
-	params.windowId = windowId;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
-	params.pointer = &pointerMove;
-	params.event = &event;
-
-	return impl::SA_Impl::PointerMove(params);
-}
-
-void ScrollArea::InputConnectionLost()
-{
-	child->InputConnectionLost();
-}
-
-void ScrollArea::CharEnterEvent(Context& ctx)
-{
-	child->CharEnterEvent(ctx);
-}
-
-void ScrollArea::CharEvent(Context& ctx, u32 utfValue)
-{
-	child->CharEvent(ctx, utfValue);
-}
-
-void ScrollArea::CharRemoveEvent(Context& ctx)
-{
-	child->CharRemoveEvent(ctx);
+	newConsumed = newConsumed || pointerInside;
+	return newConsumed;
 }
 
 SizeHint ScrollArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
 {
+	auto& pusher = params.pusher;
+
 	if (child)
 	{
 		child->GetSizeHint2(params);
@@ -753,13 +417,13 @@ SizeHint ScrollArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) con
 
 	SizeHint returnVal = {};
 
-	returnVal.preferred.width = 150;
-	returnVal.preferred.height = 150;
+	returnVal.minimum.width = 150 + scrollbarThickness;
+	returnVal.minimum.height = 150;
 
 	returnVal.expandX = true;
 	returnVal.expandY = true;
 
-	params.pusher.PushSizeHint(*this, returnVal);
+	pusher.Push(*this, returnVal);
 
 	return returnVal;
 }
@@ -769,15 +433,18 @@ void ScrollArea::BuildChildRects(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
+	auto& pusher = params.pusher;
+
 	if (child)
 	{
-		auto const childSizeHint = params.builder.GetSizeHint(*child);
+		auto const& childWidget = *child;
+		auto const childSizeHint = pusher.GetSizeHint(childWidget);
 
 		auto const contentArea = impl::GetContentArea(widgetRect, scrollbarThickness);
 
 		auto correctedScrollbarPos = impl::GetCorrectedScrollbarPos(
 			contentArea.extent.height,
-			childSizeHint.preferred.height,
+			childSizeHint.minimum.height,
 			currScrollbarPos);
 
 		Rect childRect = impl::GetChildRect(
@@ -788,8 +455,8 @@ void ScrollArea::BuildChildRects(
 
 		auto const childVisibleRect = Rect::Intersection(visibleRect, contentArea);
 
-		params.builder.PushRect(*child, { childRect, childVisibleRect });
-		child->BuildChildRects(params, childRect, childVisibleRect);
+		params.pusher.Push(*child, { childRect, childVisibleRect });
+		childWidget.BuildChildRects(params, childRect, childVisibleRect);
 	}
 }
 
@@ -798,19 +465,23 @@ void ScrollArea::Render2(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
+	auto& rectCollection = params.rectCollection;
+	auto& drawInfo = params.drawInfo;
+
+
 	if (Rect::Intersection(widgetRect, visibleRect).IsNothing())
 		return;
 
-	RectCombo childRectCombo = {};
+	RectPair childRectCombo = {};
 
 	if (child)
 	{
-		childRectCombo = params.rectCollection.GetRect(*child);
+		childRectCombo = rectCollection.GetRect(*child);
 
 		if (!childRectCombo.visibleRect.IsNothing())
 		{
 			auto const scopedScissor = DrawInfo::ScopedScissor(
-				params.drawInfo,
+				drawInfo,
 				childRectCombo.visibleRect);
 
 			child->Render2(
@@ -869,6 +540,8 @@ void ScrollArea::CursorExit(Context& ctx)
 
 bool ScrollArea::CursorMove(
 	Widget::CursorMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
 	bool occluded)
 {
 	impl::PointerMoveEvent pointerMove = {};
@@ -876,7 +549,7 @@ bool ScrollArea::CursorMove(
 	pointerMove.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
 	pointerMove.occluded = occluded;
 
-	impl::PointerMove_Params2<Std::Trait::RemoveCVRef<decltype(params)>> temp {
+	impl::PointerMove_Params<Widget::CursorMoveParams> temp {
 		*this,
 		params.rectCollection,
 		pointerMove,
@@ -887,6 +560,8 @@ bool ScrollArea::CursorMove(
 
 bool ScrollArea::CursorPress2(
 	Widget::CursorPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
 	bool consumed)
 {
 	impl::PointerPressEvent pointerPressEvent = {};
@@ -894,12 +569,24 @@ bool ScrollArea::CursorPress2(
 	pointerPressEvent.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
 	pointerPressEvent.pressed = params.event.pressed;
 	pointerPressEvent.type = impl::ToPointerType(params.event.button);
-	pointerPressEvent.consumed = consumed;
 
-	impl::PointerPress_Params2 temp = {
-		*this,
-		params.rectCollection,
-		pointerPressEvent };
+	impl::PointerPress_Params<Widget::CursorPressParams> temp = {
+		.scrollArea = *this,
+		.rectCollection = params.rectCollection,
+		.pointer = pointerPressEvent,
+		.eventConsumed = consumed,
+		.eventParams = params };
 
 	return impl::SA_Impl::PointerPress(temp);
+}
+
+void ScrollArea::TextInput(
+	Context& ctx,
+	Std::FrameAlloc& transientAlloc,
+	TextInputEvent const& event)
+{
+	if (child)
+	{
+		child->TextInput(ctx, transientAlloc, event);
+	}
 }

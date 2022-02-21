@@ -26,18 +26,9 @@ namespace DEngine::Application::impl
 		GLFWcursor* cursorTypes[(int)CursorType::COUNT] = {};
 	};
 
-	static Button Backend_GLFW_MouseButtonToRawButton(i32 input);
+	static Button Backend_GLFWButtonToDEngineButton(i32 input);
 
 	/*
-	static void Backend_GLFW_KeyboardKeyCallback(
-		GLFWwindow* window,
-		int key,
-		int scancode,
-		int action,
-		int mods);
-	static void Backend_GLFW_CharCallback(
-		GLFWwindow* window,
-		unsigned int codepoint);
 	static void Backend_GLFW_ScrollCallback(
 		GLFWwindow* window,
 		double xoffset,
@@ -59,6 +50,10 @@ namespace DEngine::Application::impl
 		GLFWwindow* window,
 		int xpos,
 		int ypos);
+	static void Backend_GLFW_WindowSizeCallback(
+		GLFWwindow* window,
+		int width,
+		int height);
 
 	static void Backend_GLFW_CursorPosCallback(
 		GLFWwindow* window,
@@ -69,11 +64,16 @@ namespace DEngine::Application::impl
 		int button,
 		int action,
 		int mods);
-	/*
-	static void Backend_GLFW_WindowSizeCallback(
+	static void Backend_GLFW_KeyboardKeyCallback(
 		GLFWwindow* window,
-		int width,
-		int height);
+		int key,
+		int scancode,
+		int action,
+		int mods);
+	static void Backend_GLFW_CharCallback(
+		GLFWwindow* window,
+		unsigned int codepoint);
+	/*
 
 	static void Backend_GLFW_WindowFramebufferSizeCallback(
 		GLFWwindow* window,
@@ -82,199 +82,20 @@ namespace DEngine::Application::impl
 	 */
 }
 
-namespace DEngine::Application::detail
-{
-	struct Backend_Data
-	{
-		bool cursorLocked = false;
-		Math::Vec2Int virtualCursorPos{};
-
-		GLFWcursor* cursorTypes[(int)CursorType::COUNT] = {};
-	};
-
-	static Backend_Data* pBackendData = nullptr;
-
-	static void Backend_GLFW_ErrorCallback(
-		int error, 
-		const char* description);
-	static Button Backend_GLFW_KeyboardKeyToRawButton(i32 input);
-	static Button Backend_GLFW_MouseButtonToRawButton(i32 input);
-	static void Backend_GLFW_KeyboardKeyCallback(
-		GLFWwindow* window, 
-		int key, 
-		int scancode, 
-		int action, 
-		int mods);
-	static void Backend_GLFW_CharCallback(
-		GLFWwindow* window, 
-		unsigned int codepoint);
-	static void Backend_GLFW_MouseButtonCallback(
-		GLFWwindow* window,
-		int button,
-		int action,
-		int mods);
-	static void Backend_GLFW_CursorPosCallback(
-		GLFWwindow* window,
-		double xpos,
-		double ypos);
-	static void Backend_GLFW_ScrollCallback(
-		GLFWwindow* window, 
-		double xoffset,
-		double yoffset);
-	static void Backend_GLFW_JoystickConnectedCallback(
-		int jid, 
-		int event);
-	static void Backend_GLFW_WindowPosCallback(
-		GLFWwindow* window, 
-		int xpos,
-		int ypos);
-	static void Backend_GLFW_WindowSizeCallback(
-		GLFWwindow* window,
-		int width,
-		int height);
-	static void Backend_GLFW_WindowCursorEnterCallback(
-		GLFWwindow* window,
-		int entered);
-	static void Backend_GLFW_WindowFramebufferSizeCallback(
-		GLFWwindow* window, 
-		int width, 
-		int height);
-	static void Backend_GLFW_WindowCloseCallback(
-		GLFWwindow* window);
-	static void Backend_GLFW_WindowFocusCallback(
-		GLFWwindow* window, 
-		int focused);
-	static void Backend_GLFW_WindowMinimizeCallback(
-		GLFWwindow* window, 
-		int iconified);
-}
-
 using namespace DEngine;
 using namespace DEngine::Application;
 
-void Application::LockCursor(bool state)
+void* Application::impl::Backend::Initialize(Context& ctx)
 {
-	auto& appData = *detail::pAppData;
-	auto& backendData = *detail::pBackendData;
+	auto& implData = ctx.GetImplData();
 
-	auto const& window = *Std::FindIf(
-		appData.windows.begin(),
-		appData.windows.end(),
-		[](decltype(appData.windows)::value_type const& val) -> bool {
-			return val.id == (WindowID)0; });
-	if (state)
-		glfwSetInputMode((GLFWwindow*)window.platformHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	else
-		glfwSetInputMode((GLFWwindow*)window.platformHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-
-	backendData.cursorLocked = state;
-}
-
-void Application::OpenSoftInput(Std::Str text, SoftInputFilter filter)
-{
-}
-
-void Application::UpdateCharInputContext(Std::Str text)
-{
-
-}
-
-void Application::HideSoftInput()
-{
-}
-
-void Application::detail::Backend_Log(char const* msg)
-{
-	std::cout << msg << std::endl;
-}
-
-void Application::SetCursor(WindowID windowIn, CursorType cursor) noexcept
-{
-	auto& appData = *detail::pAppData;
-	auto& backendData = *detail::pBackendData;
-
-	auto& window = *Std::FindIf(
-		appData.windows.begin(),
-		appData.windows.end(),
-		[windowIn](decltype(appData.windows)::value_type& val) -> bool {
-			return val.id == windowIn; });
-
-	if (window.windowData.currentCursorType != cursor)
-	{
-		glfwSetCursor((GLFWwindow*)window.platformHandle, backendData.cursorTypes[(u8)cursor]);
-		window.windowData.currentCursorType = cursor;
-	}
-}
-
-Application::WindowID Application::CreateWindow(
-	char const* title,
-	Extent extents)
-{
-	auto& appData = *detail::pAppData;
-
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	GLFWwindow* rawHandle = glfwCreateWindow((int)extents.width, (int)extents.height, title, nullptr, nullptr);
-	if (!rawHandle)
-		throw std::runtime_error("DEngine - Application: Could not make a new window.");
-
-	detail::AppData::WindowNode newNode{};
-	newNode.id = (WindowID)appData.windowIdTracker;
-	appData.windowIdTracker++;
-	newNode.platformHandle = rawHandle;
-	newNode.events = {};
-	// Get window size
-	int widthX;
-	int heightY;
-	glfwGetWindowSize(rawHandle, &widthX, &heightY);
-	newNode.windowData.extent = { (u32)widthX, (u32)heightY };
-
-	int windowPosX = 0;
-	int windowPosY = 0;
-	glfwGetWindowPos(rawHandle, &windowPosX, &windowPosY);
-	newNode.windowData.position = { (i32)windowPosX,(i32)windowPosY };
-
-	newNode.windowData.visibleOffset = {};
-	newNode.windowData.visibleExtent = newNode.windowData.extent;
-	
-	appData.windows.push_back(newNode);
-
-	glfwSetWindowPosCallback(rawHandle, &detail::Backend_GLFW_WindowPosCallback);
-	glfwSetWindowSizeCallback(rawHandle, &detail::Backend_GLFW_WindowSizeCallback);
-	glfwSetWindowFocusCallback(rawHandle, &detail::Backend_GLFW_WindowFocusCallback);
-	glfwSetWindowIconifyCallback(rawHandle, &detail::Backend_GLFW_WindowMinimizeCallback);
-	glfwSetWindowCloseCallback(rawHandle, &detail::Backend_GLFW_WindowCloseCallback);
-	glfwSetCursorEnterCallback(rawHandle, &detail::Backend_GLFW_WindowCursorEnterCallback);
-
-
-	glfwSetCursorPosCallback(rawHandle, &detail::Backend_GLFW_CursorPosCallback);
-	glfwSetMouseButtonCallback(rawHandle, &detail::Backend_GLFW_MouseButtonCallback);
-	glfwSetCharCallback(rawHandle, &detail::Backend_GLFW_CharCallback);
-	glfwSetKeyCallback(rawHandle, &detail::Backend_GLFW_KeyboardKeyCallback);
-
-	return newNode.id;
-}
-
-void Application::detail::Backend_DestroyWindow(AppData::WindowNode& windowNode)
-{
-	glfwDestroyWindow((GLFWwindow*)windowNode.platformHandle);
-}
-
-static void Application::detail::Backend_GLFW_ErrorCallback(
-	int error, 
-	const char* description)
-{
-	fputs(description, stderr);
-}
-
-void* Application::impl::Backend::Initialize(AppData& appData)
-{
 	bool glfwSuccess = glfwInit();
 	if (!glfwSuccess)
 		return nullptr;
 
 	auto* backendData = new Backend_Data;
 
-	appData.cursorOpt = CursorData();
+	implData.cursorOpt = CursorData();
 
 	backendData->cursorTypes[(u8)CursorType::Arrow] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
 	backendData->cursorTypes[(u8)CursorType::VerticalResize] = glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR);
@@ -283,7 +104,7 @@ void* Application::impl::Backend::Initialize(AppData& appData)
 	return backendData;
 }
 
-void Application::impl::Backend::ProcessEvents(AppData& appData, PollMode pollMode, Std::Opt<u64> timeoutNs)
+void Application::impl::Backend::ProcessEvents(Context& ctx, PollMode pollMode, Std::Opt<u64> const& timeoutNs)
 {
 	if (pollMode == PollMode::Immediate)
 	{
@@ -307,7 +128,7 @@ void Application::impl::Backend::Destroy(void* data)
 }
 
 auto Application::impl::Backend::NewWindow(
-	AppData& appData,
+	Context& ctx,
 	Std::Span<char const> title,
 	Extent extent) -> NewWindow_ReturnT
 {
@@ -326,7 +147,7 @@ auto Application::impl::Backend::NewWindow(
 	if (!rawHandle)
 		throw std::runtime_error("DEngine - Application: Could not make a new window.");
 
-	WindowData windowData = {};
+	Context::Impl::WindowData windowData = {};
 
 	// Get window size
 	int widthX;
@@ -346,10 +167,14 @@ auto Application::impl::Backend::NewWindow(
 
 	glfwSetWindowCloseCallback(rawHandle, &impl::Backend_GLFW_WindowCloseCallback);
 	glfwSetWindowPosCallback(rawHandle, &impl::Backend_GLFW_WindowPosCallback);
+	glfwSetWindowSizeCallback(rawHandle, &impl::Backend_GLFW_WindowSizeCallback);
 	glfwSetWindowFocusCallback(rawHandle, &impl::Backend_GLFW_WindowFocusCallback);
 
 	glfwSetCursorPosCallback(rawHandle, &impl::Backend_GLFW_CursorPosCallback);
 	glfwSetMouseButtonCallback(rawHandle, &impl::Backend_GLFW_MouseButtonCallback);
+	glfwSetKeyCallback(rawHandle, &impl::Backend_GLFW_KeyboardKeyCallback);
+	glfwSetCharCallback(rawHandle, &impl::Backend_GLFW_CharCallback);
+
 	/*
 	glfwSetWindowSizeCallback(rawHandle, &impl::Backend_GLFW_WindowSizeCallback);
 	glfwSetWindowFocusCallback(rawHandle, &impl::Backend_GLFW_WindowFocusCallback);
@@ -358,12 +183,12 @@ auto Application::impl::Backend::NewWindow(
 
 	glfwSetCursorPosCallback(rawHandle, &impl::Backend_GLFW_CursorPosCallback);
 
-	glfwSetCharCallback(rawHandle, &impl::Backend_GLFW_CharCallback);
-	glfwSetKeyCallback(rawHandle, &impl::Backend_GLFW_KeyboardKeyCallback);
+
+
 	 */
 
-
-	glfwSetWindowUserPointer(rawHandle, &appData);
+	auto& implData = ctx.GetImplData();
+	glfwSetWindowUserPointer(rawHandle, &implData);
 
 
 	NewWindow_ReturnT returnVal = {};
@@ -373,7 +198,9 @@ auto Application::impl::Backend::NewWindow(
 	return returnVal;
 }
 
-void Application::impl::Backend::DestroyWindow(AppData::WindowNode& windowNode)
+void Application::impl::Backend::DestroyWindow(
+	Context::Impl& implData,
+	Context::Impl::WindowNode const& windowNode)
 {
 	glfwDestroyWindow((GLFWwindow*)windowNode.platformHandle);
 }
@@ -397,48 +224,65 @@ Context::CreateVkSurface_ReturnT Application::impl::Backend::CreateVkSurface(
 	return returnVal;
 }
 
-void Application::impl::Backend::Log(LogSeverity severity, Std::Span<char const> msg)
+void Application::impl::Backend::Log(
+	Context::Impl& implData,
+	LogSeverity severity,
+	Std::Span<char const> const& msg)
 {
-	std::cout.write(msg.Data(), msg.Size()) << std::endl;
+	std::cout.write(msg.Data(), (std::streamsize)msg.Size()) << std::endl;
+}
+
+bool Application::impl::Backend::StartTextInputSession(
+	Context& ctx,
+	SoftInputFilter inputFilter,
+	Std::Span<char const> const& text)
+{
+	return true;
+}
+
+void Application::impl::Backend::StopTextInputSession(Context& ctx)
+{
+	auto& implData = ctx.GetImplData();
+	implData.textInputSessionActive = false;
 }
 
 void Application::impl::Backend_GLFW_WindowCursorEnterCallback(
 	GLFWwindow* window,
 	int entered)
 {
-	auto appDataPtr = static_cast<AppData*>(glfwGetWindowUserPointer(window));
-	DENGINE_IMPL_APPLICATION_ASSERT(appDataPtr);
-	auto& appData = *appDataPtr;
+	auto implDataPtr = static_cast<Context::Impl*>(glfwGetWindowUserPointer(window));
+	DENGINE_IMPL_APPLICATION_ASSERT(implDataPtr);
+	auto& implData = *implDataPtr;
 
 	BackendInterface::UpdateWindowCursorEnter(
-		appData,
-		GetWindowId(appData, window),
+		implData,
+		implData.GetWindowId(window),
 		entered);
 }
 
 void Application::impl::Backend_GLFW_WindowCloseCallback(
 	GLFWwindow *window)
 {
-	auto appDataPtr = static_cast<AppData*>(glfwGetWindowUserPointer(window));
-	DENGINE_IMPL_APPLICATION_ASSERT(appDataPtr);
-	auto& appData = *appDataPtr;
+	auto implDataPtr = static_cast<Context::Impl*>(glfwGetWindowUserPointer(window));
+	DENGINE_IMPL_APPLICATION_ASSERT(implDataPtr);
+	auto& implData = *implDataPtr;
 
 	BackendInterface::PushWindowCloseSignal(
-		appData,
-		GetWindowId(appData, window));
+		implData,
+		implData.GetWindowId(window));
 }
 
 void Application::impl::Backend_GLFW_WindowFocusCallback(
 	GLFWwindow* window,
 	int focused)
 {
-	auto appDataPtr = static_cast<AppData*>(glfwGetWindowUserPointer(window));
-	DENGINE_IMPL_APPLICATION_ASSERT(appDataPtr);
-	auto& appData = *appDataPtr;
+	auto implDataPtr = static_cast<Context::Impl*>(glfwGetWindowUserPointer(window));
+	DENGINE_IMPL_APPLICATION_ASSERT(implDataPtr);
+	auto& implData = *implDataPtr;
 
 	BackendInterface::UpdateWindowFocus(
-		appData,
-		GetWindowId(appData, window),
+		implData,
+		implData.GetWindowId(window),
 		focused);
 }
 
@@ -447,14 +291,31 @@ void Application::impl::Backend_GLFW_WindowPosCallback(
 	int xpos,
 	int ypos)
 {
-	auto appDataPtr = static_cast<AppData*>(glfwGetWindowUserPointer(window));
-	DENGINE_IMPL_APPLICATION_ASSERT(appDataPtr);
-	auto& appData = *appDataPtr;
+	auto implDataPtr = static_cast<Context::Impl*>(glfwGetWindowUserPointer(window));
+	DENGINE_IMPL_APPLICATION_ASSERT(implDataPtr);
+	auto& implData = *implDataPtr;
 
 	BackendInterface::UpdateWindowPosition(
-		appData,
-		GetWindowId(appData, window),
+		implData,
+		implData.GetWindowId(window),
 		{ (i32)xpos, (i32)ypos });
+}
+
+void Application::impl::Backend_GLFW_WindowSizeCallback(
+	GLFWwindow *window,
+	int width,
+	int height)
+{
+	auto implDataPtr = static_cast<Context::Impl*>(glfwGetWindowUserPointer(window));
+	DENGINE_IMPL_APPLICATION_ASSERT(implDataPtr);
+	auto& implData = *implDataPtr;
+
+	App::Extent extent = { (u32)width, (u32)height };
+
+	impl::BackendInterface::UpdateWindowSize(
+		implData,
+		implData.GetWindowId(window),
+		extent);
 }
 
 void Application::impl::Backend_GLFW_CursorPosCallback(
@@ -462,14 +323,64 @@ void Application::impl::Backend_GLFW_CursorPosCallback(
 	double xpos,
 	double ypos)
 {
-	auto appDataPtr = static_cast<AppData*>(glfwGetWindowUserPointer(window));
-	DENGINE_IMPL_APPLICATION_ASSERT(appDataPtr);
-	auto& appData = *appDataPtr;
+	auto implDataPtr = static_cast<Context::Impl*>(glfwGetWindowUserPointer(window));
+	DENGINE_IMPL_APPLICATION_ASSERT(implDataPtr);
+	auto& implData = *implDataPtr;
 
 	BackendInterface::UpdateCursorPosition(
-		appData,
-		GetWindowId(appData, window),
+		implData,
+		implData.GetWindowId(window),
 		{ (i32)xpos, (i32)ypos });
+}
+
+void Application::impl::Backend_GLFW_KeyboardKeyCallback(
+	GLFWwindow* window,
+	int key,
+	int scancode,
+	int action,
+	int mods)
+{
+	auto implDataPtr = static_cast<Context::Impl*>(glfwGetWindowUserPointer(window));
+	DENGINE_IMPL_APPLICATION_ASSERT(implDataPtr);
+	auto& implData = *implDataPtr;
+
+	bool wasPressed = false;
+	if (action == GLFW_PRESS)
+		wasPressed = true;
+	else if (action == GLFW_RELEASE)
+		wasPressed = false;
+	else if (action == GLFW_REPEAT)
+	{
+		return;
+	}
+	else
+		DENGINE_IMPL_APPLICATION_UNREACHABLE();
+
+	auto windowId = implData.GetWindowId(window);
+	auto dengineButton = Backend_GLFWButtonToDEngineButton(key);
+
+	BackendInterface::UpdateButton(
+		implData,
+		windowId,
+		dengineButton,
+		wasPressed);
+
+	bool doRemoveChar =
+		dengineButton == Button::Backspace &&
+		wasPressed &&
+		implData.textInputSessionActive &&
+		implData.textInputSelectedIndex > 0;
+	if (doRemoveChar)
+	{
+		auto oldIndex = implData.textInputSelectedIndex - 1;
+		auto oldCount = 1;
+		BackendInterface::PushTextInputEvent(
+			implData,
+			windowId,
+			oldIndex,
+			oldCount,
+			{});
+	}
 }
 
 void Application::impl::Backend_GLFW_MouseButtonCallback(
@@ -478,26 +389,50 @@ void Application::impl::Backend_GLFW_MouseButtonCallback(
 	int action,
 	int mods)
 {
-	auto appDataPtr = static_cast<AppData*>(glfwGetWindowUserPointer(window));
-	DENGINE_IMPL_APPLICATION_ASSERT(appDataPtr);
-	auto& appData = *appDataPtr;
-
+	auto implDataPtr = static_cast<Context::Impl*>(glfwGetWindowUserPointer(window));
+	DENGINE_IMPL_APPLICATION_ASSERT(implDataPtr);
+	auto& implData = *implDataPtr;
 
 	bool wasPressed = false;
 	if (action == GLFW_PRESS)
 		wasPressed = true;
 	else if (action == GLFW_RELEASE)
 		wasPressed = false;
+	else
+		DENGINE_IMPL_APPLICATION_UNREACHABLE();
 
 	BackendInterface::UpdateButton(
-		appData,
-		GetWindowId(appData, window),
-		Backend_GLFW_MouseButtonToRawButton(button),
+		implData,
+		implData.GetWindowId(window),
+		Backend_GLFWButtonToDEngineButton(button),
 		wasPressed);
+}
+
+void Application::impl::Backend_GLFW_CharCallback(
+	GLFWwindow* window,
+	unsigned int codepoint)
+{
+	auto implDataPtr = static_cast<Context::Impl*>(glfwGetWindowUserPointer(window));
+	DENGINE_IMPL_APPLICATION_ASSERT(implDataPtr);
+	auto& implData = *implDataPtr;
+
+	auto windowId = implData.GetWindowId(window);
+
+	auto value = (u32)codepoint;
+
+	if (implData.textInputSessionActive)
+	{
+		BackendInterface::PushTextInputEvent(
+			implData,
+			windowId,
+			implData.textInputSelectedIndex,
+			0,
+			{ &value, 1 });
+	}
 
 }
 
-auto Application::impl::Backend_GLFW_MouseButtonToRawButton(i32 input) -> Button
+auto Application::impl::Backend_GLFWButtonToDEngineButton(i32 input) -> Button
 {
 	switch (input)
 	{
@@ -516,301 +451,18 @@ auto Application::impl::Backend_GLFW_MouseButtonToRawButton(i32 input) -> Button
 	}
 }
 
-bool Application::detail::Backend_Initialize() noexcept
-{
-	glfwSetErrorCallback(Backend_GLFW_ErrorCallback);
-
-	if (!glfwInit())
-		return false;
-
-	pAppData->cursorOpt = CursorData();
-
-	pBackendData = new Backend_Data;
-
-	pBackendData->cursorTypes[(u8)CursorType::Arrow] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
-	pBackendData->cursorTypes[(u8)CursorType::VerticalResize] = glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR);
-	pBackendData->cursorTypes[(u8)CursorType::HorizontalResize] = glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR);
-
-	return true;
-}
-
-void Application::detail::Backend_ProcessEvents(PollMode pollMode, Std::Opt<u64> timeout)
-{
-	if (pollMode == PollMode::Immediate)
-	{
-		glfwPollEvents();
-	}
-	else if (pollMode == PollMode::Wait)
-	{
-		glfwWaitEvents();
-	}
-}
-
-static void Application::detail::Backend_GLFW_KeyboardKeyCallback(
-	GLFWwindow* window,
-	int key, 
-	int scancode, 
-	int action, 
-	int mods)
-{
-	DENGINE_IMPL_APPLICATION_ASSERT(pAppData);
-	auto& appData = *pAppData;
-
-	auto button = Backend_GLFW_KeyboardKeyToRawButton(key);
-
-	auto pressValue = action == GLFW_PRESS;
-
-	detail::UpdateButton(appData, button, pressValue);
-
-	if (pressValue)
-	{
-		if (button == Button::Backspace)
-			detail::PushCharRemoveEvent();
-		else if (button == Button::Enter)
-			detail::PushCharEnterEvent();
-	}
-}
-
-static void Application::detail::Backend_GLFW_CharCallback(
-	GLFWwindow* window, 
-	unsigned int codepoint)
-{
-	detail::PushCharInput(codepoint);
-}
-
-static void Application::detail::Backend_GLFW_MouseButtonCallback(
-	GLFWwindow* window, 
-	int button, 
-	int action, 
-	int mods)
-{
-	if (action != GLFW_PRESS && action != GLFW_RELEASE)
-		throw std::runtime_error("DEngine - Application: Encountered unexpected action value in GLFW mouse button press callback.");
-
-	DENGINE_IMPL_APPLICATION_ASSERT(pAppData);
-	auto& appData = *pAppData;
-
-	bool wasPressed = false;
-	if (action == GLFW_PRESS)
-		wasPressed = true;
-	else if (action == GLFW_RELEASE)
-		wasPressed = false;
-
-	detail::UpdateButton(appData, Backend_GLFW_MouseButtonToRawButton(button), wasPressed);
-}
-
-static void Application::detail::Backend_GLFW_CursorPosCallback(
-	GLFWwindow* window, 
-	double xpos, 
-	double ypos)
-{
-	auto& appData = *detail::pAppData;
-	auto& backendData = *detail::pBackendData;
-	if (backendData.cursorLocked)
-	{
-		auto const& windowNode = appData.windows.front();
-		Math::Vec2Int newVirtualCursorPos = { (i32)xpos, (i32)ypos };
-		Math::Vec2Int cursorDelta = newVirtualCursorPos - backendData.virtualCursorPos;
-		backendData.virtualCursorPos = newVirtualCursorPos;
-		CursorData cursorData = Cursor().Value();
-		detail::UpdateCursor(
-			appData,
-			window,
-			cursorData.position - windowNode.windowData.position, 
-			cursorDelta);
-	}
-	else
-	{
-		backendData.virtualCursorPos = { (i32)xpos, (i32)ypos };
-		detail::UpdateCursor(
-			appData,
-			window, 
-			{ (i32)xpos, (i32)ypos });
-	}
-}
-
-static void Application::detail::Backend_GLFW_ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
-{
-	CursorData& cursor = detail::pAppData->cursorOpt.Value();
-	cursor.scrollDeltaY = (f32)yoffset;
-}
-
-void Application::detail::Backend_GLFW_JoystickConnectedCallback(int jid, int event)
-{
-
-}
-
-static void Application::detail::Backend_GLFW_WindowPosCallback(
-	GLFWwindow* window,
-	int xpos,
-	int ypos)
-{
-	auto& appData = *detail::pAppData;
-
-	if (xpos != -32000 && ypos != -32000)
-		detail::UpdateWindowPosition(appData, window, { (i32)xpos, (i32)ypos });
-}
-
-static void Application::detail::Backend_GLFW_WindowSizeCallback(
-	GLFWwindow* window, 
-	int width, 
-	int height)
-{
-	auto& appData = *detail::pAppData;
-	auto windowNodePtr = detail::GetWindowNode(appData, window);
-
-	if (width != 0 && height != 0)
-		detail::UpdateWindowSize(
-			*windowNodePtr, 
-			{ (u32)width, (u32)height },
-			{},
-			{ (u32)width, (u32)height });
-}
-
-void Application::detail::Backend_GLFW_WindowCursorEnterCallback(
-	GLFWwindow* window,
-	int entered)
-{
-	if (entered == GLFW_TRUE)
-		detail::UpdateWindowCursorEnter(window, true);
-	else if (entered == GLFW_FALSE)
-		detail::UpdateWindowCursorEnter(window, false);
-	else
-		throw std::runtime_error("DEngine - App: GLFW window cursor enter event called with unexpected enter argument.");
-}
-
-static void Application::detail::Backend_GLFW_WindowFramebufferSizeCallback(
-	GLFWwindow* window, 
-	int width, 
-	int height)
-{
-}
-
-static void Application::detail::Backend_GLFW_WindowCloseCallback(
-	GLFWwindow* window)
-{
-	auto& appData = *detail::pAppData;
-	AppData::WindowNode* windowNode = detail::GetWindowNode(appData, window);
-	DENGINE_IMPL_APPLICATION_ASSERT(windowNode);
-	detail::UpdateWindowClose(*windowNode);
-}
-
-static void Application::detail::Backend_GLFW_WindowFocusCallback(GLFWwindow* window, int focused)
-{
-	if (focused == GLFW_TRUE)
-		detail::UpdateWindowFocus(window, true);
-	else if (focused == GLFW_FALSE)
-		detail::UpdateWindowFocus(window, false);
-	else
-		throw std::runtime_error("DEngine - App: GLFW window focus callback called with unexpected focus argument.");
-}
-
-static void Application::detail::Backend_GLFW_WindowMinimizeCallback(
-	GLFWwindow* window, 
-	int iconified)
-{
-	auto& appData = *detail::pAppData;
-	AppData::WindowNode* windowNode = detail::GetWindowNode(appData, window);
-	DENGINE_IMPL_APPLICATION_ASSERT(windowNode);
-	detail::UpdateWindowMinimized(*windowNode, iconified);
-}
-
-Std::Opt<u64> Application::CreateVkSurface(
-	WindowID window,
-	uSize vkInstance,
-	void const* vkAllocationCallbacks)
-{
-	auto const& windowContainer = detail::pAppData->windows;
-	auto windowIt = Std::FindIf(
-		windowContainer.begin(),
-		windowContainer.end(),
-		[window](detail::AppData::WindowNode const& val) -> bool {
-			return val.id == window; });
-	if (windowIt == windowContainer.end())
-		throw std::runtime_error("Could not find window.");
-
-
-	VkSurfaceKHR newSurface;
-	int err = glfwCreateWindowSurface(
-	reinterpret_cast<VkInstance>(vkInstance), 
-		(GLFWwindow*)windowIt->platformHandle,
-		reinterpret_cast<VkAllocationCallbacks const*>(vkAllocationCallbacks), 
-		&newSurface);
-	if (err != 0)
-		return {};
-	else
-		return Std::Opt{ (u64)newSurface };
-}
-
 Std::StackVec<char const*, 5> Application::RequiredVulkanInstanceExtensions() noexcept
 {
-	uint32_t count = 0;
+	u32 count = 0;
 
 	char const** exts = glfwGetRequiredInstanceExtensions(&count);
 
 	Std::StackVec<char const*, 5> returnVal{};
 	returnVal.Resize(count);
-	std::memcpy(returnVal.Data(), exts, count * sizeof(char const*));
+	for (int i = 0; i < count; i += 1)
+		returnVal[i] = exts[i];
 
 	return returnVal;
-}
-
-Application::Button Application::detail::Backend_GLFW_MouseButtonToRawButton(i32 input)
-{
-	switch (input)
-	{
-	case GLFW_MOUSE_BUTTON_LEFT:
-		return Button::LeftMouse;
-	case GLFW_MOUSE_BUTTON_RIGHT:
-		return Button::RightMouse;
-
-	case GLFW_KEY_BACKSPACE:
-		return Button::Backspace;
-	case GLFW_KEY_DELETE:
-		return Button::Delete;
-	}
-
-	return Button::Undefined;
-}
-
-Application::Button Application::detail::Backend_GLFW_KeyboardKeyToRawButton(i32 input)
-{
-	switch (input)
-	{
-	case GLFW_KEY_W:
-		return Button::W;
-	case GLFW_KEY_A:
-		return Button::A;
-	case GLFW_KEY_S:
-		return Button::S;
-	case GLFW_KEY_D:
-		return Button::D;
-
-	case GLFW_KEY_UP:
-		return Button::Up;
-	case GLFW_KEY_DOWN:
-		return Button::Down;
-	case GLFW_KEY_LEFT:
-		return Button::Left;
-	case GLFW_KEY_RIGHT:
-		return Button::Right;
-
-	case GLFW_KEY_SPACE:
-		return Button::Space;
-	case GLFW_KEY_LEFT_CONTROL:
-		return Button::LeftCtrl;
-	case GLFW_KEY_ESCAPE:
-		return Button::Escape;
-	case GLFW_KEY_BACKSPACE:
-		return Button::Backspace;
-	case GLFW_KEY_DELETE:
-		return Button::Delete;
-	case GLFW_KEY_ENTER:
-		return Button::Enter;
-
-	}
-
-	return Button::Undefined;
 }
 
 Application::FileInputStream::FileInputStream()

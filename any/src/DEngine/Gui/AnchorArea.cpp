@@ -2,54 +2,50 @@
 
 #include <DEngine/Gui/DrawInfo.hpp>
 
+#include <DEngine/Std/Trait.hpp>
+
 namespace DEngine::Gui::impl
 {
-    [[nodiscard]] static Rect GetNodeRect(
-        Std::Span<AnchorArea::Node const> nodes,
-        Rect widgetRect,
-        uSize index) noexcept
+    [[nodiscard]] static Rect BuildNodeRect(
+        AnchorArea::Node const& node,
+        Rect const& widgetRect) noexcept
     {
-        DENGINE_IMPL_GUI_ASSERT(index < nodes.Size());
-        Rect nodeRect = widgetRect;
+        Rect nodeRect = {};
 
-        if (index != nodes.Size() - 1)
-        {
-            auto const& node = nodes[index];
-            nodeRect.extent = node.extent;
-            nodeRect.position = widgetRect.position;
-            switch (node.anchorX)
-            {
-            case AnchorArea::AnchorX::Left:
-                break;
-            case AnchorArea::AnchorX::Center:
-                nodeRect.position.x += widgetRect.extent.width / 2;
-                nodeRect.position.x -= nodeRect.extent.width / 2;
-                break;
-            case AnchorArea::AnchorX::Right:
-                nodeRect.position.x += widgetRect.extent.width;
-                nodeRect.position.x -= nodeRect.extent.width;
-                break;
-            default:
-                DENGINE_IMPL_UNREACHABLE();
-                break;
-            }
-            switch (node.anchorY)
-            {
-            case AnchorArea::AnchorY::Top:
-                break;
-            case AnchorArea::AnchorY::Center:
-                nodeRect.position.y += widgetRect.extent.height / 2;
-                nodeRect.position.y -= nodeRect.extent.height / 2;
-                break;
-            case AnchorArea::AnchorY::Bottom:
-                nodeRect.position.y += widgetRect.extent.height;
-                nodeRect.position.y -= nodeRect.extent.height;
-                break;
-            default:
-                DENGINE_IMPL_UNREACHABLE();
-                break;
-            }
-        }
+		nodeRect.extent = node.extent;
+		nodeRect.position = widgetRect.position;
+		switch (node.anchorX)
+		{
+			case AnchorArea::AnchorX::Left:
+				break;
+			case AnchorArea::AnchorX::Center:
+				nodeRect.position.x += (i32)widgetRect.extent.width / 2;
+				nodeRect.position.x -= (i32)nodeRect.extent.width / 2;
+				break;
+			case AnchorArea::AnchorX::Right:
+				nodeRect.position.x += (i32)widgetRect.extent.width;
+				nodeRect.position.x -= (i32)nodeRect.extent.width;
+				break;
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				break;
+		}
+		switch (node.anchorY)
+		{
+			case AnchorArea::AnchorY::Top:
+				break;
+			case AnchorArea::AnchorY::Center:
+				nodeRect.position.y += (i32)widgetRect.extent.height / 2;
+				nodeRect.position.y -= (i32)nodeRect.extent.height / 2;
+				break;
+			case AnchorArea::AnchorY::Bottom:
+				nodeRect.position.y += (i32)widgetRect.extent.height;
+				nodeRect.position.y -= (i32)nodeRect.extent.height;
+				break;
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				break;
+		}
 
         return nodeRect;
     }
@@ -77,10 +73,11 @@ namespace DEngine::Gui::impl
             auto& node = widget.nodes[i];
             DENGINE_IMPL_GUI_ASSERT(node.widget);
 
-            auto const nodeRect = impl::GetNodeRect(
+            /*auto const nodeRect = impl::GetNodeRect(
                 { widget.nodes.data(), widget.nodes.size() },
                 widgetRect,
-                i);
+                i);*/
+			auto const nodeRect = Rect();
 
             bool newOccluded = false;
             using Type = Std::Trait::RemoveCVRef<decltype(event)>;
@@ -116,6 +113,7 @@ namespace DEngine::Gui::impl
     {
         Math::Vec2 pos;
         bool pressed;
+		bool consumed;
     };
     
     template<class T>
@@ -137,15 +135,18 @@ namespace DEngine::Gui::impl
             auto& node = widget.nodes[i];
             DENGINE_IMPL_GUI_ASSERT(node.widget);
 
-            auto const nodeRect = impl::GetNodeRect(
+
+
+            /*auto const nodeRect = impl::GetNodeRect(
                 { widget.nodes.data(), widget.nodes.size() },
                 widgetRect,
-                i);
+                i);*/
+			auto const nodeRect = Rect();
 
             bool eventConsumed = false;
             
             using Type = Std::Trait::RemoveCVRef<decltype(event)>;
-            if constexpr (Std::Trait::isSame<Type, CursorClickEvent>)
+            if constexpr (Std::Trait::isSame<Type, CursorPressEvent>)
             {
                 eventConsumed = node.widget->CursorPress(
                     ctx,
@@ -186,7 +187,7 @@ SizeHint AnchorArea::GetSizeHint(Context const& ctx) const
     SizeHint returnVal = {};
     returnVal.expandX = true;
     returnVal.expandY = true;
-    returnVal.preferred = { 150, 150 };
+    returnVal.minimum = { 150, 150 };
     return returnVal;
 }
 
@@ -197,125 +198,203 @@ void AnchorArea::Render(
     Rect visibleRect,
     DrawInfo& drawInfo) const
 {
-    // Iterate in reverse
-    for (uSize j = nodes.size(); j > 0; j -= 1)
-    {
-        uSize i = j - 1;
-
-        auto const& node = nodes[i];
-        DENGINE_IMPL_GUI_ASSERT(node.widget);
-
-        auto const nodeRect = impl::GetNodeRect(
-            { nodes.data(), nodes.size() },
-            widgetRect,
-            i);
-
-        node.widget->Render(
-            ctx,
-            framebufferExtent,
-            nodeRect,
-            visibleRect,
-            drawInfo);
-    }
-}
-
-void AnchorArea::CharEnterEvent(Context& ctx)
-{
-}
-
-void AnchorArea::CharEvent(
-    Context& ctx,
-    u32 utfValue)
-{
-}
-
-void AnchorArea::CharRemoveEvent(Context& ctx)
-{
 }
 
 void AnchorArea::InputConnectionLost()
 {
 }
 
-bool AnchorArea::CursorMove(
-    Context& ctx, 
-    WindowID windowId, 
-    Rect widgetRect, 
-    Rect visibleRect, 
-    CursorMoveEvent event, 
-    bool occluded)
+namespace DEngine::Gui::impl
 {
-    impl::PointerMove_Pointer pointer = {};
-    pointer.occluded = occluded;
-    pointer.pos = { (f32)event.position.x, (f32)event.position.y };
-    return impl::PointerMove(
-        *this,
-        ctx,
-        windowId,
-        widgetRect,
-        visibleRect,
-        pointer,
-        event);
+	struct AA_NodeEndIt
+	{
+	};
+
+	// The templates are only for 'AnchorArea' versus 'AnchorArea const'
+	template<class AnchorAreaT>
+	struct AA_NodeItResult
+	{
+		using ChildT = Std::Trait::Cond<Std::Trait::isConst<AnchorAreaT>, Widget const, Widget>;
+		ChildT& child;
+		uSize index = 0;
+		uSize childCount = 0;
+
+		[[nodiscard]] Rect BuildNodeItRect(
+			AnchorArea const& anchorArea,
+			Rect const& widgetRect) const
+		{
+			if (index == childCount)
+				return widgetRect;
+			else
+				return impl::BuildNodeRect(anchorArea.nodes[index], widgetRect);
+		}
+
+		[[nodiscard]] Rect GetNodeItRect(
+			AnchorArea const& anchorArea,
+			Rect const& widgetRect,
+			RectCollection const& rectCollection) const
+		{
+			if (index == childCount)
+				return widgetRect;
+			else
+				return rectCollection.GetRect(child).widgetRect;
+		}
+	};
+
+	template<class AnchorAreaT>
+	struct AA_NodeIt
+	{
+		AnchorAreaT& anchorArea;
+		// This is off by one when reverse iterating, so use
+		// GetActuaIndex().
+		int currIndex = 0;
+		int endIndex = 0;
+		uSize childCount = 0;
+		bool reverse = false;
+
+		[[nodiscard]] int GetActualIndex() const { return !reverse ? currIndex : currIndex - 1; }
+
+		[[nodiscard]] auto operator*() const noexcept
+		{
+			int actualIndex = GetActualIndex();
+			auto* childPtr =
+				actualIndex == childCount ?
+					anchorArea.backgroundWidget.Get() :
+					anchorArea.nodes[actualIndex].widget.Get();
+			DENGINE_IMPL_GUI_ASSERT(childPtr);
+			AA_NodeItResult<AnchorAreaT> returnValue = {
+				.child = *childPtr,
+			};
+			returnValue.index = actualIndex;
+			returnValue.childCount = childCount;
+
+			return returnValue;
+		}
+
+		[[nodiscard]] bool operator!=(AA_NodeEndIt const& other) const noexcept
+		{
+			return currIndex != endIndex;
+		}
+
+		AA_NodeIt& operator++() noexcept
+		{
+			if (!reverse)
+				currIndex += 1;
+			else
+				currIndex -= 1;
+			return *this;
+		}
+	};
+
+	template<class AnchorAreaT>
+	struct AA_NodeItPair
+	{
+		AnchorAreaT& anchorArea;
+		int startIndex = 0;
+		int endIndex = 0;
+		bool reverse = false;
+
+		[[nodiscard]] AA_NodeItPair Reverse() const noexcept
+		{
+			auto returnValue = *this;
+			returnValue.startIndex = endIndex;
+			returnValue.endIndex = startIndex;
+			returnValue.reverse = !returnValue.reverse;
+			return returnValue;
+		}
+
+		[[nodiscard]] auto begin() const noexcept
+		{
+			AA_NodeIt<AnchorAreaT> returnValue = {
+				.anchorArea = anchorArea, };
+			returnValue.currIndex = startIndex;
+			returnValue.childCount = anchorArea.nodes.size();
+			returnValue.endIndex = endIndex;
+			returnValue.reverse = reverse;
+			return returnValue;
+		}
+
+		[[nodiscard]] auto end() const noexcept
+		{
+			return AA_NodeEndIt{};
+		}
+	};
+
+	[[nodiscard]] auto BuildNodeItPair(
+		AnchorArea& anchorArea) noexcept
+	{
+		AA_NodeItPair<AnchorArea> returnValue = {
+			.anchorArea = anchorArea };
+		returnValue.startIndex = 0;
+		returnValue.endIndex = (int)anchorArea.nodes.size() + 1;
+		if (!anchorArea.backgroundWidget)
+			returnValue.endIndex -= 1;
+		return returnValue;
+	}
+
+	[[nodiscard]] auto BuildNodeItPair(
+		AnchorArea const& anchorArea) noexcept
+	{
+		AA_NodeItPair<AnchorArea const> returnValue = {
+			.anchorArea = anchorArea };
+		returnValue.startIndex = 0;
+		returnValue.endIndex = (int)anchorArea.nodes.size() + 1;
+		if (!anchorArea.backgroundWidget)
+			returnValue.endIndex -= 1;
+		return returnValue;
+	}
 }
 
-bool AnchorArea::CursorPress(
-    Context& ctx, 
-    WindowID windowId, 
-    Rect widgetRect, 
-    Rect visibleRect, 
-    Math::Vec2Int cursorPos, 
-    CursorClickEvent event)
+SizeHint AnchorArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
 {
-    impl::PointerPress_Pointer pointer = {};
-    pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
-    pointer.pressed = event.clicked;
-    return impl::PointerPress(
-        *this,
-        ctx,
-        windowId,
-        widgetRect,
-        visibleRect,
-        pointer,
-        event);
+	for (auto const& node : impl::BuildNodeItPair(*this))
+	{
+		auto const& child = node.child;
+		child.GetSizeHint2(params);
+	}
+
+	SizeHint returnValue = {};
+	returnValue.expandX = true;
+	returnValue.expandY = true;
+	returnValue.minimum = { 150, 150 };
+	params.pusher.Push(*this, returnValue);
+	return returnValue;
 }
 
-bool AnchorArea::TouchMoveEvent(
-    Context& ctx,
-    WindowID windowId,
-    Rect widgetRect,
-    Rect visibleRect,
-    Gui::TouchMoveEvent event,
-    bool occluded)
+void AnchorArea::BuildChildRects(
+	Widget::BuildChildRects_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
 {
-    impl::PointerMove_Pointer pointer = {};
-    pointer.occluded = occluded;
-    pointer.pos = event.position;
-    return impl::PointerMove(
-        *this,
-        ctx,
-        windowId,
-        widgetRect,
-        visibleRect,
-        pointer,
-        event);
+	auto& pusher = params.pusher;
+
+	for (auto const& node : impl::BuildNodeItPair(*this))
+	{
+		auto const& child = node.child;
+		auto const childRect = node.BuildNodeItRect(*this, widgetRect);
+		pusher.Push(child, { childRect, visibleRect });
+		child.BuildChildRects(
+			params,
+			childRect,
+			visibleRect);
+	}
 }
 
-bool AnchorArea::TouchPressEvent(
-    Context& ctx,
-    WindowID windowId,
-    Rect widgetRect,
-    Rect visibleRect,
-    Gui::TouchPressEvent event)
+void AnchorArea::Render2(
+	Widget::Render_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
 {
-    impl::PointerPress_Pointer pointer = {};
-    pointer.pos = event.position;
-    pointer.pressed = event.pressed;
-    return impl::PointerPress(
-        *this,
-        ctx,
-        windowId,
-        widgetRect,
-        visibleRect,
-        pointer,
-        event);
+	auto const& rectCollection = params.rectCollection;
+
+	for (auto const& node : impl::BuildNodeItPair(*this).Reverse())
+	{
+		auto const& child = node.child;
+		auto const childRect = node.GetNodeItRect(*this, widgetRect, rectCollection);
+
+		child.Render2(
+			params,
+			childRect,
+			visibleRect);
+	}
 }

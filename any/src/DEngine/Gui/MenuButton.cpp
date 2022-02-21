@@ -1,8 +1,9 @@
 #include <DEngine/Gui/MenuButton.hpp>
-
-#include <DEngine/Gui/Context.hpp>
+#include <DEngine/Gui/TextManager.hpp>
 #include <DEngine/Gui/Layer.hpp>
-#include "ImplData.hpp"
+#include <DEngine/Gui/Context.hpp>
+
+#include <DEngine/Std/Containers/Defer.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
@@ -15,11 +16,17 @@ namespace DEngine::Gui::impl
 		Math::Vec2Int pos = {};
 		MenuButton* menuButton = nullptr;
 
-		virtual void Render(
-			Context const& ctx,
-			Rect const& windowRect,
-			Rect const& usableRect,
-			DrawInfo& drawInfo) const override;
+		virtual void BuildSizeHints(BuildSizeHints_Params const& params) const override;
+		virtual void BuildRects(BuildRects_Params const& params) const override;
+		virtual void Render(Render_Params const& params) const override;
+
+		[[nodiscard]] virtual bool CursorMove(
+			CursorMoveParams const& params,
+			bool occluded) override;
+
+		[[nodiscard]] virtual Press_Return CursorPress(
+			CursorPressParams const& params,
+			bool eventConsumed) override;
 
 		virtual bool CursorMove(
 			Context& ctx,
@@ -33,7 +40,7 @@ namespace DEngine::Gui::impl
 			Rect const& windowRect,
 			Rect const& usableRect,
 			Math::Vec2Int cursorPos,
-			CursorClickEvent const& event) override;
+			CursorPressEvent const& event) override;
 
 		virtual Press_Return TouchPress(
 			Context& ctx,
@@ -63,6 +70,7 @@ namespace DEngine::Gui::impl
 		PointerType type;
 		Math::Vec2 pos;
 		bool pressed;
+		bool consumed;
 	};
 
 	struct PointerMove_Pointer
@@ -72,67 +80,72 @@ namespace DEngine::Gui::impl
 		bool occluded;
 	};
 
-	struct MenuButtonImpl
+	struct MenuBtnImpl
 	{
-		// Common event handler for both touch and cursor
-		[[nodiscard]] static bool MenuButton_PointerPress(
-			MenuButton& widget,
-			Context& ctx,
-			WindowID windowId,
-			Rect const& widgetRect,
-			Rect const& visibleRect,
-			PointerPress_Pointer const& pointer);
+		struct MenuBtn_PointerMove_Params
+		{
+			MenuButton& widget;
+			Rect widgetRect;
+			Rect visibleRect;
+			PointerMove_Pointer const& pointer;
+		};
+		[[nodiscard]] static bool MenuBtn_PointerMove(
+			MenuBtn_PointerMove_Params const& params);
 
-		static void MenuButton_SpawnSubmenuLayer(
+		struct MenuBtn_PointerPress_Params
+		{
+			MenuButton& widget;
+			Context& ctx;
+			WindowID windowId;
+			Rect widgetRect;
+			Rect visibleRect;
+			PointerPress_Pointer const& pointer;
+		};
+		[[nodiscard]] static bool MenuBtn_PointerPress(
+			MenuBtn_PointerPress_Params const& params);
+
+		static void MenuBtn_SpawnSubmenuLayer(
 			MenuButton& widget,
 			Context& ctx,
 			WindowID windowId,
 			Rect widgetRect);
 
+
+		struct MenuLayer_PointerPress_Params
+		{
+			Context& ctx;
+			MenuLayer& layer;
+			RectCollection const& rectCollection;
+			TextManager& textManager;
+			PointerPress_Pointer const& pointer;
+			u32 spacing = 0;
+			u32 margin = 0;
+			Rect usableRect = {};
+		};
 		// Common event handler for both touch and cursor
 		[[nodiscard]] static Layer::Press_Return MenuLayer_PointerPress(
-			MenuLayer& layer,
-			Context& ctx,
-			Rect const& usableRect,
-			PointerPress_Pointer const& pointer);
+			MenuButton::Submenu& submenu,
+			MenuLayer_PointerPress_Params const& params);
 
-		struct MenuLayer_PointerPress_Inner_Params
+
+		struct MenuLayer_PointerMove_Params
 		{
-			Context* ctx = nullptr;
 			u32 spacing = 0;
 			u32 margin = 0;
-			u32 lineheight = 0;
+			Rect windowRect = {};
 			Rect usableRect = {};
-			PointerPress_Pointer const* pointer = nullptr;
+			MenuLayer& layer;
+			TextManager& textManager;
+			RectCollection const& rectCollection;
+			PointerMove_Pointer const& pointer;
 		};
-		[[nodiscard]] static Layer::Press_Return MenuLayer_PointerPress_Inner(
-			MenuButton::Submenu& submenu,
-			Math::Vec2Int desiredPos,
-			MenuLayer_PointerPress_Inner_Params const& params);
-
 		[[nodiscard]] static bool MenuLayer_PointerMove(
-			MenuLayer& layer,
-			Context& ctx,
-			Rect const& usableRect,
-			PointerMove_Pointer const& pointer);
-
-		struct MenuLayer_PointerMove_Inner_Params
-		{
-			Context* ctx = nullptr;
-			u32 spacing = 0;
-			u32 margin = 0;
-			u32 lineheight = 0;
-			Rect usableRect = {};
-			PointerMove_Pointer const* pointer = nullptr;
-		};
-		[[nodiscard]] static bool MenuLayer_PointerMove_Inner(
 			MenuButton::Submenu& submenu,
-			Math::Vec2Int desiredPos,
-			MenuLayer_PointerMove_Inner_Params const& params);
+			MenuLayer_PointerMove_Params const& params);
 	};
 
 	[[nodiscard]] static Rect Submenu_BuildRectOuter(
-		Context const& ctx,
+		TextManager& textManager,
 		MenuButton::Submenu const& submenu,
 		u32 spacing,
 		u32 margin,
@@ -145,356 +158,169 @@ namespace DEngine::Gui::impl
 
 	struct MenuLayer_RenderSubmenu_Params
 	{
-		Context const* ctx = nullptr;
-		u32 spacing = 0;
-		u32 margin = 0;
-		Math::Vec4 bgColor = {};
-		Rect usableRect = {};
-		DrawInfo* drawInfo = nullptr;
+		MenuButton::Submenu const& submenu;
+		TextManager& textManager;
+		u32 spacing {};
+		u32 margin {};
+		Math::Vec4 bgColor {};
+		Rect submenuRect {};
+		Rect visibleRect {};
+		DrawInfo& drawInfo;
 	};
-	void MenuLayer_RenderSubmenu(
-		MenuButton::Submenu const& submenu,
-		Math::Vec2Int pos,
-		MenuLayer_RenderSubmenu_Params const& params)
-	{
-		auto& implData = *static_cast<impl::ImplData*>(params.ctx->Internal_ImplData());
-
-		auto const lineheight = implData.textManager.lineheight + (params.margin * 2);
-
-		auto const widgetOuterRect = Submenu_BuildRectOuter(
-			*params.ctx,
-			submenu,
-			params.spacing,
-			params.margin,
-			pos,
-			params.usableRect);
-
-		auto const widgetInnerRect = Submenu_BuildRectInner(
-			widgetOuterRect,
-			params.margin);
-
-		if (submenu.activeSubmenu.HasValue())
-		{
-			auto index = submenu.activeSubmenu.Value();
-			auto const& line = submenu.lines[index];
-
-			DENGINE_IMPL_GUI_ASSERT(line.data.IsA<MenuButton::Submenu>());
-
-			auto& subsubmenu = line.data.Get<MenuButton::Submenu>();
-
-			auto linePos = widgetInnerRect.position;
-			linePos.x += widgetOuterRect.extent.width;
-			linePos.y += lineheight * index;
-
-			MenuLayer_RenderSubmenu(
-				subsubmenu,
-				linePos,
-				params);
-		}
-
-		params.drawInfo->PushFilledQuad(widgetOuterRect, params.bgColor);
-		// First draw highlights for toggled lines
-		for (uSize i = 0; i < submenu.lines.size(); i += 1)
-		{
-			auto const& line = submenu.lines[i];
-
-			bool drawHighlight = false;
-
-			if (submenu.hoveredLineCursor.HasValue() && submenu.hoveredLineCursor.Value() == i)
-			{
-				drawHighlight = true;
-			}
-			else if (auto btn = line.data.ToPtr<MenuButton::LineButton>())
-			{
-				if (btn->togglable && btn->toggled)
-				{
-					drawHighlight = true;
-				}
-				else if (submenu.pressedLine.HasValue())
-				{
-					if (i == submenu.pressedLine.Value().lineIndex)
-						drawHighlight = true;
-				}
-			}
-
-			if (drawHighlight)
-			{
-				auto lineRect = widgetInnerRect;
-				lineRect.position.y += lineheight * i;
-				lineRect.position.y += params.spacing * i;
-				lineRect.extent.height = lineheight;
-				params.drawInfo->PushFilledQuad(lineRect, { 1.f, 1.f, 1.f, 0.25f });
-			}
-		}
-		for (uSize i = 0; i < submenu.lines.size(); i += 1)
-		{
-			auto const& line = submenu.lines[i];
-
-			auto lineRect = widgetInnerRect;
-			lineRect.position.y += lineheight * i;
-			lineRect.position.y += params.spacing * i;
-			lineRect.extent.height = lineheight;
-
-			Math::Vec4 textColor = { 1.f, 1.f, 1.f, 1.f };
-
-			auto textRect = lineRect;
-			textRect.position.x += params.margin;
-			textRect.position.y += params.margin;
-			textRect.extent.width -= params.margin * 2;
-			textRect.extent.height -= params.margin * 2;
-
-			impl::TextManager::RenderText(
-				implData.textManager,
-				{ line.title.data(), line.title.size() },
-				textColor,
-				textRect,
-				*params.drawInfo);
-		}
-	}
+	static void MenuLayer_RenderSubmenu(
+		MenuLayer_RenderSubmenu_Params const& params);
 }
 
-Layer::Press_Return Gui::impl::MenuButtonImpl::MenuLayer_PointerPress(
-	MenuLayer& layer,
-	Context& ctx,
-	Rect const& usableRect,
-	PointerPress_Pointer const& pointer)
-{
-	auto const& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-
-	auto const lineheight = implData.textManager.lineheight;
-
-	MenuLayer_PointerPress_Inner_Params params = {};
-	params.ctx = &ctx;
-	params.lineheight = lineheight;
-	params.margin = layer.menuButton->margin;
-	params.pointer = &pointer;
-	params.spacing = layer.menuButton->spacing;
-	params.usableRect = usableRect;
-
-	auto returnVal = MenuLayer_PointerPress_Inner(
-		layer.menuButton->submenu,
-		layer.pos,
-		params);
-
-	if (returnVal.destroy)
-	{
-		layer.menuButton->active = false;
-		layer.menuButton->pointerId = Std::nullOpt;
-		layer.menuButton->submenu.activeSubmenu = Std::nullOpt;
-		layer.menuButton->submenu.pressedLine = Std::nullOpt;
-		layer.menuButton->submenu.hoveredLineCursor = Std::nullOpt;
-	}
-
-	return returnVal;
-}
-
-Layer::Press_Return Gui::impl::MenuButtonImpl::MenuLayer_PointerPress_Inner(
+Layer::Press_Return Gui::impl::MenuBtnImpl::MenuLayer_PointerPress(
 	MenuButton::Submenu& submenu,
-	Math::Vec2Int desiredPos,
-	MenuLayer_PointerPress_Inner_Params const& params)
+	MenuLayer_PointerPress_Params const& params)
 {
-	auto const outerLineheight = params.lineheight + (params.margin * 2);
+	auto& ctx = params.ctx;
+	auto& layer = params.layer;
+	auto& textManager = params.textManager;
+	auto const& rectCollection = params.rectCollection;
+	auto const& pointer = params.pointer;
 
-	auto const widgetOuterRect = Submenu_BuildRectOuter(
-		*params.ctx,
-		submenu,
-		params.spacing,
-		params.margin,
-		desiredPos,
-		params.usableRect);
+	Layer::Press_Return returnValue = {};
+
+	Std::Defer deferredCleanup { [&]() {
+		if (returnValue.destroyLayer)
+		{
+			submenu.pressedLineOpt = Std::nullOpt;
+			submenu.activeSubmenu = Std::nullOpt;
+			submenu.cursorHoveredLineOpt = Std::nullOpt;
+		}
+	} };
+
+	if (params.pointer.type != PointerType::Primary)
+	{
+		returnValue.eventConsumed = false;
+		returnValue.destroyLayer = true;
+		return returnValue;
+	}
+
+	auto const& rectPair = rectCollection.GetRect(layer);
+	auto const& submenuRectOuter = rectPair.widgetRect;
 	auto const widgetInnerRect = Submenu_BuildRectInner(
-		widgetOuterRect,
+		submenuRectOuter,
 		params.margin);
 
-	Layer::Press_Return childReturn = {};
-	if (submenu.activeSubmenu.HasValue())
+	auto const pointerInsideOuter = submenuRectOuter.PointIsInside(pointer.pos);
+	if (!pointerInsideOuter && pointer.pressed)
 	{
-		auto const index = submenu.activeSubmenu.Value();
-		auto& line = submenu.lines[index];
-		DENGINE_IMPL_GUI_ASSERT(line.data.IsA<MenuButton::Submenu>());
-		auto& subsubmenu = line.data.Get<MenuButton::Submenu>();
-
-		auto childPos = widgetInnerRect.position;
-		childPos.x += widgetOuterRect.extent.width;
-		childPos.y += outerLineheight * index;
-		childReturn = MenuLayer_PointerPress_Inner(
-			subsubmenu,
-			childPos,
-			params);
+		returnValue.eventConsumed = false;
+		returnValue.destroyLayer = true;
+		return returnValue;
 	}
-	if (childReturn.eventConsumed)
+	else if (!pointerInsideOuter && !pointer.pressed)
 	{
-		Layer::Press_Return returnVal = {};
-		returnVal.eventConsumed = true;
-		returnVal.destroy = childReturn.destroy;
-		return returnVal;
+		returnValue.eventConsumed = false;
+		returnValue.destroyLayer = false;
+		return returnValue;
 	}
 
-	auto const pointerInsideOuter = widgetOuterRect.PointIsInside(params.pointer->pos);
+	returnValue.eventConsumed = pointer.consumed || pointerInsideOuter;
 
-	if (params.pointer->type != PointerType::Primary)
+	auto const pointerInsideInner = widgetInnerRect.PointIsInside(params.pointer.pos);
+	if (!pointerInsideInner && pointer.pressed)
 	{
-		Layer::Press_Return returnVal = {};
-		returnVal.eventConsumed = pointerInsideOuter;
-		returnVal.destroy = !pointerInsideOuter;
-		return returnVal;
+		returnValue.eventConsumed = returnValue.eventConsumed || !pointerInsideInner;
+		return returnValue;
 	}
 
-	if (!childReturn.eventConsumed && !pointerInsideOuter)
-	{
-		Layer::Press_Return returnVal = {};
-		returnVal.eventConsumed = false;
-		returnVal.destroy = true;
-		return returnVal;
-	}
 
-	auto const pointerInsideInner = widgetInnerRect.PointIsInside(params.pointer->pos);
-
-	if (pointerInsideInner)
+	auto const outerLineheight = textManager.GetLineheight() + (params.margin * 2);
+	// Check if we hit a line and not some spacing.
+	u32 lineRectYOffset = 0;
+	Std::Opt<uSize> indexHit;
+	int const submenuLineCount = (i32)submenu.lines.size();
+	for (int i = 0; i < submenuLineCount; i++)
 	{
-		// Check if we hit a line and not some spacing.
-		u32 lineRectYOffset = 0;
-		Std::Opt<uSize> indexHit;
-		for (int i = 0; i < submenu.lines.size(); i++)
+		Rect lineRect = widgetInnerRect;
+		lineRect.position.y += (i32)lineRectYOffset;
+		lineRect.extent.height = outerLineheight;
+		if (lineRect.PointIsInside(pointer.pos))
 		{
-			Rect lineRect = widgetInnerRect;
-			lineRect.position.y += lineRectYOffset;
-			lineRect.extent.height = outerLineheight;
-			if (lineRect.PointIsInside(params.pointer->pos))
-			{
-				indexHit = i;
-				break;
-			}
-			lineRectYOffset += lineRect.extent.height + params.spacing;
+			indexHit = i;
+			break;
 		}
+		lineRectYOffset += lineRect.extent.height + params.spacing;
+	}
 
-		if (submenu.pressedLine.HasValue())
+	if (submenu.pressedLineOpt.HasValue())
+	{
+		auto const pressedLine = submenu.pressedLineOpt.Value();
+
+		if (indexHit.HasValue() &&
+			pressedLine.lineIndex == indexHit.Value() &&
+			pressedLine.pointerId == pointer.id &&
+			!pointer.pressed)
 		{
-			auto const pressedLine = submenu.pressedLine.Value();
+			auto& line = submenu.lines[indexHit.Value()];
+			if (line.togglable)
+				line.toggled = !line.toggled;
+			if (line.callback)
+				line.callback(line, &ctx);
 
-			if (indexHit.HasValue() &&
-				pressedLine.lineIndex == indexHit.Value() &&
-				pressedLine.pointerId == params.pointer->id &&
-				!params.pointer->pressed)
-			{
-				auto& line = submenu.lines[indexHit.Value()];
-
-				if (auto subsubmenu = line.data.ToPtr<MenuButton::Submenu>())
-				{
-					submenu.activeSubmenu = indexHit.Value();
-					submenu.pressedLine = Std::nullOpt;
-
-					Layer::Press_Return returnVal = {};
-					returnVal.eventConsumed = true;
-					returnVal.destroy = false;
-					return returnVal;
-				}
-				else if (auto btn = line.data.ToPtr<MenuButton::LineButton>())
-				{
-					if (btn->togglable)
-						btn->toggled = !btn->toggled;
-					if (btn->callback)
-						btn->callback(*btn);
-
-					Layer::Press_Return returnVal = {};
-					returnVal.eventConsumed = true;
-					returnVal.destroy = true;
-					return returnVal;
-				}
-			}
+			returnValue.eventConsumed = true;
+			returnValue.destroyLayer = true;
+			return returnValue;
 		}
-		else
+	}
+	else
+	{
+		if (indexHit.HasValue() && pointer.pressed)
 		{
-			if (indexHit.HasValue() && params.pointer->pressed)
-			{
-				MenuButton::Submenu::PressedLine newPressedLine = {};
-				newPressedLine.lineIndex = indexHit.Value();
-				newPressedLine.pointerId = params.pointer->id;
-				submenu.pressedLine = newPressedLine;
+			using Submenu = MenuButton::Submenu;
+			Submenu::PressedLineData newPressedLineData = {};
+			newPressedLineData.pointerId = pointer.id;
+			newPressedLineData.lineIndex = indexHit.Value();
+			submenu.pressedLineOpt = newPressedLineData;
 
-				Layer::Press_Return returnVal = {};
-				returnVal.eventConsumed = true;
-				returnVal.destroy = false;
-				return returnVal;
-			}
+			returnValue.eventConsumed = true;
+			returnValue.destroyLayer = false;
+			return returnValue;
 		}
 	}
 
-	Layer::Press_Return returnVal = {};
-	returnVal.eventConsumed = pointerInsideOuter;
-	returnVal.destroy = false;
-	return returnVal;
+	return returnValue;
 }
 
-bool Gui::impl::MenuButtonImpl::MenuLayer_PointerMove(
-	MenuLayer& layer,
-	Context& ctx,
-	Rect const& usableRect,
-	PointerMove_Pointer const& pointer)
-{
-	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-
-	auto const lineheight = implData.textManager.lineheight;
-
-	MenuLayer_PointerMove_Inner_Params params = {};
-	params.ctx = &ctx;
-	params.lineheight = lineheight;
-	params.margin = layer.menuButton->margin;
-	params.pointer = &pointer;
-	params.spacing = layer.menuButton->spacing;
-	params.usableRect = usableRect;
-
-	return MenuLayer_PointerMove_Inner(
-		layer.menuButton->submenu,
-		layer.pos,
-		params);
-}
-
-bool Gui::impl::MenuButtonImpl::MenuLayer_PointerMove_Inner(
+bool Gui::impl::MenuBtnImpl::MenuLayer_PointerMove(
 	MenuButton::Submenu& submenu,
-	Math::Vec2Int desiredPos,
-	MenuLayer_PointerMove_Inner_Params const& params)
+	MenuLayer_PointerMove_Params const& params)
 {
-	auto const outerLineheight = params.lineheight + (params.margin * 2);
+	auto const& pointer = params.pointer;
+	auto& textManager = params.textManager;
 
-	auto const widgetRectOuter = Submenu_BuildRectOuter(
-		*params.ctx,
-		submenu,
-		params.spacing,
-		params.margin,
-		desiredPos,
-		params.usableRect);
+	auto const lineheight = textManager.GetLineheight();
 
-	bool occluded = params.pointer->occluded;
-
-	if (submenu.activeSubmenu.HasValue())
+	if (params.pointer.occluded)
 	{
-		auto const index = submenu.activeSubmenu.Value();
-		auto& line = submenu.lines[index];
-
-		DENGINE_IMPL_GUI_ASSERT(line.data.IsA<MenuButton::Submenu>());
-
-		auto& subsubmenu = line.data.Get<MenuButton::Submenu>();
-
-		auto childPos = widgetRectOuter.position;
-		childPos.x += widgetRectOuter.extent.width;
-		childPos.y += outerLineheight * index;
-		bool childOccluded = MenuLayer_PointerMove_Inner(subsubmenu, childPos, params);
-		occluded = occluded || childOccluded;
+		submenu.cursorHoveredLineOpt = Std::nullOpt;
+		return params.pointer.occluded;
 	}
+
+	auto const outerLineheight = lineheight + (params.margin * 2);
+
+	auto const& rectPair = params.rectCollection.GetRect(params.layer);
+	auto const& submenuRectOuter = rectPair.widgetRect;
 
 	auto const pointerInsideOuter =
-		widgetRectOuter.PointIsInside(params.pointer->pos) &&
-		params.usableRect.PointIsInside(params.pointer->pos);
+		submenuRectOuter.PointIsInside(pointer.pos) &&
+		rectPair.visibleRect.PointIsInside(pointer.pos);
 
-	auto const widgetRectInner = Submenu_BuildRectInner(widgetRectOuter, params.margin);
-
-	auto const pointerInsideInner =  widgetRectInner.PointIsInside(params.pointer->pos);
+	bool newOccluded = params.pointer.occluded || pointerInsideOuter;
 
 	// Find out if we're hovering a line. But only if it's the cursor
-	if (params.pointer->id == impl::cursorPointerId)
+	if (params.pointer.id == impl::cursorPointerId && pointerInsideOuter)
 	{
 		Std::Opt<uSize> indexHit;
+
+		auto const widgetRectInner = Submenu_BuildRectInner(submenuRectOuter, params.margin);
+		auto const pointerInsideInner =
+			widgetRectInner.PointIsInside(pointer.pos) &&
+			rectPair.visibleRect.PointIsInside(pointer.pos);
 		if (pointerInsideInner)
 		{
 			// Check if we hit a line and not some spacing.
@@ -504,7 +330,7 @@ bool Gui::impl::MenuButtonImpl::MenuLayer_PointerMove_Inner(
 				Rect lineRect = widgetRectInner;
 				lineRect.position.y += lineRectYOffset;
 				lineRect.extent.height = outerLineheight;
-				if (lineRect.PointIsInside(params.pointer->pos))
+				if (lineRect.PointIsInside(params.pointer.pos))
 				{
 					indexHit = i;
 					break;
@@ -512,102 +338,10 @@ bool Gui::impl::MenuButtonImpl::MenuLayer_PointerMove_Inner(
 				lineRectYOffset += lineRect.extent.height + params.spacing;
 			}
 		}
-		submenu.hoveredLineCursor = indexHit;
+		submenu.cursorHoveredLineOpt = indexHit;
 	}
 
-	occluded = occluded || pointerInsideOuter;
-
-	return occluded;
-}
-
-bool Gui::impl::MenuButtonImpl::MenuButton_PointerPress(
-	MenuButton& widget,
-	Context& ctx,
-	WindowID windowId,
-	Rect const& widgetRect,
-	Rect const& visibleRect,
-	PointerPress_Pointer const& pointer)
-{
-	bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
-	if (pointer.pressed && !pointerInside)
-		return false;
-
-	if (pointer.type == PointerType::Primary)
-	{
-		if (pointer.pressed && pointerInside)
-		{
-			widget.pointerId = pointer.id;
-			return pointerInside;
-		}
-		else if (!pointer.pressed && widget.pointerId.HasValue() && widget.pointerId.Value() == pointer.id)
-		{
-			if (pointerInside)
-			{
-				// We are inside the widget, we were in pressed state,
-				// and we unpressed the pointerId that was pressing down.
-
-				MenuButton_SpawnSubmenuLayer(widget, ctx, windowId, widgetRect);
-
-				widget.active = true;
-				widget.pointerId = Std::nullOpt;
-				return pointerInside;
-			}
-			else
-			{
-				widget.pointerId = Std::nullOpt;
-				return pointerInside;
-			}
-		}
-	}
-
-	// We are inside the button, so we always want to consume the event.
-	return pointerInside;
-}
-
-Rect Gui::impl::Submenu_BuildRectOuter(
-	Context const& ctx,
-	MenuButton::Submenu const& submenu,
-	u32 spacing,
-	u32 margin,
-	Math::Vec2Int desiredPos,
-	Rect const& usableRect)
-{
-	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-
-	// Adds text margin for inside each line
-	auto const lineheight = implData.textManager.lineheight + (margin * 2);
-
-	Rect widgetRect = {};
-	widgetRect.position = desiredPos;
-	widgetRect.extent.height = lineheight * submenu.lines.size();
-	widgetRect.extent.height += spacing * (submenu.lines.size() - 1);
-
-	// Calculate width of widget.
-	widgetRect.extent.width = 0;
-	for (auto const& subLine : submenu.lines)
-	{
-		auto const sizeHint = impl::TextManager::GetSizeHint(
-			implData.textManager,
-			{ subLine.title.data(), subLine.title.size() });
-
-		widgetRect.extent.width = Math::Max(widgetRect.extent.width, sizeHint.preferred.width);
-	}
-	// Add margin for inside line.
-	widgetRect.extent.width += margin * 2;
-
-	// Add margin to outside each line
-	widgetRect.extent.width += margin * 2;
-	widgetRect.extent.height += margin * 2;
-
-	// Adjust the position of the widget.
-	widgetRect.position.y = Math::Max(
-		widgetRect.Top(),
-		usableRect.Top());
-	widgetRect.position.y = Math::Min(
-		widgetRect.Top(),
-		usableRect.Bottom() - (i32)widgetRect.extent.height);
-
-	return widgetRect;
+	return newOccluded;
 }
 
 Rect Gui::impl::Submenu_BuildRectInner(
@@ -622,26 +356,194 @@ Rect Gui::impl::Submenu_BuildRectInner(
 	return returnVal;
 }
 
-void Gui::impl::MenuLayer::Render(
-	Context const& ctx,
-	Rect const& windowRect,
-	Rect const& usableRect,
-	DrawInfo& drawInfo) const
+void Gui::impl::MenuLayer_RenderSubmenu(
+	MenuLayer_RenderSubmenu_Params const& params)
 {
-	auto const intersection = Rect::Intersection(windowRect, usableRect);
+	auto& submenu = params.submenu;
+	auto const& submenuRect = params.submenuRect;
+	auto const& visibleRect = params.visibleRect;
+	auto& textManager = params.textManager;
 
-	impl::MenuLayer_RenderSubmenu_Params params = {};
-	params.bgColor = menuButton->colors.active;
-	params.ctx = &ctx;
-	params.drawInfo = &drawInfo;
-	params.margin = menuButton->margin;
-	params.spacing = menuButton->spacing;
-	params.usableRect = intersection;
+	auto const intersection = Rect::Intersection(submenuRect, visibleRect);
+	if (intersection.IsNothing())
+		return;
 
-	return impl::MenuLayer_RenderSubmenu(
-		menuButton->submenu,
-		pos,
-		params);
+	auto const lineheight = textManager.GetLineheight() + (params.margin * 2);
+
+	auto const submenuInnerRect = impl::Submenu_BuildRectInner(submenuRect, params.margin);
+
+	params.drawInfo.PushFilledQuad(submenuRect, params.bgColor);
+	// First draw highlights for toggled lines
+	int const submenuLineCount = (int)submenu.lines.size();
+	for (int i = 0; i < submenuLineCount; i += 1)
+	{
+		auto const& line = submenu.lines[i];
+
+		bool drawHighlight = false;
+
+		if (submenu.cursorHoveredLineOpt.HasValue() && submenu.cursorHoveredLineOpt.Value() == i)
+		{
+			drawHighlight = true;
+		}
+		else
+		{
+			if (line.togglable && line.toggled)
+			{
+				drawHighlight = true;
+			}
+			else if (submenu.pressedLineOpt.HasValue())
+			{
+				if (i == submenu.pressedLineOpt.Value().lineIndex)
+					drawHighlight = true;
+			}
+		}
+
+		if (drawHighlight)
+		{
+			auto lineRect = submenuInnerRect;
+			lineRect.position.y += lineheight * i;
+			lineRect.position.y += params.spacing * i;
+			lineRect.extent.height = lineheight;
+			params.drawInfo.PushFilledQuad(lineRect, { 1.f, 1.f, 1.f, 0.25f });
+		}
+	}
+	for (uSize i = 0; i < submenu.lines.size(); i += 1)
+	{
+		auto const& line = submenu.lines[i];
+
+		auto lineRect = submenuInnerRect;
+		lineRect.position.y += lineheight * i;
+		lineRect.position.y += params.spacing * i;
+		lineRect.extent.height = lineheight;
+
+		Math::Vec4 textColor = { 1.f, 1.f, 1.f, 1.f };
+
+		auto textRect = lineRect;
+		textRect.position.x += params.margin;
+		textRect.position.y += params.margin;
+		textRect.extent.width -= params.margin * 2;
+		textRect.extent.height -= params.margin * 2;
+
+		textManager.RenderText(
+			{ line.title.data(), line.title.size() },
+			textColor,
+			textRect,
+			params.drawInfo);
+	}
+}
+
+void Gui::impl::MenuLayer::BuildSizeHints(
+	Layer::BuildSizeHints_Params const& params) const
+{
+	auto& textManager = params.textManager;
+	auto const& textMargin = menuButton->margin;
+	auto const& lineSpacing = menuButton->spacing;
+	auto const& submenu = menuButton->submenu;
+
+	// Adds text margin for inside each line
+	auto const lineheight = textManager.GetLineheight() + (textMargin * 2);
+
+	Extent extent = {};
+	extent.height = lineheight * submenu.lines.size();
+	extent.height += lineSpacing * (submenu.lines.size() - 1);
+
+	// Calculate width of widget.
+	extent.width = 0;
+	for (auto const& subLine : submenu.lines)
+	{
+		auto const textOuterExtent = textManager.GetOuterExtent({ subLine.title.data(), subLine.title.size() });
+		extent.width = Math::Max(extent.width, textOuterExtent.width);
+	}
+	// Add margin for inside line.
+	extent.width += textMargin * 2;
+
+	// Add margin to outside each line
+	extent.width += textMargin * 2;
+	extent.height += textMargin * 2;
+
+	SizeHint returnVal = {};
+	returnVal.minimum = extent;
+
+	params.pusher.Push(*this, returnVal);
+}
+
+void Gui::impl::MenuLayer::BuildRects(
+	Layer::BuildRects_Params const& params) const
+{
+	auto const& windowRect = params.windowRect;
+	auto const& safeAreaRect = params.visibleRect;
+
+	auto const& sizeHint = params.pusher.GetSizeHint(*this);
+
+	auto const intersection = Rect::Intersection(windowRect, safeAreaRect);
+
+	Rect returnValue = {};
+	returnValue.extent.width = Math::Min(intersection.extent.width, sizeHint.minimum.width);
+	returnValue.extent.height = Math::Min(intersection.extent.height, sizeHint.minimum.height);
+
+	returnValue.position = params.windowRect.position + pos;
+
+	// Adjust the position of the widget.
+	returnValue.position.y = Math::Max(
+		intersection.Top(),
+		returnValue.Top());
+	returnValue.position.y = Math::Min(
+		returnValue.Top(),
+		intersection.Bottom() - (i32)returnValue.extent.height);
+
+	params.pusher.Push(*this, { returnValue, safeAreaRect });
+}
+
+void Gui::impl::MenuLayer::Render(
+	Render_Params const& params) const
+{
+	auto const& submenu = menuButton->submenu;
+	auto& textManager = params.textManager;
+	auto& drawInfo = params.drawInfo;
+	auto const& windowRect = params.windowRect;
+	auto const& safeAreaRect = params.safeAreaRect;
+
+	auto const intersection = Rect::Intersection(params.windowRect, params.safeAreaRect);
+	if (intersection.IsNothing())
+		return;
+
+	auto const& rectPair = params.rectCollection.GetRect(*this);
+
+	impl::MenuLayer_RenderSubmenu_Params tempParams = {
+		.submenu = submenu,
+		.textManager = textManager,
+		.drawInfo = params.drawInfo, };
+	tempParams.submenuRect = rectPair.widgetRect;
+	tempParams.visibleRect = rectPair.visibleRect;
+	tempParams.margin = menuButton->margin;
+	tempParams.spacing = menuButton->spacing;
+	tempParams.bgColor = menuButton->colors.active;
+
+	impl::MenuLayer_RenderSubmenu(tempParams);
+}
+
+bool Gui::impl::MenuLayer::CursorMove(
+	CursorMoveParams const& params,
+	bool occluded)
+{
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
+	pointer.occluded = occluded;
+
+	impl::MenuBtnImpl::MenuLayer_PointerMove_Params tempParams = {
+		.layer = *this,
+		.textManager = params.textManager,
+		.rectCollection = params.rectCollection,
+		.pointer = pointer };
+	tempParams.margin = menuButton->margin;
+	tempParams.spacing = menuButton->spacing;
+	tempParams.windowRect = params.windowRect;
+	tempParams.usableRect = params.safeAreaRect;
+
+	return impl::MenuBtnImpl::MenuLayer_PointerMove(
+		this->menuButton->submenu,
+		tempParams);
 }
 
 bool Gui::impl::MenuLayer::CursorMove(
@@ -651,6 +553,7 @@ bool Gui::impl::MenuLayer::CursorMove(
 	CursorMoveEvent const& event,
 	bool occluded)
 {
+/*
 	auto const intersection = Rect::Intersection(windowRect, usableRect);
 
 	impl::PointerMove_Pointer pointer = {};
@@ -663,6 +566,9 @@ bool Gui::impl::MenuLayer::CursorMove(
 		ctx,
 		intersection,
 		pointer);
+*/
+
+	return false;
 }
 
 Layer::Press_Return Gui::impl::MenuLayer::CursorPress(
@@ -670,14 +576,15 @@ Layer::Press_Return Gui::impl::MenuLayer::CursorPress(
 	Rect const& windowRect,
 	Rect const& usableRect,
 	Math::Vec2Int cursorPos,
-	CursorClickEvent const& event)
+	CursorPressEvent const& event)
 {
+/*
 	auto const intersection = Rect::Intersection(windowRect, usableRect);
 
 	impl::PointerPress_Pointer pointer = {};
 	pointer.id = impl::cursorPointerId;
 	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	pointer.pressed = event.clicked;
+	pointer.pressed = event.pressed;
 	pointer.type = impl::ToPointerType(event.button);
 
 	return impl::MenuButtonImpl::MenuLayer_PointerPress(
@@ -685,6 +592,9 @@ Layer::Press_Return Gui::impl::MenuLayer::CursorPress(
 		ctx,
 		intersection,
 		pointer);
+*/
+
+	return {};
 }
 
 Layer::Press_Return Gui::impl::MenuLayer::TouchPress(
@@ -693,6 +603,7 @@ Layer::Press_Return Gui::impl::MenuLayer::TouchPress(
 	Rect const& usableRect,
 	TouchPressEvent const& event)
 {
+/*
 	auto const intersection = Rect::Intersection(windowRect, usableRect);
 
 	impl::PointerPress_Pointer pointer = {};
@@ -706,54 +617,35 @@ Layer::Press_Return Gui::impl::MenuLayer::TouchPress(
 		ctx,
 		intersection,
 		pointer);
+*/
+
+	return {};
 }
 
-SizeHint MenuButton::GetSizeHint(
-	Context const& ctx) const
+Layer::Press_Return Gui::impl::MenuLayer::CursorPress(
+	Layer::CursorPressParams const& params,
+	bool eventConsumed)
 {
-	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	pointer.type = impl::ToPointerType(params.event.button);
+	pointer.pressed = params.event.pressed;
+	pointer.consumed = eventConsumed;
 
-	auto returnVal = impl::TextManager::GetSizeHint(
-		implData.textManager,
-		{ title.data(), title.size() });
-	returnVal.preferred.width += margin * 2;
-	returnVal.preferred.height += margin * 2;
+	impl::MenuBtnImpl::MenuLayer_PointerPress_Params tempParams = {
+		.ctx = params.ctx,
+		.layer = *this,
+		.rectCollection = params.rectCollection,
+		.textManager = params.textManager,
+		.pointer = pointer };
+	tempParams.spacing = menuButton->spacing;
+	tempParams.margin = menuButton->margin;
+	tempParams.usableRect = params.safeAreaRect;
 
-	return returnVal;
-}
-
-void MenuButton::Render(
-	Context const& ctx,
-	Extent framebufferExtent,
-	Rect widgetRect,
-	Rect visibleRect,
-	DrawInfo& drawInfo) const
-{
-	if (active)
-	{
-		if (colors.active.w > 0.f)
-			drawInfo.PushFilledQuad(widgetRect, colors.active);
-	}
-	else
-	{
-		if (colors.normal.w > 0.f)
-			drawInfo.PushFilledQuad(widgetRect, colors.normal);
-	}
-
-	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-
-	auto textRect = widgetRect;
-	textRect.position.x += margin;
-	textRect.position.y += margin;
-	textRect.extent.width -= margin * 2;
-	textRect.extent.height -= margin * 2;
-
-	impl::TextManager::RenderText(
-		implData.textManager,
-		{ title.data(), title.size() },
-		{ 1.f, 1.f, 1.f, 1.f },
-		textRect,
-		drawInfo);
+	return impl::MenuBtnImpl::MenuLayer_PointerPress(
+		menuButton->submenu,
+		tempParams);
 }
 
 bool MenuButton::CursorPress(
@@ -762,21 +654,10 @@ bool MenuButton::CursorPress(
 	Rect widgetRect,
 	Rect visibleRect,
 	Math::Vec2Int cursorPos,
-	CursorClickEvent event)
+	CursorPressEvent event)
 {
-	impl::PointerPress_Pointer pointer = {};
-	pointer.id = impl::cursorPointerId;
-	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	pointer.pressed = event.clicked;
-	pointer.type = impl::ToPointerType(event.button);
 
-	return impl::MenuButtonImpl::MenuButton_PointerPress(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		pointer);
+	return {};
 }
 
 bool MenuButton::TouchPressEvent(
@@ -786,6 +667,7 @@ bool MenuButton::TouchPressEvent(
 	Rect visibleRect,
 	Gui::TouchPressEvent event)
 {
+/*
 	impl::PointerPress_Pointer pointer = {};
 	pointer.id = event.id;
 	pointer.pos = event.position;
@@ -798,22 +680,175 @@ bool MenuButton::TouchPressEvent(
 		widgetRect,
 		visibleRect,
 		pointer);
+*/
+
+	return false;
 }
 
-void Gui::impl::MenuButtonImpl::MenuButton_SpawnSubmenuLayer(
+bool Gui::impl::MenuBtnImpl::MenuBtn_PointerMove(
+	MenuBtn_PointerMove_Params const& params)
+{
+	auto& widget = params.widget;
+	auto const& widgetRect = params.widgetRect;
+	auto const& visibleRect = params.visibleRect;
+	auto const& pointer = params.pointer;
+
+	auto const pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+
+	if (pointer.id == cursorPointerId)
+	{
+		widget.hoveredByCursor = pointerInside && !pointer.occluded;
+	}
+
+	bool newPointerOccluded = params.pointer.occluded;
+	newPointerOccluded = pointerInside || !pointer.occluded;
+
+	return newPointerOccluded;
+}
+
+bool Gui::impl::MenuBtnImpl::MenuBtn_PointerPress(
+	MenuBtn_PointerPress_Params const& params)
+{
+	auto& widget = params.widget;
+	auto const& widgetRect = params.widgetRect;
+	auto const& visibleRect = params.visibleRect;
+	auto const& pointer = params.pointer;
+
+	bool newEventConsumed = params.pointer.consumed;
+
+	auto const pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+	newEventConsumed = newEventConsumed || pointerInside;
+
+	if (pointer.type != PointerType::Primary)
+		return newEventConsumed;
+
+	if (pointerInside && pointer.pressed && !pointer.consumed)
+	{
+		newEventConsumed = true;
+
+		MenuBtn_SpawnSubmenuLayer(
+			widget,
+			params.ctx,
+			params.windowId,
+			widgetRect);
+	}
+
+	// We are inside the button, so we always want to consume the event.
+	return newEventConsumed;
+}
+
+void Gui::impl::MenuBtnImpl::MenuBtn_SpawnSubmenuLayer(
 	MenuButton& widget,
 	Context& ctx,
 	WindowID windowId,
 	Rect widgetRect)
 {
-	auto layerPtr = new impl::MenuLayer;
+	auto job = [&widget, widgetRect, windowId](Context& ctx) {
+		auto* layerPtr = new impl::MenuLayer;
 
-	layerPtr->menuButton = &widget;
+		layerPtr->menuButton = &widget;
 
-	layerPtr->pos = widgetRect.position;
-	layerPtr->pos.y += widgetRect.extent.height;
+		layerPtr->pos = widgetRect.position;
+		layerPtr->pos.y += widgetRect.extent.height;
 
-	ctx.SetFrontmostLayer(
-		windowId,
-		Std::Box{ layerPtr });
+		ctx.SetFrontmostLayer(
+			windowId,
+			Std::Box{ layerPtr });
+	};
+
+	ctx.PushPostEventJob(job);
+}
+
+SizeHint MenuButton::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
+{
+	auto& textManager = params.textManager;
+
+	SizeHint returnValue = {};
+
+	returnValue.minimum = textManager.GetOuterExtent({ title.data(), title.size() });
+	returnValue.minimum.width += margin * 2;
+	returnValue.minimum.height += margin * 2;
+
+	params.pusher.Push(*this, returnValue);
+
+	return returnValue;
+}
+
+void MenuButton::Render2(
+	Widget::Render_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	auto& textManager = params.textManager;
+	auto& drawInfo = params.drawInfo;
+
+	Math::Vec4 renderColor = colors.normal;
+	if (hoveredByCursor)
+		renderColor = colors.hovered;
+	if (active)
+		renderColor = colors.active;
+
+	if (renderColor.w >= 0.f)
+		drawInfo.PushFilledQuad(widgetRect, renderColor);
+
+	auto textRect = widgetRect;
+	textRect.position.x += margin;
+	textRect.position.y += margin;
+	textRect.extent.width -= margin * 2;
+	textRect.extent.height -= margin * 2;
+
+	textManager.RenderText(
+		{ title.data(), title.size() },
+		{ 1.f, 1.f, 1.f, 1.f },
+		textRect,
+		drawInfo);
+}
+
+void MenuButton::CursorExit(Context& ctx)
+{
+	hoveredByCursor = false;
+}
+
+bool MenuButton::CursorMove(
+	Widget::CursorMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
+	pointer.occluded = occluded;
+
+	impl::MenuBtnImpl::MenuBtn_PointerMove_Params tempParams {
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer };
+
+	return impl::MenuBtnImpl::MenuBtn_PointerMove(tempParams);
+}
+
+bool MenuButton::CursorPress2(
+	Widget::CursorPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	pointer.type = impl::ToPointerType(params.event.button);
+	pointer.pressed = params.event.pressed;
+	pointer.consumed = consumed;
+
+	impl::MenuBtnImpl::MenuBtn_PointerPress_Params tempParams {
+		.widget = *this,
+		.ctx = params.ctx,
+		.pointer = pointer };
+	tempParams.windowId = params.windowId;
+	tempParams.widgetRect = widgetRect;
+	tempParams.visibleRect = visibleRect;
+
+	return impl::MenuBtnImpl::MenuBtn_PointerPress(tempParams);
 }

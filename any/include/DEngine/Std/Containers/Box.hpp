@@ -48,7 +48,7 @@ namespace DEngine::Std
 		[[nodiscard]] T& operator*() noexcept;
 		[[nodiscard]] T const& operator*() const noexcept;
 
-		[[nodiscard]] operator bool() const noexcept;
+		[[nodiscard]] explicit operator bool() const noexcept;
 
 		[[nodiscard]] bool operator==(Box const&) const noexcept;
 		[[nodiscard]] bool operator==(T const*) const noexcept;

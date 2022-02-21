@@ -679,7 +679,7 @@ namespace DEngine::Editor::impl
 	static void Gizmo_HandleTranslation(
 		InternalViewportWidget const& widget,
 		Gui::Rect widgetRect,
-		InternalViewportWidget::HoldingGizmoData const& gizmoHoldingData,
+		ViewportWidget::HoldingGizmoData const& gizmoHoldingData,
 		Math::Vec2 pointerPos,
 		Transform& transform)
 	{
@@ -761,7 +761,7 @@ namespace DEngine::Editor::impl
 	static void Gizmo_HandleScaling(
 		InternalViewportWidget const& widget,
 		Gui::Rect widgetRect,
-		InternalViewportWidget::HoldingGizmoData const& holdingData,
+		ViewportWidget::HoldingGizmoData const& holdingData,
 		Math::Vec2 pointerPos,
 		Transform& transform)
 	{
@@ -863,7 +863,7 @@ namespace DEngine::Editor::impl
 	{
 		bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
 
-		if (widget.state == InternalViewportWidget::BehaviorState::Gizmo)
+		if (widget.state == ViewportWidget::BehaviorState::Gizmo)
 		{
 			DENGINE_IMPL_ASSERT(widget.holdingGizmoData.HasValue());
 			Entity entity = {};
@@ -913,7 +913,7 @@ namespace DEngine::Editor::impl
 			}
 		}
 
-		if (widget.state == InternalViewportWidget::BehaviorState::FreeLooking &&
+		if (widget.state == ViewportWidget::BehaviorState::FreeLooking &&
 			pointer.id == cursorPointerId)
 		{
 			DENGINE_IMPL_GUI_ASSERT(cursorMove);
@@ -937,6 +937,9 @@ static bool Editor::impl::PointerPress(
 	Gui::Rect const& visibleRect,
 	PointerPress_Pointer const& pointer)
 {
+	DENGINE_IMPL_ASSERT(widget.editorImpl);
+	auto& editorImpl = *widget.editorImpl;
+
 	bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
 	if (!pointerInside && pointer.pressed)
 		return false;
@@ -946,40 +949,39 @@ static bool Editor::impl::PointerPress(
 		!pointer.pressed)
 	{
 		widget.holdingGizmoData = Std::nullOpt;
-		widget.state = InternalViewportWidget::BehaviorState::Normal;
+		widget.state = ViewportWidget::BehaviorState::Normal;
 		return false;
 	}
 
 	// Initiate free-look
 	if (pointerInside && 
 		pointer.pressed && 
-		widget.state == InternalViewportWidget::BehaviorState::Normal &&
+		widget.state == ViewportWidget::BehaviorState::Normal &&
 		pointer.type == PointerType::Secondary)
 	{
-		widget.state = InternalViewportWidget::BehaviorState::FreeLooking;
-		App::LockCursor(true);
+		widget.state = ViewportWidget::BehaviorState::FreeLooking;
+		editorImpl.appCtx->LockCursor(true);
 		return true;
 	}
 
 	// Stop free-look
 	if (!pointer.pressed && 
-		widget.state == InternalViewportWidget::BehaviorState::FreeLooking &&
+		widget.state == ViewportWidget::BehaviorState::FreeLooking &&
 		pointer.type == PointerType::Secondary)
 	{
-		widget.state = InternalViewportWidget::BehaviorState::Normal;
-		App::LockCursor(false);
+		widget.state = ViewportWidget::BehaviorState::Normal;
+		editorImpl.appCtx->LockCursor(false);
 		return true;
 	}
 
-	DENGINE_IMPL_ASSERT(widget.editorImpl);
-	auto& editorImpl = *widget.editorImpl;
+
 	Scene const& scene = editorImpl.GetActiveScene();
 
 	// We don't want to do gizmo stuff if it was the secondary cursor button
 	bool doGizmoStuff =
 		pointerInside &&
 		pointer.pressed &&
-		widget.state == InternalViewportWidget::BehaviorState::Normal &&
+		widget.state == ViewportWidget::BehaviorState::Normal &&
 		pointer.type == PointerType::Primary;
 	if (doGizmoStuff)
 	{
@@ -1007,7 +1009,7 @@ static bool Editor::impl::PointerPress(
 			if (hitTestOpt.HasValue())
 			{
 				auto const& hit = hitTestOpt.Value();
-				InternalViewportWidget::HoldingGizmoData holdingGizmoData = {};
+				ViewportWidget::HoldingGizmoData holdingGizmoData = {};
 				holdingGizmoData.gizmoType = currGizmoType;
 				holdingGizmoData.holdingPart = hit.part;
 				holdingGizmoData.initialPos = transform.position;
@@ -1017,7 +1019,7 @@ static bool Editor::impl::PointerPress(
 				holdingGizmoData.relativeHitPointObject = hit.relativeHitPoint_Object;
 				holdingGizmoData.rotationOffset = hit.rotationOffset;
 				widget.holdingGizmoData = holdingGizmoData;
-				widget.state = InternalViewportWidget::BehaviorState::Gizmo;
+				widget.state = ViewportWidget::BehaviorState::Gizmo;
 				hitGizmo = true;
 				return pointerInside;
 			}
@@ -1208,12 +1210,11 @@ namespace DEngine::Editor::impl
 }
 
 Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
-	Context const& editor,
 	std::vector<Math::Vec3>& lineVertices,
 	std::vector<Gfx::LineDrawCmd>& lineDrawCmds) const noexcept
 {
-	EditorImpl const& editorImpl = editor.ImplData();
-	Scene const& scene = editorImpl.GetActiveScene();
+	DENGINE_IMPL_ASSERT(editorImpl);
+	Scene const& scene = editorImpl->GetActiveScene();
 
 	Gfx::ViewportUpdate returnVal = {};
 	returnVal.id = viewportId;
@@ -1226,9 +1227,9 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 
 	returnVal.transform = projMat;
 
-	if (editorImpl.GetSelectedEntity().HasValue())
+	if (editorImpl->GetSelectedEntity().HasValue())
 	{
-		Entity selected = editorImpl.GetSelectedEntity().Value();
+		Entity selected = editorImpl->GetSelectedEntity().Value();
 		// Find Transform component of this entity
 
 		auto transformPtr = scene.GetComponent<Transform>(selected);
@@ -1240,7 +1241,7 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 
 			returnVal.gizmoOpt = Gfx::ViewportUpdate::Gizmo{};
 			Gfx::ViewportUpdate::Gizmo& gizmo = returnVal.gizmoOpt.Value();
-			gizmo.type = impl::ToGfxGizmoType(editorImpl.GetCurrentGizmoType());
+			gizmo.type = impl::ToGfxGizmoType(editorImpl->GetCurrentGizmoType());
 			gizmo.position = transform.position;
 			gizmo.rotation = transform.rotation;
 
@@ -1295,12 +1296,12 @@ bool InternalViewportWidget::CursorPress(
 	Gui::Rect widgetRect,
 	Gui::Rect visibleRect,
 	Math::Vec2Int cursorPos,
-	Gui::CursorClickEvent event)
+	Gui::CursorPressEvent event)
 {
 	impl::PointerPress_Pointer pointer = {};
 	pointer.id = impl::cursorPointerId;
 	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	pointer.pressed = event.clicked;
+	pointer.pressed = event.pressed;
 	pointer.type = impl::ToPointerType(event.button);
 	return impl::PointerPress(
 		*this,
@@ -1379,7 +1380,7 @@ bool InternalViewportWidget::TouchMoveEvent(
 Gui::SizeHint InternalViewportWidget::GetSizeHint(Gui::Context const& ctx) const
 {
 	Gui::SizeHint returnVal = {};
-	returnVal.preferred = { 450, 450 };
+	returnVal.minimum = { 450, 450 };
 	returnVal.expandX = true;
 	returnVal.expandY = true;
 	return returnVal;
@@ -1407,17 +1408,48 @@ void InternalViewportWidget::Render(
 	drawInfo.drawCmds->push_back(drawCmd);
 }
 
+Gui::SizeHint InternalViewportWidget::GetSizeHint2(
+	Gui::Widget::GetSizeHint2_Params const& params) const
+{
+	Gui::SizeHint returnVal = {};
+	returnVal.minimum = { 450, 450 };
+	returnVal.expandX = true;
+	returnVal.expandY = true;
+
+	params.pusher.Push(*this, returnVal);
+
+	return returnVal;
+}
+
+void InternalViewportWidget::Render2(
+	Gui::Widget::Render_Params const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect) const
+{
+	isVisible = true;
+	currentlyResizing = newExtent != widgetRect.extent;
+	newExtent = widgetRect.extent;
+
+	// First draw the viewport.
+	Gfx::GuiDrawCmd drawCmd = {};
+	drawCmd.type = Gfx::GuiDrawCmd::Type::Viewport;
+	drawCmd.viewport.id = viewportId;
+	drawCmd.rectPosition.x = (f32)widgetRect.position.x / params.framebufferExtent.width;
+	drawCmd.rectPosition.y = (f32)widgetRect.position.y / params.framebufferExtent.height;
+	drawCmd.rectExtent.x = (f32)widgetRect.extent.width / params.framebufferExtent.width;
+	drawCmd.rectExtent.y = (f32)widgetRect.extent.height / params.framebufferExtent.height;
+
+	params.drawInfo.drawCmds->push_back(drawCmd);
+}
+
 ViewportWidget::ViewportWidget(EditorImpl& implData) :
-	Gui::StackLayout(Gui::StackLayout::Direction::Vertical),
 	editorImpl(&implData)
 {
+	auto* anchorArea = this;
+
 	implData.viewportWidgets.push_back(this);
 
-	Gui::AnchorArea* anchorArea = new Gui::AnchorArea;
-	AddWidget(Std::Box{ anchorArea });
-
-	Joystick* leftJoystick = new Joystick;
-	this->leftJoystick = leftJoystick;
+	leftJoystick = new Joystick;
 	Gui::AnchorArea::Node leftJoystickNode = {};
 	leftJoystickNode.anchorX = Gui::AnchorArea::AnchorX::Left;
 	leftJoystickNode.anchorY = Gui::AnchorArea::AnchorY::Bottom;
@@ -1425,8 +1457,7 @@ ViewportWidget::ViewportWidget(EditorImpl& implData) :
 	leftJoystickNode.widget = Std::Box{ leftJoystick };
 	anchorArea->nodes.push_back(Std::Move(leftJoystickNode));
 
-	Joystick* rightJoystick = new Joystick;
-	this->rightJoystick = rightJoystick;
+	rightJoystick = new Joystick;
 	Gui::AnchorArea::Node rightJoystickNode = {};
 	rightJoystickNode.anchorX = Gui::AnchorArea::AnchorX::Right;
 	rightJoystickNode.anchorY = Gui::AnchorArea::AnchorY::Bottom;
@@ -1435,12 +1466,8 @@ ViewportWidget::ViewportWidget(EditorImpl& implData) :
 	anchorArea->nodes.push_back(Std::Move(rightJoystickNode));
 
 	// Background
-	InternalViewportWidget* viewport = new InternalViewportWidget(implData);
-	this->viewport = viewport;
-
-	Gui::AnchorArea::Node background = {};
-	background.widget = Std::Box{ viewport };
-	anchorArea->nodes.push_back(Std::Move(background));
+	viewport = new InternalViewportWidget(implData);
+	anchorArea->backgroundWidget = Std::Box{ viewport };
 }
 
 Editor::ViewportWidget::~ViewportWidget()

@@ -6,12 +6,9 @@
 
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
-#include <DEngine/Std/Containers/Str.hpp>
 
 #include <functional>
 #include <string>
-
-namespace DEngine::Gui::impl { struct CH_Impl; }
 
 namespace DEngine::Gui
 {
@@ -31,6 +28,36 @@ namespace DEngine::Gui
 		using CollapseFnT = void(CollapsingHeader& widget);
 		std::function<CollapseFnT> collapseFn;
 
+
+		virtual SizeHint GetSizeHint2(
+			GetSizeHint2_Params const& params) const override;
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual void Render2(
+			Render_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual bool CursorMove(
+			CursorMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool occluded) override;
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+		virtual void CharRemoveEvent(
+			Context& ctx,
+			Std::FrameAlloc& transientAlloc) override;
+		virtual void TextInput(
+			Context& ctx,
+			Std::FrameAlloc& transientAlloc,
+			TextInputEvent const& event) override;
+
+
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;
 
@@ -41,51 +68,14 @@ namespace DEngine::Gui
 			Rect visibleRect,
 			DrawInfo& drawInfo) const override;
 
-		virtual void CharEnterEvent(
-			Context& ctx) override;
 
-		virtual void CharEvent(
-			Context& ctx,
-			u32 utfValue) override;
 
-		virtual void CharRemoveEvent(
-			Context& ctx) override;
-		
 		virtual void InputConnectionLost() override;
 
-		virtual bool CursorPress(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorPressEvent event) override;
-
-		virtual bool CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event,
-			bool occluded) override;
-
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
-
-		virtual bool TouchMoveEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchMoveEvent event,
-			bool occluded) override;
 
 	protected:
-		friend impl::CH_Impl;
+		struct Impl;
+		friend Impl;
 
 		Std::Opt<u8> headerPointerId;
 		bool hoveredByCursor = false;
