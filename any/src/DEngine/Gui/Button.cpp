@@ -59,7 +59,7 @@ namespace DEngine::Gui::impl
 using namespace DEngine;
 using namespace DEngine::Gui;
 
-class [[maybe_unused]] Gui::Button::Impl
+class [[maybe_unused]] Button::Impl
 {
 public:
 	// This data is only available when rendering.

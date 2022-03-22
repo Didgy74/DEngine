@@ -11,15 +11,7 @@ using namespace DEngine::Gui;
 
 namespace DEngine::Gui::impl
 {
-	struct CustomData
-	{
-		explicit CustomData(RectCollection::AllocT& alloc) :
-			glyphRects{ alloc }
-		{}
 
-		Extent textOuterExtent;
-		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
-	};
 
 	enum class PointerType : u8 { Primary, Secondary };
 	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
@@ -58,6 +50,47 @@ namespace DEngine::Gui::impl
 
 struct LineFloatEdit::Impl
 {
+	struct CustomData
+	{
+		explicit CustomData(RectCollection::AllocT& alloc) :
+			glyphRects{ alloc }
+		{}
+
+		Extent textOuterExtent;
+		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
+	};
+
+	static void UpdateValue(LineFloatEdit& widget, bool updateText)
+	{
+		auto& text = widget.text;
+		if (!text.empty() && text != "-" && text != "." && text != "-.")
+		{
+			char* index = nullptr;
+			f64 newValue = std::strtof(text.c_str(), &index);
+			bool newValueIsDifferent = false;
+			if (*index != 0) // error
+			{
+			}
+			else
+			{
+				newValueIsDifferent = newValue != widget.value;
+
+				widget.value = Math::Clamp(newValue, widget.min, widget.max);
+			}
+
+			if (updateText)
+			{
+				std::stringstream stream;
+				stream.precision(widget.decimalPoints);
+				stream << std::fixed << widget.value;
+				widget.text = stream.str();
+			}
+
+			if (newValueIsDifferent && widget.valueChangedFn)
+				widget.valueChangedFn(widget, widget.value);
+		}
+	}
+
 	static void StartInputConnection(LineFloatEdit& widget, Context& ctx)
 	{
 		SoftInputFilter filter = SoftInputFilter::SignedFloat;
@@ -75,6 +108,8 @@ struct LineFloatEdit::Impl
 		DENGINE_IMPL_GUI_ASSERT(widget.inputConnectionCtx);
 		widget.inputConnectionCtx->ClearInputConnection(widget);
 		widget.inputConnectionCtx = nullptr;
+
+		UpdateValue(widget, true);
 	}
 
 	[[nodiscard]] static bool PointerPress(impl::PointerPress_Params const& in) noexcept
@@ -206,7 +241,7 @@ SizeHint LineFloatEdit::GetSizeHint2(
 
 	if (pusher.IncludeRendering())
 	{
-		auto customData = impl::CustomData{ pusher.Alloc() };
+		auto customData = Impl::CustomData{ pusher.Alloc() };
 
 		customData.glyphRects.Resize(text.size());
 
@@ -240,7 +275,7 @@ void LineFloatEdit::BuildChildRects(
 
 	if (pusher.IncludeRendering())
 	{
-		auto* customDataPtr = pusher.GetCustomData2<impl::CustomData>(*this);
+		auto* customDataPtr = pusher.GetCustomData2<Impl::CustomData>(*this);
 		DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 		auto& customData = *customDataPtr;
 
@@ -274,7 +309,7 @@ void LineFloatEdit::Render2(
 	drawInfo.PushFilledQuad(widgetRect, color);
 
 	// Grab our customData to push text
-	auto* customDataPtr = rectCollection.GetCustomData2<impl::CustomData>(*this);
+	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
 
@@ -317,28 +352,6 @@ bool LineFloatEdit::CursorPress2(
 
 	return Impl::PointerPress(temp);
 }
-
-void LineFloatEdit::CharRemoveEvent(
-	Context& ctx,
-	Std::FrameAlloc& transientAlloc)
-{
-	if (inputConnectionCtx && !text.empty())
-	{
-		text.pop_back();
-		if (!text.empty() && text != "-" && text != "." && text != "-.")
-		{
-			char* endPtr = nullptr;
-			f64 newValue = std::strtod(text.c_str(), &endPtr);
-			if (*endPtr == 0) // No error, we met the end of the string.
-			{
-				value = newValue;
-				if (valueChangedFn)
-					valueChangedFn(*this, value);
-			}
-		}
-	}
-}
-
 
 void LineFloatEdit::SetValue(f64 in)
 {
@@ -383,6 +396,19 @@ void LineFloatEdit::TextInput(
 		}
 
 		for (int i = 0; i < event.newTextSize; i += 1)
-			text[i + event.oldIndex] = event.newTextData[i];
+			text[i + event.oldIndex] = (char)event.newTextData[i];
+
+		Impl::UpdateValue(*this, false);
+	}
+}
+
+void LineFloatEdit::EndTextInputSession(
+	Context& ctx,
+	Std::FrameAlloc& transientAlloc,
+	EndTextInputSessionEvent const& event)
+{
+	if (HasInputSession())
+	{
+		Impl::ClearInputConnection(*this);
 	}
 }

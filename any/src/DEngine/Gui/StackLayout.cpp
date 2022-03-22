@@ -729,3 +729,17 @@ void StackLayout::TextInput(
 			event);
 	}
 }
+
+void StackLayout::EndTextInputSession(
+	Context& ctx,
+	Std::FrameAlloc& transientAlloc,
+	EndTextInputSessionEvent const& event)
+{
+	for (auto& child : children)
+	{
+		child->EndTextInputSession(
+			ctx,
+			transientAlloc,
+			event);
+	}
+}

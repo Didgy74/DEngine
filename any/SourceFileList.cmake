@@ -63,6 +63,7 @@ set(DENGINE_GUI_SOURCE_FILES
 		src/DEngine/Gui/Grid.cpp
 		src/DEngine/Gui/Image.cpp
 		src/DEngine/Gui/LineEdit.cpp
+		src/DEngine/Gui/LineIntEdit.cpp
 		src/DEngine/Gui/LineFloatEdit.cpp
 		src/DEngine/Gui/LineList.cpp
 		src/DEngine/Gui/MenuButton.cpp

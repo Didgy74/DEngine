@@ -55,9 +55,19 @@ namespace DEngine::Gui
 			AllocT& Alloc() noexcept { return Collection().Alloc(); }
 
 			It AddEntry(Widget const& widget) { return Collection().AddEntry(widget); }
-			void SetSizeHint(It const& it, SizeHint const& sizeHint) { return Collection().SetSizeHint(it, sizeHint); }
-			It Push(Widget const& widget, SizeHint const& sizeHint) { return Collection().PushSizeHint(widget, sizeHint); }
-			void Push(Layer const& layer, SizeHint const& sizeHint) { Collection().PushSizeHint(layer, sizeHint); }
+			It AddEntry(Layer const& layer) { return Collection().AddEntry(layer); }
+			void SetSizeHint(It const& it, SizeHint const& sizeHint)
+			{
+				return Collection().SetSizeHint(it, sizeHint);
+			}
+			It Push(Widget const& widget, SizeHint const& sizeHint)
+			{
+				return Collection().PushSizeHint(widget, sizeHint);
+			}
+			void Push(Layer const& layer, SizeHint const& sizeHint)
+			{
+				Collection().PushSizeHint(layer, sizeHint);
+			}
 
 			Std::ByteSpan AttachCustomData(It const& it, uSize customDataSize)
 			{
@@ -70,7 +80,7 @@ namespace DEngine::Gui
 			}
 
 			template<class T>
-			T* AttachCustomData(It const& it, T&& input) requires Std::Trait::isMoveConstructible<T>
+			T& AttachCustomData(It const& it, T&& input) requires Std::Trait::isMoveConstructible<T>
 			{
 				return Collection().AttachCustomData(it, static_cast<T&&>(input));
 			}
@@ -90,17 +100,64 @@ namespace DEngine::Gui
 				collection{ &collection }
 			{}
 
-			void Push(Widget const& widget, RectPair const& rect) { Collection().PushRect(widget, rect); }
-			void Push(Layer const& layer, RectPair const& rect) { Collection().PushRect(layer, rect); }
+			[[nodiscard]] It GetEntry(Widget const& widget) noexcept
+			{
+				return Collection().GetEntry(widget);
+			}
+			[[nodiscard]] It GetEntry(Layer const& layer) noexcept
+			{
+				return Collection().GetEntry(layer);
+			}
 
-			[[nodiscard]] auto const& GetSizeHint(Widget const& widget) const { return Collection().GetSizeHint(widget); }
-			[[nodiscard]] auto const& GetSizeHint(Layer const& layer) const { return Collection().GetSizeHint(layer); }
+			void Push(Widget const& widget, RectPair const& rect)
+			{
+				Collection().PushRect(widget, rect);
+			}
+			void Push(Layer const& layer, RectPair const& rect)
+			{
+				Collection().PushRect(layer, rect);
+			}
+
+			[[nodiscard]] auto const& GetSizeHint(Widget const& widget) const
+			{
+				return Collection().GetSizeHint(widget);
+			}
+			[[nodiscard]] auto const& GetSizeHint(Layer const& layer) const
+			{
+				return Collection().GetSizeHint(layer);
+			}
 
 			[[nodiscard]] Std::Span<char> GetCustomData(Widget const& widget) { return Collection().GetCustomData(widget); }
 			template<class T>
-			[[nodiscard]] T* GetCustomData2(Widget const& widget) { return Collection().GetCustomData2<T>(widget); }
+			[[nodiscard]] T* GetCustomData2(Widget const& widget)
+			{
+				return Collection().GetCustomData2<T>(widget);
+			}
 			template<class T>
-			[[nodiscard]] T const* GetCustomData2(Widget const& widget) const { return Collection().GetCustomData2<T>(widget); }
+			[[nodiscard]] T const* GetCustomData2(Widget const& widget) const
+			{
+				return Collection().GetCustomData2<T>(widget);
+			}
+			template<class T>
+			[[nodiscard]] T* GetCustomData2(Layer const& layer)
+			{
+				return Collection().GetCustomData2<T>(layer);
+			}
+			template<class T>
+			[[nodiscard]] T const* GetCustomData2(Layer const& layer) const
+			{
+				return Collection().GetCustomData2<T>(layer);
+			}
+			template<class T>
+			[[nodiscard]] T* GetCustomData2(It const& it)
+			{
+				return Collection().GetCustomData2<T>(it);
+			}
+			template<class T>
+			[[nodiscard]] T const* GetCustomData2(It const& it) const
+			{
+				return Collection().GetCustomData2<T>(it);
+			}
 
 			[[nodiscard]] bool IncludeRendering() const noexcept { return Collection().BuiltForRendering(); }
 
@@ -118,6 +175,9 @@ namespace DEngine::Gui
 		RectCollection& operator=(RectCollection&&) = delete;
 
 		It AddEntry(Widget const& widget) { return AddEntry(&widget); }
+		It AddEntry(Layer const& layer) { return AddEntry(&layer); }
+		It GetEntry(Widget const& widget) const { return GetEntry(&widget); }
+		It GetEntry(Layer const& layer) const { return GetEntry(&layer); }
 		void SetSizeHint(It const& it, SizeHint const& sizeHint)
 		{
 			DENGINE_IMPL_GUI_ASSERT(it.index < sizeHints.size());
@@ -154,7 +214,7 @@ namespace DEngine::Gui
 		}
 
 		template<class T>
-		T* AttachCustomData(It const& it, T&& input) requires Std::Trait::isMoveConstructible<T>
+		T& AttachCustomData(It const& it, T&& input) requires Std::Trait::isMoveConstructible<T>
 		{
 			DENGINE_IMPL_GUI_ASSERT(it.index < widgets.size());
 			DENGINE_IMPL_GUI_ASSERT(!customData2[it.index].ptr);
@@ -169,7 +229,7 @@ namespace DEngine::Gui
 			customDataItem.ptr = returnPtr;
 			customDataItem.destructorFn = [](void* ptr) { static_cast<T*>(ptr)->~T(); };
 
-			return returnPtr;
+			return *returnPtr;
 		}
 
 		[[nodiscard]] Std::Span<char> GetCustomData(Widget const& widget) { return GetCustomData(&widget); }
@@ -178,6 +238,11 @@ namespace DEngine::Gui
 		[[nodiscard]] T const* GetCustomData2(Widget const& widget) const { return GetCustomData2<T>(&widget); }
 		template<class T>
 		[[nodiscard]] T* GetCustomData2(Widget const& widget) { return GetCustomData2<T>(&widget); }
+		template<class T>
+		[[nodiscard]] T const* GetCustomData2(It const& it) const
+		{
+			return reinterpret_cast<T const*>(customData2[it.index].ptr);
+		}
 
 		[[nodiscard]] bool BuiltForRendering() const { return containsRendering; }
 
@@ -293,7 +358,7 @@ namespace DEngine::Gui
 			return false;
 		}
 
-		It AddEntry(void const* ptr)
+		[[nodiscard]] It AddEntry(void const* ptr)
 		{
 			// Check that the widget has not already been inserted
 			DENGINE_IMPL_GUI_ASSERT(!PtrExists(ptr));
@@ -305,6 +370,13 @@ namespace DEngine::Gui
 
 			customDataViews.push_back({});
 			return It{ widgets.size() - 1 };
+		}
+
+		[[nodiscard]] It GetEntry(void const* ptr) const
+		{
+			// Check that the widget has not already been inserted
+			DENGINE_IMPL_GUI_ASSERT(PtrExists(ptr));
+			return It{ FindIndex(ptr) };
 		}
 
 		// Returns the buffer of custom data, if requested.
@@ -359,9 +431,15 @@ namespace DEngine::Gui
 			return reinterpret_cast<T*>(customData2[FindIndex(ptr)].ptr);
 		}
 		template<class T>
+		[[nodiscard]] T* GetCustomData2(It const& it)
+		{
+			return reinterpret_cast<T*>(customData2[it.index].ptr);
+		}
+		template<class T>
 		[[nodiscard]] T const* GetCustomData2(void const* ptr) const
 		{
-			return reinterpret_cast<T*>(customData2[FindIndex(ptr)].ptr);
+			return reinterpret_cast<T const*>(customData2[FindIndex(ptr)].ptr);
 		}
+
 	};
 }

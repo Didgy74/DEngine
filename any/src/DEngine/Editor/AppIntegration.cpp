@@ -79,6 +79,16 @@ void EditorImpl::TextInputEvent(
 	queuedGuiEvents.emplace_back(event);
 }
 
+void EditorImpl::EndTextInputSessionEvent(
+	App::Context& ctx,
+	App::WindowID windowId)
+{
+	Gui::EndTextInputSessionEvent event = {};
+	event.windowId = (Gui::WindowID)windowId;
+
+	queuedGuiEvents.emplace_back(event);
+}
+
 void Editor::EditorImpl::TouchEvent(
 	u8 id,
 	App::TouchEventType type,
@@ -240,6 +250,7 @@ void Editor::EditorImpl::FlushQueuedEventsToGui()
 			case EventT::indexOf<Gui::CursorMoveEvent>:
 				guiCtx->PushEvent(event.Get<Gui::CursorMoveEvent>());
 				break;
+
 			case EventT::indexOf<Gui::TextInputEvent>:
 			{
 				auto test = event.Get<Gui::TextInputEvent>();
@@ -247,6 +258,12 @@ void Editor::EditorImpl::FlushQueuedEventsToGui()
 				guiCtx->PushEvent(test);
 				break;
 			}
+			case EventT::indexOf<Gui::EndTextInputSessionEvent>:
+			{
+				guiCtx->PushEvent(event.Get<Gui::EndTextInputSessionEvent>());
+				break;
+			}
+
 			case EventT::indexOf<Gui::TouchPressEvent>:
 				//guiCtx->PushEvent(event.Get<Gui::TouchPressEvent>());
 				break;

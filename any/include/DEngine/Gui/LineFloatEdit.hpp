@@ -8,8 +8,6 @@
 #include <string>
 #include <functional>
 
-namespace DEngine::Gui::impl { struct LineFloatEditImpl; }
-
 namespace DEngine::Gui
 {
 	class LineFloatEdit : public Widget
@@ -26,6 +24,8 @@ namespace DEngine::Gui
 
 		Math::Vec4 backgroundColor = { 0.3f, 0.3f, 0.3f, 1.f };
 		u32 margin = 0;
+		static constexpr u8 defaultDecimalPoints = 0;
+		u8 decimalPoints = 0;
 
 		[[nodiscard]] bool HasInputSession() const noexcept { return inputConnectionCtx; }
 		void SetValue(f64 in);
@@ -47,13 +47,14 @@ namespace DEngine::Gui
 			Rect const& widgetRect,
 			Rect const& visibleRect,
 			bool consumed) override;
-		virtual void CharRemoveEvent(
-			Context& ctx,
-			Std::FrameAlloc& transientAlloc) override;
 		virtual void TextInput(
 			Context& ctx,
 			Std::FrameAlloc& transientAlloc,
 			TextInputEvent const& event) override;
+		virtual void EndTextInputSession(
+			Context& ctx,
+			Std::FrameAlloc& transientAlloc,
+			EndTextInputSessionEvent const& event) override;
 
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
@@ -67,6 +68,6 @@ namespace DEngine::Gui
 		Context* inputConnectionCtx = nullptr;
 		std::string text = "0.0";
 		f64 value = 0.0;
-		u8 decimalPoints = 3;
+
 	};
 }

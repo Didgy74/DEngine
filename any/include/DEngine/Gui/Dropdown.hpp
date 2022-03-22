@@ -9,8 +9,6 @@
 #include <string>
 #include <vector>
 
-namespace DEngine::Gui::impl { class DropdownImpl; }
-
 namespace DEngine::Gui
 {
 	class Dropdown : public Widget
@@ -36,6 +34,11 @@ namespace DEngine::Gui
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
 
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+
 		virtual void Render2(
 			Render_Params const& params,
 			Rect const& widgetRect,
@@ -49,48 +52,12 @@ namespace DEngine::Gui
 
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override;
+			Context const& ctx) const override { return {}; }
 
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
 
-		virtual bool CursorPress(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorPressEvent event) override;
-
-		virtual bool CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event,
-			bool cursorOccluded) override;
-
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
-
-		virtual bool TouchMoveEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchMoveEvent event,
-			bool occluded) override;
-
-	private:
-		friend impl::DropdownImpl;
+		struct Impl;
+		friend Impl;
+	protected:
 
 		Std::Opt<u8> heldPointerId;
 	};

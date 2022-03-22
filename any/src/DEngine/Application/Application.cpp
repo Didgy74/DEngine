@@ -77,11 +77,6 @@ static void Application::impl::FlushQueuedEventCallbacks(Context& appCtx)
 				job.ptr->CharEnterEvent();
 				break;
 			}
-			case Type::CharRemoveEvent:
-			{
-				job.ptr->CharRemoveEvent(job.charRemoveEvent.windowId);
-				break;
-			}
 			case Type::CursorMoveEvent:
 			{
 				auto const& event = job.cursorMoveEvent;
@@ -103,6 +98,13 @@ static void Application::impl::FlushQueuedEventCallbacks(Context& appCtx)
 					event.oldIndex,
 					event.oldCount,
 					{ implData.textInputDatas.data() + event.newTextOffset, event.newTextSize });
+				break;
+			}
+
+			case Type::EndTextInputSessionEvent:
+			{
+				auto const& event = job.endTextInputSessionEvent;
+				job.ptr->EndTextInputSessionEvent(appCtx, event.windowId);
 				break;
 			}
 
@@ -706,6 +708,15 @@ void Application::impl::BackendInterface::PushTextInputEvent(
 	event.oldCount = oldCount;
 	event.newTextOffset = oldTextDataSize;
 	event.newTextSize = newText.Size();
+	PushEvent(implData, event);
+}
+
+[[maybe_unused]] void Application::impl::BackendInterface::PushEndTextInputSessionEvent(
+	Context::Impl& implData,
+	WindowID id)
+{
+	EventCallbackJob::EndTextInputSessionEvent event = {};
+	event.windowId = id;
 	PushEvent(implData, event);
 }
 

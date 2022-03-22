@@ -2584,6 +2584,29 @@ void DockArea::TextInput(
 	}
 }
 
+void DockArea::EndTextInputSession(
+	Context& ctx,
+	Std::FrameAlloc& transientAlloc,
+	EndTextInputSessionEvent const& event)
+{
+	auto& dockArea = *this;
+	for (auto const& layerIt : Impl::DA_BuildLayerItPair(dockArea))
+	{
+		for (auto const& nodeIt : impl::BuildNodeItPair(layerIt.parentPtrToNode, transientAlloc))
+		{
+			if (nodeIt.node.GetNodeType() != impl::NodeType::Window)
+				continue;
+
+			auto& node = static_cast<impl::DA_WindowNode&>(nodeIt.node);
+			auto& activeTab = node.tabs[node.activeTabIndex];
+			if (activeTab.widget)
+			{
+				activeTab.widget->EndTextInputSession(ctx, transientAlloc, event);
+			}
+		}
+	}
+}
+
 void DockArea::Layer::Clear()
 {
 	if (root)

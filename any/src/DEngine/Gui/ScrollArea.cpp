@@ -590,3 +590,14 @@ void ScrollArea::TextInput(
 		child->TextInput(ctx, transientAlloc, event);
 	}
 }
+
+void ScrollArea::EndTextInputSession(
+	Context& ctx,
+	Std::FrameAlloc& transientAlloc,
+	EndTextInputSessionEvent const& event)
+{
+	if (child)
+	{
+		child->EndTextInputSession(ctx, transientAlloc, event);
+	}
+}

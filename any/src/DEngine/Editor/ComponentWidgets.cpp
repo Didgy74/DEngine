@@ -85,6 +85,7 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 
 			inputField->backgroundColor = Settings::GetColor(Settings::Color::Button_Normal);
 			inputField->margin = Settings::defaultTextMargin;
+			inputField->decimalPoints = Settings::inputFieldPrecision;
 			inputField->valueChangedFn = [i, &editorImpl](LineFloatEdit& widget, f64 newValue)
 			{
 				DENGINE_IMPL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
@@ -109,23 +110,20 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 		rotationLabel->margin = Settings::defaultTextMargin;
 		rotationLabel->expandX = false;
 
-		rotationInput = new LineEdit;
+		rotationInput = new LineFloatEdit;
 		outerGrid->SetChild(1, row, Std::Box{ rotationInput });
 		rotationInput->backgroundColor = Settings::GetColor(Settings::Color::Button_Normal);
 		rotationInput->margin = Settings::defaultTextMargin;
-		rotationInput->textChangedFn = [&editorImpl](LineEdit& widget)
+		rotationInput->decimalPoints = Settings::inputFieldPrecision;
+		rotationInput->valueChangedFn = [&editorImpl](LineFloatEdit& widget, f64 newValue)
 		{
 			DENGINE_IMPL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 			auto entity = editorImpl.GetSelectedEntity().Value();
-			auto componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity);
+			auto* componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity);
 			DENGINE_IMPL_ASSERT(componentPtr);
 			auto& component = *componentPtr;
-			component.rotation = std::stof(widget.text.c_str());
+			component.rotation = (f32)newValue;
 		};
-
-		auto test = new Button;
-		test->text = "Test";
-		outerGrid->SetChild(2, row, Std::Box{ test });
 	}
 
 	{
@@ -141,21 +139,20 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 		for (int i = 0; i < 2; i += 1)
 		{
 			auto& inputField = this->scaleInputFields[i];
-			inputField = new LineEdit;
+			inputField = new LineFloatEdit;
 			outerGrid->SetChild(i+1, row, Std::Box{ inputField });
 
 			inputField->backgroundColor = Settings::GetColor(Settings::Color::Button_Normal);
 			inputField->margin = Settings::defaultTextMargin;
-			inputField->type = LineEdit::Type::Float;
-			inputField->textChangedFn = [i, &editorImpl](LineEdit& widget)
+			inputField->decimalPoints = Settings::inputFieldPrecision;
+			inputField->valueChangedFn = [i, &editorImpl](LineFloatEdit& widget, f64 newValue)
 			{
 				DENGINE_IMPL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 				auto entity = editorImpl.GetSelectedEntity().Value();
 				auto componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity);
 				DENGINE_IMPL_ASSERT(componentPtr);
 				auto& component = *componentPtr;
-
-				component.scale[i] = std::stof(widget.text.c_str());
+				component.scale[i] = (f32)newValue;
 			};
 		}
 	}
@@ -207,17 +204,14 @@ void TransformWidget::Update(ComponentType const& component)
 		if (!positionInputFields[i]->HasInputSession())
 		{
 			auto& widget = *positionInputFields[i];
-			widget.SetValue((f64)component.position[i]);
+			widget.SetValue(component.position[i]);
 		}
 	}
 
 	if (!rotationInput->HasInputSession())
 	{
 		auto& widget = *rotationInput;
-		std::ostringstream out;
-		out.precision(Settings::inputFieldPrecision);
-		out << std::fixed << component.rotation;
-		widget.text = out.str();
+		widget.SetValue(component.rotation);
 	}
 
 	for (uSize i = 0; i < 2; i += 1)
@@ -225,10 +219,7 @@ void TransformWidget::Update(ComponentType const& component)
 		if (!scaleInputFields[i]->HasInputSession())
 		{
 			auto& widget = *scaleInputFields[i];
-			std::ostringstream out;
-			out.precision(Settings::inputFieldPrecision);
-			out << std::fixed << component.scale[i];
-			widget.text = out.str();
+			widget.SetValue(component.scale[i]);
 		}
 	}
 }
@@ -255,20 +246,20 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 	textureIDLabel->margin = Editor::Settings::defaultTextMargin;
 	textureIDLabel->expandX = false;
 
-	// Create the Position input field
-	textureIdInput = new LineEdit;
+	// Create the integer field
+	textureIdInput = new LineIntEdit;
 	textureIdLayout->AddWidget(Std::Box{ textureIdInput });
 	textureIdInput->backgroundColor = Settings::GetColor(Settings::Color::Button_Normal);
 	textureIdInput->margin = Settings::defaultTextMargin;
-	textureIdInput->type = LineEdit::Type::Integer;
-	textureIdInput->textChangedFn = [&editorImpl](LineEdit& widget)
+	textureIdInput->min = 0;
+	textureIdInput->valueChangedFn = [&editorImpl](LineIntEdit& widget, i64 newValue)
 	{
 		DENGINE_IMPL_ASSERT(editorImpl.GetSelectedEntity().HasValue());
 		auto entity = editorImpl.GetSelectedEntity().Value();
-		auto componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity);
+		auto* componentPtr = editorImpl.scene->GetComponent<ComponentType>(entity);
 		DENGINE_IMPL_ASSERT(componentPtr);
 		auto& component = *componentPtr;
-		component = (Gfx::TextureID)std::stoi(widget.text.c_str());
+		component = (Gfx::TextureID)newValue;
 	};
 
 	this->collapseFn = [&editorImpl](CollapsingHeader& widget)
@@ -313,7 +304,9 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 void SpriteRenderer2DWidget::Update(ComponentType const& component)
 {
 	if (!textureIdInput->HasInputSession())
-		textureIdInput->text = std::to_string((unsigned int)component);
+	{
+		textureIdInput->SetValue((unsigned int)component);
+	}
 }
 
 RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)

@@ -29,6 +29,7 @@ namespace DEngine::Editor
 			Gui::CursorPressEvent,
 			Gui::CursorMoveEvent,
 			Gui::TextInputEvent,
+			Gui::EndTextInputSessionEvent,
 			Gui::TouchPressEvent,
 			Gui::TouchMoveEvent,
 			Gui::WindowCloseEvent,
@@ -66,12 +67,17 @@ namespace DEngine::Editor
 			App::WindowID windowId,
 			Math::Vec2Int position,
 			Math::Vec2Int positionDelta) override;
+
 		virtual void TextInputEvent(
 			App::Context& ctx,
 			App::WindowID windowId,
 			uSize oldIndex,
 			uSize oldCount,
 			Std::Span<u32 const> newString) override;
+		virtual void EndTextInputSessionEvent(
+			App::Context& ctx,
+			App::WindowID windowId) override;
+
 		virtual void TouchEvent(
 			u8 id,
 			App::TouchEventType type,

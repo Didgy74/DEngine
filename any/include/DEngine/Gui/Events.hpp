@@ -110,4 +110,9 @@ namespace DEngine::Gui
 		// Size of the new substring to insert.
 		uSize newTextSize;
 	};
+
+	struct EndTextInputSessionEvent
+	{
+		WindowID windowId;
+	};
 }

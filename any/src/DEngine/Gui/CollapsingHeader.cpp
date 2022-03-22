@@ -547,3 +547,12 @@ void CollapsingHeader::TextInput(
 	if (!collapsed && child)
 		child->TextInput(ctx, transientAlloc, event);
 }
+
+void CollapsingHeader::EndTextInputSession(
+	Context& ctx,
+	Std::FrameAlloc& transientAlloc,
+	EndTextInputSessionEvent const& event)
+{
+	if (!collapsed && child)
+		child->EndTextInputSession(ctx, transientAlloc, event);
+}

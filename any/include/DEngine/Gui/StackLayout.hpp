@@ -72,6 +72,10 @@ namespace DEngine::Gui
 			Context& ctx,
 			Std::FrameAlloc& transientAlloc,
 			TextInputEvent const& event) override;
+		virtual void EndTextInputSession(
+			Context& ctx,
+			Std::FrameAlloc& transientAlloc,
+			EndTextInputSessionEvent const& event) override;
 
 		virtual void CharRemoveEvent(
 			Context& ctx,

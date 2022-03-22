@@ -76,7 +76,7 @@ namespace DEngine::Gui
 			TextManager& textManager;
 			Std::FrameAlloc& transientAlloc;
 			WindowID windowId;
-			CursorMoveEvent event;
+			CursorMoveEvent const& event;
 		};
 		/*
 			Returns true if the widget occludes the move event cursor point.
@@ -138,6 +138,10 @@ namespace DEngine::Gui
 			Context& ctx,
 			Std::FrameAlloc& transientAlloc,
 			TextInputEvent const& event) {}
+		virtual void EndTextInputSession(
+			Context& ctx,
+			Std::FrameAlloc& transientAlloc,
+			EndTextInputSessionEvent const& event) {}
 
 		virtual void CharRemoveEvent(
 			Context& ctx,

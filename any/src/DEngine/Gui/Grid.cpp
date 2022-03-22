@@ -519,3 +519,17 @@ void Grid::TextInput(
 		}
 	}
 }
+
+void Grid::EndTextInputSession(
+	Context& ctx,
+	Std::FrameAlloc& transientAlloc,
+	EndTextInputSessionEvent const& event)
+{
+	for (auto& child : children)
+	{
+		if (child)
+		{
+			child->EndTextInputSession(ctx, transientAlloc, event);
+		}
+	}
+}

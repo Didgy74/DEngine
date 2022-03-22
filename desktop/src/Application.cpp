@@ -365,6 +365,16 @@ void Application::impl::Backend_GLFW_KeyboardKeyCallback(
 		dengineButton,
 		wasPressed);
 
+	bool doCharEnterEvent =
+		dengineButton == Button::Enter &&
+		wasPressed &&
+		implData.textInputSessionActive;
+	if (doCharEnterEvent)
+	{
+		BackendInterface::PushEndTextInputSessionEvent(implData, windowId);
+	}
+
+
 	bool doRemoveChar =
 		dengineButton == Button::Backspace &&
 		wasPressed &&
@@ -443,6 +453,8 @@ auto Application::impl::Backend_GLFWButtonToDEngineButton(i32 input) -> Button
 
 		case GLFW_KEY_BACKSPACE:
 			return Button::Backspace;
+		case GLFW_KEY_ENTER:
+			return Button::Enter;
 		case GLFW_KEY_DELETE:
 			return Button::Delete;
 

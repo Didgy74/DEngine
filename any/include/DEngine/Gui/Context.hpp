@@ -74,6 +74,7 @@ namespace DEngine::Gui
 		void PushEvent(CursorPressEvent const&);
 		void PushEvent(CursorMoveEvent const&);
 		void PushEvent(TextInputEvent const&);
+		void PushEvent(EndTextInputSessionEvent const&);
 		void PushEvent(TouchMoveEvent const&);
 		void PushEvent(TouchPressEvent const&);
 		void PushEvent(WindowCloseEvent const&);

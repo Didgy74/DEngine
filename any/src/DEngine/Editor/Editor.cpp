@@ -94,11 +94,11 @@ namespace DEngine::Editor
 				this->editorImpl->UnselectEntity();
 			};
 
-			auto entityListScrollArea = new Gui::ScrollArea();
+			auto entityListScrollArea = new Gui::ScrollArea;
 			this->AddWidget(Std::Box<Gui::Widget>{ entityListScrollArea });
 			entityListScrollArea->scrollbarInactiveColor = Settings::GetColor(Settings::Color::Scrollbar_Normal);
 
-			entitiesList = new Gui::LineList();
+			entitiesList = new Gui::LineList;
 			entityListScrollArea->child = Std::Box<Gui::Widget>{ entitiesList };
 			entitiesList->textMargin = Settings::defaultTextMargin;
 			entitiesList->selectedLineChangedFn = [&editorImpl](
@@ -414,8 +414,15 @@ Editor::Context Editor::Context::Create(
 		Std::Box{ new ViewportWidget(implData) });
 
 
-	Gui::WindowHandler& guiWinHandler = implData;
-	implData.guiCtx = Std::Box{ new Gui::Context(Gui::Context::Create(guiWinHandler, implData.appCtx, implData.gfxCtx)) };
+	auto& guiWinHandler = implData;
+	auto ctx = new Gui::Context(
+		Gui::Context::Create(
+			guiWinHandler,
+			implData.appCtx,
+			implData.gfxCtx));
+	implData.guiCtx = Std::Box{ ctx };
+
+
 
 	auto const clearColor = Settings::GetColor(Settings::Color::Background);
 	implData.guiCtx->AdoptWindow(

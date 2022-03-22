@@ -27,9 +27,9 @@ namespace DEngine::Application::impl
 			ButtonEvent,
 			CharEnterEvent,
 			CharEvent,
-			CharRemoveEvent,
 			CursorMoveEvent,
 			TextInputEvent,
+			EndTextInputSessionEvent,
 			TouchEvent,
 			WindowCloseSignalEvent,
 			WindowCursorEnterEvent,
@@ -64,12 +64,12 @@ namespace DEngine::Application::impl
 		template<>
 		Type GetEventType<CharEvent>() { return Type::CharEvent; }
 
-		struct CharRemoveEvent
+		struct EndTextInputSessionEvent
 		{
 			WindowID windowId;
 		};
 		template<>
-		Type GetEventType<CharRemoveEvent>() { return Type::CharRemoveEvent; }
+		Type GetEventType<EndTextInputSessionEvent>() { return Type::EndTextInputSessionEvent; }
 
 		struct CursorMoveEvent
 		{
@@ -147,9 +147,10 @@ namespace DEngine::Application::impl
 			ButtonEvent buttonEvent;
 			CharEnterEvent charEnterEvent;
 			CharEvent charEvent;
-			CharRemoveEvent charRemoveEvent;
+
 			CursorMoveEvent cursorMoveEvent;
 			TextInputEvent textInputEvent;
+			EndTextInputSessionEvent endTextInputSessionEvent;
 			TouchEvent touchEvent;
 			WindowCloseSignalEvent windowCloseSignalEvent;
 			WindowCursorEnterEvent windowCursorEnterEvent;
@@ -166,11 +167,11 @@ namespace DEngine::Application::impl
 		template<>
 		constexpr auto& Get<CharEvent>() { return charEvent; }
 		template<>
-		constexpr auto& Get<CharRemoveEvent>() { return charRemoveEvent; }
-		template<>
 		constexpr auto& Get<CursorMoveEvent>() { return cursorMoveEvent; }
 		template<>
 		constexpr auto& Get<TextInputEvent>() { return textInputEvent; }
+		template<>
+		constexpr auto& Get<EndTextInputSessionEvent>() { return endTextInputSessionEvent; }
 		template<>
 		constexpr auto& Get<WindowCloseSignalEvent>() { return windowCloseSignalEvent; }
 		template<>
@@ -357,4 +358,8 @@ namespace DEngine::Application::impl::BackendInterface
 		uSize oldIndex,
 		uSize oldCount,
 		Std::Span<u32 const> const& newText);
+
+	[[maybe_unused]] void PushEndTextInputSessionEvent(
+		Context::Impl& implData,
+		WindowID id);
 }

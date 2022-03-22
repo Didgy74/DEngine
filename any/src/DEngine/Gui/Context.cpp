@@ -157,6 +157,7 @@ namespace DEngine::Gui::impl
 				auto& layer = *windowNode.frontmostLayer;
 				Layer::BuildRects_Params buildRectsParams {
 					.ctx = ctx,
+					.textManager = textManager,
 					.transientAlloc = transientAlloc,
 					.pusher = rectPusher };
 				buildRectsParams.windowRect = visibleRect;
@@ -318,6 +319,25 @@ void Context::PushEvent(TextInputEvent const& event)
 	}
 }
 
+void Context::PushEvent(EndTextInputSessionEvent const& event)
+{
+	auto& implData = Internal_ImplData();
+
+	auto& transientAlloc = implData.transientAlloc;
+	Std::Defer _allocCleanup = [&]() { transientAlloc.Reset(); };
+
+	auto* windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+	if (windowNode.data.topLayout)
+	{
+		windowNode.data.topLayout->EndTextInputSession(
+			*this,
+			transientAlloc,
+			event);
+	}
+}
+
 void Context::PushEvent(CursorPressEvent const& event)
 {
 	auto& implData = Internal_ImplData();
@@ -452,9 +472,9 @@ void Context::PushEvent(CursorMoveEvent const& event)
 			.ctx = *this,
 			.rectCollection = rectCollection,
 			.textManager = textManager,
-			.transientAlloc = transientAlloc };
-		widgetParams.windowId = windowNode.id;
-		widgetParams.event = modifiedEvent;
+			.transientAlloc = transientAlloc,
+			.windowId = windowNode.id,
+			.event = modifiedEvent };
 
 		widget.CursorMove(
 			widgetParams,

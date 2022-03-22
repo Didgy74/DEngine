@@ -363,6 +363,9 @@ public:
 		uSize oldIndex,
 		uSize oldCount,
 		Std::Span<u32 const> newString) {}
+	virtual void EndTextInputSessionEvent(
+		Context& ctx,
+		WindowID windowId) {}
 	virtual void TouchEvent(
 		u8 id,
 		TouchEventType type,
