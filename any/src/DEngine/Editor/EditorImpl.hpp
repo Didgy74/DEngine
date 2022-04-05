@@ -135,7 +135,7 @@ namespace DEngine::Editor
 		Gui::MenuButton* viewMenuButton = nullptr;
 		Gui::DockArea* dockArea = nullptr;
 		Gui::ButtonGroup* gizmoTypeBtnGroup = nullptr;
-		std::vector<ViewportWidget*> viewportWidgets;
+		std::vector<ViewportWidget*> viewportWidgetPtrs;
 		void SelectEntity(Entity id);
 		void SelectEntity_MidDispatch(Entity id, Gui::Context& ctx);
 		void UnselectEntity();

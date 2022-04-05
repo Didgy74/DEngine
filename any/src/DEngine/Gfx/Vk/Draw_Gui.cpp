@@ -12,8 +12,8 @@ void Gfx::Vk::RecordGuiCmds(
 	RecordGuiCmds_Params const& params)
 {
 	auto const& cmdBuffer = params.cmdBuffer;
+	auto const& viewportMan = params.viewportManager;
 	DeviceDispatch const& device = params.globUtils.device;
-
 	{
 		vk::RenderPassBeginInfo rpBegin{};
 		rpBegin.framebuffer = params.framebuffer;
@@ -177,7 +177,7 @@ void Gfx::Vk::RecordGuiCmds(
 				case GuiDrawCmd::Type::Viewport:
 				{
 					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, params.guiResManager.viewportPipeline);
-					GuiResourceManager::ViewportPushConstant pushConstant{};
+					GuiResourceManager::ViewportPushConstant pushConstant = {};
 					pushConstant.orientation = params.guiData.rotation;
 					pushConstant.rectExtent = drawCmd.rectExtent;
 					pushConstant.rectOffset = drawCmd.rectPosition;
@@ -188,11 +188,12 @@ void Gfx::Vk::RecordGuiCmds(
 						0,
 						sizeof(pushConstant),
 						&pushConstant);
-					auto const& viewportData = *std::find_if(
-						params.viewportManager.viewportNodes.begin(),
-						params.viewportManager.viewportNodes.end(),
-						[&drawCmd](decltype(params.viewportManager.viewportNodes)::value_type const& val) {
-							return drawCmd.viewport.id == val.id; });
+					auto const* viewportDataPtr = ViewportMan::FindNode(viewportMan, drawCmd.viewport.id);
+					DENGINE_IMPL_GFX_ASSERT(viewportDataPtr);
+					auto const& viewportData = *viewportDataPtr;
+					DENGINE_IMPL_GFX_ASSERT_MSG(
+						viewportData.IsInitialized(),
+						"Attempted to render a viewport that is not initialized.");
 					device.cmdBindDescriptorSets(
 						cmdBuffer,
 						vk::PipelineBindPoint::eGraphics,

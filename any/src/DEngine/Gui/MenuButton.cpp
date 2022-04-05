@@ -199,7 +199,9 @@ Layer::Press_Return Gui::impl::MenuBtnImpl::MenuLayer_PointerPress(
 		return returnValue;
 	}
 
-	auto const& rectPair = rectCollection.GetRect(layer);
+	auto const* rectPairPtr = rectCollection.GetRect(layer);
+	DENGINE_IMPL_GUI_ASSERT(rectPairPtr);
+	auto const& rectPair = *rectPairPtr;
 	auto const& submenuRectOuter = rectPair.widgetRect;
 	auto const widgetInnerRect = Submenu_BuildRectInner(
 		submenuRectOuter,
@@ -290,6 +292,9 @@ bool Gui::impl::MenuBtnImpl::MenuLayer_PointerMove(
 	MenuButton::Submenu& submenu,
 	MenuLayer_PointerMove_Params const& params)
 {
+	auto& layer = params.layer;
+	auto const& rectColl = params.rectCollection;
+
 	auto const& pointer = params.pointer;
 	auto& textManager = params.textManager;
 
@@ -303,7 +308,9 @@ bool Gui::impl::MenuBtnImpl::MenuLayer_PointerMove(
 
 	auto const outerLineheight = lineheight + (params.margin * 2);
 
-	auto const& rectPair = params.rectCollection.GetRect(params.layer);
+	auto const* rectPairPtr = rectColl.GetRect(layer);
+	DENGINE_IMPL_GUI_ASSERT(rectPairPtr);
+	auto const& rectPair = *rectPairPtr;
 	auto const& submenuRectOuter = rectPair.widgetRect;
 
 	auto const pointerInsideOuter =
@@ -436,6 +443,7 @@ void Gui::impl::MenuLayer::BuildSizeHints(
 	Layer::BuildSizeHints_Params const& params) const
 {
 	auto& textManager = params.textManager;
+	auto& pusher = params.pusher;
 	auto const& textMargin = menuButton->margin;
 	auto const& lineSpacing = menuButton->spacing;
 	auto const& submenu = menuButton->submenu;
@@ -464,16 +472,20 @@ void Gui::impl::MenuLayer::BuildSizeHints(
 	SizeHint returnVal = {};
 	returnVal.minimum = extent;
 
-	params.pusher.Push(*this, returnVal);
+	auto entry = pusher.AddEntry(*this);
+	pusher.SetSizeHint(entry, returnVal);
 }
 
 void Gui::impl::MenuLayer::BuildRects(
 	Layer::BuildRects_Params const& params) const
 {
+	auto& pusher = params.pusher;
 	auto const& windowRect = params.windowRect;
 	auto const& safeAreaRect = params.visibleRect;
 
-	auto const& sizeHint = params.pusher.GetSizeHint(*this);
+	auto entry = pusher.GetEntry(*this);
+
+	auto const& sizeHint = pusher.GetSizeHint(entry);
 
 	auto const intersection = Rect::Intersection(windowRect, safeAreaRect);
 
@@ -481,7 +493,7 @@ void Gui::impl::MenuLayer::BuildRects(
 	returnValue.extent.width = Math::Min(intersection.extent.width, sizeHint.minimum.width);
 	returnValue.extent.height = Math::Min(intersection.extent.height, sizeHint.minimum.height);
 
-	returnValue.position = params.windowRect.position + pos;
+	returnValue.position = windowRect.position + pos;
 
 	// Adjust the position of the widget.
 	returnValue.position.y = Math::Max(
@@ -491,23 +503,26 @@ void Gui::impl::MenuLayer::BuildRects(
 		returnValue.Top(),
 		intersection.Bottom() - (i32)returnValue.extent.height);
 
-	params.pusher.Push(*this, { returnValue, safeAreaRect });
+	pusher.SetRectPair(entry, { returnValue, safeAreaRect });
 }
 
 void Gui::impl::MenuLayer::Render(
 	Render_Params const& params) const
 {
 	auto const& submenu = menuButton->submenu;
+	auto const& rectColl = params.rectCollection;
 	auto& textManager = params.textManager;
 	auto& drawInfo = params.drawInfo;
 	auto const& windowRect = params.windowRect;
 	auto const& safeAreaRect = params.safeAreaRect;
 
-	auto const intersection = Rect::Intersection(params.windowRect, params.safeAreaRect);
+	auto const intersection = Rect::Intersection(windowRect, safeAreaRect);
 	if (intersection.IsNothing())
 		return;
 
-	auto const& rectPair = params.rectCollection.GetRect(*this);
+	auto const* rectPairPtr = rectColl.GetRect(*this);
+	DENGINE_IMPL_GUI_ASSERT(rectPairPtr);
+	auto const& rectPair = *rectPairPtr;
 
 	impl::MenuLayer_RenderSubmenu_Params tempParams = {
 		.submenu = submenu,
@@ -761,6 +776,7 @@ void Gui::impl::MenuBtnImpl::MenuBtn_SpawnSubmenuLayer(
 
 SizeHint MenuButton::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
 {
+	auto& pusher = params.pusher;
 	auto& textManager = params.textManager;
 
 	SizeHint returnValue = {};
@@ -769,7 +785,8 @@ SizeHint MenuButton::GetSizeHint2(Widget::GetSizeHint2_Params const& params) con
 	returnValue.minimum.width += margin * 2;
 	returnValue.minimum.height += margin * 2;
 
-	params.pusher.Push(*this, returnValue);
+	auto entry = pusher.AddEntry(*this);
+	pusher.SetSizeHint(entry, returnValue);
 
 	return returnValue;
 }

@@ -509,6 +509,8 @@ bool StackLayout::TouchMoveEvent(
 
 SizeHint StackLayout::GetSizeHint2(GetSizeHint2_Params const& params) const
 {
+	auto& pusher = params.pusher;
+
 	uSize const childCount = children.size();
 
 	SizeHint returnVal = {};
@@ -532,7 +534,8 @@ SizeHint StackLayout::GetSizeHint2(GetSizeHint2_Params const& params) const
 	returnValRefs.dir += padding * 2;
 	returnValRefs.nonDir += padding * 2;
 
-	params.pusher.Push(*this, returnVal);
+	auto entry = pusher.AddEntry(*this);
+	pusher.SetSizeHint(entry, returnVal);
 	return returnVal;
 }
 
@@ -541,15 +544,20 @@ void StackLayout::BuildChildRects(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
+	auto& pusher = params.pusher;
+	auto& transientAlloc = params.transientAlloc;
+
 	uSize const childCount = children.size();
 
-	auto childSizeHints = Std::MakeVec<SizeHint>(params.transientAlloc);
+	auto childEntries = Std::MakeVec<RectCollection::It>(transientAlloc);
+	childEntries.Resize(childCount);
+	for (uSize i = 0; i < childCount; i += 1)
+		childEntries[i] = pusher.GetEntry(*children[i]);
+
+	auto childSizeHints = Std::MakeVec<SizeHint>(transientAlloc);
 	childSizeHints.Resize(childCount);
 	for (uSize i = 0; i < childCount; i += 1)
-	{
-		auto& child = *children[i];
-		childSizeHints[i] = params.pusher.GetSizeHint(child);
-	}
+		childSizeHints[i] = pusher.GetSizeHint(childEntries[i]);
 
 	auto const innerRect = impl::BuildInnerRect(widgetRect, padding);
 
@@ -563,7 +571,7 @@ void StackLayout::BuildChildRects(
 	for (uSize i = 0; i < childCount; i += 1)
 	{
 		auto& child = *children[i];
-		params.pusher.Push(child, { childRects[i], visibleRect });
+		pusher.SetRectPair(childEntries[i], { childRects[i], visibleRect });
 		child.BuildChildRects(
 			params,
 			childRects[i],
@@ -601,6 +609,8 @@ bool StackLayout::CursorPress2(
 	Rect const& visibleRect,
 	bool consumed)
 {
+	auto const& rectColl = params.rectCollection;
+
 	bool newEventConsumed = consumed;
 
 	{
@@ -620,11 +630,13 @@ bool StackLayout::CursorPress2(
 				continue;
 
 			auto& child = *children[index.Value()];
-			auto const& rectPair = params.rectCollection.GetRect(child);
+			auto const* childRectPairPtr = rectColl.GetRect(child);
+			DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
+			auto const& childRects = *childRectPairPtr;
 			bool const childConsumed = child.CursorPress2(
 				params,
-				rectPair.widgetRect,
-				rectPair.visibleRect,
+				childRects.widgetRect,
+				childRects.visibleRect,
 				newEventConsumed);
 			newEventConsumed = newEventConsumed || childConsumed;
 		}
@@ -642,6 +654,8 @@ bool StackLayout::CursorMove(
 	Rect const& visibleRect,
 	bool occluded)
 {
+	auto const& rectColl = params.rectCollection;
+
 	DENGINE_IMPL_GUI_ASSERT(!currentlyIterating);
 	currentlyIterating = true;
 	Std::Defer cleanup { [this]() {
@@ -659,11 +673,13 @@ bool StackLayout::CursorMove(
 			continue;
 
 		auto& child = *children[index.Value()];
-		auto const& rectPair = params.rectCollection.GetRect(child);
+		auto const* childRectPairPtr = rectColl.GetRect(child);
+		DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
+		auto const& childRects = *childRectPairPtr;
 		child.CursorMove(
 			params,
-			rectPair.widgetRect,
-			rectPair.visibleRect,
+			childRects.widgetRect,
+			childRects.visibleRect,
 			occluded);
 	}
 
@@ -677,6 +693,8 @@ void StackLayout::Render2(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
+	auto& rectColl = params.rectCollection;
+
 	auto const innerRect = impl::BuildInnerRect(widgetRect, padding);
 
 	if (Rect::Intersection(innerRect, visibleRect).IsNothing())
@@ -698,7 +716,9 @@ void StackLayout::Render2(
 			continue;
 
 		auto const& child = *children[indexOpt.Value()];
-		auto const& childRects = params.rectCollection.GetRect(child);
+		auto const* childRectPairPtr = rectColl.GetRect(child);
+		DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
+		auto const& childRects = *childRectPairPtr;
 		child.Render2(
 			params,
 			childRects.widgetRect,

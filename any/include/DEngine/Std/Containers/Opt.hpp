@@ -13,7 +13,6 @@ constexpr void* operator new(decltype(sizeof(int)) size, T* data, DEngine::Std::
 namespace DEngine::Std
 {
 	enum class NullOpt_T : char;
-
 	constexpr NullOpt_T nullOpt = {};
 
 	template<typename T>

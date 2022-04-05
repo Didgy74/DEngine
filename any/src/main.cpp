@@ -147,7 +147,7 @@ namespace DEngine::impl
 		Gfx::Context& gfxData,
 		App::Context& appCtx,
 		Editor::Context& editorCtx,
-		Scene& scene);
+		Scene const& scene);
 }
 
 /*
@@ -311,6 +311,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	// Initialize the renderer
 	auto requiredInstanceExtensions = App::RequiredVulkanInstanceExtensions();
 	impl::GfxLogger gfxLogger = {};
+	gfxLogger.appCtx = &appCtx;
 	impl::GfxTexAssetInterfacer gfxTexAssetInterfacer{};
 	Gfx::Context gfxCtx = impl::CreateGfxContext(
 		gfxWsiConnection,
@@ -455,7 +456,7 @@ void DEngine::impl::SubmitRendering(
 	Gfx::Context& gfxData,
 	App::Context& appCtx,
 	Editor::Context& editorCtx,
-	Scene& scene)
+	Scene const& scene)
 {
 	Gfx::DrawParams params = {};
 
@@ -464,10 +465,10 @@ void DEngine::impl::SubmitRendering(
 		auto& entity = item.a;
 
 		// First check if this entity has a position
-		Transform* transformPtr = scene.GetComponent<Transform>(entity);
+		auto const* transformPtr = scene.GetComponent<Transform>(entity);
 		if (transformPtr == nullptr)
 			continue;
-		Transform& transform = *transformPtr;
+		auto& transform = *transformPtr;
 
 		params.textureIDs.push_back(item.b);
 

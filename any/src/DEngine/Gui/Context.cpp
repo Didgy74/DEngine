@@ -174,7 +174,8 @@ namespace DEngine::Gui::impl
 				.pusher = rectPusher, };
 
 			auto& widget = *windowNode.data.topLayout;
-			params.pusher.Push(widget, { visibleRect, visibleRect });
+			auto childEntry = params.pusher.GetEntry(widget);
+			params.pusher.SetRectPair(childEntry, { visibleRect, visibleRect });
 			widget.BuildChildRects(
 				params,
 				visibleRect,
@@ -610,6 +611,7 @@ void Context::Render2(Render2_Params const& params) const
 			Layer::Render_Params layerRenderParams {
 				.ctx = *this,
 				.textManager = textManager,
+				.transientAlloc = transientAlloc,
 				.windowRect = windowRect,
 				.safeAreaRect = visibleRect,
 				.rectCollection = rectCollection,

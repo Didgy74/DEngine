@@ -12,14 +12,11 @@
 
 namespace DEngine::Gui
 {
-	namespace impl { struct BtnGroupImpl; }
-
 	class ButtonGroup : public Widget
 	{
 	public:
 		u32 activeIndex = 0;
-		struct InternalButton
-		{
+		struct InternalButton {
 			std::string title;
 		};
 		std::vector<InternalButton> buttons;
@@ -43,6 +40,10 @@ namespace DEngine::Gui
 
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
 		virtual void Render2(
 			Render_Params const& params,
 			Rect const& widgetRect,
@@ -63,23 +64,7 @@ namespace DEngine::Gui
 			Rect const& visibleRect,
 			bool consumed) override;
 
-
-
-
-		virtual bool TouchMoveEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchMoveEvent event,
-			bool occluded) override;
-
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
+		struct Impl;
 
 	protected:
 		struct HeldPointerData
@@ -90,6 +75,7 @@ namespace DEngine::Gui
 		Std::Opt<HeldPointerData> heldPointerData;
 		Std::Opt<uSize> cursorHoverIndex;
 
-		friend impl::BtnGroupImpl;
+
+		friend Impl;
 	};
 }

@@ -242,6 +242,11 @@ namespace DEngine::Gfx::Vk::ViewportMgrImpl
 using namespace DEngine;
 using namespace DEngine::Gfx;
 
+bool Vk::ViewportManager::Node::IsInitialized() const
+{
+	return viewport.renderTarget.img != vk::Image{};
+}
+
 bool Vk::ViewportManager::Init(
 	ViewportManager& manager,
 	DeviceDispatch const& device,
@@ -392,6 +397,24 @@ void Vk::ViewportManager::UpdateCameras(
 			node.viewport.camDataMappedMem.Data() + manager.camElementSize * inFlightIndex,
 			&viewportUpdate.transform,
 			manager.camElementSize);
+	}
+}
+
+
+auto Vk::ViewportManager::FindNode(ViewportManager const& viewportMan, ViewportID id) -> Node const*
+{
+	auto const& end = viewportMan.viewportNodes.end();
+	auto resultIt = Std::FindIf(
+		viewportMan.viewportNodes.begin(),
+		end,
+		[id](auto const& val) { return val.id == id; });
+
+	if (resultIt == end)
+		return nullptr;
+	else
+	{
+		auto const& test = *resultIt;
+		return &test;
 	}
 }
 

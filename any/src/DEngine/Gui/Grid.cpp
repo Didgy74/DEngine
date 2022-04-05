@@ -297,10 +297,10 @@ SizeHint Grid::GetSizeHint2(
 	returnValue.expandX = true;
 	returnValue.expandY = true;
 
-	pusher.Push(*this, returnValue);
+	auto entry = pusher.AddEntry(*this);
+	pusher.SetSizeHint(entry, returnValue);
 	return returnValue;
 }
-
 
 void Grid::BuildChildRects(
 	BuildChildRects_Params const& params,
@@ -312,6 +312,15 @@ void Grid::BuildChildRects(
 
 	auto const childCount = (int)children.size();
 
+	// Gather all the RectCollection entries for the children
+	auto childrenEntries = Std::MakeVec<RectCollection::It>(transientAlloc);
+	childrenEntries.Resize(childCount);
+	for (int i = 0; i < childCount; i++) {
+		auto& child = children[i];
+		if (child)
+			childrenEntries[i] = pusher.GetEntry(*child);
+	}
+
 	// Gather all the size-hints for out children.
 	auto childrenSizeHints = Std::MakeVec<SizeHint>(transientAlloc);
 	childrenSizeHints.Resize(childCount);
@@ -319,7 +328,7 @@ void Grid::BuildChildRects(
 	{
 		auto& child = children[i];
 		if (child)
-			childrenSizeHints[i] = pusher.GetSizeHint(*child);
+			childrenSizeHints[i] = pusher.GetSizeHint(childrenEntries[i]);
 	}
 
 	auto colMaxWidths = Impl::BuildColMaxWidths(
@@ -398,7 +407,7 @@ void Grid::BuildChildRects(
 			auto& child = children[linearIndex];
 			if (child)
 			{
-				pusher.Push(*child, { childRect, visibleRect });
+				pusher.SetRectPair(childrenEntries[linearIndex], { childRect, visibleRect });
 				child->BuildChildRects(
 					params,
 					childRect,
@@ -424,15 +433,14 @@ void Grid::Render2(
 {
 	auto& rectCollection = params.rectCollection;
 
-	for (auto& child : children)
-	{
-		if (child)
-		{
-			auto const& childRectPair = rectCollection.GetRect(*child);
+	for (auto& child : children) {
+		if (child) {
+			auto const* childRectPairPtr = rectCollection.GetRect(*child);
+			DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
 			child->Render2(
 				params,
-				childRectPair.widgetRect,
-				childRectPair.visibleRect);
+				childRectPairPtr->widgetRect,
+				childRectPairPtr->visibleRect);
 		}
 	}
 }
@@ -446,15 +454,14 @@ bool Grid::CursorMove(
 	auto& rectCollection = params.rectCollection;
 
 	bool newOccluded = occluded;
-	for (auto& child : children)
-	{
-		if (child)
-		{
-			auto const& childRectPair = rectCollection.GetRect(*child);
+	for (auto& child : children) {
+		if (child) {
+			auto const* childRectPairPtr = rectCollection.GetRect(*child);
+			DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
 			bool childOccludedReturn = child->CursorMove(
 				params,
-				childRectPair.widgetRect,
-				childRectPair.visibleRect,
+				childRectPairPtr->widgetRect,
+				childRectPairPtr->visibleRect,
 				newOccluded);
 			newOccluded = newOccluded || childOccludedReturn;
 		}
@@ -479,11 +486,12 @@ bool Grid::CursorPress2(
 	{
 		if (child)
 		{
-			auto const& childRectPair = rectCollection.GetRect(*child);
+			auto const* childRectPairPtr = rectCollection.GetRect(*child);
+			DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
 			bool childConsumedReturn = child->CursorPress2(
 				params,
-				childRectPair.widgetRect,
-				childRectPair.visibleRect,
+				childRectPairPtr->widgetRect,
+				childRectPairPtr->visibleRect,
 				newConsumed);
 			newConsumed = newConsumed || childConsumedReturn;
 		}

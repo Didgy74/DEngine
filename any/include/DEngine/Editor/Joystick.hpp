@@ -25,7 +25,7 @@ namespace DEngine::Editor
 		{
 			if (pressedData.HasValue())
 				return pressedData.Value().currPos;
-			return {0.f, 0.f};
+			return { 0.f, 0.f };
 		}
 
 		virtual Gui::SizeHint GetSizeHint2(
@@ -34,46 +34,19 @@ namespace DEngine::Editor
 			Render_Params const& params,
 			Gui::Rect const& widgetRect,
 			Gui::Rect const& visibleRect) const override;
-
-		virtual bool CursorPress(
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			Gui::CursorPressEvent event) override;
-
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			Gui::Rect const& widgetRect,
+			Gui::Rect const& visibleRect,
+			bool consumed) override;
 		virtual bool CursorMove(
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Gui::CursorMoveEvent event,
+			CursorMoveParams const& params,
+			Gui::Rect const& widgetRect,
+			Gui::Rect const& visibleRect,
 			bool occluded) override;
 
-		virtual bool TouchMoveEvent(
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Gui::TouchMoveEvent event,
-			bool occluded) override;
-
-		virtual bool TouchPressEvent(
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Gui::TouchPressEvent event) override;
 
 		[[nodiscard]] virtual Gui::SizeHint GetSizeHint(
 			Gui::Context const& ctx) const override;
-
-		virtual void Render(
-			Gui::Context const& ctx,
-			Gui::Extent framebufferExtent,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Gui::DrawInfo& drawInfo) const override;
 	};
 }

@@ -237,7 +237,7 @@ namespace DEngine::Gui::impl
 			if (index == childCount)
 				return widgetRect;
 			else
-				return rectCollection.GetRect(child).widgetRect;
+				return rectCollection.GetRect(child)->widgetRect;
 		}
 	};
 
@@ -347,8 +347,9 @@ namespace DEngine::Gui::impl
 
 SizeHint AnchorArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
 {
-	for (auto const& node : impl::BuildNodeItPair(*this))
-	{
+	auto& pusher = params.pusher;
+
+	for (auto const& node : impl::BuildNodeItPair(*this)) {
 		auto const& child = node.child;
 		child.GetSizeHint2(params);
 	}
@@ -357,7 +358,9 @@ SizeHint AnchorArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) con
 	returnValue.expandX = true;
 	returnValue.expandY = true;
 	returnValue.minimum = { 150, 150 };
-	params.pusher.Push(*this, returnValue);
+
+	auto entry = pusher.AddEntry(*this);
+	pusher.SetSizeHint(entry, returnValue);
 	return returnValue;
 }
 
@@ -372,7 +375,9 @@ void AnchorArea::BuildChildRects(
 	{
 		auto const& child = node.child;
 		auto const childRect = node.BuildNodeItRect(*this, widgetRect);
-		pusher.Push(child, { childRect, visibleRect });
+
+		auto childEntry = pusher.GetEntry(child);
+		pusher.SetRectPair(childEntry, { childRect, visibleRect });
 		child.BuildChildRects(
 			params,
 			childRect,
@@ -397,4 +402,57 @@ void AnchorArea::Render2(
 			childRect,
 			visibleRect);
 	}
+}
+
+bool AnchorArea::CursorPress2(
+	Widget::CursorPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	auto const& rectColl = params.rectCollection;
+
+	bool newConsumed = consumed;
+
+	for (auto node : impl::BuildNodeItPair(*this))
+	{
+		auto& child = node.child;
+		auto const childRect = node.GetNodeItRect(*this, widgetRect, rectColl);
+
+		bool childConsumed = child.CursorPress2(
+			params,
+			childRect,
+			visibleRect,
+			newConsumed);
+
+		newConsumed = newConsumed || childConsumed;
+	}
+
+	return newConsumed;
+}
+
+bool AnchorArea::CursorMove(
+	Widget::CursorMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	auto const& rectColl = params.rectCollection;
+
+	bool newOccluded = occluded;
+
+	for (auto node : impl::BuildNodeItPair(*this))
+	{
+		auto& child = node.child;
+		auto const childRect = node.GetNodeItRect(*this, widgetRect, rectColl);
+
+		bool childOccluded = child.CursorMove(
+			params,
+			childRect,
+			visibleRect,
+			newOccluded);
+		newOccluded = newOccluded || childOccluded;
+	}
+
+	return newOccluded;
 }

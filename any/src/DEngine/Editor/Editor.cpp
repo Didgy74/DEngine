@@ -11,6 +11,7 @@
 
 #include <vector>
 #include <string>
+#include <sstream>
 
 using namespace DEngine;
 using namespace DEngine::Editor;
@@ -212,6 +213,9 @@ namespace DEngine::Editor
 		{
 			outerLayout->ClearChildren();
 
+			box2DWidget = new RigidbodyWidget(*editorImpl);
+			outerLayout->AddWidget(Std::Box{ box2DWidget });
+
 			moveWidget = new MoveWidget(*editorImpl);
 			outerLayout->AddWidget(Std::Box{ moveWidget });
 
@@ -220,9 +224,6 @@ namespace DEngine::Editor
 
 			spriteRendererWidget = new SpriteRenderer2DWidget(*editorImpl);
 			outerLayout->AddWidget(Std::Box{ spriteRendererWidget });
-
-			box2DWidget = new RigidbodyWidget(*editorImpl);
-			outerLayout->AddWidget(Std::Box{ box2DWidget });
 		}
 
 		void EntitySelected_MidDispatch(Entity id, Gui::Context& ctx)
@@ -230,6 +231,9 @@ namespace DEngine::Editor
 			outerLayout->ClearChildren();
 
 			auto job = [this](Gui::Context& ctx) {
+				box2DWidget = new RigidbodyWidget(*editorImpl);
+				outerLayout->AddWidget(Std::Box{ box2DWidget });
+
 				moveWidget = new MoveWidget(*editorImpl);
 				outerLayout->AddWidget(Std::Box{ moveWidget });
 
@@ -238,9 +242,6 @@ namespace DEngine::Editor
 
 				spriteRendererWidget = new SpriteRenderer2DWidget(*editorImpl);
 				outerLayout->AddWidget(Std::Box{ spriteRendererWidget });
-
-				box2DWidget = new RigidbodyWidget(*editorImpl);
-				outerLayout->AddWidget(Std::Box{ box2DWidget });
 			};
 
 			ctx.PushPostEventJob(job);
@@ -445,16 +446,20 @@ void Editor::Context::ProcessEvents()
 
 	implData.FlushQueuedEventsToGui();
 
-	for (auto viewportPtr : implData.viewportWidgets)
+	for (auto viewportPtr : implData.viewportWidgetPtrs)
 	{
 		viewportPtr->Tick(Time::Delta());
 	}
 	if (implData.appCtx->TickCount() % 60 == 0)
 	{
-		std::string temp;
-		//temp += std::to_string(1.f / Time::Delta()) + " - ";
-		temp += std::to_string(Time::Delta());
-		implData.test_fpsText->text = temp;
+		std::ostringstream out;
+		out.precision(3);
+		out << std::fixed << Time::Delta() * 1000.f;
+		std::string text = out.str();
+		text += "ms - ";
+		text += std::to_string((int)Math::Round(1.f / Time::Delta()));
+		text += " FPS";
+		implData.test_fpsText->text = text;
 		implData.InvalidateRendering();
 	}
 	if (implData.appCtx->TickCount() % 10 == 0)
@@ -470,10 +475,8 @@ void Editor::Context::ProcessEvents()
 	{
 		implData.guiRenderingInvalidated = false;
 
-		for (auto viewportPtr : implData.viewportWidgets)
-		{
-			viewportPtr->viewport->isVisible = false;
-		}
+		for (auto viewportPtr : implData.viewportWidgetPtrs)
+			viewportPtr->GetInternalViewport().isVisible = false;
 
 		implData.vertices.clear();
 		implData.indices.clear();
@@ -488,10 +491,30 @@ void Editor::Context::ProcessEvents()
 			.windowUpdates = implData.windowUpdates };
 		implData.guiCtx->Render2(renderParams);
 
-		for (auto viewportPtr : implData.viewportWidgets)
+
+		// We want to see if our viewports were rendered, and update them if they were.
+		for (auto viewportPtr : implData.viewportWidgetPtrs)
 		{
-			if (viewportPtr->viewport->currentExtent == Gui::Extent{} && viewportPtr->viewport->newExtent != Gui::Extent{})
-				viewportPtr->viewport->currentExtent = viewportPtr->viewport->newExtent;
+			DENGINE_IMPL_ASSERT(viewportPtr);
+
+			auto const& rectColl = implData.guiRectCollection;
+			auto& viewport = viewportPtr->GetInternalViewport();
+
+			auto entryOpt = rectColl.GetEntry(viewport);
+			if (entryOpt.HasValue())
+			{
+				// This means the viewport was rendered
+				auto const& entry = entryOpt.Value();
+				auto const& viewportRectPair = rectColl.GetRect(entry);
+				auto const& currentRect = viewportRectPair.widgetRect;
+
+				viewport.isVisible = true;
+				viewport.currentlyResizing = viewport.newExtent != currentRect.extent;
+				viewport.newExtent = currentRect.extent;
+
+				if (viewport.currentExtent == Gui::Extent{} && viewport.newExtent != Gui::Extent{})
+					viewport.currentExtent = viewport.newExtent;
+			}
 		}
 	}
 }
@@ -526,16 +549,16 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 
 	returnVal.windowUpdates = implData.windowUpdates;
 
-	for (auto viewportWidgetPtr : implData.viewportWidgets)
+	for (auto viewportWidgetPtr : implData.viewportWidgetPtrs)
 	{
 		DENGINE_IMPL_ASSERT(viewportWidgetPtr);
-		auto& viewportWidget = *viewportWidgetPtr;
+		auto const& viewport = viewportWidgetPtr->GetInternalViewport();
 		if (viewportWidgetPtr->viewport->isVisible)
 		{
-			DENGINE_IMPL_ASSERT(viewportWidget.viewport->currentExtent.width > 0 && viewportWidget.viewport->currentExtent.height > 0);
-			DENGINE_IMPL_ASSERT(viewportWidget.viewport->newExtent.width > 0 && viewportWidget.viewport->newExtent.height > 0);
+			DENGINE_IMPL_ASSERT(viewport.currentExtent.width > 0 && viewport.currentExtent.height > 0);
+			DENGINE_IMPL_ASSERT(viewport.newExtent.width > 0 && viewport.newExtent.height > 0);
 
-			Gfx::ViewportUpdate update = viewportWidget.viewport->GetViewportUpdate(
+			Gfx::ViewportUpdate update = viewport.GetViewportUpdate(
 				returnVal.lineVertices,
 				returnVal.lineDrawCmds);
 			

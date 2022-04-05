@@ -81,7 +81,7 @@ set(DENGINE_MATH_SOURCE_FILES
 
 		src/DEngine/Math/Common.cpp
 		src/DEngine/Math/Vector.cpp
-
+		src/DEngine/Math/LinearTransform3D.cpp
 		)
 
 

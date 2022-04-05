@@ -1595,7 +1595,9 @@ auto DA::Impl::DA_PointerMove_StateNormal(
 			if (activeTab.widget)
 			{
 				auto& widget = *activeTab.widget;
-				auto const& childRectPair = rectCollection.GetRect(widget);
+				auto const* childRectPairPtr = rectCollection.GetRect(widget);
+				DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
+				auto const& childRectPair = *childRectPairPtr;
 				auto const widgetReturn = widget.CursorMove(
 					params.params,
 					childRectPair.widgetRect,
@@ -2012,7 +2014,9 @@ auto DA::Impl::DA_PointerPress_StateNormal(
 			if (activeTab.widget)
 			{
 				auto& widget = *activeTab.widget;
-				auto const& rectPair = rectCollection.GetRect(widget);
+				auto const* rectPairPtr = rectCollection.GetRect(widget);
+				DENGINE_IMPL_GUI_ASSERT(rectPairPtr);
+				auto const& rectPair = *rectPairPtr;
 				auto tempChildReturn = widget.CursorPress2(
 					params.params,
 					rectPair.widgetRect,
@@ -2290,8 +2294,9 @@ SizeHint DockArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
 {
 	auto& dockArea = *this;
 	auto& textManager = params.textManager;
+	auto& pusher = params.pusher;
 
-	for (auto const layer : Impl::DA_BuildLayerItPair(dockArea))
+	for (auto const& layer : Impl::DA_BuildLayerItPair(dockArea))
 	{
 		for (auto const& itResult : impl::BuildNodeItPair(layer.parentPtrToNode, params.transientAlloc))
 		{
@@ -2313,8 +2318,9 @@ SizeHint DockArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
 	sizeHint.expandY = true;
 	sizeHint.minimum = { 400, 400 };
 
-	params.pusher.Push(*this, sizeHint);
 
+	auto entry = pusher.AddEntry(*this);
+	pusher.SetSizeHint(entry, sizeHint);
 	return sizeHint;
 }
 
@@ -2326,6 +2332,7 @@ void DockArea::BuildChildRects(
 	auto& dockArea = *this;
 	auto& textManager = params.textManager;
 	auto& transientAlloc = params.transientAlloc;
+	auto& pusher = params.pusher;
 
 	auto const totalLineheight = textManager.GetLineheight() + (dockArea.tabTextMargin * 2);
 
@@ -2346,7 +2353,8 @@ void DockArea::BuildChildRects(
 			if (activeTab.widget)
 			{
 				auto& widget = *activeTab.widget;
-				params.pusher.Push(widget, { windowRects.contentRect, visibleRect });
+				auto entry = pusher.GetEntry(widget);
+				pusher.SetRectPair(entry, { windowRects.contentRect, visibleRect });
 				widget.BuildChildRects(
 					params,
 					windowRects.contentRect,

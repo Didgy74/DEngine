@@ -40,7 +40,8 @@ namespace DEngine::Gui
 		std::vector<Node> nodes;
 		// If no widget, it falls back to the background color.
 		Std::Box<Widget> backgroundWidget;
-		Math::Vec4 backgroundColor;
+		static constexpr Math::Vec4 defaultBackgroundColor = { 0.5f, 0.5f, 0.5f, 1.f };
+		Math::Vec4 backgroundColor = defaultBackgroundColor;
 
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
@@ -52,6 +53,17 @@ namespace DEngine::Gui
 			Render_Params const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect) const override;
+
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+		virtual bool CursorMove(
+			CursorMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool occluded) override;
 
 		[[nodiscard]] virtual SizeHint GetSizeHint(
 			Context const& ctx) const override;

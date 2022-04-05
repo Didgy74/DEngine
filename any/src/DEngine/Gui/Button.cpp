@@ -299,8 +299,8 @@ void Button::BuildChildRects(
 
 	auto const textExtent = customData->titleTextOuterExtent;
 	Math::Vec2Int const centerOffset = {
-		(i32)(widgetRect.extent.width / 2 - textExtent.width / 2),
-		(i32)(widgetRect.extent.height / 2 - textExtent.height / 2) };
+		(i32)Math::Round(widgetRect.extent.width * 0.5f - textExtent.width * 0.5f),
+		(i32)Math::Round(widgetRect.extent.height * 0.5f - textExtent.height * 0.5f) };
 
 	int const textLength = (int)text.size();
 	DENGINE_IMPL_GUI_ASSERT(textLength == customData->glyphRects.Size());

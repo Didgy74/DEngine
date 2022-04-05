@@ -44,6 +44,7 @@ namespace DEngine::Gui
 		{
 			Context const& ctx;
 			TextManager& textManager;
+			Std::FrameAlloc& transientAlloc;
 			Rect windowRect;
 			Rect safeAreaRect;
 			RectCollection const& rectCollection;

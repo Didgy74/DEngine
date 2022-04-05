@@ -9,8 +9,6 @@
 
 namespace DEngine::Gui
 {
-	class Context;
-
 	class Button : public Widget
 	{
 	public:

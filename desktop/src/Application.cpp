@@ -391,6 +391,14 @@ void Application::impl::Backend_GLFW_KeyboardKeyCallback(
 			oldCount,
 			{});
 	}
+
+	bool endInputSession =
+		implData.textInputSessionActive &&
+		dengineButton == Button::Escape;
+	if (endInputSession)
+	{
+		BackendInterface::PushEndTextInputSessionEvent(implData, windowId);
+	}
 }
 
 void Application::impl::Backend_GLFW_MouseButtonCallback(
@@ -439,7 +447,6 @@ void Application::impl::Backend_GLFW_CharCallback(
 			0,
 			{ &value, 1 });
 	}
-
 }
 
 auto Application::impl::Backend_GLFWButtonToDEngineButton(i32 input) -> Button
@@ -457,6 +464,8 @@ auto Application::impl::Backend_GLFWButtonToDEngineButton(i32 input) -> Button
 			return Button::Enter;
 		case GLFW_KEY_DELETE:
 			return Button::Delete;
+		case GLFW_KEY_ESCAPE:
+			return Button::Escape;
 
 		default:
 			return Button::Undefined;

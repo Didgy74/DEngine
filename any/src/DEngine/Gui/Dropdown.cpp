@@ -64,11 +64,11 @@ namespace DEngine::Gui::impl
 		Math::Vec2 pointerPos)
 	{
 		Std::Opt<uSize> lineHit;
-		for (uSize i = 0; i < lineCount; i++)
+		for (int i = 0; i < lineCount; i++)
 		{
 			Rect lineRect = {};
 			lineRect.position = rectPos;
-			lineRect.position.y += lineHeight * i;
+			lineRect.position.y += (i32)lineHeight * i;
 			lineRect.extent.width = rectWidth;
 			lineRect.extent.height = lineHeight;
 
@@ -130,13 +130,20 @@ struct Dropdown::Impl
 		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
 	};
 
+
+	struct Dropdown_PointerPress_Params
+	{
+		Dropdown& widget;
+		Context& ctx;
+		WindowID windowId;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
+		RectCollection const& rectCollection;
+		impl::PointerPress_Pointer const& pointer;
+		bool eventConsumed;
+	};
 	[[nodiscard]] static bool Dropdown_PointerPress(
-		Dropdown& widget,
-		Context& ctx,
-		WindowID windowId,
-		Rect const& widgetRect,
-		Rect const& visibleRect,
-		impl::PointerPress_Pointer const& pointer);
+		Dropdown_PointerPress_Params const& params);
 
 	class DropdownLayer : public Layer
 	{
@@ -160,6 +167,14 @@ struct Dropdown::Impl
 		virtual void BuildRects(BuildRects_Params const& params) const override;
 
 		virtual void Render(Render_Params const& params) const override;
+
+		virtual bool CursorMove(
+			CursorMoveParams const& params,
+			bool occluded) override;
+
+		[[nodiscard]] virtual Press_Return CursorPress(
+			CursorPressParams const& params,
+			bool eventConsumed) override;
 	};
 
 	// This data is only available when rendering.
@@ -169,55 +184,37 @@ struct Dropdown::Impl
 			lineGlyphRects{ alloc },
 			lineGlyphRectOffsets{ alloc} {}
 
+		int textheight = 0;
 		// Only available when rendering.
 		Std::Vec<Rect, RectCollection::AllocT> lineGlyphRects;
 		Std::Vec<uSize, RectCollection::AllocT> lineGlyphRectOffsets;
 	};
 
-	[[nodiscard]] static Rect DropdownLayer_BuildOuterRect(
-		DropdownLayer const& layer,
-		TextManager& textManager,
-		Rect const& usableRect)
+	struct DropdownLayer_PointerMove_Params
 	{
-		auto const& dropdownWidget = *layer.dropdownWidget;
-
-		Rect widgetRect = {};
-		widgetRect.position = layer.pos;
-
-		widgetRect.extent = impl::DropdownLayer_BuildOuterExtent(
-			{ dropdownWidget.items.data(), dropdownWidget.items.size() },
-			dropdownWidget.textMargin,
-			textManager,
-			usableRect);
-
-		// Adjust the position of the widget.
-		widgetRect.position.y = Math::Max(
-			widgetRect.Top(),
-			usableRect.Top());
-		widgetRect.position.y = Math::Min(
-			widgetRect.Top(),
-			usableRect.Bottom() - (i32)widgetRect.extent.height);
-
-		return widgetRect;
-	}
-
+		DropdownLayer& layer;
+		Context& ctx;
+		RectCollection const& rectCollection;
+		Rect const& windowRect;
+		Rect const& usableRect;
+		impl::PointerMove_Pointer const& pointer;
+	};
 	[[nodiscard]] static bool DropdownLayer_PointerMove(
-		DropdownLayer& layer,
-		Context& ctx,
-		TextManager& textManager,
-		Rect const& windowRect,
-		Rect const& usableRect,
-		Rect const& listRectOuter,
-		impl::PointerMove_Pointer const& pointer);
+		DropdownLayer_PointerMove_Params const& params);
 
+
+	struct DropdownLayer_PointerPress_Params
+	{
+		DropdownLayer& layer;
+		Context& ctx;
+		RectCollection const& rectCollection;
+		Rect const& windowRect;
+		Rect const& usableRect;
+		impl::PointerPress_Pointer const& pointer;
+		bool eventConsumed;
+	};
 	[[nodiscard]] static Layer::Press_Return DropdownLayer_PointerPress(
-		DropdownLayer& widget,
-		Context& ctx,
-		TextManager& textManager,
-		Rect const& usableRect,
-		Rect const& listRectOuter,
-		impl::PointerPress_Pointer const& pointer,
-		bool eventConsumed);
+		DropdownLayer_PointerPress_Params const& params);
 };
 
 namespace DEngine::Gui::impl
@@ -241,23 +238,27 @@ namespace DEngine::Gui::impl
 }
 
 bool Dropdown::Impl::Dropdown_PointerPress(
-	Dropdown& widget,
-	Context& ctx,
-	WindowID windowId,
-	Rect const& widgetRect,
-	Rect const& visibleRect,
-	impl::PointerPress_Pointer const& pointer)
+	Dropdown_PointerPress_Params const& params)
 {
-	auto const pointerInside =
-		widgetRect.PointIsInside(pointer.pos) &&
-		visibleRect.PointIsInside(pointer.pos);
-	if (pointer.pressed && !pointerInside)
-		return false;
+	auto& widget = params.widget;
+	auto& rectColl = params.rectCollection;
+	auto& ctx = params.ctx;
+	auto const& widgetRect = params.widgetRect;
+	auto const& visibleRect = params.visibleRect;
+	auto const& windowId = params.windowId;
+	auto const& pointer = params.pointer;
+	auto const& oldEventConsumed = params.eventConsumed;
+
+	auto outerRect = Rect::Intersection(widgetRect, visibleRect);
+
+	auto const pointerInside = outerRect.PointIsInside(pointer.pos);
+
+	auto newEventConsumed = oldEventConsumed || pointerInside;
 
 	// If our pointer-type is not primary, we don't want to do anything,
 	// Just consume the event if it's inside the widget and move on.
 	if (pointer.type != impl::PointerType::Primary)
-		return pointerInside;
+		return newEventConsumed;
 
 	// We can now trust pointer.type == Primary
 	if (widget.heldPointerId.HasValue())
@@ -270,18 +271,20 @@ bool Dropdown::Impl::Dropdown_PointerPress(
 		{
 			// Now we open the dropdown menu
 			impl::CreateDropdownLayer(widget, ctx, windowId, widgetRect);
+			newEventConsumed = true;
 		}
 	}
 	else
 	{
-		if (pointerInside && pointer.pressed)
+		if (!oldEventConsumed && pointerInside && pointer.pressed)
 		{
 			widget.heldPointerId = pointer.id;
+			newEventConsumed = true;
 		}
 	}
 
 	// We are inside the button, so we always want to consume the event.
-	return pointerInside;
+	return newEventConsumed;
 }
 
 void Dropdown::Impl::DropdownLayer::BuildSizeHints(
@@ -297,38 +300,10 @@ void Dropdown::Impl::DropdownLayer::BuildSizeHints(
 
 	auto pusherIt = pusher.AddEntry(*this);
 
-	if (pusher.IncludeRendering())
-	{
-		DropdownLayer_CustomData customDataTemp { params.pusher.Alloc() };
-		auto& customData = pusher.AttachCustomData(pusherIt, Std::Move(customDataTemp));
+	DropdownLayer_CustomData customDataTemp { params.pusher.Alloc() };
+	auto& customData = pusher.AttachCustomData(pusherIt, Std::Move(customDataTemp));
 
-		// First we calculate total amount of glyphs of all the lines, and
-		// the offset for each line
-		customData.lineGlyphRectOffsets.Resize(lineCount);
-		uSize currentOffset = 0;
-		for (int i = 0; i < lineCount; i += 1)
-		{
-			customData.lineGlyphRectOffsets[i] = currentOffset;
-			currentOffset += widget.items[i].size();
-		}
-
-		customData.lineGlyphRects.Resize(currentOffset);
-
-		// Then populate our array with the rects.
-		for (int i = 0; i < lineCount; i += 1)
-		{
-			auto const& line = widget.items[i];
-			auto const& offset = customData.lineGlyphRectOffsets[i];
-			textManager.GetOuterExtent(
-				{ line.data(), line.size() },
-				{},
-				&customData.lineGlyphRects[offset]);
-		}
-	}
-	else
-	{
-
-	}
+	customData.textheight = (int)lineheight;
 
 	SizeHint returnValue = {};
 	returnValue.minimum.height = (lineheight + widget.textMargin * 2) * lineCount;
@@ -355,121 +330,259 @@ void Dropdown::Impl::DropdownLayer::BuildRects(BuildRects_Params const& params) 
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
 
-	int lineheight = textManager.GetLineheight();
+	int textheight = customData.textheight;
+	int lineheight = textheight + mainWidget.textMargin * 2;
 	int linecount = (int)mainWidget.items.size();
 
 	// Figure out the rect of the list of items.
 	Rect outerBoxRect = {};
 	outerBoxRect.extent.width = dropdownWidgetWidth;
-	outerBoxRect.extent.height = (lineheight + mainWidget.textMargin * 2) * linecount;
+	outerBoxRect.extent.height = lineheight * linecount;
 	// Position it and clamp it to the usable area.
 	outerBoxRect.position = pos;
 	outerBoxRect.position.x = Math::Min(
 		outerBoxRect.position.x,
-		usableRect.position.x - (i32)outerBoxRect.extent.width);
+		usableRect.Right() - (i32)outerBoxRect.extent.width);
 	outerBoxRect.position.x = Math::Max(
 		outerBoxRect.position.x,
 		usableRect.position.x);
 	outerBoxRect.position.y = Math::Min(
 		outerBoxRect.position.y,
-		usableRect.position.y - (i32)outerBoxRect.extent.height);
+		usableRect.Bottom() - (i32)outerBoxRect.extent.height);
 	outerBoxRect.position.y = Math::Max(
 		outerBoxRect.position.y,
 		usableRect.position.y);
 
+	pusher.SetRectPair(pusherIt, { outerBoxRect, usableRect });
+
 	// Position our line glyphs correctly
 	if (pusher.IncludeRendering())
 	{
-		Math::Vec2Int linePosOffset = {};
-		// Iterate over each line and place its glyphs correctly.
-		// To figure out the size of each line, we take the
-		// current offset compared to the previous one.
-		for (int i = 1; i < linecount; i += 1)
+		// First we calculate total amount of glyphs of all the lines, and
+		// the index for each line
+		customData.lineGlyphRectOffsets.Resize(linecount);
+		int currentOffset = 0;
+		for (int i = 0; i < linecount; i++)
 		{
-			auto startOffset = customData.lineGlyphRectOffsets[i - 1];
-			auto endOffset = customData.lineGlyphRectOffsets[i];
-			auto length = endOffset - startOffset;
-			auto* glyphStart = &customData.lineGlyphRects[startOffset];
-			for (int j = 0; j < length; j += 1)
-				glyphStart[j].position += outerBoxRect.position + linePosOffset;
+			customData.lineGlyphRectOffsets[i] = currentOffset;
+			currentOffset += mainWidget.items[i].size();
+		}
 
-			linePosOffset.y += lineheight;
+		// Then populate our list with the rects
+		auto const totalStrLength = currentOffset;
+		customData.lineGlyphRects.Resize(totalStrLength);
+		i32 linePosOffsetY = {};
+		for (int i = 0; i < linecount; i++)
+		{
+			// We can't know the outer extent of the text until we have gathered the rects.
+			// We need to know the outer extent to center it.
+			// We gather the rects first then offset them accordingly.
+			auto const& line = mainWidget.items[i];
+			auto const linelength = line.size();
+			auto const& offset = customData.lineGlyphRectOffsets[i];
+
+			auto textExtent = textManager.GetOuterExtent(
+				{ line.data(), linelength },
+				{},
+				&customData.lineGlyphRects[offset]);
+
+			Rect lineRect = outerBoxRect;
+			lineRect.extent.height = lineheight;
+			lineRect.position.y += (i32)lineRect.extent.height * i;
+
+			Math::Vec2Int textPos = lineRect.position;
+			textPos.x += (i32)(lineRect.extent.width / 2 - textExtent.width / 2);
+			textPos.y += (i32)(lineRect.extent.height / 2 - textExtent.height / 2);
+			auto lineGlyphs = Std::Span{ &customData.lineGlyphRects[offset], linelength };
+			for (auto& glyph : lineGlyphs)
+				glyph.position += textPos;
+
+			linePosOffsetY += textheight;
+			linePosOffsetY += (i32)mainWidget.textMargin * 2;
 		}
 	}
 }
 
 void Dropdown::Impl::DropdownLayer::Render(Render_Params const& params) const
 {
-	auto const& rectCollection = params.rectCollection;
+	auto const& rectColl = params.rectCollection;
+	auto& transientAlloc = params.transientAlloc;
 	auto& drawInfo = params.drawInfo;
+	auto const& windowRect = params.windowRect;
+	auto const& safeAreaRect = params.safeAreaRect;
 
 	auto const& mainWidget = GetDropdownWidget();
 
-	auto usableRect = Rect::Intersection(params.windowRect, params.safeAreaRect);
+	auto usableRect = Rect::Intersection(windowRect, safeAreaRect);
 	if (usableRect.IsNothing())
 		return;
 
 	// First find the rect for the background of the list-items
-	auto rectCollEntry = rectCollection.GetEntry(*this);
-
-	auto* customDataPtr =
-		rectCollection.GetCustomData2<Impl::DropdownLayer_CustomData>(rectCollEntry);
+	auto rectCollEntryOpt = rectColl.GetEntry(*this);
+	DENGINE_IMPL_GUI_ASSERT(rectCollEntryOpt.HasValue());
+	auto const& rectCollEntry = rectCollEntryOpt.Value();
+	auto const* customDataPtr = rectColl.GetCustomData2<Impl::DropdownLayer_CustomData>(rectCollEntry);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
 
+	auto lineheight = customData.textheight;
 
+	// First we want to draw the background rect
+	auto const& rectPair = rectColl.GetRect(rectCollEntry);
+	drawInfo.PushFilledQuad(rectPair.widgetRect, { 0.5f, 0.5f, 0.5f, 1.f });
+
+	auto scissorGuard = DrawInfo::ScopedScissor{ drawInfo, rectPair.widgetRect };
+
+	// Then we display the hovered item if there is one.
+	if (hoveredByCursorIndex.HasValue())
+	{
+		auto const& hoveredIndex = hoveredByCursorIndex.Value();
+		auto lineRect = rectPair.widgetRect;
+		lineRect.extent.height = lineheight + mainWidget.textMargin * 2;
+		lineRect.position.y += (i32)lineRect.extent.height * (i32)hoveredIndex;
+		drawInfo.PushFilledQuad(lineRect, { 1.f, 1.f, 1.f, 0.5f });
+	}
+
+	// Append all text into a single list.
+	int allTextCount = 0;
+	for (auto const& item : mainWidget.items)
+		allTextCount += (int)item.length();
+	auto allText = Std::MakeVec<char>(transientAlloc);
+	allText.Resize(allTextCount);
+	int offset = 0;
+	for (auto const& item : mainWidget.items)
+	{
+		int strLength = (int)item.length();
+		for (int i = 0; i < strLength; i += 1)
+			allText[i + offset] = item[i];
+		offset += strLength;
+	}
+
+	// Next draw each line
+	drawInfo.PushText(
+		{ allText.Data(), allText.Size() },
+		customData.lineGlyphRects.Data(),
+		{ 1.f, 1.f, 1.f, 1.f });
+}
+
+bool Dropdown::Impl::DropdownLayer::CursorMove(
+	Layer::CursorMoveParams const& params,
+	bool occluded)
+{
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
+	pointer.occluded = occluded;
+
+	DropdownLayer_PointerMove_Params temp = {
+		.layer = *this,
+		.ctx = params.ctx,
+		.rectCollection = params.rectCollection,
+		.windowRect = params.windowRect,
+		.usableRect = params.safeAreaRect,
+		.pointer = pointer, };
+
+	return DropdownLayer_PointerMove(temp);
+}
+
+Layer::Press_Return
+Dropdown::Impl::DropdownLayer::CursorPress(
+	Layer::CursorPressParams const& params,
+	bool eventConsumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.type = impl::ToPointerType(params.event.button);
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	pointer.pressed = params.event.pressed;
+
+	DropdownLayer_PointerPress_Params temp = {
+		.layer = *this,
+		.ctx = params.ctx,
+		.rectCollection = params.rectCollection,
+		.windowRect = params.windowRect,
+		.usableRect = params.safeAreaRect,
+		.pointer = pointer,
+		.eventConsumed = eventConsumed,
+	};
+	return DropdownLayer_PointerPress(temp);
 }
 
 bool Dropdown::Impl::DropdownLayer_PointerMove(
-	DropdownLayer& layer,
-	Context& ctx,
-	TextManager& textManager,
-	Rect const& windowRect,
-	Rect const& usableRect,
-	Rect const& listRectOuter,
-	impl::PointerMove_Pointer const& pointer)
+	DropdownLayer_PointerMove_Params const& params)
 {
-	auto& dropdownWidget = *layer.dropdownWidget;
+	auto& layer = params.layer;
+	auto& rectColl = params.rectCollection;
+	auto& pointer = params.pointer;
 
-	auto const textHeight = textManager.GetLineheight();
+	auto& mainWidget = layer.GetDropdownWidget();
 
-	auto const pointerInsideOuter = listRectOuter.PointIsInside(pointer.pos);
+	auto rectCollEntryOpt = rectColl.GetEntry(layer);
+	DENGINE_IMPL_GUI_ASSERT(rectCollEntryOpt.HasValue());
+	auto const& rectCollEntry = rectCollEntryOpt.Value();
+	auto const* customDataPtr = rectColl.GetCustomData2<DropdownLayer_CustomData>(rectCollEntry);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+	auto const& customData = *customDataPtr;
+
+	auto const outerRect = rectColl.GetRect(rectCollEntry);
+
+	bool newOccluded = pointer.occluded;
 
 	if (pointer.id == impl::cursorPointerId)
 	{
-		u32 const lineHeight = textHeight + (dropdownWidget.textMargin * 2);
+		if (pointer.occluded)
+			layer.hoveredByCursorIndex = Std::nullOpt;
+		else
+		{
+			auto const lineHeight = customData.textheight;
 
-		// Figure out if we hit a line
-		auto lineHit = impl::DropdownLayer_CheckLineHit(
-			listRectOuter.position,
-			listRectOuter.extent.width,
-			dropdownWidget.items.size(),
-			lineHeight,
-			pointer.pos);
+			// Figure out if we hit a line
+			auto lineHit = impl::DropdownLayer_CheckLineHit(
+				outerRect.widgetRect.position,
+				outerRect.widgetRect.extent.width,
+				mainWidget.items.size(),
+				lineHeight + mainWidget.textMargin * 2,
+				pointer.pos);
 
-		layer.hoveredByCursorIndex = lineHit;
+			layer.hoveredByCursorIndex = lineHit;
+		}
 	}
 
-	return pointerInsideOuter;
+	newOccluded = newOccluded || outerRect.widgetRect.PointIsInside(pointer.pos);
+
+	return newOccluded;
 }
 
 Layer::Press_Return Dropdown::Impl::DropdownLayer_PointerPress(
-	DropdownLayer& widget,
-	Context& ctx,
-	TextManager& textManager,
-	Rect const& usableRect,
-	Rect const& listRectOuter,
-	impl::PointerPress_Pointer const& pointer,
-	bool eventConsumed)
+	DropdownLayer_PointerPress_Params const& params)
 {
-	auto& dropdownWidget = *widget.dropdownWidget;
-	auto const textHeight = textManager.GetLineheight();
+	auto& layer = params.layer;
+	auto& mainWidget = layer.GetDropdownWidget();
+	auto const& rectColl = params.rectCollection;
+	auto const& pointer = params.pointer;
+	auto const& eventConsumed = params.eventConsumed;
 
-	auto const pointerInsideOuter = listRectOuter.PointIsInside(pointer.pos);
+	auto rectCollEntryOpt = rectColl.GetEntry(layer);
+	DENGINE_IMPL_GUI_ASSERT(rectCollEntryOpt.HasValue());
+	auto const& rectCollEntry = rectCollEntryOpt.Value();
+	auto const* customDataPtr = rectColl.GetCustomData2<Impl::DropdownLayer_CustomData>(rectCollEntry);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+	auto const& customData = *customDataPtr;
+
+	auto const textheight = customData.textheight;
+	auto const lineheight = textheight + mainWidget.textMargin * 2;
+
+	auto const& outerRectPair = rectColl.GetRect(rectCollEntry);
+	auto const outerRect = Rect::Intersection(outerRectPair.widgetRect, outerRectPair.visibleRect);
+
+	auto const pointerInsideOuter = outerRect.PointIsInside(pointer.pos);
 
 	Layer::Press_Return returnVal = {};
-	returnVal.eventConsumed = pointerInsideOuter;
-	returnVal.destroyLayer = !pointerInsideOuter;
+	// We want to consume the event if it's inside our rect.
+	returnVal.eventConsumed = eventConsumed || pointerInsideOuter;
+	// We want to destroy this layer if the even has not already been consumed
+	// and we missed the rect.
+	returnVal.destroyLayer = !eventConsumed && !pointerInsideOuter;
 
 	if (pointer.type != impl::PointerType::Primary)
 	{
@@ -484,32 +597,30 @@ Layer::Press_Return Dropdown::Impl::DropdownLayer_PointerPress(
 		return returnVal;
 	}
 
-	auto const lineHeight = textHeight + (dropdownWidget.textMargin * 2);
-
 	// Figure out if we hit a line
 	auto lineHit = impl::DropdownLayer_CheckLineHit(
-		listRectOuter.position,
-		listRectOuter.extent.width,
-		dropdownWidget.items.size(),
-		lineHeight,
+		outerRect.position,
+		outerRect.extent.width,
+		mainWidget.items.size(),
+		lineheight,
 		pointer.pos);
 
-	if (widget.pressedLine.HasValue())
+	if (layer.pressedLine.HasValue())
 	{
-		auto const pressedLine = widget.pressedLine.Value();
+		auto const pressedLine = layer.pressedLine.Value();
 		if (pressedLine.pointerId == pointer.id)
 		{
 			if (!pointer.pressed)
-				widget.pressedLine = Std::nullOpt;
+				layer.pressedLine = Std::nullOpt;
 
 			if (lineHit.HasValue() &&
 				lineHit.Value() == pressedLine.index &&
 				!pointer.pressed)
 			{
-				dropdownWidget.selectedItem = pressedLine.index;
+				mainWidget.selectedItem = pressedLine.index;
 
-				if (dropdownWidget.selectionChangedCallback)
-					dropdownWidget.selectionChangedCallback(dropdownWidget);
+				if (mainWidget.selectionChangedCallback)
+					mainWidget.selectionChangedCallback(mainWidget);
 
 				returnVal.destroyLayer = true;
 			}
@@ -522,7 +633,7 @@ Layer::Press_Return Dropdown::Impl::DropdownLayer_PointerPress(
 			DropdownLayer::PressedLine newPressedLine = {};
 			newPressedLine.pointerId = pointer.id;
 			newPressedLine.index = lineHit.Value();
-			widget.pressedLine = newPressedLine;
+			layer.pressedLine = newPressedLine;
 		}
 	}
 
@@ -540,27 +651,23 @@ SizeHint Dropdown::GetSizeHint2(
 
 	auto pusherIt = pusher.AddEntry(*this);
 
-	auto& text = items[selectedItem];
-
-	if (pusher.IncludeRendering())
+	// We want to find the size of the biggest text in the dropdown entries
+	// We could measure each lines outer rect, but I'm boring so I'm gonna
+	// just find the line with the longest count kek
+	int longestElementIndex = 0;
+	int linecount = (int)items.size();
+	for (int i = 0; i < linecount; i += 1)
 	{
-		auto customData = Impl::CustomData{ pusher.Alloc() };
-
-		customData.glyphRects.Resize(text.size());
-		auto const textOuterExtent = textManager.GetOuterExtent(
-			{ text.data(), text.size() },
-			{},
-			customData.glyphRects.Data());
-
-		customData.titleTextOuterExtent = textOuterExtent;
-		returnValue.minimum = textOuterExtent;
-
-		pusher.AttachCustomData(pusherIt, Std::Move(customData));
+		if (items[i].size() > items[longestElementIndex].size())
+			longestElementIndex = i;
 	}
-	else
-	{
-		returnValue.minimum = textManager.GetOuterExtent({ text.data(), text.size() });
-	}
+
+	auto& text = items[longestElementIndex];
+
+	// We do not store the glyphs of this text, because it's not the
+	// line we want to render later. This is just the longest line.
+	auto const textOuterExtent = textManager.GetOuterExtent({ text.data(), text.size() });
+	returnValue.minimum = textOuterExtent;
 
 	returnValue.minimum.width += textMargin * 2;
 	returnValue.minimum.height += textMargin * 2;
@@ -574,29 +681,34 @@ void Dropdown::BuildChildRects(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
+	auto& textMan = params.textManager;
 	auto& pusher = params.pusher;
 
 	if (!pusher.IncludeRendering())
 		return;
 
-	auto* customDataPtr = pusher.GetCustomData2<Impl::CustomData>(*this);
-	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
-	auto& customData = customDataPtr;
+	auto customData = Impl::CustomData{ pusher.Alloc() };
 
-	auto const textExtent = customData->titleTextOuterExtent;
+	auto& text = items[selectedItem];
+	auto const textLength = (int)text.size();
+	customData.glyphRects.Resize(text.size());
+	auto const textExtent = textMan.GetOuterExtent(
+		{ text.data(), (uSize)textLength },
+		{},
+		customData.glyphRects.Data());
+
 	Math::Vec2Int const centerOffset = {
 		(i32)(widgetRect.extent.width / 2 - textExtent.width / 2),
 		(i32)(widgetRect.extent.height / 2 - textExtent.height / 2) };
-
-	auto& text = items[selectedItem];
-	int const textLength = (int)text.size();
-	DENGINE_IMPL_GUI_ASSERT(textLength == customData->glyphRects.Size());
 	for (int i = 0; i < textLength; i += 1)
 	{
-		auto& rect = customData->glyphRects[i];
+		auto& rect = customData.glyphRects[i];
 		rect.position += widgetRect.position;
 		rect.position += centerOffset;
 	}
+
+	auto rectCollEntry = pusher.GetEntry(*this);
+	pusher.AttachCustomData(rectCollEntry, Std::Move(customData));
 }
 
 void Dropdown::Render2(
@@ -640,22 +752,21 @@ bool Dropdown::CursorPress2(
 	Rect const& visibleRect,
 	bool consumed)
 {
-	auto& ctx = params.ctx;
-	auto windowId = params.windowId;
-	auto const& cursorPos = params.cursorPos;
-	auto const& event = params.event;
-
 	impl::PointerPress_Pointer pointer = {};
 	pointer.id = impl::cursorPointerId;
-	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	pointer.pressed = event.pressed;
-	pointer.type = impl::ToPointerType(event.button);
+	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	pointer.pressed = params.event.pressed;
+	pointer.type = impl::ToPointerType(params.event.button);
 
-	return Impl::Dropdown_PointerPress(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		pointer);
+	Impl::Dropdown_PointerPress_Params temp = {
+		.widget = *this,
+		.ctx = params.ctx,
+		.windowId = params.windowId,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.rectCollection = params.rectCollection,
+		.pointer = pointer,
+		.eventConsumed = consumed, };
+
+	return Impl::Dropdown_PointerPress(temp);
 }

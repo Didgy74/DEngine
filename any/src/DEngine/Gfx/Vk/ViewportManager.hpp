@@ -2,7 +2,7 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/FrameAllocator.hpp>
-#include <DEngine/Std/Containers/Pair.hpp>
+#include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
@@ -65,6 +65,8 @@ namespace DEngine::Gfx::Vk
 		{
 			ViewportID id;
 			ViewportMgr_ViewportData viewport;
+
+			[[nodiscard]] bool IsInitialized() const;
 		};
 		// Unsorted vector holding viewport-data and their ID.
 		std::vector<Node> viewportNodes{};
@@ -88,6 +90,9 @@ namespace DEngine::Gfx::Vk
 		static void DeleteViewport(
 			ViewportManager& viewportManager, 
 			ViewportID id);
+		[[nodiscard]] static Node const* FindNode(
+			ViewportManager const& viewportManager,
+			ViewportID id);
 
 		// Making it static made it more explicit.
 		// Easier to identify in the main loop
@@ -105,4 +110,6 @@ namespace DEngine::Gfx::Vk
 			Std::Span<ViewportUpdate const> viewportUpdates,
 			u8 inFlightIndex);
 	};
+
+	using ViewportMan = ViewportManager;
 }

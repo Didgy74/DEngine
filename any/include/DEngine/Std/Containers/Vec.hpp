@@ -21,15 +21,14 @@ constexpr void* operator new(
 
 namespace DEngine::Std
 {
-	template<class T, class AllocatorT = Std::DefaultAllocator> requires (impl::Vec_isMovable<T>)
+	template<class T, class AllocatorT = Std::DefaultAllocator>
+		requires (impl::Vec_isMovable<T> && !Trait::isConst<T> && !Trait::isConst<AllocatorT>)
 	class Vec
 	{
 	public:
-		Vec() noexcept requires (AllocatorT::stateless) {}
+		Vec() noexcept requires (AllocatorT::stateless) = default;
 		Vec(Vec const&) = delete;
-		explicit Vec(AllocatorT& alloc) noexcept:
-			alloc{ &alloc }
-		{}
+		explicit Vec(AllocatorT& alloc) noexcept : alloc{ &alloc } {}
 
 		Vec(Vec&& other) noexcept :
 			data{ other.data },
@@ -37,10 +36,7 @@ namespace DEngine::Std
 			capacity{ other.capacity },
 			alloc{ other.alloc }
 		{
-			other.data = nullptr;
-			other.count = 0;
-			other.capacity = 0;
-			other.alloc = nullptr;
+			other.Nullify();
 		}
 
 		~Vec() noexcept
@@ -58,7 +54,7 @@ namespace DEngine::Std
 			capacity = other.capacity;
 			alloc = other.alloc;
 
-			other.data = nullptr;
+			other.Nullify();
 		}
 
 		[[nodiscard]] AllocatorT const& Allocator() const noexcept { return *alloc; }
@@ -74,7 +70,7 @@ namespace DEngine::Std
 						data[i].~T();
 				}
 				alloc->Free(data);
-				data = nullptr;
+				Nullify();
 			}
 		}
 
@@ -208,6 +204,15 @@ namespace DEngine::Std
 		uSize count = 0;
 		uSize capacity = 0;
 		AllocatorT* alloc = nullptr;
+
+		// Sets all memmbers to zero.
+		void Nullify()
+		{
+			data = nullptr;
+			count = 0;
+			capacity = 0;
+			alloc = nullptr;
+		}
 
 		bool Grow(uSize newCapacity) noexcept
 		{

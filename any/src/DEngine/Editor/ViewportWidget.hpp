@@ -76,6 +76,9 @@ namespace DEngine::Editor
 
 		EditorImpl* editorImpl = nullptr;
 		InternalViewportWidget* viewport = nullptr;
+		[[nodiscard]] InternalViewportWidget& GetInternalViewport() { return *viewport; }
+		[[nodiscard]] InternalViewportWidget const& GetInternalViewport() const { return *viewport; }
+
 		Joystick* leftJoystick = nullptr;
 		Joystick* rightJoystick = nullptr;
 
@@ -118,11 +121,11 @@ namespace DEngine::Editor
 		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
 		EditorImpl* editorImpl = nullptr;
 
-		mutable bool isVisible = false;
+		bool isVisible = false;
 
 		Gui::Extent currentExtent = {};
-		mutable Gui::Extent newExtent = {};
-		mutable bool currentlyResizing = false;
+		Gui::Extent newExtent = {};
+		bool currentlyResizing = false;
 		u32 extentCorrectTickCounter = 0;
 
 		ViewportWidget::BehaviorState state = ViewportWidget::BehaviorState::Normal;
@@ -156,46 +159,20 @@ namespace DEngine::Editor
 			Render_Params const& params,
 			Gui::Rect const& widgetRect,
 			Gui::Rect const& visibleRect) const override;
-
-		virtual bool CursorPress(
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			Gui::CursorPressEvent event) override;
-
 		virtual bool CursorMove(
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Gui::CursorMoveEvent event,
+			CursorMoveParams const& params,
+			Gui::Rect const& widgetRect,
+			Gui::Rect const& visibleRect,
 			bool occluded) override;
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			Gui::Rect const& widgetRect,
+			Gui::Rect const& visibleRect,
+			bool consumed) override;
 
-		virtual bool TouchPressEvent(
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Gui::TouchPressEvent event) override;
 
-		virtual bool TouchMoveEvent(
-			Gui::Context& ctx,
-			Gui::WindowID windowId,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Gui::TouchMoveEvent event,
-			bool occluded) override;
 
 		virtual Gui::SizeHint GetSizeHint(
 			Gui::Context const& ctx) const override;
-
-		virtual void Render(
-			Gui::Context const& ctx,
-			Gui::Extent framebufferExtent,
-			Gui::Rect widgetRect,
-			Gui::Rect visibleRect,
-			Gui::DrawInfo& drawInfo) const override;
 	};
 }

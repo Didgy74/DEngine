@@ -173,9 +173,11 @@ namespace DEngine::Gui::impl
 	{
 		ScrollArea& scrollArea;
 		RectCollection const& rectCollection;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
 		PointerPressEvent const& pointer;
 		bool eventConsumed;
-		T const& eventParams;
+		T const& dispatchFn;
 	};
 
 	struct PointerMoveEvent
@@ -190,8 +192,10 @@ namespace DEngine::Gui::impl
 	{
 		ScrollArea& scrollArea;
 		RectCollection const& rectCollection;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
 		PointerMoveEvent const& pointer;
-		T const& eventParams;
+		T const& dispatchFn;
 	};
 }
 
@@ -212,9 +216,8 @@ bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params<T> const& params)
 {
 	auto& scrollArea = params.scrollArea;
 	auto& rectCollection = params.rectCollection;
-	auto const& rectPair = rectCollection.GetRect(scrollArea);
-	auto& widgetRect = rectPair.widgetRect;
-	auto& visibleRect = rectPair.visibleRect;
+	auto& widgetRect = params.widgetRect;
+	auto& visibleRect = params.visibleRect;
 	auto& pointer = params.pointer;
 
 	auto const contentArea = impl::GetContentArea(widgetRect, scrollArea.scrollbarThickness);
@@ -224,7 +227,9 @@ bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params<T> const& params)
 	if (scrollArea.child)
 	{
 		auto& child = *scrollArea.child;
-		auto const& childRectPair = params.rectCollection.GetRect(child);
+		auto const* childRectPairPtr = rectCollection.GetRect(child);
+		DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
+		auto const& childRectPair = *childRectPairPtr;
 		auto const& childRect = childRectPair.widgetRect;
 
 		if (scrollArea.scrollbarHoldData.HasValue())
@@ -288,16 +293,14 @@ bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params<T> const& params)
 		auto const pointerOccludedForChild = pointer.occluded || pointerInsideScrollbarArea;
 
 		auto& child = *scrollArea.child;
-		auto const& childRectPair = rectCollection.GetRect(child);
-
-		if constexpr (Std::Trait::isSame<T, Widget::CursorMoveParams>)
-		{
-			child.CursorMove(
-				params.eventParams,
-				childRectPair.widgetRect,
-				contentArea,
-				pointerOccludedForChild);
-		}
+		auto const* childRectPairPtr = rectCollection.GetRect(child);
+		DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
+		auto const& childRectPair = *childRectPairPtr;
+		params.dispatchFn(
+			child,
+			childRectPair.widgetRect,
+			contentArea,
+			pointerOccludedForChild);
 	}
 
 	return pointerInside;
@@ -308,9 +311,8 @@ bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params<T> const& params)
 {
 	auto& scrollArea = params.scrollArea;
 	auto& rectCollection = params.rectCollection;
-	auto const& rectPair = rectCollection.GetRect(scrollArea);
-	auto& widgetRect = rectPair.widgetRect;
-	auto& visibleRect = rectPair.visibleRect;
+	auto& widgetRect = params.widgetRect;
+	auto& visibleRect = params.visibleRect;
 	auto& pointer = params.pointer;
 
 	auto const pointerInside =
@@ -327,7 +329,9 @@ bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params<T> const& params)
 	{
 		// We only have a scrollbar if we have child.
 		auto& child = *scrollArea.child;
-		auto const& childRectPair = params.rectCollection.GetRect(child);
+		auto const* childRectPairPtr = rectCollection.GetRect(child);
+		DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
+		auto const& childRectPair = *childRectPairPtr;
 		auto const& childRect = childRectPair.widgetRect;
 
 		correctedScrollbarPos = impl::GetCorrectedScrollbarPos(
@@ -390,16 +394,14 @@ bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params<T> const& params)
 		newConsumed = newConsumed || pointerInsideScrollbarArea;
 
 		auto& child = *scrollArea.child;
-		auto const& childRectPair = rectCollection.GetRect(child);
-		if constexpr (Std::Trait::isSame<T, Widget::CursorPressParams>)
-		{
-			auto const childConsumed = child.CursorPress2(
-				params.eventParams,
-				childRectPair.widgetRect,
-				contentArea,
-				newConsumed);
-			newConsumed = newConsumed || childConsumed;
-		}
+		auto const* childRectPairPtr = rectCollection.GetRect(child);
+		DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
+		auto const& childRectPair = *childRectPairPtr;
+		params.dispatchFn(
+			child,
+			childRectPair.widgetRect,
+			contentArea,
+			newConsumed);
 	}
 
 	newConsumed = newConsumed || pointerInside;
@@ -423,8 +425,8 @@ SizeHint ScrollArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) con
 	returnVal.expandX = true;
 	returnVal.expandY = true;
 
-	pusher.Push(*this, returnVal);
-
+	auto entry = pusher.AddEntry(*this);
+	pusher.SetSizeHint(entry, returnVal);
 	return returnVal;
 }
 
@@ -438,7 +440,8 @@ void ScrollArea::BuildChildRects(
 	if (child)
 	{
 		auto const& childWidget = *child;
-		auto const childSizeHint = pusher.GetSizeHint(childWidget);
+		auto const childEntry = pusher.GetEntry(childWidget);
+		auto const& childSizeHint = pusher.GetSizeHint(childEntry);
 
 		auto const contentArea = impl::GetContentArea(widgetRect, scrollbarThickness);
 
@@ -455,7 +458,7 @@ void ScrollArea::BuildChildRects(
 
 		auto const childVisibleRect = Rect::Intersection(visibleRect, contentArea);
 
-		params.pusher.Push(*child, { childRect, childVisibleRect });
+		pusher.SetRectPair(childEntry, { childRect, childVisibleRect });
 		childWidget.BuildChildRects(params, childRect, childVisibleRect);
 	}
 }
@@ -476,7 +479,9 @@ void ScrollArea::Render2(
 
 	if (child)
 	{
-		childRectCombo = rectCollection.GetRect(*child);
+		auto const* childRectComboPtr = rectCollection.GetRect(*child);
+		DENGINE_IMPL_GUI_ASSERT(childRectComboPtr);
+		childRectCombo = *childRectComboPtr;
 
 		if (!childRectCombo.visibleRect.IsNothing())
 		{
@@ -549,11 +554,26 @@ bool ScrollArea::CursorMove(
 	pointerMove.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
 	pointerMove.occluded = occluded;
 
-	impl::PointerMove_Params<Widget::CursorMoveParams> temp {
-		*this,
-		params.rectCollection,
-		pointerMove,
-		params };
+	auto dispatchFn = [&params](
+		Widget& childIn,
+		Rect const& childRect,
+		Rect const& childVisibleRect,
+		bool newOccluded) -> bool
+	{
+		return childIn.CursorMove(
+			params,
+			childRect,
+			childVisibleRect,
+			newOccluded);
+	};
+
+	impl::PointerMove_Params<decltype(dispatchFn)> temp {
+		.scrollArea = *this,
+		.rectCollection = params.rectCollection,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointerMove,
+		.dispatchFn = dispatchFn, };
 
 	return impl::SA_Impl::PointerMove(temp);
 }
@@ -570,12 +590,27 @@ bool ScrollArea::CursorPress2(
 	pointerPressEvent.pressed = params.event.pressed;
 	pointerPressEvent.type = impl::ToPointerType(params.event.button);
 
-	impl::PointerPress_Params<Widget::CursorPressParams> temp = {
+	auto dispatchFn = [&params](
+		Widget& childIn,
+		Rect const& childRect,
+		Rect const& childVisibleRect,
+		bool newOccluded) -> bool
+	{
+		return childIn.CursorPress2(
+			params,
+			childRect,
+			childVisibleRect,
+			newOccluded);
+	};
+
+	impl::PointerPress_Params<decltype(dispatchFn)> temp = {
 		.scrollArea = *this,
 		.rectCollection = params.rectCollection,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
 		.pointer = pointerPressEvent,
 		.eventConsumed = consumed,
-		.eventParams = params };
+		.dispatchFn = dispatchFn, };
 
 	return impl::SA_Impl::PointerPress(temp);
 }

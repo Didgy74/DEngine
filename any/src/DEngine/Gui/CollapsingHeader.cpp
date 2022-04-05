@@ -410,7 +410,8 @@ void CollapsingHeader::BuildChildRects(
 			widgetRect.extent.height);
 		auto childVisibleRect = Rect::Intersection(visibleRect, childRect);
 
-		pusher.Push(childWidget, { childRect, childVisibleRect });
+		auto childEntry = pusher.GetEntry(childWidget);
+		pusher.SetRectPair(childEntry, { childRect, childVisibleRect });
 		childWidget.BuildChildRects(
 			params,
 			childRect,
