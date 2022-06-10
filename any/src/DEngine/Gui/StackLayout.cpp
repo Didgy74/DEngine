@@ -147,7 +147,7 @@ struct StackLayout::Impl
 		StackLayout::Direction dir,
 		u32 spacing,
 		Std::Span<SizeHint const> sizeHints,
-		Std::FrameAllocator& transientAlloc)
+		AllocRef const& transientAlloc)
 	{
 		auto const childCount = (int)sizeHints.Size();
 		if (childCount <= 0)
@@ -454,14 +454,6 @@ void StackLayout::ClearChildren()
 	children.clear();
 }
 
-void StackLayout::InputConnectionLost()
-{
-	for (auto& child : children)
-	{
-		child->InputConnectionLost();
-	}
-}
-
 bool StackLayout::TouchPressEvent(
 	Context& ctx,
 	WindowID windowId,
@@ -566,7 +558,7 @@ void StackLayout::BuildChildRects(
 		direction,
 		spacing,
 		childSizeHints.ToSpan(),
-		params.transientAlloc);
+		transientAlloc);
 
 	for (uSize i = 0; i < childCount; i += 1)
 	{
@@ -726,19 +718,9 @@ void StackLayout::Render2(
 	}
 }
 
-void StackLayout::CharRemoveEvent(
-	Context& ctx,
-	Std::FrameAlloc& transientAlloc)
-{
-	for (auto& child : children)
-	{
-		child->CharRemoveEvent(ctx, transientAlloc);
-	}
-}
-
 void StackLayout::TextInput(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	TextInputEvent const& event)
 {
 	for (auto& child : children)
@@ -752,7 +734,7 @@ void StackLayout::TextInput(
 
 void StackLayout::EndTextInputSession(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	EndTextInputSessionEvent const& event)
 {
 	for (auto& child : children)

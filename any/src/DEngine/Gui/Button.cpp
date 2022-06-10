@@ -65,10 +65,10 @@ public:
 	// This data is only available when rendering.
 	struct [[maybe_unused]] CustomData
 	{
-		explicit CustomData(RectCollection::AllocT& alloc) : glyphRects{ alloc } {}
+		explicit CustomData(RectCollection::AllocRefT const& alloc) : glyphRects{ alloc } {}
 
 		Extent titleTextOuterExtent = {};
-		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
+		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
 	// Return true if the event is consumed.
@@ -307,8 +307,13 @@ void Button::BuildChildRects(
 	for (int i = 0; i < textLength; i += 1)
 	{
 		auto& rect = customData->glyphRects[i];
+		auto relativePos = rect.position;
+
 		rect.position += widgetRect.position;
 		rect.position += centerOffset;
+
+		rect.position.x = Math::Max(rect.position.x, widgetRect.position.x + relativePos.x);
+		rect.position.y = Math::Max(rect.position.y, widgetRect.position.y + relativePos.y);
 	}
 }
 
@@ -377,13 +382,7 @@ void Button::Render2(
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
 
-	auto const textIsBiggerThanExtent =
-		customData.titleTextOuterExtent.width > widgetRect.extent.width ||
-		customData.titleTextOuterExtent.height > widgetRect.extent.height;
-
-	Std::Opt<DrawInfo::ScopedScissor> scissor;
-	if (textIsBiggerThanExtent)
-		scissor = DrawInfo::ScopedScissor(drawInfo, intersection);
+	auto scissor = DrawInfo::ScopedScissor(drawInfo, widgetRect, visibleRect);
 
 	drawInfo.PushText(
 		{ text.data(), text.size() },

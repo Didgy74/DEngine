@@ -52,12 +52,11 @@ struct LineFloatEdit::Impl
 {
 	struct CustomData
 	{
-		explicit CustomData(RectCollection::AllocT& alloc) :
-			glyphRects{ alloc }
-		{}
+		explicit CustomData(RectCollection::AllocRefT const& alloc) :
+			glyphRects{ alloc } {}
 
 		Extent textOuterExtent;
-		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
+		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
 	static void UpdateValue(LineFloatEdit& widget, bool updateText)
@@ -218,17 +217,6 @@ LineFloatEdit::~LineFloatEdit()
 	}
 }
 
-SizeHint LineFloatEdit::GetSizeHint(Context const& ctx) const
-{
-	/*
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-	return impl::TextManager::GetSizeHint(
-		implData.textManager,
-		{ text.data(), text.size() });
-	 */
-	return {};
-}
-
 SizeHint LineFloatEdit::GetSizeHint2(
 	Widget::GetSizeHint2_Params const& params) const
 {
@@ -363,7 +351,7 @@ void LineFloatEdit::SetValue(f64 in)
 
 void LineFloatEdit::TextInput(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	TextInputEvent const& event)
 {
 	if (HasInputSession())
@@ -404,7 +392,7 @@ void LineFloatEdit::TextInput(
 
 void LineFloatEdit::EndTextInputSession(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	EndTextInputSessionEvent const& event)
 {
 	if (HasInputSession())

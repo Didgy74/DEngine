@@ -1212,7 +1212,7 @@ namespace DEngine::Editor::impl
 	}
 }
 
-Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
+Gfx::ViewportUpdate InternalViewportWidget::BuildViewportUpdate(
 	std::vector<Math::Vec3>& lineVertices,
 	std::vector<Gfx::LineDrawCmd>& lineDrawCmds) const noexcept
 {
@@ -1290,15 +1290,6 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 		}
 	}
 
-	return returnVal;
-}
-
-Gui::SizeHint InternalViewportWidget::GetSizeHint(Gui::Context const& ctx) const
-{
-	Gui::SizeHint returnVal = {};
-	returnVal.minimum = { 450, 450 };
-	returnVal.expandX = true;
-	returnVal.expandY = true;
 	return returnVal;
 }
 

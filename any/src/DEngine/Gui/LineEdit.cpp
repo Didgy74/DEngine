@@ -12,7 +12,7 @@ struct LineEdit::Impl
 {
 	struct CustomData
 	{
-		explicit CustomData(RectCollection::AllocT& alloc) :
+		explicit CustomData(RectCollection::AllocRefT const& alloc) :
 			glyphRects{ alloc }
 		{
 
@@ -20,7 +20,7 @@ struct LineEdit::Impl
 
 
 		Extent textOuterExtent = {};
-		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
+		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
 	enum class PointerType : u8 { Primary, Secondary };
@@ -157,133 +157,6 @@ LineEdit::~LineEdit()
 {
 	if (HasInputSession())
 		ClearInputConnection();
-}
-
-SizeHint LineEdit::GetSizeHint(Context const& ctx) const
-{
-/*
-	auto& implData = *static_cast<impl::ImplData const*>(ctx.Internal_ImplData());
-	auto& textManager = implData.GetTextManager();
-
-	auto returnVal = impl::TextManager::GetSizeHint(
-		textManager,
-		{ text.data(), text.size() });
-	returnVal.minimum.width += margin * 2;
-	returnVal.minimum.height += margin * 2;
-	return returnVal;
-*/
-	return {};
-}
-
-void LineEdit::Render(
-	Context const& ctx,
-	Extent framebufferExtent,
-	Rect widgetRect,
-	Rect visibleRect,
-	DrawInfo& drawInfo) const
-{
-
-}
-
-/*
-void LineEdit::CharEnterEvent(Context& ctx)
-{
-	if (inputConnectionCtx)
-	{
-		if (text.empty())
-		{
-			text = "0";
-			if (textChangedFn)
-				textChangedFn(*this);
-		}
-		ClearInputConnection();
-	}
-}
-
-void LineEdit::CharEvent(Context& ctx, u32 charEvent)
-{
-	if (inputConnectionCtx)
-	{
-		bool validChar = false;
-		switch (this->type)
-		{
-		case Type::Float:
-			if ('0' <= charEvent && charEvent <= '9')
-			{
-				validChar = true;
-				break;
-			}
-			if (charEvent == '-' && text.length() == 0)
-			{
-				validChar = true;
-				break;
-			}
-			if (charEvent == '.') // Check if we already have dot
-			{
-				bool alreadyHasDot = text.find('.') != std::string::npos;
-				if (!alreadyHasDot)
-				{
-					validChar = true;
-					break;
-				}
-			}
-			break;
-		case Type::Integer:
-			if ('0' <= charEvent && charEvent <= '9')
-			{
-				validChar = true;
-				break;
-			}
-			if (charEvent == '-' && text.length() == 0)
-			{
-				validChar = true;
-				break;
-			}
-			break;
-		case Type::UnsignedInteger:
-			if ('0' <= charEvent && charEvent <= '9')
-			{
-				validChar = true;
-				break;
-			}
-			break;
-		}
-		if (validChar)
-		{
-			text.push_back((u8)charEvent);
-			auto const& string = text;
-			if (string != "" && string != "-" && string != "." && string != "-.")
-			{
-				if (textChangedFn)
-					textChangedFn(*this);
-			}
-		}
-	}
-}
- */
-
-void LineEdit::CharRemoveEvent(
-	Context& ctx,
-	Std::FrameAlloc& transientAlloc)
-{
-	if (inputConnectionCtx && !text.empty())
-	{
-		text.pop_back();
-		auto const& string = text;
-		if (!string.empty() && string != "-" && string != "." && string != "-.")
-		{
-			if (textChangedFn)
-				textChangedFn(*this);
-		}
-	}
-}
-
-void LineEdit::InputConnectionLost()
-{
-	if (this->inputConnectionCtx)
-	{
-		ClearInputConnection();
-	}
 }
 
 bool LineEdit::TouchPressEvent(

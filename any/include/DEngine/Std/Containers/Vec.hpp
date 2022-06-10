@@ -8,8 +8,6 @@
 namespace DEngine::Std::impl
 {
 	struct VecPlacementNewTag {};
-	template<class T>
-	constexpr bool Vec_isMovable = Trait::isMoveConstructible<T> && Trait::isMoveAssignable<T>;
 }
 constexpr void* operator new(
 	decltype(sizeof(int)) size,
@@ -21,14 +19,20 @@ constexpr void* operator new(
 
 namespace DEngine::Std
 {
-	template<class T, class AllocatorT = Std::DefaultAllocator>
-		requires (impl::Vec_isMovable<T> && !Trait::isConst<T> && !Trait::isConst<AllocatorT>)
+	template<class T>
+	concept CanBeUsedForVec =
+		Trait::isMoveConstructible<T> &&
+	    Trait::isMoveAssignable<T> &&
+		!Trait::isConst<T>;
+
+	template<class T, class AllocRefT = Std::DefaultAllocator>
+		requires (CanBeUsedForVec<T>)
 	class Vec
 	{
 	public:
-		Vec() noexcept requires (AllocatorT::stateless) = default;
+		Vec() noexcept requires (AllocRefT::stateless) = default;
 		Vec(Vec const&) = delete;
-		explicit Vec(AllocatorT& alloc) noexcept : alloc{ &alloc } {}
+		explicit Vec(AllocRefT const& alloc) noexcept : alloc{ alloc } {}
 
 		Vec(Vec&& other) noexcept :
 			data{ other.data },
@@ -57,7 +61,7 @@ namespace DEngine::Std
 			other.Nullify();
 		}
 
-		[[nodiscard]] AllocatorT const& Allocator() const noexcept { return *alloc; }
+		[[nodiscard]] AllocRefT const& Allocator() const noexcept { return alloc; }
 
 		[[nodiscard]] bool Empty() const noexcept { return count == 0; }
 		void Clear() noexcept
@@ -69,7 +73,7 @@ namespace DEngine::Std
 					for (auto i = 0; i < count; i += 1)
 						data[i].~T();
 				}
-				alloc->Free(data);
+				alloc.Free(data);
 				Nullify();
 			}
 		}
@@ -203,7 +207,7 @@ namespace DEngine::Std
 		T* data = nullptr;
 		uSize count = 0;
 		uSize capacity = 0;
-		AllocatorT* alloc = nullptr;
+		AllocRefT alloc;
 
 		// Sets all memmbers to zero.
 		void Nullify()
@@ -211,7 +215,6 @@ namespace DEngine::Std
 			data = nullptr;
 			count = 0;
 			capacity = 0;
-			alloc = nullptr;
 		}
 
 		bool Grow(uSize newCapacity) noexcept
@@ -220,14 +223,14 @@ namespace DEngine::Std
 
 			bool needNewAlloc = false;
 			if (data)
-				needNewAlloc = !alloc->Realloc(data, newCapacity * sizeof(T));
+				needNewAlloc = !alloc.Realloc(data, newCapacity * sizeof(T));
 			else
 				needNewAlloc = true;
 
 			if (needNewAlloc)
 			{
 				auto oldData = data;
-				data = static_cast<T*>(alloc->Alloc(newCapacity * sizeof(T), alignof(T)));
+				data = static_cast<T*>(alloc.Alloc(newCapacity * sizeof(T), alignof(T)));
 
 				if (oldData)
 				{
@@ -237,7 +240,7 @@ namespace DEngine::Std
 						if constexpr (!Trait::isTriviallyDestructible<T>)
 							oldData[i].~T();
 					}
-					alloc->Free(oldData);
+					alloc.Free(oldData);
 				}
 			}
 
@@ -247,6 +250,6 @@ namespace DEngine::Std
 		}
 	};
 
-	template<class T, class AllocatorT>
-	inline Std::Vec<T, AllocatorT> MakeVec(AllocatorT& alloc) noexcept { return Std::Vec<T, AllocatorT>{ alloc }; }
+	template<class T, class AllocRefT>
+	inline auto MakeVec(AllocRefT const& alloc) { return Std::Vec<T, AllocRefT>{ alloc }; }
 }

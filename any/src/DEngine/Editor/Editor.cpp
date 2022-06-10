@@ -476,7 +476,7 @@ void Editor::Context::ProcessEvents()
 		implData.guiRenderingInvalidated = false;
 
 		for (auto viewportPtr : implData.viewportWidgetPtrs)
-			viewportPtr->GetInternalViewport().isVisible = false;
+			viewportPtr->GetInternalViewport().wasRendered = false;
 
 		implData.vertices.clear();
 		implData.indices.clear();
@@ -501,19 +501,23 @@ void Editor::Context::ProcessEvents()
 			auto& viewport = viewportPtr->GetInternalViewport();
 
 			auto entryOpt = rectColl.GetEntry(viewport);
+
 			if (entryOpt.HasValue())
 			{
 				// This means the viewport was rendered
 				auto const& entry = entryOpt.Value();
-				auto const& viewportRectPair = rectColl.GetRect(entry);
-				auto const& currentRect = viewportRectPair.widgetRect;
+				auto const& rectPair = rectColl.GetRect(entry);
+				auto const visibleIntersection = Gui::Intersection(rectPair.widgetRect, rectPair.visibleRect);
+				if (!visibleIntersection.IsNothing())
+				{
+					auto const& currentRect = rectPair.widgetRect;
+					viewport.wasRendered = true;
+					viewport.currentlyResizing = viewport.newExtent != currentRect.extent;
+					viewport.newExtent = currentRect.extent;
 
-				viewport.isVisible = true;
-				viewport.currentlyResizing = viewport.newExtent != currentRect.extent;
-				viewport.newExtent = currentRect.extent;
-
-				if (viewport.currentExtent == Gui::Extent{} && viewport.newExtent != Gui::Extent{})
-					viewport.currentExtent = viewport.newExtent;
+					if (viewport.currentExtent == Gui::Extent{} && viewport.newExtent != Gui::Extent{})
+						viewport.currentExtent = viewport.newExtent;
+				}
 			}
 		}
 	}
@@ -553,12 +557,9 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 	{
 		DENGINE_IMPL_ASSERT(viewportWidgetPtr);
 		auto const& viewport = viewportWidgetPtr->GetInternalViewport();
-		if (viewportWidgetPtr->viewport->isVisible)
+		if (viewport.wasRendered && !viewport.currentExtent.IsNothing())
 		{
-			DENGINE_IMPL_ASSERT(viewport.currentExtent.width > 0 && viewport.currentExtent.height > 0);
-			DENGINE_IMPL_ASSERT(viewport.newExtent.width > 0 && viewport.newExtent.height > 0);
-
-			Gfx::ViewportUpdate update = viewport.GetViewportUpdate(
+			Gfx::ViewportUpdate update = viewport.BuildViewportUpdate(
 				returnVal.lineVertices,
 				returnVal.lineDrawCmds);
 			

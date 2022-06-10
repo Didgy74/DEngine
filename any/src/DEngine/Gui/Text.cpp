@@ -14,13 +14,13 @@ struct Text::Impl
 	// This data is only available when rendering.
 	struct CustomData
 	{
-		explicit CustomData(RectCollection::AllocT& alloc) :
+		explicit CustomData(RectCollection::AllocRefT const& alloc) :
 			glyphRects{ alloc }
 		{
 		}
 
 		Extent textOuterExtent = {};
-		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
+		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 };
 

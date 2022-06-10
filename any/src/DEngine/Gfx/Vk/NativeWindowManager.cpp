@@ -7,6 +7,7 @@
 #include <DEngine/Math/Common.hpp>
 #include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Std/Utility.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
 
 #include <string>
@@ -113,13 +114,13 @@ namespace DEngine::Gfx::Vk::NativeWinMgrImpl
 	static void HandleCreationJobs(
 		NativeWinMgr& manager,
 		GlobUtils const& globUtils,
-		Std::FrameAlloc& transientAlloc);
+		Std::AllocRef const& transientAlloc);
 
 	static void HandleDeletionJobs(
 		NativeWinMgr& manager,
 		GlobUtils const& globUtils,
-		DeletionQueue& delQueue,
-		Std::FrameAlloc& transientAlloc);
+		DelQueue& delQueue,
+		Std::AllocRef const& transientAlloc);
 
 	static void HandleWindowResize(
 		NativeWinMgr& manager,
@@ -142,7 +143,7 @@ void NativeWinMgr::ProcessEvents(
 	NativeWinMgr& manager,
 	GlobUtils const& globUtils,
 	DeletionQueue& delQueue,
-	Std::FrameAlloc& transientAlloc,
+	Std::AllocRef const& transientAlloc,
 	Std::Span<NativeWindowUpdate const> windowUpdates)
 {
 	NativeWinMgrImpl::HandleCreationJobs(
@@ -424,12 +425,12 @@ vk::Semaphore NativeWinMgrImpl::CreateImageReadySemaphore(
 static void NativeWinMgrImpl::HandleCreationJobs(
 	NativeWinMgr& manager,
 	GlobUtils const& globUtils,
-	Std::FrameAllocator& transientAlloc)
+	Std::AllocRef const& transientAlloc)
 {
 	auto const* debugUtils = globUtils.DebugUtilsPtr();
 
 	// Copy the jobs over so we can release the mutex early
-	auto tempCreateJobs = Std::Vec<NativeWinMgr::CreateJob, Std::FrameAlloc>{ transientAlloc };
+	auto tempCreateJobs = Std::MakeVec<NativeWinMgr::CreateJob>(transientAlloc);
 	{
 		std::scoped_lock lock{ manager.insertionJobs.lock };
 		tempCreateJobs.Resize(manager.insertionJobs.createQueue.size());
@@ -536,11 +537,11 @@ static void NativeWinMgrImpl::HandleCreationJobs(
 static void NativeWinMgrImpl::HandleDeletionJobs(
 	NativeWinMgr& manager,
 	GlobUtils const& globUtils,
-	DeletionQueue& delQueue,
-	Std::FrameAlloc& transientAlloc)
+	DelQueue& delQueue,
+	Std::AllocRef const& transientAlloc)
 {
 	// Copy the jobs over so we can release the mutex early
-	auto tempDeleteJobs = Std::Vec<NativeWinMgr::DeleteJob, Std::FrameAlloc>{ transientAlloc };
+	auto tempDeleteJobs = Std::MakeVec<NativeWinMgr::DeleteJob>(transientAlloc);
 	{
 		std::lock_guard lock{ manager.insertionJobs.lock };
 		tempDeleteJobs.Resize(manager.insertionJobs.deleteQueue.size());

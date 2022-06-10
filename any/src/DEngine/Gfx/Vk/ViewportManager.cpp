@@ -176,9 +176,9 @@ namespace DEngine::Gfx::Vk::ViewportMgrImpl
 		ViewportManager& viewportManager,
 		GlobUtils const& globUtils,
 		DelQueue& delQueue,
-		Std::FrameAlloc& transientAlloc)
+		Std::AllocRef const& transientAlloc)
 	{
-		auto tempDeleteJobs = Std::Vec<ViewportID, Std::FrameAlloc>{ transientAlloc };
+		auto tempDeleteJobs = Std::MakeVec<ViewportID>(transientAlloc);
 		{
 			std::scoped_lock lock { viewportManager.deleteQueue_Lock };
 
@@ -215,7 +215,7 @@ namespace DEngine::Gfx::Vk::ViewportMgrImpl
 	void HandleViewportCreationJobs(
 		ViewportManager& viewportManager,
 		GlobUtils const& globUtils,
-		Std::FrameAlloc& transientAlloc)
+		Std::AllocRef const& transientAlloc)
 	{
 		auto tempCreateJobs = Std::MakeVec<ViewportManager::CreateJob>(transientAlloc);
 		{
@@ -304,7 +304,7 @@ void Vk::ViewportManager::ProcessEvents(
 	ViewportManager& manager,
 	GlobUtils const& globUtils,
 	DelQueue& delQueue,
-	Std::FrameAlloc& transientAlloc,
+	Std::AllocRef const& transientAlloc,
 	Std::Span<ViewportUpdate const> viewportUpdates,
 	GuiResourceManager const& guiResourceManager)
 {

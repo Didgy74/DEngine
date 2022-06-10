@@ -4,6 +4,7 @@
 
 #include <DEngine/Gui/SizeHint.hpp>
 #include <DEngine/Gui/Utility.hpp>
+#include <DEngine/Gui/AllocRef.hpp>
 
 #include <DEngine/Std/Utility.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
@@ -30,8 +31,8 @@ namespace DEngine::Gui
 	class RectCollection
 	{
 	public:
-		using AllocT = Std::FrameAlloc;
-		AllocT& Alloc() noexcept { return alloc; }
+		using AllocRefT = AllocRef;
+		AllocRefT Alloc() noexcept { return alloc; }
 
 		// Should always be valid after the SizeHint
 		// gathering stage
@@ -54,7 +55,7 @@ namespace DEngine::Gui
 				collection{ &collection }
 			{}
 
-			[[nodiscard]] AllocT& Alloc() noexcept { return Collection().Alloc(); }
+			[[nodiscard]] AllocRefT Alloc() noexcept { return Collection().Alloc(); }
 
 			It AddEntry(Widget const& widget) { return Collection().AddEntry(widget); }
 			It AddEntry(Layer const& layer) { return Collection().AddEntry(layer); }
@@ -84,7 +85,7 @@ namespace DEngine::Gui
 		public:
 			explicit RectPusher(RectCollection& collection) noexcept : collection{ &collection } {}
 
-			[[nodiscard]] AllocT& Alloc() noexcept { return Collection().Alloc(); }
+			[[nodiscard]] AllocRefT Alloc() noexcept { return Collection().Alloc(); }
 
 			[[nodiscard]] It GetEntry(Widget const& widget) noexcept {
 				auto temp = Collection().GetEntry(widget);

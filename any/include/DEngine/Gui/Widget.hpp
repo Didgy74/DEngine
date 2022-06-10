@@ -3,6 +3,7 @@
 #include <DEngine/Gui/Events.hpp>
 #include <DEngine/Gui/SizeHint.hpp>
 #include <DEngine/Gui/RectCollection.hpp>
+#include <DEngine/Gui/AllocRef.hpp>
 #include <DEngine/Gui/Utility.hpp>
 
 #include <DEngine/Std/FrameAllocator.hpp>
@@ -29,7 +30,7 @@ namespace DEngine::Gui
 		{
 			Context const& ctx;
 			TextManager& textManager;
-			Std::FrameAllocator& transientAlloc;
+			AllocRef const& transientAlloc;
 			RectCollection::SizeHintPusher& pusher;
 		};
 		/*
@@ -43,7 +44,7 @@ namespace DEngine::Gui
 		{
 			Context const& ctx;
 			TextManager& textManager;
-			Std::FrameAllocator& transientAlloc;
+			AllocRef const& transientAlloc;
 			RectCollection::RectPusher& pusher;
 		};
 		/*
@@ -61,7 +62,7 @@ namespace DEngine::Gui
 			TextManager& textManager;
 			RectCollection const& rectCollection;
 			Extent const& framebufferExtent;
-			Std::FrameAlloc& transientAlloc;
+			AllocRef const& transientAlloc;
 			DrawInfo& drawInfo;
 		};
 		virtual void Render2(
@@ -74,7 +75,7 @@ namespace DEngine::Gui
 			Context& ctx;
 			RectCollection const& rectCollection;
 			TextManager& textManager;
-			Std::FrameAlloc& transientAlloc;
+			AllocRef const& transientAlloc;
 			WindowID windowId;
 			CursorMoveEvent const& event;
 		};
@@ -112,7 +113,7 @@ namespace DEngine::Gui
 			Context& ctx;
 			RectCollection const& rectCollection;
 			TextManager& textManager;
-			Std::FrameAlloc& transientAlloc;
+			AllocRef const& transientAlloc;
 			WindowID windowId;
 			Math::Vec2Int cursorPos;
 			CursorPressEvent event;
@@ -136,40 +137,12 @@ namespace DEngine::Gui
 
 		virtual void TextInput(
 			Context& ctx,
-			Std::FrameAlloc& transientAlloc,
+			AllocRef const& transientAlloc,
 			TextInputEvent const& event) {}
 		virtual void EndTextInputSession(
 			Context& ctx,
-			Std::FrameAlloc& transientAlloc,
+			AllocRef const& transientAlloc,
 			EndTextInputSessionEvent const& event) {}
-
-		virtual void CharRemoveEvent(
-			Context& ctx,
-			Std::FrameAlloc& transientAlloc) {}
-
-
-
-
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const { return {}; };
-
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const {}
-
-		virtual void CharEnterEvent(
-			Context& ctx) {}
-
-		virtual void CharEvent(
-			Context& ctx,
-			u32 utfValue) {}
-
-
-
-		virtual void InputConnectionLost() {}
 
 		virtual void CursorExit(
 			Context& ctx) {}

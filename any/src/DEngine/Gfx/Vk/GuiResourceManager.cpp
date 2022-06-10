@@ -6,6 +6,7 @@
 
 #include <DEngine/Std/Containers/Array.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
 
 // For file IO
 #include <DEngine/Application.hpp>
@@ -32,7 +33,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		return { position, uv };
 	}
 
-	static constexpr Std::Array<vk::VertexInputBindingDescription, 1> BuildShaderVertexInputBindingDescr()
+	static Std::Array<vk::VertexInputBindingDescription, 1> BuildShaderVertexInputBindingDescr()
 	{
 		vk::VertexInputBindingDescription binding{};
 		binding.binding = 0;
@@ -46,7 +47,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		GuiResourceManager& manager,
 		DeviceDispatch const& device,
 		vk::RenderPass guiRenderPass,
-		Std::FrameAllocator& frameAlloc,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils)
 	{
 		vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -128,7 +129,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto vertCode = Std::MakeVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -148,7 +149,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto fragCode = Std::MakeVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
@@ -209,7 +210,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		GuiResourceManager& manager,
 		DeviceDispatch const& device,
 		vk::RenderPass guiRenderPass,
-		Std::FrameAllocator& frameAlloc,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils)
 	{
 		vk::DescriptorSetLayoutBinding imgDescrBinding{};
@@ -308,7 +309,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto vertCode = Std::MakeVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -328,7 +329,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto fragCode = Std::MakeVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
@@ -388,7 +389,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		GuiResourceManager& manager,
 		DeviceDispatch const& device,
 		vk::RenderPass guiRenderPass,
-		Std::FrameAllocator& frameAlloc,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils)
 	{
 		vk::DescriptorPoolSize sampledImgDescrPoolSize{};
@@ -516,7 +517,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto vertCode = Std::MakeVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -536,7 +537,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto fragCode = Std::MakeVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
@@ -599,7 +600,7 @@ void Vk::GuiResourceManager::Init(
 	VmaAllocator vma,
 	u8 inFlightCount,
 	vk::RenderPass guiRenderPass,
-	Std::FrameAllocator& frameAlloc,
+	Std::AllocRef const& transientAlloc,
 	DebugUtilsDispatch const* debugUtils)
 {
 	vk::Result vkResult{};
@@ -664,21 +665,21 @@ void Vk::GuiResourceManager::Init(
 		manager,
 		device,
 		guiRenderPass,
-		frameAlloc,
+		transientAlloc,
 		debugUtils);
 	
 	GuiResourceManagerImpl::CreateTextShader(
 		manager,
 		device,
 		guiRenderPass,
-		frameAlloc,
+		transientAlloc,
 		debugUtils);
 
 	GuiResourceManagerImpl::CreateViewportShader(
 		manager,
 		device,
 		guiRenderPass,
-		frameAlloc,
+		transientAlloc,
 		debugUtils);
 }
 

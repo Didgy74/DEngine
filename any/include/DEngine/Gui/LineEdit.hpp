@@ -49,22 +49,6 @@ namespace DEngine::Gui
 			Rect const& visibleRect,
 			bool consumed) override;
 
-
-		[[nodiscard]] virtual SizeHint GetSizeHint(Context const& ctx) const override;
-
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
-
-		virtual void CharRemoveEvent(
-			Context& ctx,
-			Std::FrameAlloc& transientAlloc) override;
-
-		virtual void InputConnectionLost() override;
-
 		virtual bool TouchPressEvent(
 			Context& ctx,
 			WindowID windowId,

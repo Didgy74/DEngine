@@ -220,7 +220,8 @@ void Context::TakeInputConnection(
 	auto& implData = Internal_ImplData();
 	if (implData.inputConnectionWidget)
 	{
-		implData.inputConnectionWidget->InputConnectionLost();
+		DENGINE_IMPL_GUI_UNREACHABLE();
+		//implData.inputConnectionWidget->InputConnectionLost();
 	}
 	implData.windowHandler->OpenSoftInput(
 		{ currentText.Data(), currentText.Size() },
@@ -267,7 +268,8 @@ void Context::PushEvent(CharEnterEvent const& event)
 		if (!windowNode.data.topLayout)
 			continue;
 
-		windowNode.data.topLayout->CharEnterEvent(*this);
+		DENGINE_IMPL_GUI_UNREACHABLE();
+		//windowNode.data.topLayout->CharEnterEvent(*this);
 	}
 }
 
@@ -279,9 +281,10 @@ void Context::PushEvent(CharEvent const& event)
 		if (!windowNode.data.topLayout)
 			continue;
 
-		windowNode.data.topLayout->CharEvent(
-			*this,
-			event.utfValue);
+		DENGINE_IMPL_GUI_UNREACHABLE();
+		//windowNode.data.topLayout->CharEvent(
+			//*this,
+			//event.utfValue);
 	}
 }
 

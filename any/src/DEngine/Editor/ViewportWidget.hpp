@@ -121,7 +121,7 @@ namespace DEngine::Editor
 		Gfx::ViewportID viewportId = Gfx::ViewportID::Invalid;
 		EditorImpl* editorImpl = nullptr;
 
-		bool isVisible = false;
+		bool wasRendered = false;
 
 		Gui::Extent currentExtent = {};
 		Gui::Extent newExtent = {};
@@ -149,7 +149,7 @@ namespace DEngine::Editor
 
 		void Tick() noexcept;
 
-		Gfx::ViewportUpdate GetViewportUpdate(
+		Gfx::ViewportUpdate BuildViewportUpdate(
 			std::vector<Math::Vec3>& lineVertices,
 			std::vector<Gfx::LineDrawCmd>& lineDrawCmds) const noexcept;
 
@@ -170,9 +170,5 @@ namespace DEngine::Editor
 			Gui::Rect const& visibleRect,
 			bool consumed) override;
 
-
-
-		virtual Gui::SizeHint GetSizeHint(
-			Gui::Context const& ctx) const override;
 	};
 }

@@ -15,7 +15,7 @@ namespace DEngine::Gui::impl
 	[[nodiscard]] static auto GetButtonWidths(
 		Std::Span<u32 const> desiredButtonWidths,
 		u32 widgetWidth,
-		Std::FrameAlloc& transientAlloc)
+		AllocRef const& transientAlloc)
 	{
 		auto const count = desiredButtonWidths.Size();
 
@@ -98,17 +98,17 @@ struct Gui::ButtonGroup::Impl
 	// This data is only available when rendering.
 	struct [[maybe_unused]] CustomData
 	{
-		explicit CustomData(RectCollection::AllocT& alloc) :
+		explicit CustomData(RectCollection::AllocRefT const& alloc) :
 			desiredBtnWidths{ alloc },
 			totalTextWidths{ alloc },
 			glyphRects{ alloc } {}
 
-		Std::Vec<u32, RectCollection::AllocT> desiredBtnWidths;
+		Std::Vec<u32, RectCollection::AllocRefT> desiredBtnWidths;
 
 		// Only available
 		u32 textHeight;
-		Std::Vec<u32, RectCollection::AllocT> totalTextWidths;
-		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
+		Std::Vec<u32, RectCollection::AllocRefT> totalTextWidths;
+		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
 	static constexpr u8 cursorPointerId = (u8)-1;
@@ -154,7 +154,7 @@ struct Gui::ButtonGroup::Impl
 		Rect const& widgetRect;
 		Rect const& visibleRect;
 		RectCollection const& rectCollection;
-		Std::FrameAlloc& transientAlloc;
+		AllocRef const& transientAlloc;
 		PointerMove_Pointer const& pointer;
 	};
 	[[nodiscard]] static bool PointerMove(
@@ -209,7 +209,7 @@ struct Gui::ButtonGroup::Impl
 		 Rect const& widgetRect;
 		 Rect const& visibleRect;
 		 RectCollection const& rectCollection;
-		 Std::FrameAlloc& transientAlloc;
+		 AllocRef const& transientAlloc;
 		 PointerPress_Pointer const& pointer;
 	 };
 	[[nodiscard]] static bool PointerPress(

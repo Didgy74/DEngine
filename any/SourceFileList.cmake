@@ -58,7 +58,9 @@ set(DENGINE_GUI_SOURCE_FILES
 		src/DEngine/Gui/Button.cpp
 		src/DEngine/Gui/ButtonGroup.cpp
 		src/DEngine/Gui/CollapsingHeader.cpp
-		src/DEngine/Gui/DockArea.cpp
+		src/DEngine/Gui/DockArea/DockArea.cpp
+		src/DEngine/Gui/DockArea/PointerBehavior.cpp
+		src/DEngine/Gui/DockArea/Utilities.cpp
 		src/DEngine/Gui/Dropdown.cpp
 		src/DEngine/Gui/Grid.cpp
 		src/DEngine/Gui/Image.cpp

@@ -50,12 +50,12 @@ struct LineIntEdit::Impl
 {
 	struct CustomData
 	{
-		explicit CustomData(RectCollection::AllocT& alloc) :
+		explicit CustomData(RectCollection::AllocRefT const& alloc) :
 			glyphRects{ alloc }
 		{}
 
 		Extent textOuterExtent;
-		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
+		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
 	static void UpdateValue(LineIntEdit& widget, bool updateText)
@@ -219,17 +219,6 @@ LineIntEdit::~LineIntEdit()
 	}
 }
 
-SizeHint LineIntEdit::GetSizeHint(Context const& ctx) const
-{
-	/*
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-	return impl::TextManager::GetSizeHint(
-		implData.textManager,
-		{ text.data(), text.size() });
-	 */
-	return {};
-}
-
 SizeHint LineIntEdit::GetSizeHint2(
 	Widget::GetSizeHint2_Params const& params) const
 {
@@ -363,7 +352,7 @@ void LineIntEdit::SetValue(i64 in)
 
 void LineIntEdit::TextInput(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	TextInputEvent const& event)
 {
 	if (HasInputSession())
@@ -404,7 +393,7 @@ void LineIntEdit::TextInput(
 
 void LineIntEdit::EndTextInputSession(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	EndTextInputSessionEvent const& event)
 {
 	if (HasInputSession())

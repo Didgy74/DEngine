@@ -8,6 +8,7 @@
 #include "ForwardDeclarations.hpp"
 
 #include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Math/Matrix.hpp>
 
@@ -74,7 +75,7 @@ namespace DEngine::Gfx::Vk
 			NativeWinMgr& manager,
 			GlobUtils const& globUtils,
 			DeletionQueue& delQueue,
-			Std::FrameAlloc& transientAlloc,
+			Std::AllocRef const& transientAlloc,
 			Std::Span<NativeWindowUpdate const> windowUpdates);
 
 		struct InitInfo

@@ -7,6 +7,9 @@
 
 #include <DEngine/Math/Vector.hpp>
 
+#include <DEngine/Std/Containers/Opt.hpp>
+#include <DEngine/Std/Containers/Span.hpp>
+
 namespace DEngine::Gui
 {
 	struct Extent
@@ -16,6 +19,7 @@ namespace DEngine::Gui
 
 		[[nodiscard]] constexpr bool IsNothing() const noexcept;
 		[[nodiscard]] constexpr f32 Aspect() const noexcept;
+		[[nodiscard]] constexpr bool FitsInside(Extent const& other) const noexcept;
 
 		// Gets the minimum of both directions
 		[[nodiscard]] constexpr static Extent Min(Extent const& a, Extent const& b) noexcept;
@@ -48,17 +52,23 @@ namespace DEngine::Gui
 	};
 
 	// Represents a rectangle in UI space. Includes position and extent.
+	// Axis-aligned.
 	struct Rect
 	{
 		Math::Vec2Int position;
 		Extent extent;
 
+		// Returns the Y coordinate of the top side.
 		[[nodiscard]] constexpr i32 Top() const noexcept;
+		// Returns the Y coordinate of the bottom side.
 		[[nodiscard]] constexpr i32 Bottom() const noexcept;
+		// Returns the X coordinate of the left side.
 		[[nodiscard]] constexpr i32 Left() const noexcept;
+		// Returns the Y coordinate of the right side.
 		[[nodiscard]] constexpr i32 Right() const noexcept;
 
 		[[nodiscard]] constexpr bool IsNothing() const noexcept;
+		[[nodiscard]] constexpr bool FitsInside(Rect const& other) const noexcept;
 
 		[[nodiscard]] constexpr bool PointIsInside(Math::Vec2Int point) const noexcept;
 		[[nodiscard]] constexpr bool PointIsInside(Math::Vec2 point) const noexcept;
@@ -68,10 +78,20 @@ namespace DEngine::Gui
 		[[nodiscard]] constexpr bool operator==(Rect const&) const noexcept;
 		[[nodiscard]] constexpr bool operator!=(Rect const&) const noexcept;
 	};
+
+	[[nodiscard]] constexpr Rect Intersection(Rect const& a, Rect const& b) noexcept {
+		return Rect::Intersection(a, b);
+	}
+
+	[[nodiscard]] inline Std::Opt<uSize> PointIsInside(Std::Span<Rect const> rects, Math::Vec2 point);
 }
 
 constexpr bool DEngine::Gui::Extent::IsNothing() const noexcept { return width == 0 || height == 0; }
 constexpr DEngine::f32 DEngine::Gui::Extent::Aspect() const noexcept { return (f32)width / (f32)height; }
+constexpr bool DEngine::Gui::Extent::FitsInside(Extent const& a) const noexcept
+{
+	return width <= a.width && height <= a.height;
+}
 
 constexpr auto DEngine::Gui::Extent::Min(Extent const& a, Extent const& b) noexcept -> Extent
 {
@@ -97,6 +117,14 @@ constexpr DEngine::i32 DEngine::Gui::Rect::Left() const noexcept { return (i32)p
 constexpr DEngine::i32 DEngine::Gui::Rect::Right() const noexcept { return (i32)position.x + (i32)extent.width; }
 
 constexpr bool DEngine::Gui::Rect::IsNothing() const noexcept { return extent.IsNothing(); }
+constexpr bool DEngine::Gui::Rect::FitsInside(Rect const& other) const noexcept
+{
+	return
+		Left() >= other.Left() &&
+		Top() >= other.Top() &&
+		Right() <= other.Right() &&
+		Bottom() <= other.Bottom();
+}
 
 constexpr bool DEngine::Gui::Rect::PointIsInside(Math::Vec2Int point) const noexcept
 {
@@ -137,4 +165,12 @@ constexpr bool DEngine::Gui::Rect::operator==(Rect const& other) const noexcept
 constexpr bool DEngine::Gui::Rect::operator!=(Rect const& other) const noexcept
 {
 	return !(*this == other);
+}
+
+inline auto DEngine::Gui::PointIsInside(Std::Span<Rect const> rects, Math::Vec2 point) -> Std::Opt<uSize> {
+	for (uSize i = 0; i < rects.Size(); i += 1) {
+		if (rects[i].PointIsInside(point))
+			return i;
+	}
+	return Std::nullOpt;
 }

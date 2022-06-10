@@ -16,7 +16,12 @@
 
 namespace DEngine::Gui
 {
-	namespace impl { struct DA_Node; }
+	namespace impl
+	{
+		struct DA_Node;
+		struct DA_SplitNode;
+		struct DA_WindowNode;
+	}
 
 	class DockArea : public Widget
 	{
@@ -32,6 +37,8 @@ namespace DEngine::Gui
 			Math::Vec4 dockingHighlight = { 0.f, 0.5f, 1.f, 0.5f };
 		};
 		Colors colors = {};
+
+		static constexpr Extent defaultLayerExtent = { 600, 600 };
 
 		DockArea();
 
@@ -64,31 +71,26 @@ namespace DEngine::Gui
 			bool consumed) override;
 		virtual void TextInput(
 			Context& ctx,
-			Std::FrameAlloc& transientAlloc,
+			AllocRef const& transientAlloc,
 			TextInputEvent const& event) override;
 		virtual void EndTextInputSession(
 			Context& ctx,
-			Std::FrameAlloc& transientAlloc,
+			AllocRef const& transientAlloc,
 			EndTextInputSessionEvent const& event) override;
-
-
-
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override;
-
-		virtual void CharRemoveEvent(
-			Context& ctx,
-			Std::FrameAlloc& transientAlloc) override;
-
 
 		struct Impl;
 		friend Impl;
 	protected:
+
+
 		struct Layer
 		{
+			// We did not use Std::Box for this because the implementation
+			// needs to access the raw pointer, by reference.
+			// (Yes, it's using double pointer).
 			impl::DA_Node* root = nullptr;
 			// This rect is relative to the DockArea widgets position.
-			// Do no use this directly. Use the GetLayerRect function.
+			// Do no use this directly. Use the DA_GetLayerRect function.
 			Rect rect = {};
 			Layer() = default;
 			Layer(Layer&& other) noexcept : root{ other.root }, rect{ other.rect }
@@ -110,40 +112,34 @@ namespace DEngine::Gui
 		};
 		std::vector<Layer> layers;
 
-		struct State_Normal
-		{
-
-		};
-		struct State_Moving
-		{
-			bool movingSplitNode;
-
+		struct State_Normal {};
+		struct State_Moving {
 			u8 pointerId;
 			// Pointer offset relative to window origin
 			Math::Vec2 pointerOffset;
-
-			struct HoveredWindow
-			{
-				uSize layerIndex;
-				// As the impl::DA_WindowNode type
-				void const* windowNode;
-				Std::Opt<int> gizmoHighlightOpt;
+			struct HoveredWindow {
+				// If windowNode is nullptr, it means
+				// we are hovering the back layers outer gizmos.
+				// If it is not a nullptr, we are hovering a specific windows
+				// inner gizmos.
+				impl::DA_WindowNode* windowNode = nullptr;
+				[[nodiscard]] impl::DA_WindowNode const* GetWindowNode() const { return windowNode; }
+				bool gizmoIsInner = false;
+				Std::Opt<int> gizmo;
 			};
-			Std::Opt<HoveredWindow> hoveredWindowOpt;
-			Std::Opt<int> backOuterGizmoHighlightOpt;
+			Std::Opt<HoveredWindow> hoveredGizmoOpt;
 		};
-		struct State_HoldingTab
-		{
+		struct State_HoldingTab {
 			// This is a impl::DA_WindowNode type
-			void const* windowBeingHeld;
+			impl::DA_WindowNode* windowBeingHeld;
 			u8 pointerId;
-			// Pointer offset relative to tab origin
-			Math::Vec2 pointerOffset;
+			uSize tabIndex;
+			Math::Vec2 pointerOffsetFromTab;
 		};
 		struct State_ResizingSplit
 		{
 			bool resizingBack;
-			void const* splitNode;
+			impl::DA_SplitNode* splitNode;
 			u8 pointerId;
 		};
 		using StateDataT = Std::Variant<

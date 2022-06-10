@@ -18,8 +18,7 @@ namespace DEngine::Std
 	}
 
 	template<class Alloc, class T, class... Us>
-	class Fn
-	{ };
+	class Fn;
 
 	template<class Alloc, class Ret, class... Us>
 	class Fn<Ret(Us...), Alloc>

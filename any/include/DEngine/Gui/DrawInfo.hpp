@@ -154,6 +154,16 @@ namespace DEngine::Gui
 		class ScopedScissor
 		{
 		public:
+			ScopedScissor(
+				DrawInfo& drawInfoIn,
+				Rect const& widgetRect,
+				Rect const& visibleRect)
+			{
+				if (!widgetRect.FitsInside(visibleRect)) {
+					drawInfo = &drawInfoIn;
+					drawInfo->PushScissor(Intersection(widgetRect, visibleRect));
+				}
+			}
 			ScopedScissor(DrawInfo& drawInfo, Rect const& scissor) : drawInfo{ &drawInfo }
 			{
 				drawInfo.PushScissor(scissor);

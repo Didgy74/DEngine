@@ -48,7 +48,7 @@ void TextureManager::Update(
 	DelQueue& delQueue,
 	DrawParams const& drawParams,
 	Gfx::TextureAssetInterface const& texAssetInterface,
-	Std::FrameAllocator& frameAlloc)
+	Std::AllocRef const& transientAlloc)
 {
 	auto const* debugUtils = globUtils.DebugUtilsPtr();
 	auto const& device = globUtils.device;
@@ -112,7 +112,7 @@ void TextureManager::Update(
 					name.c_str());
 			}
 
-			auto workingMemory = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+			auto workingMemory = Std::MakeVec<char>(transientAlloc);
 			if (texFileInfo.workingMemoryRequired() > 0)
 				workingMemory.Resize(texFileInfo.workingMemoryRequired());
 

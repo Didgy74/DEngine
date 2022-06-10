@@ -134,6 +134,7 @@ namespace DEngine::Std
 		Opt& operator=([[maybe_unused]] NullOpt_T) noexcept;
 
 		[[nodiscard]] bool HasValue() const noexcept;
+		[[nodiscard]] bool Has() const noexcept;
 
 		[[nodiscard]] T const& Value() const& noexcept
 		{
@@ -142,6 +143,7 @@ namespace DEngine::Std
 				"Tried to deference Opt without a value.");
 			return value;
 		}
+		[[nodiscard]] T const& Get() const& noexcept { return Value(); }
 		[[nodiscard]] T& Value() & noexcept
 		{
 			DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
@@ -149,6 +151,7 @@ namespace DEngine::Std
 				"Tried to deference Opt without a value.");
 			return value;
 		}
+		[[nodiscard]] T& Get() & noexcept { return Value(); }
 		[[nodiscard]] T&& Value() && noexcept
 		{
 			DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
@@ -156,6 +159,7 @@ namespace DEngine::Std
 				"Tried to deference Opt without a value.");
 			return static_cast<T&&>(value);
 		}
+		[[nodiscard]] T&& Get() && noexcept { return Value(); }
 
 		[[nodiscard]] T const* ToPtr() const noexcept;
 		[[nodiscard]] T* ToPtr() noexcept;
@@ -188,10 +192,10 @@ namespace DEngine::Std
 	}
 
 	template<typename T>
-	bool Opt<T>::HasValue() const noexcept
-	{
-		return hasValue;
-	}
+	bool Opt<T>::HasValue() const noexcept { return hasValue; }
+
+	template<typename T>
+	bool Opt<T>::Has() const noexcept { return hasValue; }
 
 	template<typename T>
 	T const* Opt<T>::ToPtr() const noexcept

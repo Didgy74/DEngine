@@ -44,9 +44,5 @@ namespace DEngine::Editor
 			Gui::Rect const& widgetRect,
 			Gui::Rect const& visibleRect,
 			bool occluded) override;
-
-
-		[[nodiscard]] virtual Gui::SizeHint GetSizeHint(
-			Gui::Context const& ctx) const override;
 	};
 }

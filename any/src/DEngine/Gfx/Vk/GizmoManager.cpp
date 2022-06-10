@@ -308,7 +308,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_InitializeArrowShader(
 		GizmoManager& manager,
 		DeviceDispatch const& device,
-		Std::FrameAllocator& frameAlloc,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils,
 		APIData const& apiData)
 	{
@@ -341,7 +341,7 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto vertCode = Std::MakeVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -360,7 +360,7 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto fragCode = Std::MakeVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
@@ -479,7 +479,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_InitializeQuadShader(
 		GizmoManager& manager,
 		DeviceDispatch const& device,
-		Std::FrameAllocator& frameAlloc,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils,
 		APIData const& apiData)
 	{
@@ -491,7 +491,7 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto vertCode = Std::MakeVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -510,7 +510,7 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto fragCode = Std::MakeVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
@@ -616,7 +616,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_InitializeLineShader(
 		GizmoManager& manager,
 		DeviceDispatch const& device,
-		Std::FrameAllocator& frameAlloc,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils,
 		APIData const& apiData)
 	{
@@ -628,7 +628,7 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto vertCode = Std::MakeVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -647,7 +647,7 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::Vec<char, Std::FrameAllocator>(frameAlloc);
+		auto fragCode = Std::MakeVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();

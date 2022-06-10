@@ -124,10 +124,10 @@ struct Dropdown::Impl
 	// This data is only available when rendering.
 	struct [[maybe_unused]] CustomData
 	{
-		explicit CustomData(RectCollection::AllocT& alloc) : glyphRects{ alloc } {}
+		explicit CustomData(RectCollection::AllocRefT const& alloc) : glyphRects{ alloc } {}
 
 		Extent titleTextOuterExtent = {};
-		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
+		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
 
@@ -180,14 +180,14 @@ struct Dropdown::Impl
 	// This data is only available when rendering.
 	struct [[maybe_unused]] DropdownLayer_CustomData
 	{
-		explicit DropdownLayer_CustomData(RectCollection::AllocT& alloc) :
+		explicit DropdownLayer_CustomData(RectCollection::AllocRefT const& alloc) :
 			lineGlyphRects{ alloc },
 			lineGlyphRectOffsets{ alloc} {}
 
 		int textheight = 0;
 		// Only available when rendering.
-		Std::Vec<Rect, RectCollection::AllocT> lineGlyphRects;
-		Std::Vec<uSize, RectCollection::AllocT> lineGlyphRectOffsets;
+		Std::Vec<Rect, RectCollection::AllocRefT> lineGlyphRects;
+		Std::Vec<uSize, RectCollection::AllocRefT> lineGlyphRectOffsets;
 	};
 
 	struct DropdownLayer_PointerMove_Params
@@ -300,7 +300,7 @@ void Dropdown::Impl::DropdownLayer::BuildSizeHints(
 
 	auto pusherIt = pusher.AddEntry(*this);
 
-	DropdownLayer_CustomData customDataTemp { params.pusher.Alloc() };
+	DropdownLayer_CustomData customDataTemp { pusher.Alloc() };
 	auto& customData = pusher.AttachCustomData(pusherIt, Std::Move(customDataTemp));
 
 	customData.textheight = (int)lineheight;

@@ -118,46 +118,6 @@ namespace DEngine::Gui::impl
 	}
 }
 
-SizeHint ScrollArea::GetSizeHint(
-	Context const& ctx) const
-{
-	SizeHint returnVal = {};
-	returnVal.minimum = { 50, 50 };
-	returnVal.expandX = true;
-	returnVal.expandY = true;
-
-	Gui::SizeHint childSizeHint = child->GetSizeHint(ctx);
-	returnVal.minimum.width = childSizeHint.minimum.width;
-
-	returnVal.minimum.width += scrollbarThickness;
-
-	return returnVal;
-}
-
-void ScrollArea::Render(
-	Context const& ctx,
-	Extent framebufferExtent,
-	Rect widgetRect,
-	Rect visibleRect,
-	DrawInfo& drawInfo) const
-{
-}
-
-void ScrollArea::InputConnectionLost()
-{
-	child->InputConnectionLost();
-}
-
-void ScrollArea::CharRemoveEvent(
-	Context& ctx,
-	Std::FrameAlloc& transientAlloc)
-{
-	if (child)
-	{
-		child->CharRemoveEvent(ctx, transientAlloc);
-	}
-}
-
 namespace DEngine::Gui::impl
 {
 	struct PointerPressEvent
@@ -617,7 +577,7 @@ bool ScrollArea::CursorPress2(
 
 void ScrollArea::TextInput(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	TextInputEvent const& event)
 {
 	if (child)
@@ -628,7 +588,7 @@ void ScrollArea::TextInput(
 
 void ScrollArea::EndTextInputSession(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	EndTextInputSessionEvent const& event)
 {
 	if (child)

@@ -182,28 +182,6 @@ AnchorArea::AnchorArea()
 {
 }
 
-SizeHint AnchorArea::GetSizeHint(Context const& ctx) const
-{
-    SizeHint returnVal = {};
-    returnVal.expandX = true;
-    returnVal.expandY = true;
-    returnVal.minimum = { 150, 150 };
-    return returnVal;
-}
-
-void AnchorArea::Render(
-    Context const& ctx, 
-    Extent framebufferExtent, 
-    Rect widgetRect, 
-    Rect visibleRect,
-    DrawInfo& drawInfo) const
-{
-}
-
-void AnchorArea::InputConnectionLost()
-{
-}
-
 namespace DEngine::Gui::impl
 {
 	struct AA_NodeEndIt

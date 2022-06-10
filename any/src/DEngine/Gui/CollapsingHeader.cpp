@@ -12,14 +12,12 @@ struct CollapsingHeader::Impl
 public:
 	struct CustomData
 	{
-		explicit CustomData(RectCollection::AllocT& alloc) :
-			glyphRects{ alloc }
-		{
-		}
+		explicit CustomData(RectCollection::AllocRefT alloc) :
+			glyphRects{ alloc } {}
 
 		Extent titleTextOuterExtent = {};
 		// Only included when rendering.
-		Std::Vec<Rect, RectCollection::AllocT> glyphRects;
+		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
 	[[nodiscard]] static Rect BuildHeaderRect(
@@ -264,66 +262,6 @@ CollapsingHeader::CollapsingHeader()
 
 }
 
-SizeHint CollapsingHeader::GetSizeHint(
-	Context const& ctx) const
-{
-/*
-	SizeHint returnVal = {};
-
-	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-
-	auto textRectInner = impl::TextManager::GetSizeHint(
-		implData.textManager,
-		{ title.data(), title.size() });
-
-	returnVal.minimum.width += textRectInner.minimum.width;
-	returnVal.minimum.height += textRectInner.minimum.height;
-
-	returnVal.minimum.width += titleMargin * 2;
-	returnVal.minimum.height += titleMargin * 2;
-
-	// Add the child if there is one
-	if (!collapsed && child)
-	{
-		auto const childHint = child->GetSizeHint(ctx);
-		returnVal.minimum.width = Math::Max(
-			returnVal.minimum.width,
-			childHint.minimum.width);
-		returnVal.minimum.height += childHint.minimum.height;
-	}
-
-	return returnVal;
-*/
-
-	return {};
-}
-
-void CollapsingHeader::Render(
-	Context const& ctx, 
-	Extent framebufferExtent, 
-	Rect widgetRect, 
-	Rect visibleRect,
-	DrawInfo& drawInfo) const
-{
-
-}
-
-void CollapsingHeader::CharRemoveEvent(
-	Context& ctx,
-	Std::FrameAlloc& transientAlloc)
-{
-	if (!collapsed && child)
-		child->CharRemoveEvent(ctx, transientAlloc);
-}
-
-void CollapsingHeader::InputConnectionLost()
-{
-	if (!collapsed && child)
-		child->InputConnectionLost();
-}
-
-
-
 SizeHint CollapsingHeader::GetSizeHint2(
 	Widget::GetSizeHint2_Params const& params) const
 {
@@ -542,7 +480,7 @@ void CollapsingHeader::Render2(
 
 void CollapsingHeader::TextInput(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	TextInputEvent const& event)
 {
 	if (!collapsed && child)
@@ -551,7 +489,7 @@ void CollapsingHeader::TextInput(
 
 void CollapsingHeader::EndTextInputSession(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	EndTextInputSessionEvent const& event)
 {
 	if (!collapsed && child)

@@ -83,42 +83,12 @@ void LineList::RemoveLine(uSize index)
 	}
 }
 
-SizeHint LineList::GetSizeHint(Context const& ctx) const
-{
-/*	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-	auto const textHeight = implData.textManager.lineheight;
-	auto const lineHeight = textHeight + (textMargin * 2);
-	SizeHint returnVal = {};
-	returnVal.minimum.height = lineHeight * lines.size();
-	for (auto const& line : lines)
-	{
-		auto const sizeHint = impl::TextManager::GetSizeHint(
-			implData.textManager,
-			{ line.data(), line.size() });
-		returnVal.minimum.width = Math::Max(
-			returnVal.minimum.width,
-			sizeHint.minimum.width);
-	}
-	return returnVal;
- */
-	return {};
-}
-
-void LineList::Render(
-	Context const& ctx,
-	Extent framebufferExtent,
-	Rect widgetRect,
-	Rect visibleRect,
-	DrawInfo& drawInfo) const
-{
-}
-
 struct LineList::Impl
 {
 	// A reference for the serialized struct we use.
 	struct CustomData
 	{
-		explicit CustomData(RectCollection::AllocT& alloc) noexcept :
+		explicit CustomData(RectCollection::AllocRefT const& alloc) noexcept :
 			lineGlyphRects{ alloc },
 			lineGlyphRectOffsets{ alloc}
 		{
@@ -128,8 +98,8 @@ struct LineList::Impl
 		LineHeightT lineHeight = {};
 
 		// Only included when we are rendering
-		Std::Vec<Rect, RectCollection::AllocT> lineGlyphRects;
-		Std::Vec<uSize, RectCollection::AllocT> lineGlyphRectOffsets;
+		Std::Vec<Rect, RectCollection::AllocRefT> lineGlyphRects;
+		Std::Vec<uSize, RectCollection::AllocRefT> lineGlyphRectOffsets;
 	};
 
 

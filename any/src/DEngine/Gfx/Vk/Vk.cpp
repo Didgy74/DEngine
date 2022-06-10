@@ -21,6 +21,7 @@
 #include <string>
 
 #include <DEngine/Std/Containers/Defer.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
 
 //vk::DispatchLoaderDynamic vk::defaultDispatchLoaderDynamic;
 
@@ -30,7 +31,7 @@ namespace DEngine::Gfx::Vk
 
 	namespace Init
 	{
-		void InitTestPipeline(APIData& apiData, Std::FrameAllocator& frameAlloc);
+		void InitTestPipeline(APIData& apiData, Std::AllocRef const& transientAlloc);
 	}
 }
 
@@ -422,7 +423,7 @@ APIDataBase* Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo)
 	return returnVal;
 }
 
-void Vk::Init::InitTestPipeline(APIData& apiData, Std::FrameAllocator& frameAlloc)
+void Vk::Init::InitTestPipeline(APIData& apiData, Std::AllocRef const& transientAlloc)
 {
 	auto const& globUtils = apiData.globUtils;
 	auto const& device = globUtils.device;
@@ -453,7 +454,7 @@ void Vk::Init::InitTestPipeline(APIData& apiData, Std::FrameAllocator& frameAllo
 	vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 	u64 vertFileLength = vertFile.Tell().Value();
 	vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-	auto vertCode = Std::Vec<char, Std::FrameAllocator>{ frameAlloc };
+	auto vertCode = Std::MakeVec<char>(transientAlloc);
 	vertCode.Resize((uSize)vertFileLength);
 	vertFile.Read(vertCode.Data(), vertFileLength);
 
@@ -472,7 +473,7 @@ void Vk::Init::InitTestPipeline(APIData& apiData, Std::FrameAllocator& frameAllo
 	fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 	u64 fragFileLength = fragFile.Tell().Value();
 	fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-	auto fragCode = Std::Vec<char, Std::FrameAllocator>{ frameAlloc };
+	auto fragCode = Std::MakeVec<char>(transientAlloc);
 	fragCode.Resize((uSize)fragFileLength);
 	fragFile.Read(fragCode.Data(), fragFileLength);
 

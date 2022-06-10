@@ -24,11 +24,10 @@ struct Grid::Impl
 		return index / width;
 	}
 
-	template<class AllocT>
 	[[nodiscard]] static auto BuildColMaxWidths(
 		Grid const& widget,
 		Std::Span<SizeHint> childrenSizeHints,
-		AllocT& alloc)
+		AllocRef const& alloc)
 	{
 		auto colMaxWidths = Std::MakeVec<u32>(alloc);
 		colMaxWidths.Resize(widget.width);
@@ -50,11 +49,10 @@ struct Grid::Impl
 		return colMaxWidths;
 	}
 
-	template<class AllocT>
 	[[nodiscard]] static auto BuildColExpandX(
 		Grid const& widget,
 		Std::Span<SizeHint> childrenSizeHints,
-		AllocT& alloc)
+		AllocRef alloc)
 	{
 		auto returnValue = Std::MakeVec<bool>(alloc);
 		returnValue.Resize(widget.width);
@@ -76,11 +74,10 @@ struct Grid::Impl
 		return returnValue;
 	}
 
-	template<class AllocT>
 	[[nodiscard]] static auto BuildRowExpandY(
 		Grid const& widget,
 		Std::Span<SizeHint> childrenSizeHints,
-		AllocT& alloc)
+		AllocRef alloc)
 	{
 		auto returnValue = Std::MakeVec<bool>(alloc);
 		returnValue.Resize(widget.height);
@@ -102,11 +99,10 @@ struct Grid::Impl
 		return returnValue;
 	}
 
-	template<class AllocT>
 	[[nodiscard]] static auto BuildRowMaxHeights(
 		Grid const& widget,
 		Std::Span<SizeHint> childrenSizeHints,
-		AllocT& alloc)
+		AllocRef const& alloc)
 	{
 		auto rowMaxHeights = Std::MakeVec<u32>(alloc);
 		rowMaxHeights.Resize(widget.height);
@@ -503,20 +499,9 @@ bool Grid::CursorPress2(
 	return newConsumed || cursorInside;
 }
 
-void Grid::CharRemoveEvent(Context& ctx, Std::FrameAlloc& transientAlloc)
-{
-	for (auto& child : children)
-	{
-		if (child)
-		{
-			child->CharRemoveEvent(ctx, transientAlloc);
-		}
-	}
-}
-
 void Grid::TextInput(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	TextInputEvent const& event)
 {
 	for (auto& child : children)
@@ -530,7 +515,7 @@ void Grid::TextInput(
 
 void Grid::EndTextInputSession(
 	Context& ctx,
-	Std::FrameAlloc& transientAlloc,
+	AllocRef const& transientAlloc,
 	EndTextInputSessionEvent const& event)
 {
 	for (auto& child : children)

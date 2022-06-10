@@ -114,15 +114,6 @@ namespace DEngine::Editor::impl
 using namespace DEngine;
 using namespace DEngine::Editor;
 
-Gui::SizeHint Joystick::GetSizeHint(Gui::Context const& ctx) const
-{
-	Gui::SizeHint returnVal = {};
-	returnVal.expandX = false;
-	returnVal.expandY = false;
-	returnVal.minimum = { 150, 150 };
-	return returnVal;
-}
-
 Gui::SizeHint Joystick::GetSizeHint2(Gui::Widget::GetSizeHint2_Params const& params) const
 {
 	Gui::SizeHint returnVal = {};

@@ -33,6 +33,9 @@ namespace DEngine::Std::Trait::impl
 	template<class T, class U>
 	struct Conditional<false, T, U> { using Type = U; };
 
+	template<class T>
+	struct HasVirtualDestructor : public BoolValue<__has_virtual_destructor(T)> {};
+
 	template <class T, class... Ts>
 	struct IndexOf;
 	template <class T, class... Ts>
@@ -130,6 +133,9 @@ namespace DEngine::Std::Trait
 
 	template<class T, class... Ts> requires (impl::IsSame<T, Ts>::value || ...)
 	constexpr unsigned int indexOf = impl::IndexOf<T, Ts...>::value;
+
+	template<class T>
+	constexpr bool hasVirtualDestructor = impl::HasVirtualDestructor<T>::value;
 
 	template<class Base, class Derived>
 	constexpr bool isBaseOf = __is_base_of(Base, Derived);

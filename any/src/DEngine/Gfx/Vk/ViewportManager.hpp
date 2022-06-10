@@ -2,6 +2,7 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
@@ -100,7 +101,7 @@ namespace DEngine::Gfx::Vk
 			ViewportManager& manager,
 			GlobUtils const& globUtils,
 			DelQueue& delQueue,
-			Std::FrameAlloc& transientAlloc,
+			Std::AllocRef const& transientAlloc,
 			Std::Span<ViewportUpdate const> viewportUpdates,
 			GuiResourceManager const& guiResourceManager);
 

@@ -51,10 +51,6 @@ namespace DEngine::Gui
 			bool consumed) override;
 
 
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override { return {}; }
-
-
 		struct Impl;
 		friend Impl;
 	protected:

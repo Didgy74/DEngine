@@ -51,31 +51,12 @@ namespace DEngine::Gui
 
 		virtual void TextInput(
 			Context& ctx,
-			Std::FrameAlloc& transientAlloc,
+			AllocRef const& transientAlloc,
 			TextInputEvent const& event) override;
 		virtual void EndTextInputSession(
 			Context& ctx,
-			Std::FrameAlloc& transientAlloc,
+			AllocRef const& transientAlloc,
 			EndTextInputSessionEvent const& event) override;
-
-
-
-
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override;
-
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
-
-		virtual void InputConnectionLost() override;
-
-		virtual void CharRemoveEvent(
-			Context& ctx,
-			Std::FrameAlloc& transientAlloc) override;
 
 	private:
 		friend impl::SA_Impl;

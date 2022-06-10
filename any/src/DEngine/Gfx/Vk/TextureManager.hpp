@@ -2,6 +2,7 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
 
 #include "DynamicDispatch.hpp"
@@ -47,6 +48,6 @@ namespace DEngine::Gfx::Vk
 			DelQueue& delQueue,
 			DrawParams const& drawParams,
 			Gfx::TextureAssetInterface const& texAssetInterface,
-			Std::FrameAllocator& frameAlloc);
+			Std::AllocRef const& transientAlloc);
 	};
 }

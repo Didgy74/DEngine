@@ -47,16 +47,12 @@ namespace DEngine::Gui
 			bool consumed) override;
 		virtual void TextInput(
 			Context& ctx,
-			Std::FrameAlloc& transientAlloc,
+			AllocRef const& transientAlloc,
 			TextInputEvent const& event) override;
 		virtual void EndTextInputSession(
 			Context& ctx,
-			Std::FrameAlloc& transientAlloc,
+			AllocRef const& transientAlloc,
 			EndTextInputSessionEvent const& event) override;
-
-
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override;
 
 		struct Impl;
 		friend Impl;

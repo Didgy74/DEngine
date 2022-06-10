@@ -5,6 +5,7 @@
 #include "ForwardDeclarations.hpp"
 
 #include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
@@ -85,7 +86,7 @@ namespace DEngine::Gfx::Vk
 			VmaAllocator vma,
 			u8 inFlightCount,
 			vk::RenderPass guiRenderPass,
-			Std::FrameAllocator& frameAlloc,
+			Std::AllocRef const& transientAlloc,
 			DebugUtilsDispatch const* debugUtils);
 
 		static void Update(

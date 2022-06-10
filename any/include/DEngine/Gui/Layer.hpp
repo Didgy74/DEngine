@@ -3,6 +3,7 @@
 #include <DEngine/Gui/Events.hpp>
 #include <DEngine/Gui/Utility.hpp>
 #include <DEngine/Gui/RectCollection.hpp>
+#include <DEngine/Gui/AllocRef.hpp>
 
 namespace DEngine::Gui
 {
@@ -44,7 +45,7 @@ namespace DEngine::Gui
 		{
 			Context const& ctx;
 			TextManager& textManager;
-			Std::FrameAlloc& transientAlloc;
+			AllocRef transientAlloc;
 			Rect windowRect;
 			Rect safeAreaRect;
 			RectCollection const& rectCollection;

@@ -152,9 +152,9 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	APIData& apiData = *this;
 	auto const& device = globUtils.device;
 	auto& delQueue = apiData.delQueue;
-	auto& transientAlloc = apiData.frameAllocator;
-	Std::Defer allocCleanup { [&transientAlloc]() {
-		transientAlloc.Reset();
+	auto const& transientAlloc = Std::AllocRef{ apiData.frameAllocator };
+	Std::Defer allocCleanup { [&apiData]() {
+		apiData.frameAllocator.Reset();
 	}};
 
 	NativeWinMgr::ProcessEvents(
@@ -255,13 +255,13 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	}
 
 	// Record all the GUI shit.
-	auto swapchainIndices = Std::Vec<u32, Std::FrameAllocator>{ transientAlloc };
+	auto swapchainIndices = Std::MakeVec<u32>(transientAlloc);
 	swapchainIndices.Resize(drawParams.nativeWindowUpdates.size());
-	auto swapchains = Std::Vec<vk::SwapchainKHR, Std::FrameAllocator>{ transientAlloc };
+	auto swapchains = Std::MakeVec<vk::SwapchainKHR>(transientAlloc);
 	swapchains.Resize(drawParams.nativeWindowUpdates.size());
-	auto swapchainImageReadySemaphores = Std::Vec<vk::Semaphore, Std::FrameAllocator>{ transientAlloc };
+	auto swapchainImageReadySemaphores = Std::MakeVec<vk::Semaphore>(transientAlloc);
 	swapchainImageReadySemaphores.Resize(drawParams.nativeWindowUpdates.size());
-	auto swapchainImageReadyStages = Std::Vec<vk::PipelineStageFlags, Std::FrameAllocator>{ transientAlloc };
+	auto swapchainImageReadyStages = Std::MakeVec<vk::PipelineStageFlags>(transientAlloc);
 	swapchainImageReadyStages.Resize(drawParams.nativeWindowUpdates.size());
 	for (auto& item : swapchainImageReadyStages)
 		item = vk::PipelineStageFlagBits::eColorAttachmentOutput;

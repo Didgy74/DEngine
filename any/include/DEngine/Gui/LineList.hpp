@@ -49,16 +49,6 @@ namespace DEngine::Gui
 		virtual void CursorExit(
 			Context& ctx) override;
 
-
-		[[nodiscard]] virtual SizeHint GetSizeHint(Context const& ctx) const override;
-	
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
-
 	protected:
 		struct Impl;
 		friend Impl;

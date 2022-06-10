@@ -46,16 +46,13 @@ namespace DEngine::Gui
 			Rect const& widgetRect,
 			Rect const& visibleRect,
 			bool consumed) override;
-		virtual void CharRemoveEvent(
-			Context& ctx,
-			Std::FrameAlloc& transientAlloc) override;
 		virtual void TextInput(
 			Context& ctx,
-			Std::FrameAlloc& transientAlloc,
+			AllocRef const& transientAlloc,
 			TextInputEvent const& event) override;
 		virtual void EndTextInputSession(
 			Context& ctx,
-			Std::FrameAlloc& transientAlloc,
+			AllocRef const& transientAlloc,
 			EndTextInputSessionEvent const& event) override;
 
 	protected:
