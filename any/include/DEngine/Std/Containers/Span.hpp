@@ -9,6 +9,10 @@ namespace DEngine::Std
 {
 	namespace impl
 	{
+		template<class T>
+		struct Span_IsConst { static constexpr bool value = false; };
+		template<class T>
+		struct Span_IsConst<T const> { static constexpr bool value = true; };
 		template<class Type>
 		struct Span_RemoveConst_Struct { using T = Type; };
 		template<class Type>
@@ -22,9 +26,15 @@ namespace DEngine::Std
 	{
 	public:
 		using ValueType = impl::Span_RemoveConst<T>;
+		static constexpr bool typeIsConst = impl::Span_IsConst<T>::value;
 
 		constexpr Span() noexcept = default;
 		constexpr Span(T* data, uSize size) noexcept;
+		// Deleted so the compiler can not implicitly convert integer to nullptr
+		constexpr Span(int, uSize) = delete;
+		// Testing some stuff
+		//template<int N>
+		//constexpr Span(T (&arr)[N]) noexcept;
 
 		[[nodiscard]] constexpr Span<T const> ConstSpan() const noexcept;
 		constexpr operator Span<T const>() const noexcept;

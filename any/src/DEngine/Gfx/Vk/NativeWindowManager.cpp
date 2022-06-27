@@ -208,7 +208,8 @@ void NativeWinMgr::Initialize(
 {
 	NativeWinMgr_PushCreateWindowJob(
 		initInfo.manager,
-		initInfo.initialWindow);
+		initInfo.initialWindow,
+		initInfo.surface);
 }
 
 void NativeWinMgr::Destroy(
@@ -238,10 +239,12 @@ void NativeWinMgr::Destroy(
 
 void Vk::NativeWinMgr_PushCreateWindowJob(
 	NativeWinMgr& manager,
-	NativeWindowID windowId)
+	NativeWindowID windowId,
+	Std::Opt<vk::SurfaceKHR> const& surface)
 {
 	NativeWinMgr::CreateJob newJob = {};
 	newJob.id = windowId;
+	newJob.surface = surface;
 
 	std::scoped_lock _{ manager.insertionJobs.lock };
 
@@ -458,15 +461,20 @@ static void NativeWinMgrImpl::HandleCreationJobs(
 		auto& newNode = manager.main.nativeWindows.back();
 		newNode.id = createJob.id;
 
-		auto createSurfaceResult = globUtils.wsiInterface->CreateVkSurface(
-			createJob.id,
-			(uSize)(VkInstance)globUtils.instance.handle,
-			nullptr);
-		vkResult = (vk::Result)createSurfaceResult.vkResult;
-		if (vkResult != vk::Result::eSuccess)
-			throw std::runtime_error("DEngine - Vulkan: Could not create VkSurfaceKHR");
+		if (createJob.surface.Has()) {
+			newNode.windowData.surface = createJob.surface.Get();
+		} else {
+			auto createSurfaceResult = globUtils.wsiInterface->CreateVkSurface(
+				createJob.id,
+				(uSize)(VkInstance)globUtils.instance.handle,
+				nullptr);
+			vkResult = (vk::Result)createSurfaceResult.vkResult;
+			if (vkResult != vk::Result::eSuccess)
+				throw std::runtime_error("DEngine - Vulkan: Could not create VkSurfaceKHR");
 
-		newNode.windowData.surface = (vk::SurfaceKHR)(VkSurfaceKHR)createSurfaceResult.vkSurface;
+			newNode.windowData.surface = (vk::SurfaceKHR)(VkSurfaceKHR)createSurfaceResult.vkSurface;
+		}
+
 		if (debugUtils)
 		{
 			std::string name;

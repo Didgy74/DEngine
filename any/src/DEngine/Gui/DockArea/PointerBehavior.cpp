@@ -113,9 +113,7 @@ namespace DEngine::Gui::impl
 		auto const textheight = textManager.GetLineheight();
 		auto const totalTabHeight = textheight + dockArea.tabTextMargin * 2;
 
-		bool pointerInsideWidget =
-			widgetRect.PointIsInside(pointer.pos) &&
-			visibleRect.PointIsInside(pointer.pos);
+		bool pointerInWidget = PointIsInAll(pointer.pos, { widgetRect, visibleRect });
 
 		DA_PointerPress_Result returnValue = { .job = transientAlloc };
 		returnValue.eventConsumed = eventConsumed;
@@ -123,9 +121,9 @@ namespace DEngine::Gui::impl
 		for (auto const layerIt : DA_BuildLayerItPair(dockArea))
 		{
 			auto const& layerRect = layerIt.BuildLayerRect(widgetRect);
-			auto const& pointerInsideLayer =
+			auto const& pointerInLayer =
 				layerRect.PointIsInside(pointer.pos) &&
-				pointerInsideWidget;
+				pointerInWidget;
 
 			// If the event is not consumed and we down-pressed, on a layer that is not the front-most and not the rear-most
 			// then we push this layer to front. AND we have not already found a layer to push to front
@@ -133,14 +131,14 @@ namespace DEngine::Gui::impl
 				!returnValue.pushLayerToFrontJob.HasValue() &&
 				!returnValue.eventConsumed &&
 				pointer.pressed &&
-				pointerInsideLayer &&
+				pointerInLayer &&
 				layerIt.layerIndex != 0 &&
 				layerIt.layerIndex != layerIt.layerCount - 1;
 			if (pushLayerToFront)
 				returnValue.pushLayerToFrontJob = layerIt.layerIndex;
 
 			// First we check if we hit a resize handle.
-			if (pointer.pressed && pointerInsideLayer && !returnValue.eventConsumed)
+			if (pointer.pressed && pointerInLayer && !returnValue.eventConsumed)
 			{
 				// Pointer to the node of the resize handle that we hit.
 				auto resizeHandleHitNodePtr = DA_Layer_CheckHitResizeHandle(
@@ -176,7 +174,7 @@ namespace DEngine::Gui::impl
 					totalTabHeight);
 				auto const pointerInsideTitlebar =
 					titlebarRect.PointIsInside(pointer.pos) &&
-					pointerInsideLayer;
+					pointerInLayer;
 
 				// Check if we hit any of the tabs.
 				// We only want to enter the holding tab stat
@@ -204,7 +202,7 @@ namespace DEngine::Gui::impl
 						dockArea.tabTextMargin,
 						textManager,
 						transientAlloc);
-					auto hitTabOpt = PointIsInside(tabRects.ToSpan(), pointer.pos);
+					auto hitTabOpt = PointIsInside(pointer.pos, tabRects.ToSpan());
 					if (hitTabOpt.HasValue())
 					{
 						returnValue.eventConsumed = true;
@@ -241,7 +239,7 @@ namespace DEngine::Gui::impl
 				}
 			}
 
-			returnValue.eventConsumed = returnValue.eventConsumed || pointerInsideLayer;
+			returnValue.eventConsumed = returnValue.eventConsumed || pointerInLayer;
 		}
 
 		return returnValue;
@@ -584,9 +582,7 @@ namespace DEngine::Gui::impl
 		auto const& visibleRect = params.visibleRect;
 		auto const& pointer = params.pointer;
 
-		auto const pointerInsideWidget =
-			widgetRect.PointIsInside(pointer.pos) &&
-			visibleRect.PointIsInside(pointer.pos);
+		auto const pointerInWidget = PointIsInAll(pointer.pos, { widgetRect, visibleRect });
 
 		// If we only have 0-1 layers, we shouldn't be in the moving state
 		// to begin with.
@@ -600,7 +596,7 @@ namespace DEngine::Gui::impl
 		stateData.hoveredGizmoOpt = Std::nullOpt;
 
 		// Before we do anything, check if we are hovering any of the outer docking gizmos.
-		if (pointerInsideWidget) {
+		if (pointerInWidget) {
 			auto hitOuterGizmoOpt = DA_CheckHitOuterLayoutGizmo(
 				widgetRect,
 				dockArea.gizmoSize,
@@ -678,7 +674,7 @@ namespace DEngine::Gui::impl
 		}
 
 
-		returnValue.pointerOccluded = returnValue.pointerOccluded || pointerInsideWidget;
+		returnValue.pointerOccluded = returnValue.pointerOccluded || pointerInWidget;
 
 		return returnValue;
 	}

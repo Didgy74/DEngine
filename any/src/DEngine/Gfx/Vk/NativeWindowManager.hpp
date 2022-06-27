@@ -44,6 +44,7 @@ namespace DEngine::Gfx::Vk
 		struct CreateJob
 		{
 			NativeWindowID id;
+			Std::Opt<vk::SurfaceKHR> surface;
 		};
 		struct DeleteJob
 		{
@@ -82,6 +83,7 @@ namespace DEngine::Gfx::Vk
 		{
 			NativeWinMgr& manager;
 			NativeWindowID initialWindow;
+			vk::SurfaceKHR surface;
 			DeviceDispatch const& device;
 			QueueData const& queues;
 			DebugUtilsDispatch const* optional_debugUtils;
@@ -97,7 +99,8 @@ namespace DEngine::Gfx::Vk
 
 	void NativeWinMgr_PushCreateWindowJob(
 		NativeWinMgr& manager,
-		NativeWindowID windowId);
+		NativeWindowID windowId,
+		Std::Opt<vk::SurfaceKHR> const& surface = Std::nullOpt);
 
 	void NativeWinMgr_PushDeleteWindowJob(
 		NativeWinMgr& manager,

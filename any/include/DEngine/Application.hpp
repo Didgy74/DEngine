@@ -8,15 +8,7 @@
 
 #include <DEngine/Math/Vector.hpp>
 
-#if defined(_WIN32) || defined(_WIN64)
-#	define DENGINE_OS_WINDOWS
-#elif defined(__ANDROID__)
-#	define DENGINE_OS_ANDROID
-#elif defined(__GNUC__)
-#	define DENGINE_OS_LINUX
-#else
-#	error Error. DEngine does not support this platform/compiler
-#endif
+#include <DEngine/Std/Defines.hpp>
 
 namespace DEngine::Application
 {
@@ -152,7 +144,7 @@ namespace DEngine::Application
 		struct CreateVkSurface_ReturnT
 		{
 			u32 vkResult;
-			uSize vkSurface;
+			u64 vkSurface;
 		};
 		// Thread-safe
 		[[nodiscard]] CreateVkSurface_ReturnT CreateVkSurface(
@@ -216,33 +208,6 @@ enum class DEngine::Application::Orientation : DEngine::u8
 	Landscape,
 	Portrait
 };
-
-enum class DEngine::Application::OS : DEngine::u8
-{
-	Windows,
-	Linux,
-	Android
-};
-
-enum class DEngine::Application::Platform : DEngine::u8
-{
-	Desktop,
-	Mobile
-};
-
-namespace DEngine::Application
-{
-#if defined(DENGINE_OS_WINDOWS)
-	constexpr OS targetOS = OS::Windows;
-	constexpr Platform targetOSType = Platform::Desktop;
-#elif defined(DENGINE_OS_ANDROID)
-	constexpr OS targetOS = OS::Android;
-	constexpr Platform targetOSType = Platform::Mobile;
-#elif defined(DENGINE_OS_LINUX)
-	constexpr OS targetOS = OS::Linux;
-	constexpr Platform targetOSType = Platform::Desktop;
-#endif
-}
 
 enum class DEngine::Application::Button : DEngine::u16
 {
@@ -349,9 +314,6 @@ public:
 		WindowID windowId,
 		Button button,
 		bool state) {}
-	virtual void CharEnterEvent() {}
-	virtual void CharEvent(u32 utfValue) {}
-	virtual void CharRemoveEvent(WindowID windowId) {}
 	virtual void CursorMove(
 		Context& appCtx,
 		WindowID windowId,
@@ -367,6 +329,7 @@ public:
 		Context& ctx,
 		WindowID windowId) {}
 	virtual void TouchEvent(
+		WindowID windowId,
 		u8 id,
 		TouchEventType type,
 		Math::Vec2 position) {}

@@ -437,7 +437,7 @@ bool InstanceDispatch::getPhysicalDeviceSurfaceSupportKHR(
 	std::uint32_t queueFamilyIndex,
 	vk::SurfaceKHR surface) const
 {
-	VkBool32 surfaceSupported;
+	VkBool32 surfaceSupported = 0;
 	vk::Result vkResult = static_cast<vk::Result>(surfaceRaw.vkGetPhysicalDeviceSurfaceSupportKHR(
 		static_cast<VkPhysicalDevice>(physDevice),
 		queueFamilyIndex,

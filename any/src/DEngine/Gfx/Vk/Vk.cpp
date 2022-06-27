@@ -303,6 +303,7 @@ APIDataBase* Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo)
 	NativeWinMgr::InitInfo windowManInfo = {
 		.manager = apiData.nativeWindowManager,
 		.initialWindow = initInfo.initialWindow,
+		.surface = surface,
 		.device = device,
 		.queues = queues,
 		.optional_debugUtils = debugUtils };

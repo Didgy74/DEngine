@@ -72,24 +72,17 @@ namespace DEngine::Gui
 			Rect const& visibleRect,
 			bool consumed) override;
 
+		virtual bool TouchMove2(
+			TouchMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool occluded) override;
 
-
-
-
-		virtual bool CursorPress(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorPressEvent event) override;
-
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
 
 	private:
 		// Determines whether the button is currently pressed and should be showing the submenu.

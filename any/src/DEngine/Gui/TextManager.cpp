@@ -160,7 +160,7 @@ void Gui::impl::InitializeTextManager(
 	ftError = FT_Set_Char_Size(
 		implData.face,    /* handle to face object           */
 		0,       /* char_width in 1/64th of points  */
-		52 * 64,   /* char_height in 1/64th of points */
+		72 * 64,   /* char_height in 1/64th of points */
 		0,     /* horizontal device resolution    */
 		0);   /* vertical device resolution      */
 	if (ftError != FT_Err_Ok)

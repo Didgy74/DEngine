@@ -63,6 +63,7 @@ namespace DEngine::Gui
 
 	struct TouchPressEvent
 	{
+		WindowID windowId;
 		u8 id;
 		Math::Vec2 position;
 		bool pressed;
@@ -70,20 +71,9 @@ namespace DEngine::Gui
 
 	struct TouchMoveEvent
 	{
+		WindowID windowId;
 		u8 id;
 		Math::Vec2 position;
-	};
-
-	struct CharEnterEvent {};
-
-	struct CharEvent
-	{
-		u32 utfValue;
-	};
-
-	struct CharRemoveEvent
-	{
-		WindowID windowId;
 	};
 
 	struct TextInputEvent

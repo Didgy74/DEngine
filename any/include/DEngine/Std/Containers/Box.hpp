@@ -26,7 +26,7 @@ namespace DEngine::Std
 			other.data = nullptr;
 		}
 
-		template<class U> requires (Trait::isBaseOf<T, U> && Trait::hasVirtualDestructor<T>)
+		template<class U> requires (Trait::hasVirtualDestructor<T>)
 		constexpr Box(Box<U>&& in) noexcept :
 			data{ in.data }
 		{
@@ -42,7 +42,7 @@ namespace DEngine::Std
 
 		Box& operator=(Box const&) = delete;
 		Box& operator=(Box&&) noexcept;
-		template<class U> requires Trait::isBaseOf<T, U>
+		template<class U> requires (Trait::hasVirtualDestructor<T>)
 		constexpr Box& operator=(Box<U>&& in) noexcept
 		{
 			Clear();

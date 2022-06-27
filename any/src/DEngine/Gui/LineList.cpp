@@ -3,8 +3,6 @@
 
 #include <DEngine/Std/Containers/Vec.hpp>
 
-#include <cstring>
-
 using namespace DEngine;
 using namespace DEngine::Gui;
 
@@ -488,6 +486,51 @@ bool LineList::CursorMove(
 		.pointer = pointer,
 		.pointerOccluded = occluded };
 	return Impl::PointerMove(temp);
+}
+
+bool LineList::TouchMove2(
+	TouchMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	Impl::PointerMove_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+
+	Impl::PointerMove_Params temp = {
+		.widget = *this,
+		.rectCollection = params.rectCollection,
+		.textManager = params.textManager,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.pointerOccluded = occluded };
+	return Impl::PointerMove(temp);
+}
+
+bool LineList::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.type = Impl::PointerType::Primary;
+	pointer.pressed = params.event.pressed;
+
+	Impl::PointerPress_Params temp = {
+		.ctx = params.ctx,
+		.widget = *this,
+		.rectCollection = params.rectCollection,
+		.textManager = params.textManager,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.eventConsumed = consumed };
+	return Impl::PointerPress(temp);
 }
 
 void LineList::CursorExit(Context& ctx)

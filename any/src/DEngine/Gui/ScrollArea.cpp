@@ -1,7 +1,7 @@
 #include <DEngine/Gui/ScrollArea.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
 
-#include <DEngine/Std/Trait.hpp>
+#include <DEngine/Std/Containers/FnRef.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
@@ -120,6 +120,24 @@ namespace DEngine::Gui::impl
 
 namespace DEngine::Gui::impl
 {
+	struct PointerMoveEvent
+	{
+		u8 id;
+		Math::Vec2 pos;
+		bool occluded;
+	};
+
+	using PointerMove_DispatchFnT = Std::FnRef<bool(Widget&, Rect const&, Rect const&, bool)>;
+	struct PointerMove_Params
+	{
+		ScrollArea& scrollArea;
+		RectCollection const& rectCollection;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
+		PointerMoveEvent const& pointer;
+		PointerMove_DispatchFnT const& dispatchFn;
+	};
+
 	struct PointerPressEvent
 	{
 		u8 id;
@@ -128,7 +146,7 @@ namespace DEngine::Gui::impl
 		bool pressed;
 	};
 
-	template<class T>
+	using PointerPress_DispatchFnT = Std::FnRef<bool(Widget&, Rect const&, Rect const&, bool)>;
 	struct PointerPress_Params
 	{
 		ScrollArea& scrollArea;
@@ -137,25 +155,7 @@ namespace DEngine::Gui::impl
 		Rect const& visibleRect;
 		PointerPressEvent const& pointer;
 		bool eventConsumed;
-		T const& dispatchFn;
-	};
-
-	struct PointerMoveEvent
-	{
-		u8 id;
-		Math::Vec2 pos;
-		bool occluded;
-	};
-
-	template<class T>
-	struct PointerMove_Params
-	{
-		ScrollArea& scrollArea;
-		RectCollection const& rectCollection;
-		Rect const& widgetRect;
-		Rect const& visibleRect;
-		PointerMoveEvent const& pointer;
-		T const& dispatchFn;
+		PointerPress_DispatchFnT const& dispatchFn;
 	};
 }
 
@@ -163,16 +163,13 @@ class Gui::impl::SA_Impl
 {
 public:
 	// Returns true if the pointer is occluded.
-	template<class T>
-	static bool PointerMove(PointerMove_Params<T> const& params);
+	static bool PointerMove(PointerMove_Params const& params);
 
 	// Returns true if the event was consumed.
-	template<class T>
-	[[nodiscard]] static bool PointerPress(PointerPress_Params<T> const& params);
+	[[nodiscard]] static bool PointerPress(PointerPress_Params const& params);
 };
 
-template<class T>
-bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params<T> const& params)
+bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params const& params)
 {
 	auto& scrollArea = params.scrollArea;
 	auto& rectCollection = params.rectCollection;
@@ -266,8 +263,7 @@ bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params<T> const& params)
 	return pointerInside;
 }
 
-template<class T>
-bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params<T> const& params)
+bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params const& params)
 {
 	auto& scrollArea = params.scrollArea;
 	auto& rectCollection = params.rectCollection;
@@ -513,7 +509,6 @@ bool ScrollArea::CursorMove(
 	pointerMove.id = impl::cursorPointerId;
 	pointerMove.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
 	pointerMove.occluded = occluded;
-
 	auto dispatchFn = [&params](
 		Widget& childIn,
 		Rect const& childRect,
@@ -527,7 +522,7 @@ bool ScrollArea::CursorMove(
 			newOccluded);
 	};
 
-	impl::PointerMove_Params<decltype(dispatchFn)> temp {
+	impl::PointerMove_Params temp {
 		.scrollArea = *this,
 		.rectCollection = params.rectCollection,
 		.widgetRect = widgetRect,
@@ -563,7 +558,7 @@ bool ScrollArea::CursorPress2(
 			newOccluded);
 	};
 
-	impl::PointerPress_Params<decltype(dispatchFn)> temp = {
+	impl::PointerPress_Params temp = {
 		.scrollArea = *this,
 		.rectCollection = params.rectCollection,
 		.widgetRect = widgetRect,
@@ -572,6 +567,76 @@ bool ScrollArea::CursorPress2(
 		.eventConsumed = consumed,
 		.dispatchFn = dispatchFn, };
 
+	return impl::SA_Impl::PointerPress(temp);
+}
+
+bool ScrollArea::TouchMove2(
+	TouchMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	impl::PointerMoveEvent pointerMove = {};
+	pointerMove.id = params.event.id;
+	pointerMove.pos = params.event.position;
+	pointerMove.occluded = occluded;
+	auto dispatchFn = [&params](
+		Widget& childIn,
+		Rect const& childRect,
+		Rect const& childVisibleRect,
+		bool newOccluded) -> bool
+	{
+		return childIn.TouchMove2(
+			params,
+			childRect,
+			childVisibleRect,
+			newOccluded);
+	};
+
+	impl::PointerMove_Params temp {
+		.scrollArea = *this,
+		.rectCollection = params.rectCollection,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointerMove,
+		.dispatchFn = dispatchFn, };
+
+	return impl::SA_Impl::PointerMove(temp);
+}
+
+bool ScrollArea::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPressEvent pointerPressEvent = {};
+	pointerPressEvent.id = params.event.id;
+	pointerPressEvent.pos = params.event.position;
+	pointerPressEvent.pressed = params.event.pressed;
+	pointerPressEvent.type = impl::PointerType::Primary;
+
+	auto dispatchFn = [&params](
+		Widget& childIn,
+		Rect const& childRect,
+		Rect const& childVisibleRect,
+		bool newOccluded) -> bool
+	{
+		return childIn.TouchPress2(
+			params,
+			childRect,
+			childVisibleRect,
+			newOccluded);
+	};
+
+	impl::PointerPress_Params temp = {
+		.scrollArea = *this,
+		.rectCollection = params.rectCollection,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointerPressEvent,
+		.eventConsumed = consumed,
+		.dispatchFn = dispatchFn, };
 	return impl::SA_Impl::PointerPress(temp);
 }
 

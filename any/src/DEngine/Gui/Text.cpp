@@ -1,11 +1,6 @@
 #include <DEngine/Gui/Text.hpp>
 #include <DEngine/Gui/TextManager.hpp>
 
-#include <DEngine/Std/Trait.hpp>
-
-#include <cstddef>
-#include <cstring>
-
 using namespace DEngine;
 using namespace DEngine::Gui;
 
@@ -24,6 +19,18 @@ struct Text::Impl
 	};
 };
 
+namespace DEngine::Gui::impl {
+	[[nodiscard]] static Math::Vec2Int BuildTextOffset(Extent const& widgetExtent, Extent const& textExtent) noexcept {
+		Math::Vec2Int out = {};
+		for (int i = 0; i < 2; i++) {
+			auto temp = (i32)Math::Round((f32)widgetExtent[i] * 0.5f - (f32)textExtent[i] * 0.5f);
+			temp = Math::Max(0, temp);
+			out[i] = temp;
+		}
+		return out;
+	}
+}
+
 SizeHint Text::GetSizeHint2(
 	Widget::GetSizeHint2_Params const& params) const
 {
@@ -38,7 +45,7 @@ SizeHint Text::GetSizeHint2(
 	{
 		auto& transientAlloc = params.transientAlloc;
 
-		auto customData =  Impl::CustomData{ pusher.Alloc() };
+		auto customData = Impl::CustomData{ pusher.Alloc() };
 
 		customData.glyphRects.Resize(text.size());
 
@@ -81,10 +88,7 @@ void Text::BuildChildRects(
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
 
-	auto const textExtent = customData.textOuterExtent;
-	Math::Vec2Int const centerOffset = {
-		(i32)(widgetRect.extent.width / 2 - textExtent.width / 2),
-		(i32)(widgetRect.extent.height / 2 - textExtent.height / 2) };
+	auto const textPosOffset = impl::BuildTextOffset(widgetRect.extent, customData.textOuterExtent);
 
 	int const textLength = (int)text.size();
 	DENGINE_IMPL_GUI_ASSERT(textLength == customData.glyphRects.Size());
@@ -92,7 +96,7 @@ void Text::BuildChildRects(
 	{
 		auto& rect = customData.glyphRects[i];
 		rect.position += widgetRect.position;
-		rect.position += centerOffset;
+		rect.position += textPosOffset;
 	}
 }
 
@@ -114,13 +118,10 @@ void Text::Render2(
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
 
-	auto const textIsBiggerThanExtent =
-		customData.textOuterExtent.width > widgetRect.extent.width ||
-		customData.textOuterExtent.height > widgetRect.extent.height;
-
-	Std::Opt<DrawInfo::ScopedScissor> scissor;
-	if (textIsBiggerThanExtent)
-		scissor = DrawInfo::ScopedScissor(drawInfo, intersection);
+	Rect textRect = {};
+	textRect.position = widgetRect.position + impl::BuildTextOffset(widgetRect.extent, customData.textOuterExtent);
+	textRect.extent = customData.textOuterExtent;
+	auto scissor = DrawInfo::ScopedScissor(drawInfo, textRect, widgetRect);
 
 	drawInfo.PushText(
 		{ text.data(), text.size() },

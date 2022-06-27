@@ -83,7 +83,11 @@ namespace DEngine::Gui
 		return Rect::Intersection(a, b);
 	}
 
-	[[nodiscard]] inline Std::Opt<uSize> PointIsInside(Std::Span<Rect const> rects, Math::Vec2 point);
+	[[nodiscard]] inline Std::Opt<uSize> PointIsInside(Math::Vec2 point, Std::Span<Rect const> rects);
+	template<int N>
+	[[nodiscard]] inline bool PointIsInAll(Math::Vec2 point, Rect const (&in)[N]);
+	template<int N>
+	[[nodiscard]] inline bool PointIsInAll(Math::Vec2Int point, Rect const (&in)[N]);
 }
 
 constexpr bool DEngine::Gui::Extent::IsNothing() const noexcept { return width == 0 || height == 0; }
@@ -167,10 +171,28 @@ constexpr bool DEngine::Gui::Rect::operator!=(Rect const& other) const noexcept
 	return !(*this == other);
 }
 
-inline auto DEngine::Gui::PointIsInside(Std::Span<Rect const> rects, Math::Vec2 point) -> Std::Opt<uSize> {
+inline auto DEngine::Gui::PointIsInside(Math::Vec2 point, Std::Span<Rect const> rects) -> Std::Opt<uSize> {
 	for (uSize i = 0; i < rects.Size(); i += 1) {
 		if (rects[i].PointIsInside(point))
 			return i;
 	}
 	return Std::nullOpt;
+}
+
+template<int N>
+[[nodiscard]] inline bool DEngine::Gui::PointIsInAll(Math::Vec2 point, Rect const (&in)[N]) {
+	for (auto const& item : in) {
+		if (!item.PointIsInside(point))
+			return false;
+	}
+	return true;
+}
+
+template<int N>
+[[nodiscard]] inline bool DEngine::Gui::PointIsInAll(Math::Vec2Int point, Rect const (&in)[N]) {
+	for (auto const& item : in) {
+		if (!item.PointIsInside(point))
+			return false;
+	}
+	return true;
 }

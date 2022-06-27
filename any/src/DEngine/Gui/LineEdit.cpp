@@ -13,10 +13,7 @@ struct LineEdit::Impl
 	struct CustomData
 	{
 		explicit CustomData(RectCollection::AllocRefT const& alloc) :
-			glyphRects{ alloc }
-		{
-
-		}
+			glyphRects{ alloc } {}
 
 
 		Extent textOuterExtent = {};
@@ -26,14 +23,13 @@ struct LineEdit::Impl
 	enum class PointerType : u8 { Primary, Secondary };
 	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
 	{
-		switch (in)
-		{
+		switch (in) {
 			case CursorButton::Primary: return PointerType::Primary;
 			case CursorButton::Secondary: return PointerType::Secondary;
-			default: break;
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				return {};
 		}
-		DENGINE_IMPL_UNREACHABLE();
-		return {};
 	}
 
 	static constexpr u8 cursorPointerId = ~static_cast<u8>(0);
@@ -59,19 +55,9 @@ struct LineEdit::Impl
 
 	static void BeginInputSession(LineEdit& widget, Context& ctx)
 	{
-		SoftInputFilter filter = {};
-		if (widget.type == LineEdit::Type::Float)
-			filter = SoftInputFilter::SignedFloat;
-		else if (widget.type == LineEdit::Type::Integer)
-			filter = SoftInputFilter::SignedInteger;
-		else if (widget.type == LineEdit::Type::UnsignedInteger)
-			filter = SoftInputFilter::UnsignedInteger;
-		else
-			DENGINE_IMPL_UNREACHABLE();
-
 		ctx.TakeInputConnection(
 			widget,
-			filter,
+			Gui::SoftInputFilter::NoFilter,
 			{ widget.text.data(), widget.text.length() });
 		widget.inputConnectionCtx = &ctx;
 	}
@@ -86,36 +72,34 @@ struct LineEdit::Impl
 
 		bool eventConsumed = pointer.consumed;
 
-		auto const pointerInside =
-			widgetRect.PointIsInside(pointer.pos) &&
-			visibleRect.PointIsInside(pointer.pos);
+		auto const pointerInside = PointIsInAll(pointer.pos, { widgetRect, visibleRect });
 
 		// The field is currently being held.
-		if (widget.pointerId.HasValue())
+		if (widget.pointerId.Has())
 		{
-			auto const currPointerId = widget.pointerId.Value();
+			auto const currPointerId = widget.pointerId.Get();
 
 			// It's a integration error if we received a click down on a pointer id
 			// that's already holding this widget. I think?
 			DENGINE_IMPL_GUI_ASSERT(!(currPointerId == pointer.id && pointer.pressed));
 
-			if (currPointerId == pointer.id &&
-				!pointer.pressed)
-			{
+			if (currPointerId == pointer.id && !pointer.pressed) {
 				widget.pointerId = Std::nullOpt;
 			}
 
-			if (!eventConsumed &&
+			bool beginInputSession =
+				!eventConsumed &&
 				pointerInside &&
 				currPointerId == pointer.id &&
 				!pointer.pressed &&
-				pointer.type == PointerType::Primary)
-			{
+				pointer.type == PointerType::Primary;
+			if (beginInputSession) {
 				BeginInputSession(widget, ctx);
 				eventConsumed = true;
 			}
 		}
-		else {
+		else
+		{
 			if (widget.HasInputSession())
 			{
 				bool shouldEndInputSession = false;
@@ -138,11 +122,12 @@ struct LineEdit::Impl
 			}
 			else
 			{
-				if (!eventConsumed &&
+				bool startHoldingOnWidget =
+					!eventConsumed &&
 					pointer.pressed &&
 					pointerInside &&
-					pointer.type == PointerType::Primary)
-				{
+					pointer.type == PointerType::Primary;
+				if (startHoldingOnWidget) {
 					widget.pointerId = pointer.id;
 				}
 			}
@@ -159,36 +144,12 @@ LineEdit::~LineEdit()
 		ClearInputConnection();
 }
 
-bool LineEdit::TouchPressEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchPressEvent event)
-{
-	/*
-	impl::PointerPress_Params temp = {};
-	temp.ctx = &ctx;
-	temp.pointerId = impl::cursorPointerId;
-	temp.pointerPos = event.position;
-	temp.pointerPressed = event.pressed;
-	temp.pointerType = impl::PointerType::Primary;
-	temp.visibleRect = visibleRect;
-	temp.widgetRect = widgetRect;
-	temp.widget = this;
-
-	return impl::LineEditImpl::PointerPressed(temp);
-	*/
-	return false;
-}
-
 void LineEdit::ClearInputConnection()
 {
 	DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx);
 	this->inputConnectionCtx->ClearInputConnection(*this);
 	this->inputConnectionCtx = nullptr;
 }
-
 
 SizeHint LineEdit::GetSizeHint2(
 	Widget::GetSizeHint2_Params const& params) const
@@ -203,7 +164,6 @@ SizeHint LineEdit::GetSizeHint2(
 	if (pusher.IncludeRendering())
 	{
 		auto customData = Impl::CustomData{ pusher.Alloc() };
-
 		customData.glyphRects.Resize(text.size());
 
 		customData.textOuterExtent = textManager.GetOuterExtent(
@@ -214,8 +174,7 @@ SizeHint LineEdit::GetSizeHint2(
 
 		pusher.AttachCustomData(pusherIt, Std::Move(customData));
 	}
-	else
-	{
+	else {
 		returnValue.minimum = textManager.GetOuterExtent({ text.data(), text.size() });
 	}
 
@@ -256,14 +215,19 @@ void LineEdit::Render2(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
-	auto const intersection = Rect::Intersection(widgetRect, visibleRect);
+	auto const intersection = Intersection(widgetRect, visibleRect);
 	if (intersection.IsNothing())
 		return;
 
 	auto& drawInfo = params.drawInfo;
 	auto& rectCollection = params.rectCollection;
 
-	drawInfo.PushFilledQuad(widgetRect, backgroundColor);
+	Math::Vec4 tempBackground = {};
+	if (HasInputSession())
+		tempBackground = { 0.5f, 0.f, 0.f, 1.f };
+	else
+		tempBackground = backgroundColor;
+	drawInfo.PushFilledQuad(widgetRect, tempBackground);
 
 	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
@@ -271,13 +235,7 @@ void LineEdit::Render2(
 
 	DENGINE_IMPL_GUI_ASSERT(customData.glyphRects.Size() == text.size());
 
-	auto const textIsBiggerThanExtent =
-		(customData.textOuterExtent.width + margin * 2)  > widgetRect.extent.width ||
-		customData.textOuterExtent.height > widgetRect.extent.height;
-
-	Std::Opt<DrawInfo::ScopedScissor> scissor;
-	if (textIsBiggerThanExtent)
-		scissor = DrawInfo::ScopedScissor(drawInfo, intersection);
+	auto drawScissor = DrawInfo::ScopedScissor(drawInfo, intersection);
 
 	drawInfo.PushText(
 		{ text.data(), text.size() },
@@ -307,4 +265,79 @@ bool LineEdit::CursorPress2(
 		.pointer = pointer, };
 
 	return Impl::PointerPress(temp);
+}
+
+bool LineEdit::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pressed = params.event.pressed;
+	pointer.type = Impl::PointerType::Primary;
+	pointer.pos = params.event.position;
+	pointer.consumed = consumed;
+
+	Impl::PointerPress_Params temp = {
+		.ctx = params.ctx,
+		.rectCollection = params.rectCollection,
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer, };
+
+	return Impl::PointerPress(temp);
+}
+
+void LineEdit::TextInput(
+	Context& ctx,
+	AllocRef const& transientAlloc,
+	TextInputEvent const& event)
+{
+	if (HasInputSession())
+	{
+		DENGINE_IMPL_GUI_ASSERT(event.oldIndex + event.oldCount <= text.size());
+
+		auto sizeDifference = (int)event.newTextSize - (int)event.oldCount;
+
+		// First check if we need to expand our storage.
+		if (sizeDifference > 0)
+		{
+			// We need to move all content behind the old substring
+			// To the right.
+			auto oldSize = (int)text.size();
+			text.resize(text.size() + sizeDifference);
+			int end = (int)event.oldIndex + (int)event.oldCount - 1;
+			for (int i = oldSize - 1; i > end; i -= 1)
+				text[i + sizeDifference] = text[i];
+		}
+		else if (sizeDifference < 0)
+		{
+			// We need to move all content behind the old substring
+			// To the left.
+			auto oldSize = (int)text.size();
+			int begin = (int)event.oldIndex + (int)event.oldCount;
+			for (int i = begin; i < oldSize; i += 1)
+				text[i + sizeDifference] = text[i];
+
+			text.resize(text.size() + sizeDifference);
+		}
+
+		for (int i = 0; i < event.newTextSize; i += 1)
+			text[i + event.oldIndex] = (char)event.newTextData[i];
+	}
+}
+
+void LineEdit::EndTextInputSession(
+	Context& ctx,
+	AllocRef const& transientAlloc,
+	EndTextInputSessionEvent const& event)
+{
+	if (HasInputSession())
+	{
+		inputConnectionCtx->ClearInputConnection(*this);
+		inputConnectionCtx = nullptr;
+	}
 }

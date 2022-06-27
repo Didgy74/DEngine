@@ -21,6 +21,6 @@
 }
 
 -keep public class didgy.dengine.editor.DEngineActivity {
-    public void openSoftInput(java.lang.String, int);
-    public void hideSoftInput();
+    public void nativeEvent_openSoftInput(java.lang.String, int);
+    public void nativeEvent_hideSoftInput();
 }

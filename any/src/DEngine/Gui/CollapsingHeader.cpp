@@ -3,6 +3,7 @@
 #include <DEngine/Gui/DrawInfo.hpp>
 
 #include <DEngine/Std/Containers/Vec.hpp>
+#include <DEngine/Std/Containers/FnRef.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
@@ -70,6 +71,7 @@ public:
 		bool pressed;
 		bool consumed;
 	};
+	using PointerPress_DispatchFnT = Std::FnRef<bool(Widget&, Rect const&, Rect const&, bool)>;
 	struct PointerPress_Params
 	{
 		Context& ctx;
@@ -78,7 +80,7 @@ public:
 		Rect const& widgetRect;
 		Rect const& visibleRect;
 		PointerPress_Pointer const& pointer;
-		Widget::CursorPressParams const* eventParams_cursorPress;
+		PointerPress_DispatchFnT const& dispatchFn;
 	};
 
 	[[nodiscard]] static bool PointerPress(PointerPress_Params const& params)
@@ -151,22 +153,11 @@ public:
 			// We only want to forward the event if it's currently not collapsed.
 			if (!widget.collapsed && widget.child)
 			{
-				auto childEventConsumed = false;
-
-				if (pointer.id == cursorPointerId)
-				{
-					childEventConsumed = widget.child->CursorPress2(
-						*params.eventParams_cursorPress,
-						childRect,
-						childVisibleRect,
-						newEventConsumed);
-				}
-				else
-				{
-					DENGINE_IMPL_GUI_UNREACHABLE();
-
-				}
-
+				auto childEventConsumed = params.dispatchFn(
+					*widget.child,
+					childRect,
+					childVisibleRect,
+					newEventConsumed);
 				newEventConsumed = newEventConsumed || childEventConsumed || insideContent;
 			}
 		}
@@ -181,6 +172,7 @@ public:
 		Math::Vec2 pos;
 		bool occluded;
 	};
+	using PointerMove_DispatchFnT = Std::FnRef<void(Widget&, Rect const&, Rect const&, bool)>;
 	struct PointerMove_Params
 	{
 		Context& ctx;
@@ -189,7 +181,7 @@ public:
 		Rect const& widgetRect;
 		Rect const& visibleRect;
 		PointerMove_Pointer const& pointer;
-		Widget::CursorMoveParams const* eventParams_cursorMove;
+		PointerMove_DispatchFnT const& dispatchFn;
 	};
 
 	[[nodiscard]] static bool PointerMove(PointerMove_Params const& params)
@@ -227,32 +219,15 @@ public:
 		{
 			auto const occludedForChild = pointer.occluded || insideHeader;
 			auto const childRect = BuildChildRect(headerRect, widgetRect.extent.height);
-			if (pointer.id == cursorPointerId)
-			{
-				widget.child->CursorMove(
-					*params.eventParams_cursorMove,
-					childRect,
-					visibleRect,
-					occludedForChild);
-			}
-			else
-			{
-				DENGINE_IMPL_GUI_UNREACHABLE();
-				/*
-				widget.child->TouchMoveEvent(
-					ctx,
-					params.windowId,
-					childRect,
-					visibleRect,
-					*params.touchMove,
-					occludedForChild);
-				 */
-			}
+
+			params.dispatchFn(
+				*widget.child,
+				childRect,
+				visibleRect,
+				occludedForChild);
 		}
 
-		auto const pointerOccluded =
-			widgetRect.PointIsInside(pointer.pos) &&
-			visibleRect.PointIsInside(pointer.pos);
+		auto const pointerOccluded = PointIsInAll(pointer.pos, { widgetRect, visibleRect});
 		return pointerOccluded;
 	}
 };
@@ -367,6 +342,18 @@ bool CollapsingHeader::CursorMove(
 	pointer.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
 	pointer.occluded = occluded;
 	pointer.id = Impl::cursorPointerId;
+	auto dispatch = [&params](
+		Widget& childIn,
+		Rect const& childRect,
+		Rect const& visibleRect,
+		bool occluded)
+	{
+		childIn.CursorMove(
+			params,
+			childRect,
+			visibleRect,
+			occluded);
+	};
 
 	Impl::PointerMove_Params temp = {
 		.ctx = params.ctx,
@@ -375,9 +362,8 @@ bool CollapsingHeader::CursorMove(
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
 		.pointer = pointer,
-		.eventParams_cursorMove = &params,
+		.dispatchFn = dispatch,
 	};
-
 	return Impl::PointerMove(temp);
 }
 
@@ -393,6 +379,18 @@ bool CollapsingHeader::CursorPress2(
 	pointer.id = Impl::cursorPointerId;
 	pointer.type = Impl::ToPointerType(params.event.button);
 	pointer.pressed = params.event.pressed;
+	auto dispatch = [&params](
+		Widget& childIn,
+		Rect const& childRect,
+		Rect const& visibleRect,
+		bool occluded)
+	{
+		return childIn.CursorPress2(
+			params,
+			childRect,
+			visibleRect,
+			occluded);
+	};
 
 	Impl::PointerPress_Params temp = {
 		.ctx = params.ctx,
@@ -401,9 +399,80 @@ bool CollapsingHeader::CursorPress2(
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
 		.pointer = pointer,
-		.eventParams_cursorPress = &params,
+		.dispatchFn = dispatch,
+	};
+	return Impl::PointerPress(temp);
+}
+
+bool CollapsingHeader::TouchMove2(
+	TouchMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	Impl::PointerMove_Pointer pointer = {};
+	pointer.pos = params.event.position;
+	pointer.occluded = occluded;
+	pointer.id = params.event.id;
+	auto dispatch = [&params](
+		Widget& childIn,
+		Rect const& childRect,
+		Rect const& visibleRect,
+		bool occluded)
+	{
+		childIn.TouchMove2(
+			params,
+			childRect,
+			visibleRect,
+			occluded);
 	};
 
+	Impl::PointerMove_Params temp = {
+		.ctx = params.ctx,
+		.widget = *this,
+		.rectCollection = params.rectCollection,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.dispatchFn = dispatch,
+	};
+	return Impl::PointerMove(temp);
+}
+
+bool CollapsingHeader::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.pos = params.event.position;
+	pointer.consumed = consumed;
+	pointer.id = params.event.id;
+	pointer.type = Impl::PointerType::Primary;
+	pointer.pressed = params.event.pressed;
+	auto dispatch = [&params](
+		Widget& childIn,
+		Rect const& childRect,
+		Rect const& visibleRect,
+		bool occluded)
+	{
+		return childIn.TouchPress2(
+			params,
+			childRect,
+			visibleRect,
+			occluded);
+	};
+
+	Impl::PointerPress_Params temp = {
+		.ctx = params.ctx,
+		.rectCollection = params.rectCollection,
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.dispatchFn = dispatch,
+	};
 	return Impl::PointerPress(temp);
 }
 
@@ -471,6 +540,8 @@ void CollapsingHeader::Render2(
 		}
 	}
 	drawInfo.PushFilledQuad(headerRect, headerBgColor);
+
+	auto drawScissor = DrawInfo::ScopedScissor(drawInfo, headerRect);
 
 	drawInfo.PushText(
 		{ title.data(), title.size() },

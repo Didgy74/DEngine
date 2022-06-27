@@ -434,3 +434,55 @@ bool AnchorArea::CursorMove(
 
 	return newOccluded;
 }
+
+bool AnchorArea::TouchMove2(
+	TouchMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	auto const& rectColl = params.rectCollection;
+
+	bool newOccluded = occluded;
+
+	for (auto node : impl::BuildNodeItPair(*this))
+	{
+		auto& child = node.child;
+		auto const childRect = node.GetNodeItRect(*this, widgetRect, rectColl);
+
+		bool childOccluded = child.TouchMove2(
+			params,
+			childRect,
+			visibleRect,
+			newOccluded);
+		newOccluded = newOccluded || childOccluded;
+	}
+
+	return newOccluded;
+}
+bool AnchorArea::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	auto const& rectColl = params.rectCollection;
+
+	bool newConsumed = consumed;
+
+	for (auto node : impl::BuildNodeItPair(*this))
+	{
+		auto& child = node.child;
+		auto const childRect = node.GetNodeItRect(*this, widgetRect, rectColl);
+
+		bool childConsumed = child.TouchPress2(
+			params,
+			childRect,
+			visibleRect,
+			newConsumed);
+
+		newConsumed = newConsumed || childConsumed;
+	}
+
+	return newConsumed;
+}

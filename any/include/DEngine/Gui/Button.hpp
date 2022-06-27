@@ -77,20 +77,17 @@ namespace DEngine::Gui
 
 
 
-		virtual bool TouchMoveEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchMoveEvent event,
+		virtual bool TouchMove2(
+			TouchMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool occluded) override;
 
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
 
 	protected:
 		bool toggled = false;

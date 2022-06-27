@@ -5,16 +5,9 @@
 #include <cstring>
 
 // For Std::NameThisThread
-#include <DEngine/Application.hpp>
 #include <DEngine/impl/Assert.hpp>
 
-#if defined(DENGINE_OS_WINDOWS)
-#	include <windows.h>
-#	include <processthreadsapi.h>
-#elif defined(DENGINE_OS_LINUX) || defined(DENGINE_OS_ANDROID)
-#	include <pthread.h>
-#endif
-
+#include <DEngine/Std/Defines.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Std;
@@ -49,6 +42,13 @@ f32 Std::RandRange(f32 a, f32 b)
 	return dis(gen);
 }
 
+#if DENGINE_STD_COMPILER == DENGINE_STD_COMPILER_GCC_VALUE
+#include <pthread.h>
+#elif DENGINE_STD_COMPILER == DENGINE_STD_COMPILER_MSVC_VALUE
+#include <Windows.h>
+#include <processthreadsapi.h>
+#endif
+
 void Std::NameThisThread(Span<char const> name)
 {
 	// Maximum size set by POSIX.
@@ -58,7 +58,15 @@ void Std::NameThisThread(Span<char const> name)
 	// This accounts for null-terminator
 	DENGINE_IMPL_ASSERT(name.Size() < maxThreadNameLength - 1);
 
-#if defined(DENGINE_OS_WINDOWS)
+#if DENGINE_STD_COMPILER == DENGINE_STD_COMPILER_GCC_VALUE
+	char tempString[maxThreadNameLength] = {};
+	for (u8 i = 0; i < (u8)name.Size(); i += 1)
+		tempString[i] = name[i];
+	tempString[maxThreadNameLength - 1] = 0;
+
+	pthread_setname_np(pthread_self(), tempString);
+
+#elif DENGINE_STD_COMPILER == DENGINE_STD_COMPILER_MSVC_VALUE
 	wchar_t tempString[maxThreadNameLength] = {};
 	for (u8 i = 0; i < (u8)name.Size(); i += 1)
 		tempString[i] = name[i];
@@ -67,12 +75,7 @@ void Std::NameThisThread(Span<char const> name)
 	[[maybe_unused]] HRESULT r = SetThreadDescription(
 		GetCurrentThread(),
 		tempString);
-#elif defined(DENGINE_OS_LINUX) || defined(DENGINE_OS_ANDROID)
-	char tempString[maxThreadNameLength] = {};
-	for (u8 i = 0; i < (u8)name.Size(); i += 1)
-		tempString[i] = name[i];
-	tempString[maxThreadNameLength - 1] = 0;
-
-	pthread_setname_np(pthread_self(), tempString);
+#else
+#error "Unsupported"
 #endif
 }

@@ -109,9 +109,10 @@ namespace DEngine::impl
 
 	struct TempWindowHandler : public Gui::WindowHandler
 	{
+		App::Context* appCtx = nullptr;
+
 		virtual void CloseWindow(Gui::WindowID) override
 		{
-
 		}
 
 		virtual void SetCursorType(Gui::WindowID, Gui::CursorType) override
@@ -121,16 +122,25 @@ namespace DEngine::impl
 
 		virtual void HideSoftInput() override
 		{
-
+			appCtx->StopTextInputSession();
 		}
 
-		virtual void OpenSoftInput(Std::Span<char const> inputText, Gui::SoftInputFilter inputFilter) override
+		virtual void OpenSoftInput(
+			Std::Span<char const> inputText,
+			Gui::SoftInputFilter inputFilter) override
 		{
+			auto convert = [&]() {
+				switch (inputFilter) {
+					case Gui::SoftInputFilter::SignedFloat:
+						return App::SoftInputFilter::Float;
+					default:
+						return App::SoftInputFilter{};
+				}
+			};
 
+			appCtx->StartTextInputSession(convert(), inputText);
 		}
 	};
-
-	TempWindowHandler tempWindowHandler = {};
 
 	class GfxGuiEventForwarder : public App::EventForwarder
 	{
@@ -149,6 +159,22 @@ namespace DEngine::impl
 
 			// We return true to tell the appCtx to destroy the window.
 			return true;
+		}
+
+		virtual void TextInputEvent(
+			App::Context& ctx,
+			App::WindowID windowId,
+			uSize oldIndex,
+			uSize oldCount,
+			Std::Span<u32 const> newString) override
+		{
+			Gui::TextInputEvent event = {};
+			event.windowId = (Gui::WindowID)windowId;
+			event.oldIndex = oldIndex;
+			event.oldCount = oldCount;
+			event.newTextData = newString.Data();
+			event.newTextSize = newString.Size();
+			guiCtx->PushEvent(event);
 		}
 
 		virtual void WindowCursorEnter(
@@ -226,6 +252,29 @@ namespace DEngine::impl
 			moveEvent.position = position;
 			moveEvent.positionDelta = positionDelta;
 			guiCtx->PushEvent(moveEvent);
+		}
+
+		virtual void TouchEvent(
+			App::WindowID windowId,
+			u8 id,
+			App::TouchEventType type,
+			Math::Vec2 position) override
+		{
+			if (type == App::TouchEventType::Down || type == App::TouchEventType::Up) {
+				Gui::TouchPressEvent event = {};
+				event.windowId = (Gui::WindowID)windowId;
+				event.position = position;
+				event.id = id;
+				event.pressed = type == App::TouchEventType::Down;
+				guiCtx->PushEvent(event);
+			}
+			else if (type == App::TouchEventType::Moved) {
+				Gui::TouchMoveEvent event = {};
+				event.windowId = (Gui::WindowID)windowId;
+				event.position = position;
+				event.id = id;
+				guiCtx->PushEvent(event);
+			}
 		}
 	};
 
@@ -322,7 +371,10 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		gfxLogger,
 		requiredInstanceExtensions);
 
-	auto guiCtx = Gui::Context::Create(impl::tempWindowHandler, &appCtx, &gfxCtx);
+	impl::TempWindowHandler tempWindowHandler = {};
+	tempWindowHandler.appCtx = &appCtx;
+
+	auto guiCtx = Gui::Context::Create(tempWindowHandler, &appCtx, &gfxCtx);
 
 	impl::SetupWindowA(guiCtx, mainWindowInfo);
 	//impl::SetupWindowB(appCtx, guiCtx, gfxCtx);
@@ -339,7 +391,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	{
 		// This will in turn call the appropriate callbacks into the
 		// GfxGuiEventForwarder object.
-		App::impl::ProcessEvents(appCtx, App::impl::PollMode::Wait);
+		App::impl::ProcessEvents(appCtx, true, 0, true);
 		if (appCtx.GetWindowCount() == 0)
 			break;
 

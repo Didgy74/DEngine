@@ -213,7 +213,7 @@ namespace DEngine::Gfx
 		struct CreateVkSurface_ReturnT
 		{
 			u32 vkResult;
-			uSize vkSurface;
+			u64 vkSurface;
 		};
 		virtual CreateVkSurface_ReturnT CreateVkSurface(
 			NativeWindowID windowId,

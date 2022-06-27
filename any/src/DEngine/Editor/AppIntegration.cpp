@@ -24,27 +24,6 @@ void Editor::EditorImpl::ButtonEvent(
 	}
 }
 
-void Editor::EditorImpl::CharEnterEvent()
-{
-	Gui::CharEnterEvent event = {};
-	queuedGuiEvents.emplace_back(event);
-}
-
-void Editor::EditorImpl::CharEvent(
-	u32 value)
-{
-	Gui::CharEvent event = {};
-	event.utfValue = value;
-	queuedGuiEvents.emplace_back(event);
-}
-
-void Editor::EditorImpl::CharRemoveEvent(App::WindowID windowId)
-{
-	Gui::CharRemoveEvent event = {};
-	event.windowId = (Gui::WindowID)windowId;
-	queuedGuiEvents.emplace_back(event);
-}
-
 void Editor::EditorImpl::CursorMove(
 	App::Context& appCtx,
 	App::WindowID windowId,
@@ -90,6 +69,7 @@ void EditorImpl::EndTextInputSessionEvent(
 }
 
 void Editor::EditorImpl::TouchEvent(
+	App::WindowID windowId,
 	u8 id,
 	App::TouchEventType type,
 	Math::Vec2 position)
@@ -205,9 +185,8 @@ void Editor::EditorImpl::OpenSoftInput(
 	Std::Span<char const> text,
 	Gui::SoftInputFilter inputFilter)
 {
-	App::SoftInputFilter filter{};
-	switch (inputFilter)
-	{
+	App::SoftInputFilter filter = {};
+	switch (inputFilter) {
 	case Gui::SoftInputFilter::SignedFloat:
 		filter = App::SoftInputFilter::Float;
 		break;
@@ -235,15 +214,6 @@ void Editor::EditorImpl::FlushQueuedEventsToGui()
 
 		switch (event.GetIndex())
 		{
-			case EventT::indexOf<Gui::CharEnterEvent>:
-				guiCtx->PushEvent(event.Get<Gui::CharEnterEvent>());
-				break;
-			case EventT::indexOf<Gui::CharEvent>:
-				guiCtx->PushEvent(event.Get<Gui::CharEvent>());
-				break;
-			case EventT::indexOf<Gui::CharRemoveEvent>:
-				guiCtx->PushEvent(event.Get<Gui::CharRemoveEvent>());
-				break;
 			case EventT::indexOf<Gui::CursorPressEvent>:
 				guiCtx->PushEvent(event.Get<Gui::CursorPressEvent>());
 				break;
@@ -265,10 +235,10 @@ void Editor::EditorImpl::FlushQueuedEventsToGui()
 			}
 
 			case EventT::indexOf<Gui::TouchPressEvent>:
-				//guiCtx->PushEvent(event.Get<Gui::TouchPressEvent>());
+				guiCtx->PushEvent(event.Get<Gui::TouchPressEvent>());
 				break;
 			case EventT::indexOf<Gui::TouchMoveEvent>:
-				//guiCtx->PushEvent(event.Get<Gui::TouchMoveEvent>());
+				guiCtx->PushEvent(event.Get<Gui::TouchMoveEvent>());
 				break;
 			case EventT::indexOf<Gui::WindowCloseEvent>:
 				//guiCtx->PushEvent(event.Get<Gui::WindowCloseEvent>());

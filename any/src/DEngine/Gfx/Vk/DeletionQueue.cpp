@@ -66,7 +66,7 @@ namespace DEngine::Gfx::Vk::impl
 					nextQueue.jobs.push_back(newJob);
 
 					// Then we pad to align to 8 bytes.
-					uSize addSize = Math::CeilToMultiple(newJob.job.dataSize, customDataAlignment);
+					uSize addSize = Math::CeilToMultiple((u64)newJob.job.dataSize, (u64)customDataAlignment);
 
 					nextQueue.customData.resize(nextQueue.customData.size() + addSize);
 
@@ -335,7 +335,7 @@ void DeletionQueue::Destroy(
 	currentQueue.jobs.push_back(newJob);
 
 	// Then we pad to align to 8 bytes.
-	uSize addSize = Math::CeilToMultiple(newJob.dataSize, impl::customDataAlignment);
+	uSize addSize = Math::CeilToMultiple((u64)newJob.dataSize, (u64)impl::customDataAlignment);
 
 	currentQueue.customData.resize(currentQueue.customData.size() + addSize);
 
@@ -437,7 +437,7 @@ void DeletionQueue::Destroy(
 	currentQueue.jobs.emplace_back(newJob);
 
 	// Then we pad to align to 8 bytes.
-	uSize addSize = Math::CeilToMultiple(newJob.dataSize, impl::customDataAlignment);
+	uSize addSize = Math::CeilToMultiple((u64)newJob.dataSize, (u64)impl::customDataAlignment);
 
 	currentQueue.customData.resize(currentQueue.customData.size() + addSize);
 
@@ -462,7 +462,7 @@ void DeletionQueue::Destroy(
 	currentQueue.jobs.emplace_back(newJob);
 
 	// Then we pad to align to 8 bytes.
-	uSize addSize = Math::CeilToMultiple(newJob.job.dataSize, impl::customDataAlignment);
+	uSize addSize = Math::CeilToMultiple((u64)newJob.job.dataSize, (u64)impl::customDataAlignment);
 
 	currentQueue.customData.resize(currentQueue.customData.size() + addSize);
 

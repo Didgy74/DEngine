@@ -44,5 +44,15 @@ namespace DEngine::Editor
 			Gui::Rect const& widgetRect,
 			Gui::Rect const& visibleRect,
 			bool occluded) override;
+		virtual bool TouchMove2(
+			TouchMoveParams const& params,
+			Gui::Rect const& widgetRect,
+			Gui::Rect const& visibleRect,
+			bool occluded) override;
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Gui::Rect const& widgetRect,
+			Gui::Rect const& visibleRect,
+			bool consumed) override;
 	};
 }

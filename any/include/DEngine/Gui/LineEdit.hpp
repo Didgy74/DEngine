@@ -12,14 +12,6 @@ namespace DEngine::Gui
 	class LineEdit : public Widget
 	{
 	public:
-		enum class Type
-		{
-			Float,
-			Integer,
-			UnsignedInteger,
-		};
-		Type type = Type::Float;
-
 		Math::Vec4 backgroundColor = { 0.3f, 0.3f, 0.3f, 1.f };
 		u32 margin = 0;
 
@@ -31,7 +23,6 @@ namespace DEngine::Gui
 		virtual ~LineEdit();
 
 		[[nodiscard]] constexpr bool HasInputSession() const;
-
 
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
@@ -48,13 +39,19 @@ namespace DEngine::Gui
 			Rect const& widgetRect,
 			Rect const& visibleRect,
 			bool consumed) override;
-
-		virtual bool TouchPressEvent(
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+		void TextInput(
 			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
+			AllocRef const& transientAlloc,
+			TextInputEvent const& event) override;
+		void EndTextInputSession(
+			Context& ctx,
+			AllocRef const& transientAlloc,
+			EndTextInputSessionEvent const& event) override;
 
 	protected:
 		// Holds the pointer ID if the widget is currently pressed.

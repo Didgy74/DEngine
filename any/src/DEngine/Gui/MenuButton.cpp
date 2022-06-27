@@ -20,33 +20,21 @@ namespace DEngine::Gui::impl
 		virtual void BuildRects(BuildRects_Params const& params) const override;
 		virtual void Render(Render_Params const& params) const override;
 
-		[[nodiscard]] virtual bool CursorMove(
+		virtual bool CursorMove(
 			CursorMoveParams const& params,
 			bool occluded) override;
 
-		[[nodiscard]] virtual Press_Return CursorPress(
+		virtual Press_Return CursorPress(
 			CursorPressParams const& params,
 			bool eventConsumed) override;
 
-		virtual bool CursorMove(
-			Context& ctx,
-			Rect const& windowRect,
-			Rect const& usableRect,
-			CursorMoveEvent const& event,
+		virtual bool TouchMove2(
+			TouchMoveParams const& params,
 			bool occluded) override;
 
-		virtual Press_Return CursorPress(
-			Context& ctx,
-			Rect const& windowRect,
-			Rect const& usableRect,
-			Math::Vec2Int cursorPos,
-			CursorPressEvent const& event) override;
-
-		virtual Press_Return TouchPress(
-			Context& ctx,
-			Rect const& windowRect,
-			Rect const& usableRect,
-			TouchPressEvent const& event) override;
+		virtual Press_Return TouchPress2(
+			TouchPressParams const& params,
+			bool consumed) override;
 	};
 
 	enum class PointerType : u8 { Primary, Secondary };
@@ -561,82 +549,6 @@ bool Gui::impl::MenuLayer::CursorMove(
 		tempParams);
 }
 
-bool Gui::impl::MenuLayer::CursorMove(
-	Context& ctx,
-	Rect const& windowRect,
-	Rect const& usableRect,
-	CursorMoveEvent const& event,
-	bool occluded)
-{
-/*
-	auto const intersection = Rect::Intersection(windowRect, usableRect);
-
-	impl::PointerMove_Pointer pointer = {};
-	pointer.id = impl::cursorPointerId;
-	pointer.pos = { (f32)event.position.x, (f32)event.position.y };
-	pointer.occluded = occluded;
-
-	return impl::MenuButtonImpl::MenuLayer_PointerMove(
-		*this,
-		ctx,
-		intersection,
-		pointer);
-*/
-
-	return false;
-}
-
-Layer::Press_Return Gui::impl::MenuLayer::CursorPress(
-	Context& ctx,
-	Rect const& windowRect,
-	Rect const& usableRect,
-	Math::Vec2Int cursorPos,
-	CursorPressEvent const& event)
-{
-/*
-	auto const intersection = Rect::Intersection(windowRect, usableRect);
-
-	impl::PointerPress_Pointer pointer = {};
-	pointer.id = impl::cursorPointerId;
-	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	pointer.pressed = event.pressed;
-	pointer.type = impl::ToPointerType(event.button);
-
-	return impl::MenuButtonImpl::MenuLayer_PointerPress(
-		*this,
-		ctx,
-		intersection,
-		pointer);
-*/
-
-	return {};
-}
-
-Layer::Press_Return Gui::impl::MenuLayer::TouchPress(
-	Context& ctx,
-	Rect const& windowRect,
-	Rect const& usableRect,
-	TouchPressEvent const& event)
-{
-/*
-	auto const intersection = Rect::Intersection(windowRect, usableRect);
-
-	impl::PointerPress_Pointer pointer = {};
-	pointer.id = event.id;
-	pointer.pos = event.position;
-	pointer.pressed = event.pressed;
-	pointer.type = impl::PointerType::Primary;
-
-	return impl::MenuButtonImpl::MenuLayer_PointerPress(
-		*this,
-		ctx,
-		intersection,
-		pointer);
-*/
-
-	return {};
-}
-
 Layer::Press_Return Gui::impl::MenuLayer::CursorPress(
 	Layer::CursorPressParams const& params,
 	bool eventConsumed)
@@ -663,41 +575,54 @@ Layer::Press_Return Gui::impl::MenuLayer::CursorPress(
 		tempParams);
 }
 
-bool MenuButton::CursorPress(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Math::Vec2Int cursorPos,
-	CursorPressEvent event)
+bool Gui::impl::MenuLayer::TouchMove2(
+	TouchMoveParams const& params,
+	bool occluded)
 {
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.occluded = occluded;
 
-	return {};
+	impl::MenuBtnImpl::MenuLayer_PointerMove_Params tempParams = {
+		.layer = *this,
+		.textManager = params.textManager,
+		.rectCollection = params.rectCollection,
+		.pointer = pointer };
+	tempParams.margin = menuButton->margin;
+	tempParams.spacing = menuButton->spacing;
+	tempParams.windowRect = params.windowRect;
+	tempParams.usableRect = params.safeAreaRect;
+
+	return impl::MenuBtnImpl::MenuLayer_PointerMove(
+		this->menuButton->submenu,
+		tempParams);
 }
 
-bool MenuButton::TouchPressEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchPressEvent event)
+Layer::Press_Return Gui::impl::MenuLayer::TouchPress2(
+	TouchPressParams const& params,
+	bool consumed)
 {
-/*
 	impl::PointerPress_Pointer pointer = {};
-	pointer.id = event.id;
-	pointer.pos = event.position;
-	pointer.pressed = event.pressed;
-	pointer.type = impl::PointerType::Primary;
-	return impl::MenuButtonImpl::MenuButton_PointerPress(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		pointer);
-*/
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.type = PointerType::Primary;
+	pointer.pressed = params.event.pressed;
+	pointer.consumed = consumed;
 
-	return false;
+	impl::MenuBtnImpl::MenuLayer_PointerPress_Params tempParams = {
+		.ctx = params.ctx,
+		.layer = *this,
+		.rectCollection = params.rectCollection,
+		.textManager = params.textManager,
+		.pointer = pointer };
+	tempParams.spacing = menuButton->spacing;
+	tempParams.margin = menuButton->margin;
+	tempParams.usableRect = params.safeAreaRect;
+
+	return impl::MenuBtnImpl::MenuLayer_PointerPress(
+		menuButton->submenu,
+		tempParams);
 }
 
 bool Gui::impl::MenuBtnImpl::MenuBtn_PointerMove(
@@ -731,7 +656,7 @@ bool Gui::impl::MenuBtnImpl::MenuBtn_PointerPress(
 
 	bool newEventConsumed = params.pointer.consumed;
 
-	auto const pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+	auto const pointerInside = PointIsInAll(pointer.pos, { widgetRect, visibleRect });
 	newEventConsumed = newEventConsumed || pointerInside;
 
 	if (pointer.type != PointerType::Primary)
@@ -814,6 +739,8 @@ void MenuButton::Render2(
 	textRect.extent.width -= margin * 2;
 	textRect.extent.height -= margin * 2;
 
+	auto drawScissor = DrawInfo::ScopedScissor(drawInfo, widgetRect);
+
 	textManager.RenderText(
 		{ title.data(), title.size() },
 		{ 1.f, 1.f, 1.f, 1.f },
@@ -856,6 +783,50 @@ bool MenuButton::CursorPress2(
 	pointer.id = impl::cursorPointerId;
 	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
 	pointer.type = impl::ToPointerType(params.event.button);
+	pointer.pressed = params.event.pressed;
+	pointer.consumed = consumed;
+
+	impl::MenuBtnImpl::MenuBtn_PointerPress_Params tempParams {
+		.widget = *this,
+		.ctx = params.ctx,
+		.pointer = pointer };
+	tempParams.windowId = params.windowId;
+	tempParams.widgetRect = widgetRect;
+	tempParams.visibleRect = visibleRect;
+
+	return impl::MenuBtnImpl::MenuBtn_PointerPress(tempParams);
+}
+
+bool MenuButton::TouchMove2(
+	TouchMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.occluded = occluded;
+
+	impl::MenuBtnImpl::MenuBtn_PointerMove_Params tempParams {
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer };
+
+	return impl::MenuBtnImpl::MenuBtn_PointerMove(tempParams);
+}
+
+bool MenuButton::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.type = impl::PointerType::Primary;
 	pointer.pressed = params.event.pressed;
 	pointer.consumed = consumed;
 

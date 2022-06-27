@@ -9,11 +9,11 @@
 namespace DEngine::Gfx::Vk::Constants
 {
 	constexpr u32 maxInFlightCount = 4;
-	constexpr u32 preferredInFlightCount = 3;
+	constexpr u32 preferredInFlightCount = 2;
 
 	constexpr vk::PresentModeKHR preferredPresentMode = vk::PresentModeKHR::eFifo;
 	constexpr u32 maxSwapchainLength = 4;
-	constexpr u32 preferredSwapchainLength = 3;
+	constexpr u32 preferredSwapchainLength = 2;
 
 	constexpr char const* khronosLayerName { "VK_LAYER_KHRONOS_validation" };
 	constexpr char const* armMaliPerfLayerName { "VK_LAYER_ARM_mali_perf_doc" };

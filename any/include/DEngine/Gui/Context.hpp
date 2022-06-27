@@ -3,11 +3,14 @@
 #include <DEngine/Gui/Events.hpp>
 #include <DEngine/Gui/WindowHandler.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
+#include <DEngine/Gui/Widget.hpp>
+#include <DEngine/Gui/Layer.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/FrameAllocator.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
+
 
 #include <functional>
 #include <string>
@@ -32,8 +35,6 @@ namespace DEngine::Gui
 {
 	namespace impl { struct ImplData; }
 
-	class Widget;
-	class Layer;
 	class RectCollection;
 
 	class Context
@@ -68,9 +69,6 @@ namespace DEngine::Gui
 		};
 		void Render2(Render2_Params const& params) const;
 
-		void PushEvent(CharEnterEvent const&);
-		void PushEvent(CharEvent const&);
-		void PushEvent(CharRemoveEvent const&);
 		void PushEvent(CursorPressEvent const&);
 		void PushEvent(CursorMoveEvent const&);
 		void PushEvent(TextInputEvent const&);

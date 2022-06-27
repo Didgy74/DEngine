@@ -378,7 +378,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	{
 		Time::TickStart();
 
-		App::impl::ProcessEvents(appCtx, App::impl::PollMode::Immediate);
+		App::impl::ProcessEvents(appCtx, false);
 		if (appCtx.GetWindowCount() == 0)
 			break;
 

@@ -62,7 +62,7 @@ namespace DEngine::Std::Trait::impl
 	struct IsTriviallyConstructible : public BoolValue<__is_trivially_constructible(T)> {};
 
 	template<class T>
-	struct IsTriviallyDestructible : public BoolValue<__is_trivially_destructible(T)> {};
+	struct IsTriviallyDestructible : public BoolValue<__has_trivial_destructor(T)> {};
 
 	template<class T>
 	struct IsCopyAssignable : public BoolValue<__is_assignable(T&, T const&)> {};

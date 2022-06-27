@@ -4,6 +4,8 @@
 
 #include <DEngine/Std/Containers/Defer.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
+#include <DEngine/Std/Containers/FnRef.hpp>
+#include <DEngine/Std/Trait.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
@@ -237,6 +239,72 @@ struct StackLayout::Impl
 
 		return returnVal;
 	}
+
+	struct Iterator_Result {
+		Widget& child;
+	};
+	struct Iterator_End {};
+	struct Iterator {
+		StackLayout* layout = nullptr;
+		Widget* nextChild = nullptr;
+		int currIndex = 0;
+		int len = 0;
+		explicit Iterator(StackLayout& in) {
+			layout = &in;
+			len = (int)in.children.size();
+
+			Increment();
+		}
+
+		void Increment()
+		{
+			Std::Opt<uSize> actualIndexOpt;
+			for (; currIndex < len && !actualIndexOpt.Has(); currIndex++) {
+				actualIndexOpt = GetModifiedWidgetIndex(
+					{ layout->insertionJobs.data(), layout->insertionJobs.size() },
+					currIndex);
+			}
+
+			if (actualIndexOpt.Has())
+				nextChild = layout->children[actualIndexOpt.Get()].Get();
+			else
+				nextChild = nullptr;
+		}
+
+		auto operator*() const {
+			return Iterator_Result{
+				.child = *nextChild,
+			};
+		}
+		void operator++() {
+			Increment();
+		}
+		[[nodiscard]] bool operator!=(Iterator_End const&) const noexcept {
+			return nextChild;
+		}
+
+		~Iterator() {
+			if constexpr (!Std::Trait::isConst<decltype(*layout)>) {
+				layout->currentlyIterating = false;
+				layout->insertionJobs.clear();
+			}
+		}
+	};
+	struct IteratorPair {
+		StackLayout* layout = nullptr;
+		auto begin() {
+			return Iterator(*layout);
+		}
+		auto end() {
+			return Iterator_End{};
+		}
+	};
+
+	[[nodiscard]] static auto BuildItPair(StackLayout& layout) {
+		return IteratorPair{
+			.layout = &layout
+		};
+	}
 };
 
 namespace DEngine::Gui::impl
@@ -253,105 +321,6 @@ namespace DEngine::Gui::impl
 		returnVal.extent.height -= padding * 2;
 		return returnVal;
 	}
-
-	/*
-	// T needs to be either CursorMoveEvent or TouchMoveEvent.
-	template<class T>
-	[[nodiscard]] static bool PointerMove(
-		StackLayout& layout,
-		Context& ctx,
-		WindowID windowId,
-		Rect const& widgetRect,
-		Rect const& visibleRect,
-		Math::Vec2 pointerPos,
-		bool pointerOccluded,
-		T const& event)
-	{
-		auto innerRect = impl::BuildInnerRect(widgetRect, layout.padding);
-
-		auto itPair = impl::BuildItPair(layout, ctx, innerRect);
-		for (auto const& itItem: itPair)
-		{
-			if constexpr (Std::Trait::isSame<T, CursorMoveEvent>)
-			{
-				itItem.widget.CursorMove(
-					ctx,
-					windowId,
-					itItem.childRect,
-					visibleRect,
-					event,
-					pointerOccluded);
-			}
-			else if constexpr (Std::Trait::isSame<T, TouchMoveEvent>)
-			{
-				itItem.widget.TouchMoveEvent(
-					ctx,
-					windowId,
-					itItem.childRect,
-					visibleRect,
-					event,
-					pointerOccluded);
-			}
-		}
-
-		// If we're inside the inner rect, we want to occlude the pointer.
-		bool pointerInsideWidget = innerRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
-		return pointerInsideWidget;
-	}
-
-	// T must be either CursorClickEvent or TouchPressEvent
-	template<class T>
-	static bool PointerPress(
-		StackLayout& layout,
-		Context& ctx,
-		WindowID windowId,
-		Rect const& widgetRect,
-		Rect const& visibleRect,
-		Math::Vec2 pointerPos,
-		bool pointerPressed,
-		T const& event)
-	{
-		auto innerRect = impl::BuildInnerRect(widgetRect, layout.padding);
-
-		bool pointerInWidget = innerRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
-		if (pointerPressed && !pointerInWidget)
-			return false;
-
-		auto itPair = impl::BuildItPair(layout, ctx, innerRect);
-		for (auto const& itItem: itPair)
-		{
-			bool pointerInChild = itItem.childRect.PointIsInside(pointerPos) && visibleRect.PointIsInside(pointerPos);
-			if (pointerPressed && !pointerInChild)
-				continue;
-
-			bool eventConsumed = false;
-			if constexpr (Std::Trait::isSame<T, CursorPressEvent>)
-			{
-				eventConsumed = itItem.widget.CursorPress(
-					ctx,
-					windowId,
-					itItem.childRect,
-					visibleRect,
-					{(i32) pointerPos.x, (i32) pointerPos.y},
-					event);
-			}
-			else if constexpr (Std::Trait::isSame<T, TouchPressEvent>)
-			{
-				eventConsumed = itItem.widget.TouchPressEvent(
-					ctx,
-					windowId,
-					itItem.childRect,
-					visibleRect,
-					event);
-			}
-
-			if (pointerPressed && eventConsumed)
-				return true;
-		}
-
-		// We know we're inside the widget, so we consume the event.
-		return true;
-	}*/
 }
 
 StackLayout::~StackLayout()
@@ -360,7 +329,7 @@ StackLayout::~StackLayout()
 
 uSize StackLayout::ChildCount() const
 {
-	return (uSize) children.size();
+	return (uSize)children.size();
 }
 
 Widget& StackLayout::At(uSize index)
@@ -403,7 +372,7 @@ Std::Box<Widget> StackLayout::ExtractChild(uSize index)
 	DENGINE_IMPL_GUI_ASSERT(index < ChildCount());
 
 	auto& item = children[index];
-	Std::Box<Widget> returnVal = static_cast<Std::Box<Widget>&&>(item);
+	auto returnVal = static_cast<Std::Box<Widget>&&>(item);
 
 	children.erase(children.begin() + index);
 
@@ -454,62 +423,17 @@ void StackLayout::ClearChildren()
 	children.clear();
 }
 
-bool StackLayout::TouchPressEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchPressEvent event)
-{
-	/*
-	return impl::PointerPress(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		event.position,
-		event.pressed,
-		event);
-	 */
-
-	return {};
-}
-
-bool StackLayout::TouchMoveEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchMoveEvent event,
-	bool occluded)
-{
-	/*
-	return impl::PointerMove(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		event.position,
-		occluded,
-		event);
-	 */
-
-	return {};
-}
-
 SizeHint StackLayout::GetSizeHint2(GetSizeHint2_Params const& params) const
 {
 	auto& pusher = params.pusher;
 
-	uSize const childCount = children.size();
+	int const childCount = children.size();
 
 	SizeHint returnVal = {};
 
 	auto childSizeHints = Std::MakeVec<SizeHint>(params.transientAlloc);
 	childSizeHints.Resize(childCount);
-	for (uSize i = 0; i < childCount; i += 1)
+	for (int i = 0; i < childCount; i += 1)
 		childSizeHints[i] = children[i]->GetSizeHint2(params);
 
 	returnVal.minimum = Impl::GetSizeHintExtentSum(
@@ -573,71 +497,10 @@ void StackLayout::BuildChildRects(
 
 void StackLayout::CursorExit(Context& ctx)
 {
-	DENGINE_IMPL_GUI_ASSERT(!currentlyIterating);
-	currentlyIterating = true;
-
-	Std::Defer cleanup{ [&]() {
-		currentlyIterating = false;
-		insertionJobs.clear();
-	} };
-
-	auto const childCount = children.size();
-	for (int i = 0; i < childCount; i += 1)
-	{
-		auto const index = Impl::GetModifiedWidgetIndex(
-			{ insertionJobs.data(), insertionJobs.size() },
-			i);
-		if (!index.HasValue())
-			continue;
-
-		auto& child = *children[index.Value()];
+	for (auto const& iter : Impl::BuildItPair(*this)) {
+		auto& child = iter.child;
 		child.CursorExit(ctx);
 	}
-}
-
-bool StackLayout::CursorPress2(
-	CursorPressParams const& params,
-	Rect const& widgetRect,
-	Rect const& visibleRect,
-	bool consumed)
-{
-	auto const& rectColl = params.rectCollection;
-
-	bool newEventConsumed = consumed;
-
-	{
-		DENGINE_IMPL_GUI_ASSERT(!currentlyIterating);
-		currentlyIterating = true;
-		Std::Defer cleanup { [&]() {
-			currentlyIterating = false;
-			insertionJobs.clear();
-		} };
-		int const childCount = (int)children.size();
-		for (int i = 0; i < childCount; i += 1)
-		{
-			auto const index = Impl::GetModifiedWidgetIndex(
-				{ insertionJobs.data(), insertionJobs.size() },
-				i);
-			if (!index.HasValue())
-				continue;
-
-			auto& child = *children[index.Value()];
-			auto const* childRectPairPtr = rectColl.GetRect(child);
-			DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
-			auto const& childRects = *childRectPairPtr;
-			bool const childConsumed = child.CursorPress2(
-				params,
-				childRects.widgetRect,
-				childRects.visibleRect,
-				newEventConsumed);
-			newEventConsumed = newEventConsumed || childConsumed;
-		}
-	}
-
-	if (widgetRect.PointIsInside(params.cursorPos) && visibleRect.PointIsInside(params.cursorPos))
-		newEventConsumed = true;
-
-	return newEventConsumed;
 }
 
 bool StackLayout::CursorMove(
@@ -648,36 +511,102 @@ bool StackLayout::CursorMove(
 {
 	auto const& rectColl = params.rectCollection;
 
-	DENGINE_IMPL_GUI_ASSERT(!currentlyIterating);
-	currentlyIterating = true;
-	Std::Defer cleanup { [this]() {
-		currentlyIterating = false;
-		insertionJobs.clear();
-	} };
-
-	uSize const childCount = children.size();
-	for (uSize i = 0; i < childCount; i += 1)
-	{
-		auto const index = Impl::GetModifiedWidgetIndex(
-			{ insertionJobs.data(), insertionJobs.size() },
-			i);
-		if (!index.HasValue())
-			continue;
-
-		auto& child = *children[index.Value()];
-		auto const* childRectPairPtr = rectColl.GetRect(child);
-		DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
-		auto const& childRects = *childRectPairPtr;
+	for (auto const& iter : Impl::BuildItPair(*this)) {
+		auto& child = iter.child;
+		auto* childRects = rectColl.GetRect(child);
+		DENGINE_IMPL_GUI_ASSERT(childRects);
 		child.CursorMove(
 			params,
-			childRects.widgetRect,
-			childRects.visibleRect,
+			childRects->widgetRect,
+			childRects->visibleRect,
 			occluded);
 	}
 
 	return
-		widgetRect.PointIsInside(params.event.position) &&
-		visibleRect.PointIsInside(params.event.position);
+		occluded ||
+		PointIsInAll(params.event.position, { widgetRect, visibleRect });
+}
+
+bool StackLayout::CursorPress2(
+	CursorPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumedIn)
+{
+	auto const& rectColl = params.rectCollection;
+
+	bool consumed = consumedIn;
+
+	for (auto const& iter : Impl::BuildItPair(*this)) {
+		auto& child = iter.child;
+		auto* childRects = rectColl.GetRect(child);
+		DENGINE_IMPL_GUI_ASSERT(childRects);
+
+		bool newResult = child.CursorPress2(
+			params,
+			childRects->widgetRect,
+			childRects->visibleRect,
+			consumed);
+		consumed = consumed || newResult;
+	}
+
+	if (PointIsInAll(params.cursorPos, { widgetRect, visibleRect }))
+		consumed = true;
+
+	return consumed;
+}
+
+bool StackLayout::TouchMove2(
+	TouchMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	auto const& rectColl = params.rectCollection;
+
+	for (auto const& iter : Impl::BuildItPair(*this)) {
+		auto& child = iter.child;
+		auto* childRects = rectColl.GetRect(child);
+		DENGINE_IMPL_GUI_ASSERT(childRects);
+		child.TouchMove2(
+			params,
+			childRects->widgetRect,
+			childRects->visibleRect,
+			occluded);
+	}
+
+	return
+		occluded ||
+		PointIsInAll(params.event.position, { widgetRect, visibleRect });
+}
+
+bool StackLayout::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumedIn)
+{
+	auto const& rectColl = params.rectCollection;
+
+	bool consumed = consumedIn;
+
+	for (auto const& iter : Impl::BuildItPair(*this)) {
+		auto& child = iter.child;
+		auto* childRects = rectColl.GetRect(child);
+		DENGINE_IMPL_GUI_ASSERT(childRects);
+
+		bool newResult = child.TouchPress2(
+			params,
+			childRects->widgetRect,
+			childRects->visibleRect,
+			consumed);
+		consumed = consumed || newResult;
+	}
+
+	if (PointIsInAll(params.event.position, { widgetRect, visibleRect }))
+		consumed = true;
+
+	return consumed;
 }
 
 void StackLayout::Render2(
@@ -723,9 +652,9 @@ void StackLayout::TextInput(
 	AllocRef const& transientAlloc,
 	TextInputEvent const& event)
 {
-	for (auto& child : children)
-	{
-		child->TextInput(
+	for (auto const& iter : Impl::BuildItPair(*this)) {
+		auto& child = iter.child;
+		child.TextInput(
 			ctx,
 			transientAlloc,
 			event);
@@ -737,9 +666,9 @@ void StackLayout::EndTextInputSession(
 	AllocRef const& transientAlloc,
 	EndTextInputSessionEvent const& event)
 {
-	for (auto& child : children)
-	{
-		child->EndTextInputSession(
+	for (auto const& iter : Impl::BuildItPair(*this)) {
+		auto& child = iter.child;
+		child.EndTextInputSession(
 			ctx,
 			transientAlloc,
 			event);

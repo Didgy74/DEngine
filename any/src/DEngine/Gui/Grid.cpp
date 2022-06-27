@@ -448,7 +448,6 @@ bool Grid::CursorMove(
 	bool occluded)
 {
 	auto& rectCollection = params.rectCollection;
-
 	bool newOccluded = occluded;
 	for (auto& child : children) {
 		if (child) {
@@ -462,10 +461,7 @@ bool Grid::CursorMove(
 			newOccluded = newOccluded || childOccludedReturn;
 		}
 	}
-
-	bool cursorInside =
-		widgetRect.PointIsInside(params.event.position) &&
-		visibleRect.PointIsInside(params.event.position);
+	auto cursorInside = PointIsInAll(params.event.position, { widgetRect, visibleRect });
 	return newOccluded || cursorInside;
 }
 
@@ -476,12 +472,9 @@ bool Grid::CursorPress2(
 	bool consumed)
 {
 	auto& rectCollection = params.rectCollection;
-
 	bool newConsumed = consumed;
-	for (auto& child : children)
-	{
-		if (child)
-		{
+	for (auto& child : children) {
+		if (child) {
 			auto const* childRectPairPtr = rectCollection.GetRect(*child);
 			DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
 			bool childConsumedReturn = child->CursorPress2(
@@ -492,10 +485,57 @@ bool Grid::CursorPress2(
 			newConsumed = newConsumed || childConsumedReturn;
 		}
 	}
-
 	bool cursorInside =
 		widgetRect.PointIsInside(params.cursorPos) &&
 		visibleRect.PointIsInside(params.cursorPos);
+	return newConsumed || cursorInside;
+}
+
+bool Grid::TouchMove2(
+	TouchMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	auto& rectCollection = params.rectCollection;
+	bool newOccluded = occluded;
+	for (auto& child : children) {
+		if (child) {
+			auto const* childRectPairPtr = rectCollection.GetRect(*child);
+			DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
+			bool childOccludedReturn = child->TouchMove2(
+				params,
+				childRectPairPtr->widgetRect,
+				childRectPairPtr->visibleRect,
+				newOccluded);
+			newOccluded = newOccluded || childOccludedReturn;
+		}
+	}
+	auto cursorInside = PointIsInAll(params.event.position, { widgetRect, visibleRect });
+	return newOccluded || cursorInside;
+}
+
+bool Grid::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	auto& rectCollection = params.rectCollection;
+	bool newConsumed = consumed;
+	for (auto& child : children) {
+		if (child) {
+			auto const* childRectPairPtr = rectCollection.GetRect(*child);
+			DENGINE_IMPL_GUI_ASSERT(childRectPairPtr);
+			bool childConsumedReturn = child->TouchPress2(
+				params,
+				childRectPairPtr->widgetRect,
+				childRectPairPtr->visibleRect,
+				newConsumed);
+			newConsumed = newConsumed || childConsumedReturn;
+		}
+	}
+	auto cursorInside = PointIsInAll(params.event.position, { widgetRect, visibleRect });
 	return newConsumed || cursorInside;
 }
 

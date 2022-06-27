@@ -259,51 +259,6 @@ void Context::SetFrontmostLayer(
 	windowNode.frontmostLayer = static_cast<Std::Box<Layer>&&>(layer);
 }
 
-void Context::PushEvent(CharEnterEvent const& event)
-{
-	auto& implData = Internal_ImplData();
-
-	for (auto& windowNode : implData.windows)
-	{
-		if (!windowNode.data.topLayout)
-			continue;
-
-		DENGINE_IMPL_GUI_UNREACHABLE();
-		//windowNode.data.topLayout->CharEnterEvent(*this);
-	}
-}
-
-void Context::PushEvent(CharEvent const& event)
-{
-	auto& implData = Internal_ImplData();
-	for (auto& windowNode : implData.windows)
-	{
-		if (!windowNode.data.topLayout)
-			continue;
-
-		DENGINE_IMPL_GUI_UNREACHABLE();
-		//windowNode.data.topLayout->CharEvent(
-			//*this,
-			//event.utfValue);
-	}
-}
-
-void Context::PushEvent(CharRemoveEvent const& event)
-{
-	auto& implData = Internal_ImplData();
-	auto& transientAlloc = implData.transientAlloc;
-	Std::Defer _allocCleanup = [&]() { transientAlloc.Reset(); };
-
-	auto* windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
-	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
-	auto& windowNode = *windowNodePtr;
-
-	if (windowNode.data.topLayout)
-	{
-		//windowNode.data.topLayout->CharRemoveEvent(*this, transientAlloc);
-	}
-}
-
 void Context::PushEvent(TextInputEvent const& event)
 {
 	auto& implData = Internal_ImplData();
@@ -408,6 +363,139 @@ void Context::PushEvent(CursorPressEvent const& event)
 		auto& widget = *windowNode.data.topLayout;
 
 		widget.CursorPress2(
+			widgetParams,
+			visibleRect,
+			visibleRect,
+			eventConsumed);
+	}
+
+	impl::ImplData_FlushPostEventJobs(*this);
+}
+
+void Context::PushEvent(TouchMoveEvent const& event)
+{
+	auto& implData = Internal_ImplData();
+	auto& textManager = *implData.textManager;
+	auto& rectCollection = implData.rectCollection;
+	auto& transientAlloc = implData.transientAlloc;
+
+	auto windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+
+	impl::ImplData_PreDispatchStuff(implData);
+	impl::BuildRectCollection(
+		*this,
+		textManager,
+		rectCollection,
+		false,
+		transientAlloc);
+
+	if (windowNode.data.topLayout)
+	{
+		auto& widget = *windowNode.data.topLayout;
+
+		auto modifiedEvent = event;
+
+		auto const& windowRect = windowNode.data.rect;
+		auto const& visibleOffset = windowNode.data.visibleOffset;
+		auto const& visibleExtent = windowNode.data.visibleExtent;
+		Rect const visibleRect = Rect::Intersection(
+			{{}, windowRect.extent},
+			{{(i32) visibleOffset.x, (i32) visibleOffset.y}, visibleExtent});
+
+		bool cursorOccluded = false;
+		if (windowNode.frontmostLayer)
+		{
+			Layer::TouchMoveParams layerParams {
+				.ctx = *this,
+				.textManager = textManager,
+				.windowRect = windowRect,
+				.safeAreaRect = visibleRect,
+				.rectCollection = rectCollection,
+				.event = modifiedEvent };
+
+			auto& layer = *windowNode.frontmostLayer;
+			bool const newOccluded = layer.TouchMove2(
+				layerParams,
+				cursorOccluded);
+			cursorOccluded = cursorOccluded || newOccluded;
+		}
+
+		Widget::TouchMoveParams widgetParams {
+			.ctx = *this,
+			.rectCollection = rectCollection,
+			.textManager = textManager,
+			.transientAlloc = transientAlloc,
+			.windowId = windowNode.id,
+			.event = modifiedEvent };
+
+		widget.TouchMove2(
+			widgetParams,
+			visibleRect,
+			visibleRect,
+			cursorOccluded);
+	}
+}
+
+void Context::PushEvent(TouchPressEvent const& event)
+{
+	auto& implData = Internal_ImplData();
+	auto& textManager = *implData.textManager;
+	auto& rectCollection = implData.rectCollection;
+	auto& transientAlloc = implData.transientAlloc;
+
+	auto windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+
+	impl::ImplData_PreDispatchStuff(implData);
+	impl::BuildRectCollection(
+		*this,
+		textManager,
+		rectCollection,
+		false,
+		transientAlloc);
+
+	if (windowNode.data.topLayout)
+	{
+		Rect const& windowRect = { {}, windowNode.data.rect.extent };
+		auto const& visibleOffset = windowNode.data.visibleOffset;
+		auto const& visibleExtent = windowNode.data.visibleExtent;
+		Rect const visibleRect = Rect::Intersection(
+			windowRect,
+			{ { (i32)visibleOffset.x, (i32)visibleOffset.y }, visibleExtent });
+
+		bool eventConsumed = false;
+		Layer::Press_Return pressReturn = {};
+		if (windowNode.frontmostLayer)
+		{
+			Layer::TouchPressParams layerParams {
+				.ctx = *this,
+				.textManager = textManager,
+				.windowRect = windowRect,
+				.safeAreaRect = visibleRect,
+				.rectCollection = rectCollection,
+				.event = event, };
+
+			auto& layer = *windowNode.frontmostLayer;
+			pressReturn = layer.TouchPress2(layerParams, eventConsumed);
+			eventConsumed = eventConsumed || pressReturn.eventConsumed;
+		}
+		if (pressReturn.destroyLayer)
+		{
+			windowNode.frontmostLayer = {};
+		}
+
+		Widget::TouchPressParams widgetParams {
+			.ctx = *this,
+			.rectCollection = rectCollection,
+			.textManager = textManager,
+			.transientAlloc =  transientAlloc,
+			.windowId = windowNode.id,
+			.event = event, };
+		auto& widget = *windowNode.data.topLayout;
+		widget.TouchPress2(
 			widgetParams,
 			visibleRect,
 			visibleRect,

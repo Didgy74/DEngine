@@ -23,9 +23,6 @@ namespace DEngine::Editor
 	namespace impl
 	{
 		using GuiEvent_T = Std::Variant<
-			Gui::CharEnterEvent,
-			Gui::CharEvent,
-			Gui::CharRemoveEvent,
 			Gui::CursorPressEvent,
 			Gui::CursorMoveEvent,
 			Gui::TextInputEvent,
@@ -59,9 +56,6 @@ namespace DEngine::Editor
 			App::WindowID windowId,
 			App::Button button,
 			bool state) override;
-		virtual void CharEnterEvent() override;
-		virtual void CharEvent(u32 utfValue) override;
-		virtual void CharRemoveEvent(App::WindowID windowId) override;
 		virtual void CursorMove(
 			App::Context& appCtx,
 			App::WindowID windowId,
@@ -79,6 +73,7 @@ namespace DEngine::Editor
 			App::WindowID windowId) override;
 
 		virtual void TouchEvent(
+			App::WindowID windowId,
 			u8 id,
 			App::TouchEventType type,
 			Math::Vec2 position) override;

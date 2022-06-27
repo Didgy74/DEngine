@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <new>
+#include <stdexcept>
 
 namespace DEngine::Application::impl
 {
@@ -20,10 +21,6 @@ namespace DEngine::Application::impl
 	[[nodiscard]] static constexpr bool IsValid(GamepadAxis in) noexcept
 	{
 		return static_cast<unsigned int>(in) < static_cast<unsigned int>(GamepadAxis::COUNT);
-	}
-	[[nodiscard]] static constexpr bool IsValid(PollMode in) noexcept
-	{
-		return static_cast<unsigned int>(in) < static_cast<unsigned int>(PollMode::COUNT);
 	}
 
 	static void FlushQueuedEventCallbacks(Context& appCtx);
@@ -54,32 +51,20 @@ static void Application::impl::FlushQueuedEventCallbacks(Context& appCtx)
 	auto& implData = appCtx.GetImplData();
 	for (auto const& job : implData.queuedEventCallbacks)
 	{
-		using Type = EventCallbackJob::Type;
 		switch (job.type)
 		{
-			case Type::ButtonEvent:
+			case EventType::ButtonEvent:
 			{
-				auto const& event = job.buttonEvent;
+				auto const& event = EventUnion_Get<EventType::ButtonEvent>(job.eventUnion);
 				job.ptr->ButtonEvent(
 					event.windowId,
 					event.btn,
 					event.state);
 				break;
 			}
-			case Type::CharEvent:
+			case EventType::CursorMoveEvent:
 			{
-				auto const& event = job.charEvent;
-				job.ptr->CharEvent(job.charEvent.utfValue);
-				break;
-			}
-			case Type::CharEnterEvent:
-			{
-				job.ptr->CharEnterEvent();
-				break;
-			}
-			case Type::CursorMoveEvent:
-			{
-				auto const& event = job.cursorMoveEvent;
+				auto const& event = EventUnion_Get<EventType::CursorMoveEvent>(job.eventUnion);
 				job.ptr->CursorMove(
 					appCtx,
 					event.windowId,
@@ -88,9 +73,9 @@ static void Application::impl::FlushQueuedEventCallbacks(Context& appCtx)
 				break;
 			}
 
-			case Type::TextInputEvent:
+			case EventType::TextInputEvent:
 			{
-				auto const& event = job.textInputEvent;
+				auto const& event = EventUnion_Get<EventType::TextInputEvent>(job.eventUnion);
 				DENGINE_IMPL_APPLICATION_ASSERT(event.newTextOffset + event.newTextSize <= implData.textInputDatas.size());
 				job.ptr->TextInputEvent(
 					appCtx,
@@ -101,35 +86,35 @@ static void Application::impl::FlushQueuedEventCallbacks(Context& appCtx)
 				break;
 			}
 
-			case Type::EndTextInputSessionEvent:
+			case EventType::EndTextInputSessionEvent:
 			{
-				auto const& event = job.endTextInputSessionEvent;
+				auto const& event = EventUnion_Get<EventType::EndTextInputSessionEvent>(job.eventUnion);
 				job.ptr->EndTextInputSessionEvent(appCtx, event.windowId);
 				break;
 			}
 
-			case Type::TouchEvent:
+			case EventType::TouchEvent:
 			{
-				auto const& event = job.touchEvent;
+				auto const& event = EventUnion_Get<EventType::TouchEvent>(job.eventUnion);
 				job.ptr->TouchEvent(
+					event.windowId,
 					event.id,
 					event.type,
 					{ event.x, event.y });
 				break;
 			}
-			case Type::WindowCursorEnterEvent:
+			case EventType::WindowCursorEnterEvent:
 			{
-				auto const& event = job.windowCursorEnterEvent;
+				auto const& event = EventUnion_Get<EventType::WindowCursorEnterEvent>(job.eventUnion);
 				job.ptr->WindowCursorEnter(
 					event.window,
 					event.entered);
 				break;
 			}
 
-
-			case Type::WindowCloseSignalEvent:
+			case EventType::WindowCloseSignalEvent:
 			{
-				auto const& event = job.windowCloseSignalEvent;
+				auto const& event = EventUnion_Get<EventType::WindowCloseSignalEvent>(job.eventUnion);
 				bool const destroyWindow = job.ptr->WindowCloseSignal(
 					appCtx,
 					event.window);
@@ -140,25 +125,25 @@ static void Application::impl::FlushQueuedEventCallbacks(Context& appCtx)
 				}
 				break;
 			}
-			case Type::WindowFocusEvent:
+			case EventType::WindowFocusEvent:
 			{
-				auto const& event = job.windowFocusEvent;
+				auto const& event = EventUnion_Get<EventType::WindowFocusEvent>(job.eventUnion);
 				job.ptr->WindowFocus(
 					event.window,
 					event.focusGained);
 				break;
 			}
-			case Type::WindowMoveEvent:
+			case EventType::WindowMoveEvent:
 			{
-				auto const& event = job.windowMoveEvent;
+				auto const& event = EventUnion_Get<EventType::WindowMoveEvent>(job.eventUnion);
 				job.ptr->WindowMove(
 					event.window,
 					event.position);
 				break;
 			}
-			case Type::WindowResizeEvent:
+			case EventType::WindowResizeEvent:
 			{
-				auto const& event = job.windowResizeEvent;
+				auto const& event = EventUnion_Get<EventType::WindowResizeEvent>(job.eventUnion);
 				job.ptr->WindowResize(
 					appCtx,
 					event.window,
@@ -192,34 +177,38 @@ void Application::impl::DestroyWindow(
 		implData.windows.begin(),
 		implData.windows.end(),
 		[id](auto const& element) { return element.id == id; });
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodeIt != implData.windows.end());
 
 	auto windowNode = Std::Move(*windowNodeIt);
-
 	implData.windows.erase(windowNodeIt);
 
-	impl::Backend::DestroyWindow(implData, windowNode);
+	impl::Backend::DestroyWindow(implData, implData.backendData, windowNode);
 }
 
 auto Application::Context::Impl::Initialize() -> Context
 {
 	Context ctx;
 
-	auto* appData = new Impl;
-	ctx.m_implData = appData;
+	ctx.m_implData = new Impl;
+	auto& implData = *ctx.m_implData;
 
-	appData->backendData = impl::Backend::Initialize(ctx);
+	implData.backendData = impl::Backend::Initialize(ctx, implData);
 
 	return ctx;
 }
 
 void Application::Context::Impl::ProcessEvents(
 	Context& ctx,
-	impl::PollMode pollMode,
-	Std::Opt<u64> const& timeoutNs)
+	bool waitForEvents,
+	u64 timeoutNs,
+	bool ignoreWaitOnFirstCall)
 {
-	DENGINE_IMPL_APPLICATION_ASSERT(impl::IsValid(pollMode));
-
 	auto& implData = ctx.GetImplData();
+
+	if (ignoreWaitOnFirstCall && implData.isFirstCall) {
+		waitForEvents = false;
+		implData.isFirstCall = false;
+	}
 
 	implData.previousNow = implData.currentNow;
 	implData.currentNow = std::chrono::high_resolution_clock::now();
@@ -258,7 +247,7 @@ void Application::Context::Impl::ProcessEvents(
 	}
 	implData.textInputDatas.clear();
 
-	impl::Backend::ProcessEvents(ctx, pollMode, timeoutNs);
+	impl::Backend::ProcessEvents(ctx, implData, implData.backendData, waitForEvents, timeoutNs);
 
 	// Calculate duration for each button being held.
 	for (uSize i = 0; i < (uSize)Button::COUNT; i += 1)
@@ -313,16 +302,30 @@ auto Context::NewWindow(
 {
 	auto& appData = GetImplData();
 
-	auto newWindowInfo = impl::Backend::NewWindow(*this, title, extent);
-
-	Impl::WindowNode newNode = {};
-	newNode.id = (WindowID)appData.windowIdTracker;
-	newNode.platformHandle = newWindowInfo.platormHandle;
-	newNode.windowData = newWindowInfo.windowData;
-
+	WindowID newWindowId = {};
 	{
 		std::scoped_lock lock { appData.windowsLock };
+		newWindowId = (WindowID)appData.windowIdTracker;
 		appData.windowIdTracker += 1;
+	}
+
+	auto newWindowInfoOpt = impl::Backend::NewWindow(
+		*this,
+		appData,
+		appData.backendData,
+		newWindowId,
+		title,
+		extent);
+	if (!newWindowInfoOpt.Has())
+		throw std::runtime_error("MakeWindow failed.");
+	auto& newWindowInfo = newWindowInfoOpt.Get();
+
+	Impl::WindowNode newNode = {};
+	newNode.id = newWindowId;
+	newNode.platformHandle = newWindowInfo.platformHandle;
+	newNode.windowData = newWindowInfo.windowData;
+	{
+		std::scoped_lock lock { appData.windowsLock };
 		appData.windows.push_back(newNode);
 	}
 
@@ -382,6 +385,8 @@ auto Context::CreateVkSurface(
 	auto& windowNode = *windowNodePtr;
 
 	return impl::Backend::CreateVkSurface(
+		implData,
+		implData.backendData,
 		windowNode.platformHandle,
 		vkInstance,
 		vkAllocationCallbacks);
@@ -414,7 +419,11 @@ void Context::StartTextInputSession(SoftInputFilter inputFilter, Std::Span<char 
 {
 	auto& implData = GetImplData();
 
-	bool success = impl::Backend::StartTextInputSession(*this, inputFilter, text);
+	bool success = impl::Backend::StartTextInputSession(
+		implData,
+		implData.backendData,
+		inputFilter,
+		text);
 
 	DENGINE_IMPL_APPLICATION_ASSERT(success);
 
@@ -427,7 +436,8 @@ void Context::StartTextInputSession(SoftInputFilter inputFilter, Std::Span<char 
 
 void Context::StopTextInputSession()
 {
-	impl::Backend::StopTextInputSession(*this);
+	auto& implData = GetImplData();
+	impl::Backend::StopTextInputSession(implData, implData.backendData);
 }
 
 void Context::InsertEventForwarder(EventForwarder& in)
@@ -494,8 +504,8 @@ namespace DEngine::Application::impl
 		{
 			EventCallbackJob job = {};
 			job.ptr = eventCallback;
-			job.type = EventCallbackJob::GetEventType<T>();
-			auto& jobMember = job.Get<T>();
+			job.type = GetEventType<T>();
+			auto& jobMember = EventUnion_Get<T>(job.eventUnion);
 			jobMember = in;
 
 			implData.queuedEventCallbacks.push_back(job);
@@ -512,7 +522,7 @@ void Application::impl::BackendInterface::UpdateWindowCursorEnter(
 	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 
-	EventCallbackJob::WindowCursorEnterEvent event = {};
+	WindowCursorEnterEvent event = {};
 	event.window = id;
 	event.entered = entered;
 
@@ -527,7 +537,7 @@ void Application::impl::BackendInterface::PushWindowCloseSignal(
 	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 
-	EventCallbackJob::WindowCloseSignalEvent event = {};
+	WindowCloseSignalEvent event = {};
 	event.window = windowNode.id;
 	PushEvent(implData, event);
 }
@@ -544,7 +554,7 @@ void Application::impl::BackendInterface::UpdateWindowPosition(
 	windowNode.windowData.position = newPosition;
 	windowNode.events.move = true;
 
-	EventCallbackJob::WindowMoveEvent event = {};
+	WindowMoveEvent event = {};
 	event.position = newPosition;
 	event.window = windowNode.id;
 	PushEvent(implData, event);
@@ -563,7 +573,7 @@ void Application::impl::BackendInterface::UpdateWindowSize(
 	windowNode.events.resize = true;
 
 
-	EventCallbackJob::WindowResizeEvent event = {};
+	WindowResizeEvent event = {};
 	event.window = windowNode.id;
 	event.extent = newSize;
 	event.safeAreaOffset = {};
@@ -580,7 +590,7 @@ void Application::impl::BackendInterface::UpdateWindowFocus(
 	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 
-	EventCallbackJob::WindowFocusEvent event = {};
+	WindowFocusEvent event = {};
 	event.window = windowNode.id;
 	event.focusGained = focusGained;
 	PushEvent(implData, event);
@@ -599,7 +609,7 @@ namespace DEngine::Application::impl::BackendInterface
 		cursorData.position = (newRelativePos + windowNode.windowData.position);
 		cursorData.positionDelta += delta;
 
-		EventCallbackJob::CursorMoveEvent event = {};
+		CursorMoveEvent event = {};
 		event.windowId = windowNode.id;
 		event.pos = newRelativePos;
 		event.delta = cursorData.positionDelta;
@@ -656,6 +666,27 @@ void Application::impl::BackendInterface::UpdateCursorPosition(
 		newRelativePosition);
 }
 
+void Application::impl::BackendInterface::UpdateTouch(
+	Context::Impl& implData,
+	WindowID windowId,
+	TouchEventType eventType,
+	u8 touchId,
+	f32 x,
+	f32 y)
+{
+	auto windowNodePtr = implData.GetWindowNode(windowId);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+
+	TouchEvent event = {};
+	event.windowId = windowId;
+	event.id = touchId;
+	event.type = eventType;
+	event.x = x;
+	event.y = y;
+	PushEvent(implData, event);
+}
+
 void Application::impl::BackendInterface::UpdateButton(
 	Context::Impl& implData,
 	WindowID id,
@@ -676,7 +707,7 @@ void Application::impl::BackendInterface::UpdateButton(
 		implData.buttonHeldStart[(int)button] = std::chrono::high_resolution_clock::time_point();
 	}
 
-	EventCallbackJob::ButtonEvent event = {};
+	ButtonEvent event = {};
 	event.windowId = id;
 	event.btn = button;
 	event.state = pressed;
@@ -698,11 +729,8 @@ void Application::impl::BackendInterface::PushTextInputEvent(
 		implData.textInputDatas[i + oldTextDataSize] = newText[i];
 
 	implData.textInputSelectedIndex = oldIndex + newText.Size();
-	std::string temp;
-	temp += std::to_string(implData.textInputSelectedIndex);
-	Backend::Log(implData, LogSeverity::Debug, { temp.data(), temp.size() });
 
-	EventCallbackJob::TextInputEvent event = {};
+	TextInputEvent event = {};
 	event.windowId = id;
 	event.oldIndex = oldIndex;
 	event.oldCount = oldCount;
@@ -715,7 +743,7 @@ void Application::impl::BackendInterface::PushTextInputEvent(
 	Context::Impl& implData,
 	WindowID id)
 {
-	EventCallbackJob::EndTextInputSessionEvent event = {};
+	EndTextInputSessionEvent event = {};
 	event.windowId = id;
 	PushEvent(implData, event);
 }

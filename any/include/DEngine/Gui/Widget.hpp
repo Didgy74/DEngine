@@ -135,6 +135,41 @@ namespace DEngine::Gui
 			return false;
 		}
 
+		struct TouchPressParams
+		{
+			Context& ctx;
+			RectCollection const& rectCollection;
+			TextManager& textManager;
+			AllocRef const& transientAlloc;
+			WindowID windowId;
+			TouchPressEvent const& event;
+		};
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed)
+		{
+			return false;
+		}
+		struct TouchMoveParams
+		{
+			Context& ctx;
+			RectCollection const& rectCollection;
+			TextManager& textManager;
+			AllocRef const& transientAlloc;
+			WindowID windowId;
+			TouchMoveEvent const& event;
+		};
+		virtual bool TouchMove2(
+			TouchMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool occluded)
+		{
+			return false;
+		}
+
 		virtual void TextInput(
 			Context& ctx,
 			AllocRef const& transientAlloc,

@@ -16,7 +16,7 @@ namespace DEngine::Std
 		{
 			actualFn = &in;
 			wrapperFn = [](void const* actualFnIn, ArgsT... argsIn) {
-				auto const& fn = *reinterpret_cast<Callable const*>(actualFnIn);
+				auto const& fn = *static_cast<Callable const*>(actualFnIn);
 				return fn(argsIn...);
 			};
 		}

@@ -15,10 +15,10 @@ namespace DEngine::Gui::impl
 		{
 			case CursorButton::Primary: return PointerType::Primary;
 			case CursorButton::Secondary: return PointerType::Secondary;
-			default: break;
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				return {};
 		}
-		DENGINE_IMPL_UNREACHABLE();
-		return {};
 	}
 
 	static constexpr u8 cursorPointerId = (u8)-1;
@@ -54,6 +54,16 @@ namespace DEngine::Gui::impl
 		Rect const& visibleRect;
 		PointerPress_Pointer const& pointer;
 	};
+
+	[[nodiscard]] static Math::Vec2Int BuildTextOffset(Extent const& widgetExtent, Extent const& textExtent) noexcept {
+		Math::Vec2Int out = {};
+		for (int i = 0; i < 2; i++) {
+			auto temp = (i32)Math::Round((f32)widgetExtent[i] * 0.5f - (f32)textExtent[i] * 0.5f);
+			temp = Math::Max(0, temp);
+			out[i] = temp;
+		}
+		return out;
+	}
 }
 
 using namespace DEngine;
@@ -158,50 +168,29 @@ bool Button::GetToggled() const
 	return toggled;
 }
 
-bool Button::TouchPressEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchPressEvent event)
-{
-/*	impl::PointerPress_Params params {
-		*this,
-		widgetRect,
-		visibleRect };
-	params.pointerId = event.id;
-	params.pointerType = impl::PointerType::Primary;
-	params.pointerPos = event.position;
-	params.pointerPressed = event.pressed;
-
-	return impl::BtnImpl::PointerPress(params);*/
-	return {};
-}
-
-bool Button::TouchMoveEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchMoveEvent event,
-	bool occluded)
-{
-	/*impl::PointerMove_Params params = {
-		*this,
-		widgetRect,
-		visibleRect };
-	params.pointerId = event.id;
-	params.pointerPos = event.position;
-	params.pointerOccluded = occluded;
-
-	return impl::BtnImpl::PointerMove(params);
-	*/
-	return {};
-}
-
 void Button::CursorExit(Context& ctx)
 {
 	hoveredByCursor = false;
+}
+
+bool Button::CursorMove(
+	Widget::CursorMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
+	pointer.occluded = occluded;
+
+	impl::PointerMove_Params temp = {
+		*this,
+		widgetRect,
+		visibleRect,
+		pointer };
+
+	return Impl::PointerMove(temp);
 }
 
 bool Button::CursorPress2(
@@ -226,15 +215,15 @@ bool Button::CursorPress2(
 	return Impl::PointerPress(temp);
 }
 
-bool Button::CursorMove(
-	Widget::CursorMoveParams const& params,
+bool Button::TouchMove2(
+	TouchMoveParams const& params,
 	Rect const& widgetRect,
 	Rect const& visibleRect,
 	bool occluded)
 {
 	impl::PointerMove_Pointer pointer = {};
-	pointer.id = impl::cursorPointerId;
-	pointer.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
 	pointer.occluded = occluded;
 
 	impl::PointerMove_Params temp = {
@@ -244,6 +233,28 @@ bool Button::CursorMove(
 		pointer };
 
 	return Impl::PointerMove(temp);
+}
+
+bool Button::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.type = impl::PointerType::Primary;
+	pointer.pos = params.event.position;
+	pointer.pressed = params.event.pressed;
+	pointer.consumed = consumed;
+
+	impl::PointerPress_Params temp {
+		*this,
+		widgetRect,
+		visibleRect,
+		pointer };
+
+	return Impl::PointerPress(temp);
 }
 
 SizeHint Button::GetSizeHint2(
@@ -298,9 +309,8 @@ void Button::BuildChildRects(
 	auto& customData = customDataPtr;
 
 	auto const textExtent = customData->titleTextOuterExtent;
-	Math::Vec2Int const centerOffset = {
-		(i32)Math::Round(widgetRect.extent.width * 0.5f - textExtent.width * 0.5f),
-		(i32)Math::Round(widgetRect.extent.height * 0.5f - textExtent.height * 0.5f) };
+
+	auto textPosOffset = impl::BuildTextOffset(widgetRect.extent, textExtent);
 
 	int const textLength = (int)text.size();
 	DENGINE_IMPL_GUI_ASSERT(textLength == customData->glyphRects.Size());
@@ -310,10 +320,7 @@ void Button::BuildChildRects(
 		auto relativePos = rect.position;
 
 		rect.position += widgetRect.position;
-		rect.position += centerOffset;
-
-		rect.position.x = Math::Max(rect.position.x, widgetRect.position.x + relativePos.x);
-		rect.position.y = Math::Max(rect.position.y, widgetRect.position.y + relativePos.y);
+		rect.position += textPosOffset;
 	}
 }
 
@@ -382,7 +389,11 @@ void Button::Render2(
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
 
-	auto scissor = DrawInfo::ScopedScissor(drawInfo, widgetRect, visibleRect);
+	Rect textRect = {};
+	textRect.position = widgetRect.position + impl::BuildTextOffset(widgetRect.extent, customData.titleTextOuterExtent);
+	textRect.extent = customData.titleTextOuterExtent;
+
+	auto scissor = DrawInfo::ScopedScissor(drawInfo, textRect, widgetRect);
 
 	drawInfo.PushText(
 		{ text.data(), text.size() },

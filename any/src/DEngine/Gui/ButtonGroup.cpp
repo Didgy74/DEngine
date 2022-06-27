@@ -45,23 +45,26 @@ namespace DEngine::Gui::impl
 		return returnWidths;
 	}
 
-	/*
-	[[nodiscard]] Std::Span<u32 const> GetDesiredButtonWidths(
-		ButtonGroup const& widget,
-		RectCollection const& rectCollection)
+	[[nodiscard]] static auto GetButtonRects(
+		Std::Span<u32 const> btnWidths,
+		Math::Vec2Int widgetPos,
+		u32 widgetHeight,
+		AllocRef const& transientAlloc)
 	{
-		auto const btnWidthsByteSpan = rectCollection.GetCustomData(widget);
-		DENGINE_IMPL_GUI_ASSERT((uSize)btnWidthsByteSpan.Data() % alignof(u32) == 0);
-		DENGINE_IMPL_GUI_ASSERT((btnWidthsByteSpan.Size() % sizeof(u32)) == 0);
-		Std::Span<u32 const> const buttonDesiredWidths = {
-			reinterpret_cast<u32 const*>(btnWidthsByteSpan.Data()),
-			btnWidthsByteSpan.Size() / sizeof(u32) };
+		int btnCount = (int)btnWidths.Size();
 
-		DENGINE_IMPL_GUI_ASSERT(buttonDesiredWidths.Size() == widget.buttons.size());
+		auto returnRects = Std::MakeVec<u32>(transientAlloc);
+		returnRects.Resize(btnCount);
 
-		return buttonDesiredWidths;
+		i32 rectPosOffsetX = 0;
+		for (int i = 0; i < btnCount; i++) {
+			auto const& btnWidth = btnWidths[i];
+
+			rectPosOffsetX += btnWidth;
+		}
+
+		return returnRects;
 	}
-	*/
 
 	// Returns the index of the button, if any hit.
 	[[nodiscard]] static Std::Opt<uSize> CheckHitButtons(
@@ -90,6 +93,17 @@ namespace DEngine::Gui::impl
 			horiOffset += btnRect.extent.width;
 		}
 		return returnVal;
+	}
+
+
+	[[nodiscard]] static Math::Vec2Int BuildTextOffset(Extent const& widgetExtent, Extent const& textExtent) noexcept {
+		Math::Vec2Int out = {};
+		for (int i = 0; i < 2; i++) {
+			auto temp = (i32)Math::Round((f32)widgetExtent[i] * 0.5f - (f32)textExtent[i] * 0.5f);
+			temp = Math::Max(0, temp);
+			out[i] = temp;
+		}
+		return out;
 	}
 }
 
@@ -229,7 +243,7 @@ struct Gui::ButtonGroup::Impl
 		auto const& customData = *customDataPtr;
 		auto const& desiredBtnWidths = customData.desiredBtnWidths;
 
-		auto const pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+		auto const pointerInside = PointIsInAll(pointer.pos, { widgetRect, visibleRect });
 
 		auto const buttonWidths = impl::GetButtonWidths(
 			desiredBtnWidths.ToSpan(),
@@ -379,29 +393,23 @@ void ButtonGroup::BuildChildRects(
 
 		auto const btnCount = buttons.size();
 
-		// REMEMBER TO CENTER THE TEXT
-		int glyphRectOffset = 0;
-		int btnRectOffsetX = 0;
+		int glyphRectIndexOffset = 0;
+		int btnRectPosOffsetX = 0;
 		for (int i = 0; i < btnCount; i += 1)
 		{
 			Extent textExtent = { customData.totalTextWidths[i], customData.textHeight };
 			Extent btnExtent = { btnWidths[i], widgetRect.extent.height };
-			Math::Vec2Int centeringOffset = {
-				(i32)Math::Round( (f32)btnExtent.width * 0.5f - (f32)textExtent.width * 0.5f ),
-				(i32)Math::Round( (f32)btnExtent.height * 0.5f - (f32)textExtent.height * 0.5f ), };
-
-			Math::Vec2Int textOffset = widgetRect.position;
-			textOffset.x += btnRectOffsetX;
-			textOffset += centeringOffset;
+			auto textPos = widgetRect.position + impl::BuildTextOffset(btnExtent, textExtent);
+			textPos.x += btnRectPosOffsetX;
 
 			auto const& btn = buttons[i];
-			uSize const textLength = btn.title.size();
-			Std::Span lineGlyphRects = { &customData.glyphRects[glyphRectOffset], textLength };
+			auto textLength = btn.title.size();
+			Std::Span lineGlyphRects = { &customData.glyphRects[glyphRectIndexOffset], textLength };
 			for (auto& glyph : lineGlyphRects)
-				glyph.position += textOffset;
+				glyph.position += textPos;
 
-			btnRectOffsetX += btnExtent.width;
-			glyphRectOffset += textLength;
+			btnRectPosOffsetX += btnExtent.width;
+			glyphRectIndexOffset += textLength;
 		}
 
 	}
@@ -435,6 +443,7 @@ void ButtonGroup::Render2(
 		transientAlloc);
 
 	u32 horiOffset = 0;
+	int glyphRectIndexOffset = 0;
 	for (uSize i = 0; i < btnCount; i += 1)
 	{
 		auto const& width = btnWidths[i];
@@ -442,8 +451,7 @@ void ButtonGroup::Render2(
 		Rect btnRect = {};
 		btnRect.position = widgetRect.position;
 		btnRect.position.x += horiOffset;
-		btnRect.extent.width = width;
-		btnRect.extent.height = widgetRect.extent.height;
+		btnRect.extent = { width, widgetRect.extent.height };
 
 		Math::Vec4 color = colors.inactiveColor;
 
@@ -456,28 +464,17 @@ void ButtonGroup::Render2(
 
 		drawInfo.PushFilledQuad(btnRect, color);
 
+		auto const& btnText = buttons[i].title;
+		auto textLen = buttons[i].title.size();
+		Std::Span btnGlyphRects = { &customData.glyphRects[glyphRectIndexOffset], textLen };
+		drawInfo.PushText(
+			{ btnText.data(), btnText.size() },
+			btnGlyphRects.Data(),
+			{ 1.f, 1.f, 1.f, 1.f });
+
 		horiOffset += btnRect.extent.width;
+		glyphRectIndexOffset += textLen;
 	}
-
-	// Our text was positioned in the previous step.
-	// So we can draw all the text in one call, but we need to
-	// combine all the button titles into one long one.
-	auto combinedText = Std::MakeVec<char>(transientAlloc);
-	combinedText.Resize(customData.glyphRects.Size());
-	int combinedTextOffset = 0;
-	for (int i = 0; i < btnCount; i += 1)
-	{
-		auto const& btn = buttons[i];
-		int textLength = (int)btn.title.size();
-		for (int j = 0; j < textLength; j += 1)
-			combinedText[j + combinedTextOffset] = btn.title[j];
-		combinedTextOffset += textLength;
-	}
-
-	drawInfo.PushText(
-		combinedText.ToSpan(),
-		customData.glyphRects.Data(),
-		{ 1.f, 1.f, 1.f, 1.f });
 }
 
 bool ButtonGroup::CursorMove(
@@ -527,4 +524,48 @@ bool ButtonGroup::CursorPress2(
 void ButtonGroup::CursorExit(Context& ctx)
 {
 	cursorHoverIndex = Std::nullOpt;
+}
+
+bool ButtonGroup::TouchMove2(
+	TouchMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	Impl::PointerMove_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.occluded = occluded;
+
+	Impl::PointerMove_Params tempParams {
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.rectCollection = params.rectCollection,
+		.transientAlloc = params.transientAlloc,
+		.pointer = pointer, };
+	return Impl::PointerMove(tempParams);
+}
+
+bool ButtonGroup::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.type = Impl::PointerType::Primary;
+	pointer.pressed = params.event.pressed;
+	pointer.consumed = consumed;
+
+	Impl::PointerPress_Params tempParams {
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.rectCollection = params.rectCollection,
+		.transientAlloc = params.transientAlloc,
+		.pointer = pointer, };
+	return Impl::PointerPress(tempParams);
 }

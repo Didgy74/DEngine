@@ -235,3 +235,36 @@ bool Joystick::CursorMove(
 		impl::cursorPointerId,
 		{ (f32)params.event.position.x, (f32)params.event.position.y });
 }
+
+bool Joystick::TouchMove2(
+	TouchMoveParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool occluded)
+{
+	return impl::Joystick_PointerMove(
+		*this,
+		widgetRect,
+		params.event.id,
+		params.event.position);
+}
+
+bool Joystick::TouchPress2(
+	TouchPressParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.type = impl::PointerType::Primary;
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.pressed = params.event.pressed;
+
+	return impl::Joystick_PointerPress(
+		*this,
+		widgetRect,
+		visibleRect,
+		pointer,
+		consumed);
+}

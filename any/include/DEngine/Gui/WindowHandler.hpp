@@ -11,6 +11,7 @@ namespace DEngine::Gui
 {
 	enum class SoftInputFilter : u8
 	{
+		NoFilter,
 		SignedFloat,
 		UnsignedFloat,
 		SignedInteger,

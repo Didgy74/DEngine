@@ -85,10 +85,8 @@ namespace DEngine::Application::impl
 using namespace DEngine;
 using namespace DEngine::Application;
 
-void* Application::impl::Backend::Initialize(Context& ctx)
+void* Application::impl::Backend::Initialize(Context& ctx, Context::Impl& implData)
 {
-	auto& implData = ctx.GetImplData();
-
 	bool glfwSuccess = glfwInit();
 	if (!glfwSuccess)
 		return nullptr;
@@ -104,15 +102,20 @@ void* Application::impl::Backend::Initialize(Context& ctx)
 	return backendData;
 }
 
-void Application::impl::Backend::ProcessEvents(Context& ctx, PollMode pollMode, Std::Opt<u64> const& timeoutNs)
+void Application::impl::Backend::ProcessEvents(
+	Context& ctx,
+	Context::Impl& implData,
+	void* pBackendData,
+	bool waitForEvents,
+	u64 timeoutNs)
 {
-	if (pollMode == PollMode::Immediate)
-	{
-		glfwPollEvents();
-	}
-	else if (pollMode == PollMode::Wait)
+	if (waitForEvents)
 	{
 		glfwWaitEvents();
+	}
+	else
+	{
+		glfwPollEvents();
 	}
 }
 
@@ -129,8 +132,11 @@ void Application::impl::Backend::Destroy(void* data)
 
 auto Application::impl::Backend::NewWindow(
 	Context& ctx,
-	Std::Span<char const> title,
-	Extent extent) -> NewWindow_ReturnT
+	Context::Impl& implData,
+	void* pBackendData,
+	WindowID windowId,
+	Std::Span<char const> const& title,
+	Extent extent) -> Std::Opt<NewWindow_ReturnT>
 {
 	std::string titleString;
 	titleString.resize(title.Size());
@@ -183,29 +189,27 @@ auto Application::impl::Backend::NewWindow(
 
 	glfwSetCursorPosCallback(rawHandle, &impl::Backend_GLFW_CursorPosCallback);
 
-
-
 	 */
-
-	auto& implData = ctx.GetImplData();
 	glfwSetWindowUserPointer(rawHandle, &implData);
-
 
 	NewWindow_ReturnT returnVal = {};
 	returnVal.windowData = windowData;
-	returnVal.platormHandle = rawHandle;
+	returnVal.platformHandle = rawHandle;
 
 	return returnVal;
 }
 
 void Application::impl::Backend::DestroyWindow(
 	Context::Impl& implData,
+	void* platformHandle,
 	Context::Impl::WindowNode const& windowNode)
 {
 	glfwDestroyWindow((GLFWwindow*)windowNode.platformHandle);
 }
 
 Context::CreateVkSurface_ReturnT Application::impl::Backend::CreateVkSurface(
+	Context::Impl& implData,
+	void* pBackendDataIn,
 	void* platformHandle,
 	uSize vkInstance,
 	void const* vkAllocationCallbacks) noexcept
@@ -233,16 +237,18 @@ void Application::impl::Backend::Log(
 }
 
 bool Application::impl::Backend::StartTextInputSession(
-	Context& ctx,
+	Context::Impl& ctx,
+	void* backendDataIn,
 	SoftInputFilter inputFilter,
 	Std::Span<char const> const& text)
 {
 	return true;
 }
 
-void Application::impl::Backend::StopTextInputSession(Context& ctx)
+void Application::impl::Backend::StopTextInputSession(
+	Context::Impl& implData,
+	void* backendData)
 {
-	auto& implData = ctx.GetImplData();
 	implData.textInputSessionActive = false;
 }
 

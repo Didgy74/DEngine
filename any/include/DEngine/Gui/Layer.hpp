@@ -82,10 +82,35 @@ namespace DEngine::Gui
 			bool eventConsumed = false;
 			bool destroyLayer = false;
 		};
-		[[nodiscard]] virtual Press_Return CursorPress(
-			CursorPressParams const& params,
-			bool eventConsumed) { return {}; }
+		[[nodiscard]] virtual Press_Return CursorPress(CursorPressParams const& params, bool eventConsumed) {
+			return {};
+		}
 
+		struct TouchPressParams
+		{
+			Context& ctx;
+			TextManager& textManager;
+			Rect const& windowRect;
+			Rect const& safeAreaRect;
+			RectCollection const& rectCollection;
+			TouchPressEvent const& event;
+		};
+		[[nodiscard]] virtual Press_Return TouchPress2(TouchPressParams const& params, bool eventConsumed) {
+			return {};
+		}
+
+		struct TouchMoveParams
+		{
+			Context& ctx;
+			TextManager& textManager;
+			Rect const& windowRect;
+			Rect const& safeAreaRect;
+			RectCollection const& rectCollection;
+			TouchMoveEvent const& event;
+		};
+		[[nodiscard]] virtual bool TouchMove2(TouchMoveParams const& params, bool occluded) {
+			return false;
+		}
 
 		[[nodiscard]] virtual bool CursorMove(
 			Context& ctx,

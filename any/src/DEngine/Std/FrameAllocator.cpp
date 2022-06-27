@@ -108,16 +108,20 @@ Std::Opt<Std::FrameAllocator> Std::FrameAllocator::PreAllocate(uSize size) noexc
 	}
 }
 
-void* Std::FrameAllocator::Alloc(uSize size, uSize alignment) noexcept
+namespace DEngine::Std
 {
-	auto getAlignedOffset = [](Block::DataPtrT const* ptr, uSize offset, uSize alignment) {
-		auto const asInt = (uintptr_t)ptr + offset;
-		auto const alignedAsInt = Math::CeilToMultiple(asInt, alignment);
+	static auto GetAlignedOffset(void const* ptr, uSize offset, uSize alignment)
+	{
+		u64 const asInt = (uintptr_t)ptr + offset;
+		auto const alignedAsInt = Math::CeilToMultiple(asInt, (u64)alignment);
 		DENGINE_IMPL_CONTAINERS_ASSERT((alignedAsInt % alignment) == 0);
 		auto const alignedOffset = offset + alignedAsInt - asInt;
 		return alignedOffset;
-	};
+	}
+}
 
+void* Std::FrameAllocator::Alloc(uSize size, uSize alignment) noexcept
+{
 	bool allocActiveBlock = false;
 	uSize allocActiveBlockSize = 0;
 
@@ -127,7 +131,7 @@ void* Std::FrameAllocator::Alloc(uSize size, uSize alignment) noexcept
 
 		auto& block = activeBlock;
 
-		auto const alignedOffset = getAlignedOffset(activeBlock.data, activeBlock.offset, alignment);
+		auto const alignedOffset = GetAlignedOffset(activeBlock.data, activeBlock.offset, alignment);
 		// Check if there is enough remaining space in the block
 		if (alignedOffset + size <= block.size)
 		{

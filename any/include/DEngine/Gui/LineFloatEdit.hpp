@@ -47,6 +47,12 @@ namespace DEngine::Gui
 			Rect const& widgetRect,
 			Rect const& visibleRect,
 			bool consumed) override;
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+
 		virtual void TextInput(
 			Context& ctx,
 			AllocRef const& transientAlloc,

@@ -121,6 +121,79 @@ bool DockArea::CursorPress2(
 	return DA_PointerPress(temp, consumed);
 }
 
+bool DockArea::TouchMove2(
+	TouchMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	DA_PointerMove_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+
+	auto childDispatchFn = [&params](
+		Widget& child,
+		Rect const& childRect,
+		Rect const& childVisibleRect,
+		bool childConsumed)
+	{
+		return child.TouchMove2(
+			params,
+			childRect,
+			childVisibleRect,
+			childConsumed);
+	};
+
+	DA_PointerMove_Params2 temp {
+		.dockArea = *this,
+		.rectCollection = params.rectCollection,
+		.textManager = params.textManager,
+		.transientAlloc = params.transientAlloc,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer, };
+
+	return DA_PointerMove(
+		temp,
+		occluded,
+		childDispatchFn);
+}
+bool DockArea::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	DA_PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.pressed = params.event.pressed;
+
+	auto childDispatchFn = [&params](
+		Widget& child,
+		Rect const& childRect,
+		Rect const& childVisibleRect,
+		bool childConsumed)
+	{
+		return child.TouchPress2(
+			params,
+			childRect,
+			childVisibleRect,
+			childConsumed);
+	};
+
+	DA_PointerPress_Params2 temp {
+		.dockArea = *this,
+		.transientAlloc = params.transientAlloc,
+		.rectCollection = params.rectCollection,
+		.textManager = params.textManager,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.childDispatchFn = childDispatchFn };
+	return DA_PointerPress(temp, consumed);
+}
+
 SizeHint DockArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
 {
 	auto& dockArea = *this;

@@ -341,6 +341,30 @@ bool LineFloatEdit::CursorPress2(
 	return Impl::PointerPress(temp);
 }
 
+bool LineFloatEdit::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pressed = params.event.pressed;
+	pointer.type = impl::PointerType::Primary;
+	pointer.pos = params.event.position;
+	pointer.consumed = consumed;
+
+	impl::PointerPress_Params temp = {
+		.ctx = params.ctx,
+		.widget = *this,
+		.rectCollection = params.rectCollection,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer, };
+
+	return Impl::PointerPress(temp);
+}
+
 void LineFloatEdit::SetValue(f64 in)
 {
 	std::ostringstream out;

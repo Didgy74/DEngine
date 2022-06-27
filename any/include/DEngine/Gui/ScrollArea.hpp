@@ -42,9 +42,18 @@ namespace DEngine::Gui
 			Rect const& widgetRect,
 			Rect const& visibleRect,
 			bool occluded) override;
-
 		virtual bool CursorPress2(
 			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+		virtual bool TouchMove2(
+			TouchMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool occluded) override;
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect,
 			bool consumed) override;

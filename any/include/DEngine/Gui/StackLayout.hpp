@@ -58,16 +58,16 @@ namespace DEngine::Gui
 			Rect const& visibleRect) const override;
 		virtual void CursorExit(
 			Context& ctx) override;
-		virtual bool CursorPress2(
-			CursorPressParams const& params,
-			Rect const& widgetRect,
-			Rect const& visibleRect,
-			bool consumed) override;
 		virtual bool CursorMove(
 			CursorMoveParams const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect,
 			bool occluded) override;
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
 		virtual void TextInput(
 			Context& ctx,
 			AllocRef const& transientAlloc,
@@ -77,24 +77,16 @@ namespace DEngine::Gui
 			AllocRef const& transientAlloc,
 			EndTextInputSessionEvent const& event) override;
 
-
-
-
-
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
-
-		virtual bool TouchMoveEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchMoveEvent event,
+		virtual bool TouchMove2(
+			TouchMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool occluded) override;
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
 
 	protected:
 		std::vector<Std::Box<Widget>> children;
