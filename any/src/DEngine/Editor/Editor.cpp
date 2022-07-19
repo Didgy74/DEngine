@@ -482,6 +482,7 @@ void Editor::Context::ProcessEvents()
 		implData.indices.clear();
 		implData.drawCmds.clear();
 		implData.windowUpdates.clear();
+
 		Gui::Context::Render2_Params renderParams {
 			.rectCollection = implData.guiRectCollection,
 			.transientAlloc = implData.guiTransientAlloc,

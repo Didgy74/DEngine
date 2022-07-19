@@ -17,26 +17,25 @@ namespace DEngine::Std
 		constexpr Box() noexcept : data{ nullptr } {}
 
 		constexpr Box(decltype(nullptr)) noexcept : data(nullptr) {}
+		// To disable accidental implicit conversion from integer to nullptr.
+		explicit Box(int) = delete;
 
 		Box(Box const&) = delete;
 
 		constexpr Box(Box&& other) noexcept :
-			data(other.data)
-		{
+			data { other.data } {
 			other.data = nullptr;
 		}
 
 		template<class U> requires (Trait::hasVirtualDestructor<T>)
 		constexpr Box(Box<U>&& in) noexcept :
-			data{ in.data }
-		{
+			data{ in.data } {
 			in.data = nullptr;
 		}
 
 		explicit constexpr Box(T* ptr) noexcept : data{ ptr } {}
 
-		~Box()
-		{
+		~Box() {
 			Clear();
 		}
 
@@ -52,7 +51,6 @@ namespace DEngine::Std
 			return *this;
 		}
 		Box& operator=(decltype(nullptr)) noexcept;
-
 
 		[[nodiscard]] T* Get() noexcept;
 		[[nodiscard]] T const* Get() const noexcept;
@@ -72,7 +70,6 @@ namespace DEngine::Std
 		void Clear() noexcept;
 
 	protected:
-		
 		T* data = nullptr;
 	};
 

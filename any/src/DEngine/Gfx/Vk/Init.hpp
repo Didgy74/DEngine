@@ -4,7 +4,7 @@
 #include "VulkanIncluder.hpp"
 #include "DynamicDispatch.hpp"
 
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/AllocRef.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 

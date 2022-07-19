@@ -6,7 +6,7 @@
 #include <DEngine/Gui/AllocRef.hpp>
 #include <DEngine/Gui/Utility.hpp>
 
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 
 namespace DEngine::Gui
 {

@@ -3,7 +3,8 @@
 #include <DEngine/Application.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
+#include <DEngine/Std/Containers/FnRef.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
@@ -18,183 +19,6 @@
 #	define DENGINE_APP_MAIN_ENTRYPOINT main
 #endif
 
-namespace DEngine::Application::impl
-{
-	enum class EventType : u8
-	{
-		ButtonEvent,
-		CursorMoveEvent,
-		TextInputEvent,
-		EndTextInputSessionEvent,
-		TouchEvent,
-		WindowCloseSignalEvent,
-		WindowCursorEnterEvent,
-		WindowFocusEvent,
-		WindowMinimizeEvent,
-		WindowMoveEvent,
-		WindowResizeEvent,
-	};
-	template<class T>
-	constexpr EventType GetEventType();
-
-	struct ButtonEvent
-	{
-		WindowID windowId;
-		Button btn;
-		bool state;
-	};
-	template<>
-	constexpr EventType GetEventType<ButtonEvent>() { return EventType::ButtonEvent; }
-
-	struct EndTextInputSessionEvent
-	{
-		WindowID windowId;
-	};
-	template<>
-	constexpr EventType GetEventType<EndTextInputSessionEvent>() { return EventType::EndTextInputSessionEvent; }
-
-	struct CursorMoveEvent
-	{
-		WindowID windowId;
-		Math::Vec2Int pos;
-		Math::Vec2Int delta;
-	};
-	template<>
-	constexpr EventType GetEventType<CursorMoveEvent>() { return EventType::CursorMoveEvent; }
-
-	struct TextInputEvent
-	{
-		WindowID windowId;
-		uSize oldIndex;
-		uSize oldCount;
-		uSize newTextOffset;
-		uSize newTextSize;
-	};
-	template<>
-	constexpr EventType GetEventType<TextInputEvent>() { return EventType::TextInputEvent; }
-
-	struct TouchEvent
-	{
-		WindowID windowId;
-		TouchEventType type;
-		u8 id;
-		f32 x;
-		f32 y;
-	};
-	template<>
-	constexpr EventType GetEventType<TouchEvent>() { return EventType::TouchEvent; }
-
-	struct WindowCursorEnterEvent
-	{
-		WindowID window;
-		bool entered;
-	};
-	template<>
-	constexpr EventType GetEventType<WindowCursorEnterEvent>() { return EventType::WindowCursorEnterEvent; }
-
-	struct WindowCloseSignalEvent
-	{
-		WindowID window;
-	};
-	template<>
-	constexpr EventType GetEventType<WindowCloseSignalEvent>() { return EventType::WindowCloseSignalEvent; }
-
-	struct WindowFocusEvent
-	{
-		WindowID window;
-		bool focusGained;
-	};
-	template<>
-	constexpr EventType GetEventType<WindowFocusEvent>() { return EventType::WindowFocusEvent; }
-
-	struct WindowMoveEvent
-	{
-		WindowID window;
-		Math::Vec2Int position;
-	};
-	template<>
-	constexpr EventType GetEventType<WindowMoveEvent>() { return EventType::WindowMoveEvent; }
-
-	struct WindowResizeEvent
-	{
-		WindowID window;
-		Extent extent;
-		Math::Vec2UInt safeAreaOffset;
-		Extent safeAreaExtent;
-	};
-	template<>
-	constexpr EventType GetEventType<WindowResizeEvent>() { return EventType::WindowResizeEvent; }
-
-	union EventUnion
-	{
-		ButtonEvent buttonEvent;
-		CursorMoveEvent cursorMoveEvent;
-		TextInputEvent textInputEvent;
-		EndTextInputSessionEvent endTextInputSessionEvent;
-		TouchEvent touchEvent;
-		WindowCloseSignalEvent windowCloseSignalEvent;
-		WindowCursorEnterEvent windowCursorEnterEvent;
-		WindowFocusEvent windowFocusEvent;
-		WindowMoveEvent windowMoveEvent;
-		WindowResizeEvent windowResizeEvent;
-	};
-
-	template<class T>
-	constexpr auto& EventUnion_Get(EventUnion& in);
-	template<EventType type>
-	constexpr auto& EventUnion_Get(EventUnion& in);
-	template<EventType type>
-	constexpr auto const& EventUnion_Get(EventUnion const& in) { return EventUnion_Get<type>(const_cast<EventUnion&>(in)); }
-
-	template<>
-	constexpr auto& EventUnion_Get<ButtonEvent>(EventUnion& in) { return in.buttonEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<EventType::ButtonEvent>(EventUnion& in) { return in.buttonEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<CursorMoveEvent>(EventUnion& in) { return in.cursorMoveEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<EventType::CursorMoveEvent>(EventUnion& in) { return in.cursorMoveEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<TextInputEvent>(EventUnion& in) { return in.textInputEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<EventType::TextInputEvent>(EventUnion& in) { return in.textInputEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<EndTextInputSessionEvent>(EventUnion& in) { return in.endTextInputSessionEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<EventType::EndTextInputSessionEvent>(EventUnion& in) { return in.endTextInputSessionEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<TouchEvent>(EventUnion& in) { return in.touchEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<EventType::TouchEvent>(EventUnion& in) { return in.touchEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<WindowCloseSignalEvent>(EventUnion& in) { return in.windowCloseSignalEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<EventType::WindowCloseSignalEvent>(EventUnion& in) { return in.windowCloseSignalEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<WindowCursorEnterEvent>(EventUnion& in) { return in.windowCursorEnterEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<EventType::WindowCursorEnterEvent>(EventUnion& in) { return in.windowCursorEnterEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<WindowFocusEvent>(EventUnion& in) { return in.windowFocusEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<EventType::WindowFocusEvent>(EventUnion& in) { return in.windowFocusEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<WindowMoveEvent>(EventUnion& in) { return in.windowMoveEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<EventType::WindowMoveEvent>(EventUnion& in) { return in.windowMoveEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<WindowResizeEvent>(EventUnion& in) { return in.windowResizeEvent; }
-	template<>
-	constexpr auto& EventUnion_Get<EventType::WindowResizeEvent>(EventUnion& in) { return in.windowResizeEvent; }
-
-	struct EventCallbackJob
-	{
-		EventType type = {};
-		EventForwarder* ptr = nullptr;
-		EventUnion eventUnion = {};
-	};
-}
-
 struct DEngine::Application::Context::Impl
 {
 	[[nodiscard]] static Context Initialize();
@@ -203,6 +27,11 @@ struct DEngine::Application::Context::Impl
 		bool waitForEvents,
 		u64 timeoutNs,
 		bool returnImmediateOnFirstCall);
+
+	Impl() = default;
+	Impl(Impl const&) = delete;
+	Impl(Impl&&) = delete;
+
 
 	bool isFirstCall = true;
 	void* backendData = nullptr;
@@ -214,6 +43,7 @@ struct DEngine::Application::Context::Impl
 		Extent extent = {};
 		Math::Vec2UInt visibleOffset = {};
 		Extent visibleExtent = {};
+		Orientation orientation = {};
 
 		bool isMinimized = false;
 		bool shouldShutdown = false;
@@ -225,10 +55,10 @@ struct DEngine::Application::Context::Impl
 	u64 windowIdTracker = 0;
 	struct WindowNode
 	{
-		WindowID id;
-		WindowData windowData;
-		WindowEvents events;
-		void* platformHandle;
+		WindowID id = {};
+		WindowData windowData = {};
+		WindowEvents events = {};
+		void* platformHandle = nullptr;
 	};
 	std::vector<WindowNode> windows;
 	[[nodiscard]] WindowNode* GetWindowNode(WindowID id);
@@ -267,7 +97,11 @@ struct DEngine::Application::Context::Impl
 	// Pending event callbacks are stored in a vector.
 	std::vector<EventForwarder*> eventForwarders;
 
-	std::vector<impl::EventCallbackJob> queuedEventCallbacks;
+
+	std::vector<Std::FnRef<void(Context&, Context::Impl&, EventForwarder&)>> queuedEventCallbacks;
+	// USE ONLY WITH THE queuedEventCallbacks vector!!!!
+	Std::FrameAlloc queuedEvents_InnerBuffer = Std::FrameAlloc::PreAllocate(1024).Get();
+
 
 	bool textInputSessionActive = false;
 	uSize textInputSelectedIndex = 0;
@@ -341,10 +175,21 @@ namespace DEngine::Application::impl::BackendInterface
 		Context::Impl& implData,
 		WindowID id);
 
+	// Send false for a restore event, or true for a minimize event.
+	[[maybe_unused]] void PushWindowMinimizeSignal(
+		Context::Impl& implData,
+		WindowID id,
+		bool minimized);
+
 	[[maybe_unused]] void UpdateWindowCursorEnter(
 		Context::Impl& implData,
 		WindowID id,
 		bool entered);
+
+	[[maybe_unused]] void WindowReorientation(
+		Context::Impl& implData,
+		WindowID id,
+		Orientation newOrientation);
 
 	[[maybe_unused]] void UpdateWindowFocus(
 		Context::Impl& implData,
@@ -359,7 +204,10 @@ namespace DEngine::Application::impl::BackendInterface
 	[[maybe_unused]] void UpdateWindowSize(
 		Context::Impl& implData,
 		WindowID id,
-		Extent newSize);
+		Extent windowExtent,
+		u32 safeAreaOffsetX,
+		u32 safeAreaOffsetY,
+		Extent safeAreaExtent);
 
 	[[maybe_unused]] void UpdateCursorPosition(
 		Context::Impl& implData,

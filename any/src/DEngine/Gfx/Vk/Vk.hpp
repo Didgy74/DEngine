@@ -19,7 +19,7 @@
 #include <DEngine/Gfx/Gfx.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
 #include <DEngine/Std/Containers/Pair.hpp>
@@ -93,7 +93,7 @@ namespace DEngine::Gfx::Vk
 
 		GlobUtils globUtils = {};
 
-		Std::FrameAllocator frameAllocator;
+		Std::BumpAllocator frameAllocator;
 		DeletionQueue delQueue;
 
 		GizmoManager gizmoManager = {};

@@ -178,7 +178,7 @@ namespace DEngine::Gfx::Vk::ViewportMgrImpl
 		DelQueue& delQueue,
 		Std::AllocRef const& transientAlloc)
 	{
-		auto tempDeleteJobs = Std::MakeVec<ViewportID>(transientAlloc);
+		auto tempDeleteJobs = Std::NewVec<ViewportID>(transientAlloc);
 		{
 			std::scoped_lock lock { viewportManager.deleteQueue_Lock };
 
@@ -217,7 +217,7 @@ namespace DEngine::Gfx::Vk::ViewportMgrImpl
 		GlobUtils const& globUtils,
 		Std::AllocRef const& transientAlloc)
 	{
-		auto tempCreateJobs = Std::MakeVec<ViewportManager::CreateJob>(transientAlloc);
+		auto tempCreateJobs = Std::NewVec<ViewportManager::CreateJob>(transientAlloc);
 		{
 			std::scoped_lock lock{ viewportManager.createQueue_Lock };
 			tempCreateJobs.Resize(viewportManager.createQueue.size());
@@ -234,7 +234,10 @@ namespace DEngine::Gfx::Vk::ViewportMgrImpl
 				viewportManager.camElementSize,
 				viewportManager.cameraDescrLayout);
 
-			viewportManager.viewportNodes.push_back({ createJob.id, newViewport });
+			ViewportMan::Node newNode = {};
+			newNode.id = createJob.id;
+			newNode.viewport = newViewport;
+			viewportManager.viewportNodes.push_back(newNode);
 		}
 	}
 }

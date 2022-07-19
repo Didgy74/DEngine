@@ -8,8 +8,9 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
-#include <DEngine/Std/Containers/Fn.hpp>
+#include <DEngine/Std/Containers/FnRef.hpp>
 #include <DEngine/Std/Containers/Variant.hpp>
 
 #include <DEngine/Application.hpp>
@@ -20,22 +21,6 @@
 
 namespace DEngine::Editor
 {
-	namespace impl
-	{
-		using GuiEvent_T = Std::Variant<
-			Gui::CursorPressEvent,
-			Gui::CursorMoveEvent,
-			Gui::TextInputEvent,
-			Gui::EndTextInputSessionEvent,
-			Gui::TouchPressEvent,
-			Gui::TouchMoveEvent,
-			Gui::WindowCloseEvent,
-			Gui::WindowCursorExitEvent,
-			Gui::WindowMinimizeEvent,
-			Gui::WindowMoveEvent,
-			Gui::WindowResizeEvent>;
-	}
-
 	enum class GizmoType : u8 { Translate, Rotate, Scale, COUNT };
 	class EntityIdList;
 	class ComponentList;
@@ -96,15 +81,24 @@ namespace DEngine::Editor
 			Math::Vec2UInt visibleOffset,
 			App::Extent visibleExtent) override;
 
-		std::vector<impl::GuiEvent_T> queuedGuiEvents;
+		std::vector<Std::FnRef<void(EditorImpl&, Gui::Context&)>> queuedGuiEvents;
+		Std::FrameAlloc queuedGuiEvents_InnerBuffer = Std::FrameAlloc::PreAllocate(1024).Get();
 		std::vector<u32> guiQueuedTextInputData;
+		template<class Callable>
+		void PushQueuedGuiEvent(Callable const& in) {
+			auto* temp = (Callable*)queuedGuiEvents_InnerBuffer.Alloc(
+				sizeof(Callable),
+				alignof(Callable));
+			new(temp) Callable(in);
+			queuedGuiEvents.push_back({ *temp });
+		}
+
 
 		// Override window-handler methods
 		virtual void CloseWindow(Gui::WindowID) override;
 		virtual void SetCursorType(Gui::WindowID, Gui::CursorType) override;
 		virtual void HideSoftInput() override;
 		virtual void OpenSoftInput(Std::Span<char const>, Gui::SoftInputFilter) override;
-
 
 		std::vector<Gfx::GuiVertex> vertices;
 		std::vector<u32> indices;

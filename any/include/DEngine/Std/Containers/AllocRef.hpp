@@ -1,6 +1,6 @@
 #pragma once
 
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 
 namespace DEngine::Std
 {
@@ -14,8 +14,8 @@ namespace DEngine::Std
 		[[nodiscard]] void* Alloc(uSize size, uSize alignment) const noexcept {
 			return frameAlloc->Alloc(size, alignment);
 		}
-		[[nodiscard]] bool Realloc(void* ptr, uSize newSize) const noexcept {
-			return frameAlloc->Realloc(ptr, newSize);
+		[[nodiscard]] bool Resize(void* ptr, uSize newSize) const noexcept {
+			return frameAlloc->Resize(ptr, newSize);
 		}
 		// Passing in a pointer value that was not returned by Alloc is UB.
 		void Free(void* in) const noexcept {

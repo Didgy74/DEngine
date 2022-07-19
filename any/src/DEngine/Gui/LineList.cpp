@@ -8,32 +8,44 @@ using namespace DEngine::Gui;
 
 namespace DEngine::Gui::impl
 {
-	[[nodiscard]] static constexpr uSize LineList_GetFirstVisibleLine(
-		u32 lineHeight,
-		i32 widgetPosY,
-		i32 visiblePosY) noexcept
-	{
-		return static_cast<uSize>((visiblePosY - widgetPosY) / (f32)lineHeight);
-	}
-
-	[[nodiscard]] static constexpr uSize LineList_GetVisibleLineCount(
-		u32 lineHeight,
-		u32 visibleHeight) noexcept
-	{
-		return static_cast<uSize>(visibleHeight / (f32)lineHeight) + 2;
-	}
-
-	[[nodiscard]] static constexpr uSize LineList_GetLastVisibleLine(
+	[[nodiscard]] static uSize LineList_GetFirstVisibleLine(
 		u32 lineHeight,
 		i32 widgetPosY,
 		i32 visiblePosY,
-		u32 visibleHeight) noexcept
+		uSize linecount) noexcept
 	{
-		uSize const visibleBegin = impl::LineList_GetFirstVisibleLine(lineHeight, widgetPosY, visiblePosY);
-		return visibleBegin + impl::LineList_GetVisibleLineCount(lineHeight, visibleHeight);
+		auto temp = visiblePosY - widgetPosY;
+		auto b = (uSize)Math::Floor((f32)temp / (f32)lineHeight);
+		DENGINE_IMPL_ASSERT(b >= 0);
+		b = Math::Min(linecount, b);
+		return b;
 	}
 
-	[[nodiscard]] static constexpr Rect GetLineRect(
+	[[nodiscard]] static uSize LineList_GetVisibleLineCount(
+		u32 lineHeight,
+		u32 visibleHeight) noexcept
+	{
+		return (uSize)Math::Ceil((f32)visibleHeight / (f32)lineHeight);
+	}
+
+	[[nodiscard]] static uSize LineList_GetLastVisibleLine(
+		u32 lineHeight,
+		i32 widgetPosY,
+		i32 visiblePosY,
+		u32 visibleHeight,
+		uSize linecount) noexcept
+	{
+		uSize const visibleBegin = impl::LineList_GetFirstVisibleLine(
+			lineHeight,
+			widgetPosY,
+			visiblePosY,
+			linecount);
+		auto temp = visibleBegin + impl::LineList_GetVisibleLineCount(lineHeight, visibleHeight);
+		temp = Math::Min(linecount, temp);
+		return temp;
+	}
+
+	[[nodiscard]] static Rect GetLineRect(
 		Math::Vec2Int widgetPosition,
 		u32 widgetWidth,
 		u32 lineHeight,
@@ -47,7 +59,7 @@ namespace DEngine::Gui::impl
 		return returnVal;
 	}
 
-	[[nodiscard]] static constexpr uSize GetHoveredIndex(
+	[[nodiscard]] static uSize GetHoveredIndex(
 		i32 pointerPosY,
 		i32 widgetPosY,
 		u32 lineHeight) noexcept
@@ -92,8 +104,8 @@ struct LineList::Impl
 		{
 		}
 
-		using LineHeightT = u32;
-		LineHeightT lineHeight = {};
+		// Does NOT include any margins.
+		u32 lineHeight = {};
 
 		// Only included when we are rendering
 		Std::Vec<Rect, RectCollection::AllocRefT> lineGlyphRects;
@@ -196,24 +208,27 @@ void LineList::BuildChildRects(
 		DENGINE_IMPL_ASSERT(customDataPtr);
 		auto& customData = *customDataPtr;
 
-		auto const visibleBegin = impl::LineList_GetFirstVisibleLine(
-			customData.lineHeight,
-			widgetRect.position.y,
-			visibleRect.position.y);
-		auto const visibleEnd = impl::LineList_GetLastVisibleLine(
-			customData.lineHeight,
+		auto const totalLineHeight = customData.lineHeight + textMargin * 2;
+		auto const linecount = (int)lines.size();
+
+		auto visibleBegin = (int)impl::LineList_GetFirstVisibleLine(
+			totalLineHeight,
 			widgetRect.position.y,
 			visibleRect.position.y,
-			visibleRect.extent.height);
-
+			linecount);
+		auto visibleEnd = (int)impl::LineList_GetLastVisibleLine(
+			totalLineHeight,
+			widgetRect.position.y,
+			visibleRect.position.y,
+			visibleRect.extent.height,
+			linecount);
 
 		// First count up the total amount of Rects we need
-		auto const linecount = lines.size();
-		auto const visibleLineCount = Math::Min(linecount, visibleEnd - visibleBegin);
+		auto const visibleLineCount = visibleEnd - visibleBegin;
+
 		customData.lineGlyphRectOffsets.Resize(visibleLineCount);
 		uSize rectCount = 0;
-		for (int i = 0; i < visibleLineCount; i += 1)
-		{
+		for (int i = 0; i < visibleLineCount; i += 1) {
 			customData.lineGlyphRectOffsets[i] = rectCount;
 			auto const lineIndex = i + visibleBegin;
 			rectCount += lines[lineIndex].size();
@@ -221,12 +236,15 @@ void LineList::BuildChildRects(
 
 		// Then allocate the space we need for these rects, and load into them.
 		customData.lineGlyphRects.Resize(rectCount);
-		auto posOffset = widgetRect.position;
-		posOffset.x += (i32)textMargin;
-		posOffset.y += (i32)textMargin;
 		for (int i = 0; i < visibleLineCount; i += 1)
 		{
 			auto const lineIndex = i + visibleBegin;
+
+			auto posOffset = widgetRect.position;
+			posOffset.y += (i32)totalLineHeight * lineIndex;
+			posOffset.x += (i32)textMargin;
+			posOffset.y += (i32)textMargin;
+
 			auto const& line = lines[lineIndex];
 			auto const lineGlyphRectOffset = customData.lineGlyphRectOffsets[i];
 			auto* lineGlyphRects = &customData.lineGlyphRects[lineGlyphRectOffset];
@@ -235,9 +253,6 @@ void LineList::BuildChildRects(
 				{ line.data(), line.size() },
 				posOffset,
 				lineGlyphRects);
-
-			posOffset.y += customData.lineHeight;
-			posOffset.y += textMargin * 2;
 		}
 	}
 }
@@ -259,17 +274,21 @@ void LineList::Render2(
 
 	auto const totalLineHeight = customData.lineHeight + textMargin * 2;
 
+	auto const linecount = lines.size();
+
 	auto const visibleBegin = impl::LineList_GetFirstVisibleLine(
 		totalLineHeight,
 		widgetRect.position.y,
-		visibleRect.position.y);
+		visibleRect.position.y,
+		linecount);
 	auto const visibleEnd = impl::LineList_GetLastVisibleLine(
 		totalLineHeight,
 		widgetRect.position.y,
 		visibleRect.position.y,
-		visibleRect.extent.height);
-	auto const linecount = lines.size();
-	auto const visibleLineCount = Math::Min(linecount, visibleEnd - visibleBegin);
+		visibleRect.extent.height,
+		linecount);
+
+	auto const visibleLineCount = visibleEnd - visibleBegin;
 
 	for (uSize i = visibleBegin; i < visibleEnd; i += 1)
 	{

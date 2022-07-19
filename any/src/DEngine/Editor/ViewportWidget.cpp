@@ -1370,6 +1370,49 @@ bool InternalViewportWidget::CursorMove(
 	return impl::PointerMove(temp);
 }
 
+bool InternalViewportWidget::TouchMove2(
+	TouchMoveParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool occluded)
+{
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.posDelta = {};
+	pointer.occluded = occluded;
+
+	impl::PointerMove_Params temp = {
+		.widget = *this,
+		.ctx = params.ctx,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer, };
+	return impl::PointerMove(temp);
+}
+
+bool InternalViewportWidget::TouchPress2(
+	TouchPressParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.pressed = params.event.pressed;
+	pointer.type = impl::PointerType::Primary;
+
+	impl::PointerPress_Params temp = {
+		.widget = *this,
+		.ctx = params.ctx,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.eventConsumed = consumed, };
+	return impl::PointerPress(temp);
+}
+
 ViewportWidget::ViewportWidget(EditorImpl& implData) :
 	editorImpl(&implData)
 {

@@ -72,7 +72,7 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	CreateVkInstance_Return returnValue = {};
 
 	// Build what extensions we are going to use
-	auto extensionsToUse = Std::MakeVec<char const*>(transientAlloc);
+	auto extensionsToUse = Std::NewVec<char const*>(transientAlloc);
 	extensionsToUse.Reserve(requiredExtensionsIn.Size() + Constants::requiredInstanceExtensions.size());
 	// First copy all required instance extensions
 	for (uSize i = 0; i < requiredExtensionsIn.Size(); i++)
@@ -99,7 +99,7 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	vkResult = baseDispatch.EnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr);
 	if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 		throw std::runtime_error("Vulkan: Unable to enumerate available instance extension properties.");
-	auto availableExtensions = Std::MakeVec<vk::ExtensionProperties>(transientAlloc);
+	auto availableExtensions = Std::NewVec<vk::ExtensionProperties>(transientAlloc);
 	availableExtensions.Resize(instanceExtensionCount);
 	vkResult = baseDispatch.EnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableExtensions.Data());
 	for (const char* required : extensionsToUse)
@@ -333,7 +333,7 @@ Vk::PhysDeviceInfo Vk::Init::LoadPhysDevice(
 		throw std::runtime_error("Vulkan: Unable to enumerate physical devices.");
 	if (physicalDeviceCount == 0)
 		throw std::runtime_error("Vulkan: Host machine has no Vulkan-capable devices.");
-	auto physDevices = Std::MakeVec<vk::PhysicalDevice>(transientAlloc);
+	auto physDevices = Std::NewVec<vk::PhysicalDevice>(transientAlloc);
 	physDevices.Resize(physicalDeviceCount);
 	vkResult = instance.enumeratePhysicalDevices(&physicalDeviceCount, physDevices.Data());
 	if (vkResult != vk::Result::eSuccess)
@@ -348,7 +348,7 @@ Vk::PhysDeviceInfo Vk::Init::LoadPhysDevice(
 		physDevice.handle,
 		&queueFamilyPropertyCount,
 		nullptr);
-	auto availableQueueFamilies = Std::MakeVec<vk::QueueFamilyProperties>(transientAlloc);
+	auto availableQueueFamilies = Std::NewVec<vk::QueueFamilyProperties>(transientAlloc);
 	availableQueueFamilies.Resize(queueFamilyPropertyCount);
 	instance.getPhysicalDeviceQueueFamilyProperties(
 		physDevice.handle, 
@@ -487,7 +487,7 @@ vk::Device Vk::Init::CreateDevice(
 	vkResult = instance.enumeratePhysicalDeviceExtensionProperties(physDevice.handle, &deviceExtensionCount, nullptr);
 	if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 		throw std::runtime_error("Vulkan: Unable to enumerate device extensions.");
-	auto availableExtensions = Std::MakeVec<vk::ExtensionProperties>(transientAlloc);
+	auto availableExtensions = Std::NewVec<vk::ExtensionProperties>(transientAlloc);
 	availableExtensions.Resize(deviceExtensionCount);
 	vkResult = instance.enumeratePhysicalDeviceExtensionProperties(physDevice.handle, &deviceExtensionCount, availableExtensions.Data());
 	// Check if all required extensions are present

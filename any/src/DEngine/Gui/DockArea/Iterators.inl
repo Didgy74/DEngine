@@ -8,7 +8,7 @@
 
 #include <DEngine/Std/Trait.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 
 namespace DEngine::Gui::impl
 {

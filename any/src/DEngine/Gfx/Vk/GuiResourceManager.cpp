@@ -129,7 +129,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::MakeVec<char>(transientAlloc);
+		auto vertCode = Std::NewVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -149,7 +149,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::MakeVec<char>(transientAlloc);
+		auto fragCode = Std::NewVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
@@ -309,7 +309,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::MakeVec<char>(transientAlloc);
+		auto vertCode = Std::NewVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -329,7 +329,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::MakeVec<char>(transientAlloc);
+		auto fragCode = Std::NewVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
@@ -517,7 +517,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::MakeVec<char>(transientAlloc);
+		auto vertCode = Std::NewVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -537,7 +537,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::MakeVec<char>(transientAlloc);
+		auto fragCode = Std::NewVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();

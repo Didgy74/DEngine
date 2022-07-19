@@ -1,5 +1,7 @@
 #pragma once
 
+#include <DEngine/impl/Application.hpp>
+
 #include <android/asset_manager.h>
 #include <android/input.h>
 #include <android/native_activity.h>
@@ -8,6 +10,7 @@
 
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/FnRef.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 
 #include <thread>
 #include <vector>
@@ -51,13 +54,17 @@ namespace DEngine::Application::impl
 	{
 		enum class Type
 		{
+			OnResume,
+			OnPause,
 			TextInput,
 			EndTextInputSession,
 			NativeWindowCreated,
+			NativeWindowResized,
 			NativeWindowDestroyed,
 			InputQueueCreated,
-			VisibleAreaChanged,
-			NewOrientation,
+			InputQueueDestroyed,
+			ContentRectChanged,
+			DeviceOrientation,
 		};
 		Type type;
 
@@ -68,19 +75,31 @@ namespace DEngine::Application::impl
 			ANativeWindow* nativeWindow;
 		};
 		template<>
+		struct Data<Type::NativeWindowResized> {
+			ANativeWindow* nativeWindow;
+		};
+		template<>
+		struct Data<Type::NativeWindowDestroyed> {
+			ANativeWindow* nativeWindow;
+		};
+		template<>
 		struct Data<Type::InputQueueCreated> {
 			AInputQueue* inputQueue;
 		};
 		template<>
-		struct Data<Type::VisibleAreaChanged> {
+		struct Data<Type::InputQueueDestroyed> {
+			AInputQueue* inputQueue;
+		};
+		template<>
+		struct Data<Type::ContentRectChanged> {
 			u32 offsetX;
 			u32 offsetY;
 			u32 width;
 			u32 height;
 		};
 		template<>
-		struct Data<Type::NewOrientation> {
-			uint8_t newOrientation;
+		struct Data<Type::DeviceOrientation> {
+			Orientation newOrientation;
 		};
 		template<>
 		struct Data<Type::TextInput> {
@@ -93,21 +112,33 @@ namespace DEngine::Application::impl
 		union Data_T
 		{
 			Data<Type::NativeWindowCreated> nativeWindowCreated;
+			Data<Type::NativeWindowResized> nativeWindowResized;
 			Data<Type::NativeWindowDestroyed> nativeWindowDestroyed;
 			Data<Type::InputQueueCreated> inputQueueCreated;
-			Data<Type::VisibleAreaChanged> visibleAreaChanged;
-			Data<Type::NewOrientation> newOrientation;
+			Data<Type::InputQueueDestroyed> inputQueueDestroyed;
+			Data<Type::ContentRectChanged> contentRectChanged;
+			Data<Type::DeviceOrientation> deviceOrientation;
 			Data<Type::TextInput> textInput;
 		};
 		Data_T data;
 	};
 
-	using CustomEvent_CallbackFnT = Std::FnRef<void(CustomEvent const&)>;
+	using CustomEvent_CallbackFnT = Std::FnRef<void(CustomEvent::Type)>;
+
+	struct CustomEvent2 {
+		CustomEvent::Type type;
+		Std::FnRef<void(Context::Impl&, BackendData&)> fn;
+	};
 
 	struct PollSource {
 		Context::Impl* implData = nullptr;
 		BackendData* backendData = nullptr;
 		Std::Opt<CustomEvent_CallbackFnT> customEvent_CallbackFnOpt;
+	};
+
+	struct JniMethodIds {
+		jmethodID openSoftInput = nullptr;
+		jmethodID hideSoftInput = nullptr;
 	};
 
 	struct BackendData
@@ -123,12 +154,15 @@ namespace DEngine::Application::impl
 		// poll the events with the ALooper.
 		int customEventFd = 0;
 
+		// I think this is owned by the
+		// Java thread, by default we should not touch its members directly?
 		ANativeActivity* nativeActivity = nullptr;
 		PollSource pollSource = {};
 
 		std::thread gameThread;
 
 		Std::Opt<WindowID> currentWindow;
+		ALooper* gameThreadAndroidLooper = nullptr;
 		ANativeWindow* nativeWindow = nullptr;
 		AInputQueue* inputQueue = nullptr;
 		Math::Vec2UInt visibleAreaOffset;
@@ -136,16 +170,21 @@ namespace DEngine::Application::impl
 		Orientation currentOrientation;
 
 		JavaVM* globalJavaVm = nullptr;
+		// This is initialized to be a global Java ref
 		jobject mainActivity = nullptr;
 		AAssetManager* assetManager = nullptr;
 		// JNI Envs are per-thread. This is for the game thread, it is created when attaching
 		// the thread to the JavaVM.
 		JNIEnv* gameThreadJniEnv = nullptr;
-		jmethodID jniOpenSoftInput = nullptr;
-		jmethodID jniHideSoftInput = nullptr;
+		JniMethodIds jniMethodIds = {};
+
 		std::mutex customEventQueueLock;
 		std::vector<CustomEvent> customEventQueue;
 		std::vector<u32> customEvent_textInputs;
+		std::vector<CustomEvent2> customEventQueue2;
+		// ONLY USE WITH customEventQueue member!!!
+		Std::FrameAlloc queuedEvents_InnerBuffer = Std::FrameAlloc::PreAllocate(1024).Get();
+
 	};
 
 	extern BackendData* pBackendData;

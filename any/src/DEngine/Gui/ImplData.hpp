@@ -5,7 +5,7 @@
 #include <DEngine/Gui/WindowHandler.hpp>
 #include <DEngine/Gui/RectCollection.hpp>
 
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>

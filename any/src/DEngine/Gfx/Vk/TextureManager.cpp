@@ -112,7 +112,7 @@ void TextureManager::Update(
 					name.c_str());
 			}
 
-			auto workingMemory = Std::MakeVec<char>(transientAlloc);
+			auto workingMemory = Std::NewVec<char>(transientAlloc);
 			if (texFileInfo.workingMemoryRequired() > 0)
 				workingMemory.Resize(texFileInfo.workingMemoryRequired());
 

@@ -255,13 +255,13 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	}
 
 	// Record all the GUI shit.
-	auto swapchainIndices = Std::MakeVec<u32>(transientAlloc);
+	auto swapchainIndices = Std::NewVec<u32>(transientAlloc);
 	swapchainIndices.Resize(drawParams.nativeWindowUpdates.size());
-	auto swapchains = Std::MakeVec<vk::SwapchainKHR>(transientAlloc);
+	auto swapchains = Std::NewVec<vk::SwapchainKHR>(transientAlloc);
 	swapchains.Resize(drawParams.nativeWindowUpdates.size());
-	auto swapchainImageReadySemaphores = Std::MakeVec<vk::Semaphore>(transientAlloc);
+	auto swapchainImageReadySemaphores = Std::NewVec<vk::Semaphore>(transientAlloc);
 	swapchainImageReadySemaphores.Resize(drawParams.nativeWindowUpdates.size());
-	auto swapchainImageReadyStages = Std::MakeVec<vk::PipelineStageFlags>(transientAlloc);
+	auto swapchainImageReadyStages = Std::NewVec<vk::PipelineStageFlags>(transientAlloc);
 	swapchainImageReadyStages.Resize(drawParams.nativeWindowUpdates.size());
 	for (auto& item : swapchainImageReadyStages)
 		item = vk::PipelineStageFlagBits::eColorAttachmentOutput;

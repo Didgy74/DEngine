@@ -57,6 +57,7 @@ namespace DEngine::Math
 	[[nodiscard]] constexpr f64 Clamp(f64 value, f64 min, f64 max);
 
 	[[nodiscard]] f32 Floor(f32 input);
+	[[nodiscard]] f64 Floor(f64 input);
 
 	[[nodiscard]] constexpr f32 Lerp(f32 a, f32 b, f32 delta);
 	[[nodiscard]] constexpr f64 Lerp(f64 a, f64 b, f64 delta);

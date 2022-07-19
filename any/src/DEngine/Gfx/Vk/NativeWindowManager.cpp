@@ -5,7 +5,7 @@
 #include "QueueData.hpp"
 
 #include <DEngine/Math/Common.hpp>
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Utility.hpp>
 #include <DEngine/Std/Containers/AllocRef.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
@@ -139,6 +139,22 @@ using namespace DEngine;
 using namespace DEngine::Gfx;
 using namespace DEngine::Gfx::Vk;
 
+namespace DEngine::Gfx::Vk {
+	[[nodiscard]] static bool HasAnyResizeEvents(Std::Span<NativeWindowUpdate const> const& windowUpdates) {
+		for (auto const& item : windowUpdates)
+		{
+			switch (item.event)
+			{
+				case NativeWindowEvent::Resize:
+				case NativeWindowEvent::Restore:
+					return true;
+				default: {}
+			}
+		}
+		return false;
+	}
+}
+
 void NativeWinMgr::ProcessEvents(
 	NativeWinMgr& manager,
 	GlobUtils const& globUtils,
@@ -157,21 +173,10 @@ void NativeWinMgr::ProcessEvents(
 		transientAlloc);
 
 	// First we see if there are resizes at all, so we know if we have to stall the device.
-	bool needToStall = false;
-	for (auto const& item : windowUpdates)
-	{
-		switch (item.event)
-		{
-		case NativeWindowEvent::Resize:
-		case NativeWindowEvent::Restore:
-			needToStall = true;
-			break;
-		default:
-			break;
-		}
-	}
+	bool needToStall = HasAnyResizeEvents(windowUpdates);
 	if (needToStall)
 		globUtils.device.waitIdle();
+
 	for (auto const& item : windowUpdates)
 	{
 		auto const windowNodeIt = Std::FindIf(
@@ -433,7 +438,7 @@ static void NativeWinMgrImpl::HandleCreationJobs(
 	auto const* debugUtils = globUtils.DebugUtilsPtr();
 
 	// Copy the jobs over so we can release the mutex early
-	auto tempCreateJobs = Std::MakeVec<NativeWinMgr::CreateJob>(transientAlloc);
+	auto tempCreateJobs = Std::NewVec<NativeWinMgr::CreateJob>(transientAlloc);
 	{
 		std::scoped_lock lock{ manager.insertionJobs.lock };
 		tempCreateJobs.Resize(manager.insertionJobs.createQueue.size());
@@ -549,7 +554,7 @@ static void NativeWinMgrImpl::HandleDeletionJobs(
 	Std::AllocRef const& transientAlloc)
 {
 	// Copy the jobs over so we can release the mutex early
-	auto tempDeleteJobs = Std::MakeVec<NativeWinMgr::DeleteJob>(transientAlloc);
+	auto tempDeleteJobs = Std::NewVec<NativeWinMgr::DeleteJob>(transientAlloc);
 	{
 		std::lock_guard lock{ manager.insertionJobs.lock };
 		tempDeleteJobs.Resize(manager.insertionJobs.deleteQueue.size());
@@ -586,13 +591,13 @@ void NativeWinMgrImpl::HandleWindowResize(
 {
 	auto& windowData = windowNode.windowData;
 
-	NativeWinMgrImpl::SwapchainSettings swapchainSettings = NativeWinMgrImpl::BuildSwapchainSettings(
+	auto swapchainSettings = NativeWinMgrImpl::BuildSwapchainSettings(
 		globUtils.instance,
 		globUtils.physDevice.handle,
 		windowData.surface,
 		globUtils.surfaceInfo);
 
-	// We need to resize this native-window and it's GUI.
+	// We need to resize this native-window and its GUI.
 
 	vk::SwapchainKHR oldSwapchain = windowData.swapchain;
 	windowData.swapchain = NativeWinMgrImpl::CreateSwapchain(

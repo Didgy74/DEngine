@@ -25,7 +25,7 @@ namespace DEngine::Gui
 			TextManager& textManager;
 			Rect windowRect;
 			Rect safeAreaRect;
-			Std::FrameAllocator& transientAlloc;
+			Std::BumpAllocator& transientAlloc;
 			RectCollection::SizeHintPusher& pusher;
 		};
 		virtual void BuildSizeHints(BuildSizeHints_Params const& params) const {}
@@ -36,7 +36,7 @@ namespace DEngine::Gui
 			Rect windowRect;
 			Rect visibleRect;
 			TextManager& textManager;
-			Std::FrameAllocator& transientAlloc;
+			Std::BumpAllocator& transientAlloc;
 			RectCollection::RectPusher& pusher;
 		};
 		virtual void BuildRects(BuildRects_Params const& params) const {}

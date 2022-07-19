@@ -5,7 +5,7 @@
 #include "GizmoManager.hpp"
 
 #include <DEngine/FixedWidthTypes.hpp>
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
@@ -183,7 +183,7 @@ APIDataBase* Vk::InitializeBackend(Context& gfxData, InitInfo const& initInfo)
 	auto& apiData = *apiDataPtr;
 	auto& globUtils = apiData.globUtils;
 
-	apiData.frameAllocator = Std::FrameAllocator::PreAllocate(1024 * 1024).Value();
+	apiData.frameAllocator = Std::BumpAllocator::PreAllocate(1024 * 1024).Value();
 	auto& transientAlloc = apiData.frameAllocator;
 	Std::Defer allocCleanup { [&transientAlloc]() {
 		transientAlloc.Reset();
@@ -455,7 +455,7 @@ void Vk::Init::InitTestPipeline(APIData& apiData, Std::AllocRef const& transient
 	vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 	u64 vertFileLength = vertFile.Tell().Value();
 	vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-	auto vertCode = Std::MakeVec<char>(transientAlloc);
+	auto vertCode = Std::NewVec<char>(transientAlloc);
 	vertCode.Resize((uSize)vertFileLength);
 	vertFile.Read(vertCode.Data(), vertFileLength);
 
@@ -474,7 +474,7 @@ void Vk::Init::InitTestPipeline(APIData& apiData, Std::AllocRef const& transient
 	fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 	u64 fragFileLength = fragFile.Tell().Value();
 	fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-	auto fragCode = Std::MakeVec<char>(transientAlloc);
+	auto fragCode = Std::NewVec<char>(transientAlloc);
 	fragCode.Resize((uSize)fragFileLength);
 	fragFile.Read(fragCode.Data(), fragFileLength);
 

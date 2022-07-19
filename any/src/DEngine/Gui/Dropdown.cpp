@@ -130,7 +130,6 @@ struct Dropdown::Impl
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
-
 	struct Dropdown_PointerPress_Params
 	{
 		Dropdown& widget;
@@ -171,10 +170,16 @@ struct Dropdown::Impl
 		virtual bool CursorMove(
 			CursorMoveParams const& params,
 			bool occluded) override;
-
-		[[nodiscard]] virtual Press_Return CursorPress(
+		virtual Press_Return CursorPress(
 			CursorPressParams const& params,
 			bool eventConsumed) override;
+
+		virtual Press_Return TouchPress2(
+			TouchPressParams const& params,
+			bool eventConsumed) override;
+		virtual bool TouchMove2(
+			TouchMoveParams const& params,
+			bool occluded) override;
 	};
 
 	// This data is only available when rendering.
@@ -447,7 +452,7 @@ void Dropdown::Impl::DropdownLayer::Render(Render_Params const& params) const
 	int allTextCount = 0;
 	for (auto const& item : mainWidget.items)
 		allTextCount += (int)item.length();
-	auto allText = Std::MakeVec<char>(transientAlloc);
+	auto allText = Std::NewVec<char>(transientAlloc);
 	allText.Resize(allTextCount);
 	int offset = 0;
 	for (auto const& item : mainWidget.items)
@@ -485,6 +490,26 @@ bool Dropdown::Impl::DropdownLayer::CursorMove(
 	return DropdownLayer_PointerMove(temp);
 }
 
+bool Dropdown::Impl::DropdownLayer::TouchMove2(
+	TouchMoveParams const& params,
+	bool occluded)
+{
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.occluded = occluded;
+
+	DropdownLayer_PointerMove_Params temp = {
+		.layer = *this,
+		.ctx = params.ctx,
+		.rectCollection = params.rectCollection,
+		.windowRect = params.windowRect,
+		.usableRect = params.safeAreaRect,
+		.pointer = pointer, };
+
+	return DropdownLayer_PointerMove(temp);
+}
+
 Layer::Press_Return
 Dropdown::Impl::DropdownLayer::CursorPress(
 	Layer::CursorPressParams const& params,
@@ -494,6 +519,29 @@ Dropdown::Impl::DropdownLayer::CursorPress(
 	pointer.type = impl::ToPointerType(params.event.button);
 	pointer.id = impl::cursorPointerId;
 	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	pointer.pressed = params.event.pressed;
+
+	DropdownLayer_PointerPress_Params temp = {
+		.layer = *this,
+		.ctx = params.ctx,
+		.rectCollection = params.rectCollection,
+		.windowRect = params.windowRect,
+		.usableRect = params.safeAreaRect,
+		.pointer = pointer,
+		.eventConsumed = eventConsumed,
+	};
+	return DropdownLayer_PointerPress(temp);
+}
+
+Layer::Press_Return
+Dropdown::Impl::DropdownLayer::TouchPress2(
+	TouchPressParams const& params,
+	bool eventConsumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.type = impl::PointerType::Primary;
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
 	pointer.pressed = params.event.pressed;
 
 	DropdownLayer_PointerPress_Params temp = {
@@ -757,6 +805,31 @@ bool Dropdown::CursorPress2(
 	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
 	pointer.pressed = params.event.pressed;
 	pointer.type = impl::ToPointerType(params.event.button);
+
+	Impl::Dropdown_PointerPress_Params temp = {
+		.widget = *this,
+		.ctx = params.ctx,
+		.windowId = params.windowId,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.rectCollection = params.rectCollection,
+		.pointer = pointer,
+		.eventConsumed = consumed, };
+
+	return Impl::Dropdown_PointerPress(temp);
+}
+
+bool Dropdown::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.pressed = params.event.pressed;
+	pointer.type = impl::PointerType::Primary;
 
 	Impl::Dropdown_PointerPress_Params temp = {
 		.widget = *this,

@@ -29,7 +29,7 @@ struct Grid::Impl
 		Std::Span<SizeHint> childrenSizeHints,
 		AllocRef const& alloc)
 	{
-		auto colMaxWidths = Std::MakeVec<u32>(alloc);
+		auto colMaxWidths = Std::NewVec<u32>(alloc);
 		colMaxWidths.Resize(widget.width);
 		for (auto& item : colMaxWidths)
 			item = 0;
@@ -54,7 +54,7 @@ struct Grid::Impl
 		Std::Span<SizeHint> childrenSizeHints,
 		AllocRef alloc)
 	{
-		auto returnValue = Std::MakeVec<bool>(alloc);
+		auto returnValue = Std::NewVec<bool>(alloc);
 		returnValue.Resize(widget.width);
 		for (auto& item : returnValue)
 			item = 0;
@@ -79,7 +79,7 @@ struct Grid::Impl
 		Std::Span<SizeHint> childrenSizeHints,
 		AllocRef alloc)
 	{
-		auto returnValue = Std::MakeVec<bool>(alloc);
+		auto returnValue = Std::NewVec<bool>(alloc);
 		returnValue.Resize(widget.height);
 		for (auto& item : returnValue)
 			item = 0;
@@ -104,7 +104,7 @@ struct Grid::Impl
 		Std::Span<SizeHint> childrenSizeHints,
 		AllocRef const& alloc)
 	{
-		auto rowMaxHeights = Std::MakeVec<u32>(alloc);
+		auto rowMaxHeights = Std::NewVec<u32>(alloc);
 		rowMaxHeights.Resize(widget.height);
 		for (auto& item : rowMaxHeights)
 			item = 0;
@@ -254,7 +254,7 @@ SizeHint Grid::GetSizeHint2(
 	SizeHint returnValue = {};
 
 	auto const childCount = (int)children.size();
-	auto childrenSizeHints = Std::MakeVec<SizeHint>(transientAlloc);
+	auto childrenSizeHints = Std::NewVec<SizeHint>(transientAlloc);
 	childrenSizeHints.Resize(childCount);
 	for (int i = 0; i < childCount; i += 1)
 	{
@@ -309,7 +309,7 @@ void Grid::BuildChildRects(
 	auto const childCount = (int)children.size();
 
 	// Gather all the RectCollection entries for the children
-	auto childrenEntries = Std::MakeVec<RectCollection::It>(transientAlloc);
+	auto childrenEntries = Std::NewVec<RectCollection::It>(transientAlloc);
 	childrenEntries.Resize(childCount);
 	for (int i = 0; i < childCount; i++) {
 		auto& child = children[i];
@@ -318,7 +318,7 @@ void Grid::BuildChildRects(
 	}
 
 	// Gather all the size-hints for out children.
-	auto childrenSizeHints = Std::MakeVec<SizeHint>(transientAlloc);
+	auto childrenSizeHints = Std::NewVec<SizeHint>(transientAlloc);
 	childrenSizeHints.Resize(childCount);
 	for (int i = 0; i < childCount; i += 1)
 	{

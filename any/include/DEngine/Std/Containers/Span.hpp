@@ -135,12 +135,21 @@ namespace DEngine::Std
 	T* Span<T>::end() const noexcept { return m_data + m_size; }
 
 	template<class T>
-	[[nodiscard]] Std::Span<T> ByteSpan::Cast() const noexcept
+	[[nodiscard]] Span<T> ByteSpan::Cast() const noexcept
 	{
 		DENGINE_IMPL_CONTAINERS_ASSERT((uSize)(static_cast<char*>(m_data) + m_size) % alignof(T) == 0);
 		DENGINE_IMPL_CONTAINERS_ASSERT(m_size % sizeof(T) == 0);
 		return {
 			static_cast<T*>(m_data),
 			m_size / sizeof(T) };
+	}
+
+	// Pass in string literals
+	template<unsigned N>
+	[[nodiscard]] constexpr Span<char const> CStrToSpan(char const (&in)[N]) noexcept {
+		return {
+			in,
+			N - 1
+		};
 	}
 }

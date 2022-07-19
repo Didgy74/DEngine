@@ -28,8 +28,9 @@ namespace DEngine::Application
 		bool cursorExit;
 		bool minimize;
 		bool restore;
+		bool orientation;
 	};
-	Std::StackVec<char const*, 5> RequiredVulkanInstanceExtensions() noexcept;
+	Std::StackVec<char const*, 5> GetRequiredVkInstanceExtensions() noexcept;
 
 	enum class CursorType : u8;
 
@@ -140,6 +141,8 @@ namespace DEngine::Application
 		[[nodiscard]] Math::Vec2Int GetWindowVisibleOffset(WindowID) const noexcept;
 		// Thread-safe
 		[[nodiscard]] WindowEvents GetWindowEvents(WindowID) const noexcept;
+		// Thread-safe
+		[[nodiscard]] bool IsWindowMinimized(WindowID) const noexcept;
 
 		struct CreateVkSurface_ReturnT
 		{
@@ -264,6 +267,7 @@ struct DEngine::Application::TouchInput
 
 enum class DEngine::Application::SoftInputFilter : DEngine::u8
 {
+	Text,
 	Integer,
 	UnsignedInteger,
 	Float,

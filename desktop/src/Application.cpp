@@ -321,6 +321,9 @@ void Application::impl::Backend_GLFW_WindowSizeCallback(
 	impl::BackendInterface::UpdateWindowSize(
 		implData,
 		implData.GetWindowId(window),
+		extent,
+		0,
+		0,
 		extent);
 }
 
@@ -478,7 +481,7 @@ auto Application::impl::Backend_GLFWButtonToDEngineButton(i32 input) -> Button
 	}
 }
 
-Std::StackVec<char const*, 5> Application::RequiredVulkanInstanceExtensions() noexcept
+Std::StackVec<char const*, 5> Application::GetRequiredVkInstanceExtensions() noexcept
 {
 	u32 count = 0;
 

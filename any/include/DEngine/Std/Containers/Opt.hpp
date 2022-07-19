@@ -152,14 +152,18 @@ namespace DEngine::Std
 			return value;
 		}
 		[[nodiscard]] T& Get() & noexcept { return Value(); }
-		[[nodiscard]] T&& Value() && noexcept
-		{
+		[[nodiscard]] T&& Value() && noexcept {
 			DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 				hasValue,
 				"Tried to deference Opt without a value.");
 			return static_cast<T&&>(value);
 		}
-		[[nodiscard]] T&& Get() && noexcept { return Value(); }
+		[[nodiscard]] T&& Get() && noexcept {
+			DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
+				hasValue,
+				"Tried to deference Opt without a value.");
+			return static_cast<T&&>(value);
+		}
 
 		[[nodiscard]] T const* ToPtr() const noexcept;
 		[[nodiscard]] T* ToPtr() noexcept;

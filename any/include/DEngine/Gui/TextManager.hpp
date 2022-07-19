@@ -6,7 +6,7 @@
 
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Math/Vector.hpp>
 
 // Temporary

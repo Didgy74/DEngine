@@ -25,7 +25,7 @@ namespace DEngine::Gui::impl
 
 		f32 const scaleFactor = (f32)widgetWidth / (f32)sumDesiredWidth;
 
-		auto returnWidths = Std::MakeVec<u32>(transientAlloc);
+		auto returnWidths = Std::NewVec<u32>(transientAlloc);
 		returnWidths.Resize(count);
 
 		u32 remainingWidth = widgetWidth;
@@ -53,7 +53,7 @@ namespace DEngine::Gui::impl
 	{
 		int btnCount = (int)btnWidths.Size();
 
-		auto returnRects = Std::MakeVec<u32>(transientAlloc);
+		auto returnRects = Std::NewVec<u32>(transientAlloc);
 		returnRects.Resize(btnCount);
 
 		i32 rectPosOffsetX = 0;

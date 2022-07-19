@@ -1,29 +1,36 @@
 #include <DEngine/Gui/LineFloatEdit.hpp>
-
-#include <DEngine/Gui/Context.hpp>
 #include <DEngine/Gui/TextManager.hpp>
+#include <DEngine/Gui/DrawInfo.hpp>
+#include <DEngine/Gui/Context.hpp>
+
+#include <DEngine/Std/Containers/Vec.hpp>
 
 #include <sstream>
-#include <cstdlib>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
 
-namespace DEngine::Gui::impl
+struct LineFloatEdit::Impl
 {
+	struct CustomData
+	{
+		explicit CustomData(RectCollection::AllocRefT const& alloc) :
+			glyphRects{ alloc } {}
 
+		Extent textOuterExtent = {};
+		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
+	};
 
 	enum class PointerType : u8 { Primary, Secondary };
 	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
 	{
-		switch (in)
-		{
+		switch (in) {
 			case CursorButton::Primary: return PointerType::Primary;
 			case CursorButton::Secondary: return PointerType::Secondary;
-			default: break;
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				return {};
 		}
-		DENGINE_IMPL_UNREACHABLE();
-		return {};
 	}
 
 	static constexpr u8 cursorPointerId = ~static_cast<u8>(0);
@@ -40,23 +47,11 @@ namespace DEngine::Gui::impl
 	struct PointerPress_Params
 	{
 		Context& ctx;
-		LineFloatEdit& widget;
 		RectCollection const& rectCollection;
+		LineFloatEdit& widget;
 		Rect const& widgetRect;
 		Rect const& visibleRect;
 		PointerPress_Pointer const& pointer;
-	};
-}
-
-struct LineFloatEdit::Impl
-{
-	struct CustomData
-	{
-		explicit CustomData(RectCollection::AllocRefT const& alloc) :
-			glyphRects{ alloc } {}
-
-		Extent textOuterExtent;
-		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
 	static void UpdateValue(LineFloatEdit& widget, bool updateText)
@@ -90,28 +85,16 @@ struct LineFloatEdit::Impl
 		}
 	}
 
-	static void StartInputConnection(LineFloatEdit& widget, Context& ctx)
+	static void BeginInputSession(LineFloatEdit& widget, Context& ctx)
 	{
-		SoftInputFilter filter = SoftInputFilter::SignedFloat;
-		if (widget.min >= 0.0)
-			filter = SoftInputFilter::UnsignedFloat;
 		ctx.TakeInputConnection(
 			widget,
-			filter,
+			Gui::SoftInputFilter::NoFilter,
 			{ widget.text.data(), widget.text.length() });
 		widget.inputConnectionCtx = &ctx;
 	}
 
-	static void ClearInputConnection(LineFloatEdit& widget)
-	{
-		DENGINE_IMPL_GUI_ASSERT(widget.inputConnectionCtx);
-		widget.inputConnectionCtx->ClearInputConnection(widget);
-		widget.inputConnectionCtx = nullptr;
-
-		UpdateValue(widget, true);
-	}
-
-	[[nodiscard]] static bool PointerPress(impl::PointerPress_Params const& in) noexcept
+	[[nodiscard]] static bool PointerPress(PointerPress_Params const& in) noexcept
 	{
 		auto& widget = in.widget;
 		auto& ctx = in.ctx;
@@ -121,21 +104,18 @@ struct LineFloatEdit::Impl
 
 		bool eventConsumed = pointer.consumed;
 
-		auto const pointerInside =
-			widgetRect.PointIsInside(pointer.pos) &&
-			visibleRect.PointIsInside(pointer.pos);
+		auto const pointerInside = PointIsInAll(pointer.pos, { widgetRect, visibleRect });
 
 		// The field is currently being held.
-		if (widget.pointerId.HasValue())
+		if (widget.pointerId.Has())
 		{
-			auto const currPointerId = widget.pointerId.Value();
+			auto const currPointerId = widget.pointerId.Get();
 
 			// It's a integration error if we received a click down on a pointer id
 			// that's already holding this widget. I think?
 			DENGINE_IMPL_GUI_ASSERT(!(currPointerId == pointer.id && pointer.pressed));
 
-			if (currPointerId == pointer.id && !pointer.pressed)
-			{
+			if (currPointerId == pointer.id && !pointer.pressed) {
 				widget.pointerId = Std::nullOpt;
 			}
 
@@ -144,59 +124,42 @@ struct LineFloatEdit::Impl
 				pointerInside &&
 				currPointerId == pointer.id &&
 				!pointer.pressed &&
-				pointer.type == impl::PointerType::Primary;
-			if (beginInputSession)
-			{
-				StartInputConnection(widget, ctx);
+				pointer.type == PointerType::Primary;
+			if (beginInputSession) {
+				BeginInputSession(widget, ctx);
 				eventConsumed = true;
 			}
 		}
-		else // The widget is not currently being held.
-		{
+		else {
+			// The field is not currently being held.
+
 			if (widget.HasInputSession())
 			{
-				// There are two scenarios in which we want to end the
-				// input session.
 				bool shouldEndInputSession = false;
 
-
-				// First is if we pressed somewhere and
-				// we hit something else before this widget is processed.
-				shouldEndInputSession =
-					shouldEndInputSession ||
-					eventConsumed &&
-					pointer.pressed;
-
-				// Second is if we are processing this widget and we hit
-				// outside it.
-				shouldEndInputSession =
-					shouldEndInputSession ||
-					!eventConsumed &&
-					pointer.pressed &&
-					!pointerInside;
+				shouldEndInputSession = shouldEndInputSession ||
+				                        eventConsumed &&
+				                        pointer.pressed;
+				shouldEndInputSession = shouldEndInputSession ||
+				                        !eventConsumed &&
+				                        pointer.pressed &&
+				                        !pointerInside;
 
 				if (shouldEndInputSession)
 				{
-					widget.inputConnectionCtx->ClearInputConnection(widget);
-					widget.inputConnectionCtx = nullptr;
+					widget.ClearInputConnection();
+					eventConsumed = true;
 				}
 			}
 			else
 			{
-				// Remember pointerId that is holding our widget
-				// if the event is not consumed yet.
-				// And we are pressed down,
-				// and we are inside
-				// with a primary pointer-type.
-				bool rememberPointerId =
+				bool startHoldingOnWidget =
 					!eventConsumed &&
 					pointer.pressed &&
 					pointerInside &&
-					pointer.type == impl::PointerType::Primary;
-				if (rememberPointerId)
-				{
+					pointer.type == PointerType::Primary;
+				if (startHoldingOnWidget) {
 					widget.pointerId = pointer.id;
-					eventConsumed = true;
 				}
 			}
 		}
@@ -206,15 +169,27 @@ struct LineFloatEdit::Impl
 	}
 };
 
-using namespace DEngine;
-using namespace DEngine::Gui;
-
 LineFloatEdit::~LineFloatEdit()
 {
-	if (inputConnectionCtx)
-	{
-		Impl::ClearInputConnection(*this);
-	}
+	if (HasInputSession())
+		ClearInputConnection();
+}
+
+void LineFloatEdit::ClearInputConnection()
+{
+	DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx);
+	this->inputConnectionCtx->ClearInputConnection(*this);
+	this->inputConnectionCtx = nullptr;
+}
+
+void LineFloatEdit::SetValue(f64 in)
+{
+	std::ostringstream out;
+	out.precision(decimalPoints);
+	out << std::fixed << in;
+	text = out.str();
+
+	value = in;
 }
 
 SizeHint LineFloatEdit::GetSizeHint2(
@@ -230,7 +205,6 @@ SizeHint LineFloatEdit::GetSizeHint2(
 	if (pusher.IncludeRendering())
 	{
 		auto customData = Impl::CustomData{ pusher.Alloc() };
-
 		customData.glyphRects.Resize(text.size());
 
 		customData.textOuterExtent = textManager.GetOuterExtent(
@@ -241,8 +215,7 @@ SizeHint LineFloatEdit::GetSizeHint2(
 
 		pusher.AttachCustomData(pusherIt, Std::Move(customData));
 	}
-	else
-	{
+	else {
 		returnValue.minimum = textManager.GetOuterExtent({ text.data(), text.size() });
 	}
 
@@ -283,33 +256,27 @@ void LineFloatEdit::Render2(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
-	auto const intersection = Rect::Intersection(widgetRect, visibleRect);
+	auto const intersection = Intersection(widgetRect, visibleRect);
 	if (intersection.IsNothing())
 		return;
 
 	auto& drawInfo = params.drawInfo;
 	auto& rectCollection = params.rectCollection;
 
-	// Draw the background rect
-	auto color = backgroundColor;
+	Math::Vec4 tempBackground = {};
 	if (HasInputSession())
-		color = { 0.5f, 0.0f, 0.0f, 1.0f };
-	drawInfo.PushFilledQuad(widgetRect, color);
+		tempBackground = { 0.5f, 0.f, 0.f, 1.f };
+	else
+		tempBackground = backgroundColor;
+	drawInfo.PushFilledQuad(widgetRect, tempBackground);
 
-	// Grab our customData to push text
 	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
 
 	DENGINE_IMPL_GUI_ASSERT(customData.glyphRects.Size() == text.size());
 
-	// Apply rendering scissor only if needed
-	auto const textIsBiggerThanExtent =
-		(customData.textOuterExtent.width + margin * 2) > widgetRect.extent.width ||
-		customData.textOuterExtent.height > widgetRect.extent.height;
-	Std::Opt<DrawInfo::ScopedScissor> scissor;
-	if (textIsBiggerThanExtent)
-		scissor = DrawInfo::ScopedScissor(drawInfo, intersection);
+	auto drawScissor = DrawInfo::ScopedScissor(drawInfo, intersection);
 
 	drawInfo.PushText(
 		{ text.data(), text.size() },
@@ -323,17 +290,17 @@ bool LineFloatEdit::CursorPress2(
 	Rect const& visibleRect,
 	bool consumed)
 {
-	impl::PointerPress_Pointer pointer = {};
-	pointer.id = impl::cursorPointerId;
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.id = Impl::cursorPointerId;
 	pointer.pressed = params.event.pressed;
-	pointer.type = impl::ToPointerType(params.event.button);
+	pointer.type = Impl::ToPointerType(params.event.button);
 	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
 	pointer.consumed = consumed;
 
-	impl::PointerPress_Params temp = {
+	Impl::PointerPress_Params temp = {
 		.ctx = params.ctx,
-		.widget = *this,
 		.rectCollection = params.rectCollection,
+		.widget = *this,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
 		.pointer = pointer, };
@@ -347,30 +314,22 @@ bool LineFloatEdit::TouchPress2(
 	Rect const& visibleRect,
 	bool consumed)
 {
-	impl::PointerPress_Pointer pointer = {};
+	Impl::PointerPress_Pointer pointer = {};
 	pointer.id = params.event.id;
 	pointer.pressed = params.event.pressed;
-	pointer.type = impl::PointerType::Primary;
+	pointer.type = Impl::PointerType::Primary;
 	pointer.pos = params.event.position;
 	pointer.consumed = consumed;
 
-	impl::PointerPress_Params temp = {
+	Impl::PointerPress_Params temp = {
 		.ctx = params.ctx,
-		.widget = *this,
 		.rectCollection = params.rectCollection,
+		.widget = *this,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
 		.pointer = pointer, };
 
 	return Impl::PointerPress(temp);
-}
-
-void LineFloatEdit::SetValue(f64 in)
-{
-	std::ostringstream out;
-	out.precision(decimalPoints);
-	out << std::fixed << in;
-	text = out.str();
 }
 
 void LineFloatEdit::TextInput(
@@ -403,7 +362,6 @@ void LineFloatEdit::TextInput(
 			int begin = (int)event.oldIndex + (int)event.oldCount;
 			for (int i = begin; i < oldSize; i += 1)
 				text[i + sizeDifference] = text[i];
-
 			text.resize(text.size() + sizeDifference);
 		}
 
@@ -421,6 +379,6 @@ void LineFloatEdit::EndTextInputSession(
 {
 	if (HasInputSession())
 	{
-		Impl::ClearInputConnection(*this);
+		ClearInputConnection();
 	}
 }

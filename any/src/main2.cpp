@@ -5,12 +5,13 @@
 #include <DEngine/Gui/Grid.hpp>
 #include <DEngine/Gui/Text.hpp>
 #include <DEngine/Gui/LineEdit.hpp>
+#include <DEngine/Gui/LineFloatEdit.hpp>
 #include <DEngine/Gui/StackLayout.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Allocator.hpp>
 #include <DEngine/Std/Utility.hpp>
 #include <DEngine/Math/Vector.hpp>
@@ -129,8 +130,10 @@ namespace DEngine::impl
 			Std::Span<char const> inputText,
 			Gui::SoftInputFilter inputFilter) override
 		{
-			auto convert = [&]() {
+			auto convert = [=]() {
 				switch (inputFilter) {
+					case Gui::SoftInputFilter::NoFilter:
+						return App::SoftInputFilter::Text;
 					case Gui::SoftInputFilter::SignedFloat:
 						return App::SoftInputFilter::Float;
 					default:
@@ -147,6 +150,16 @@ namespace DEngine::impl
 	public:
 		Gui::Context* guiCtx = nullptr;
 		Gfx::Context* gfxCtx = nullptr;
+
+		virtual void WindowMinimize(
+			App::WindowID window,
+			bool wasMinimized) override
+		{
+			Gui::WindowMinimizeEvent event {};
+			event.windowId = (Gui::WindowID)window;
+			event.wasMinimized = wasMinimized;
+			guiCtx->PushEvent(event);
+		}
 
 		virtual bool WindowCloseSignal(
 			App::Context& appCtx,
@@ -283,7 +296,7 @@ namespace DEngine::impl
 		App::Context::NewWindow_ReturnT const& windowInfo)
 	{
 		auto* outerGrid = new Gui::Grid;
-		outerGrid->SetWidth(4);
+		outerGrid->SetWidth(3);
 
 		Gui::Rect windowRect = {
 			{ windowInfo.position.x, windowInfo.position.y },
@@ -306,11 +319,11 @@ namespace DEngine::impl
 			a->text = "Text A:";
 			a->expandX = false;
 
-			for (int i = 1; i < 4; i += 1)
+			for (int i = 1; i < 2; i += 1)
 			{
 				auto* temp = new Gui::LineEdit;
 				outerGrid->SetChild(i, rowIndex, Std::Box{ temp });
-				temp->text = "0.000";
+				temp->text = "Nils";
 			}
 		}
 		{
@@ -321,9 +334,8 @@ namespace DEngine::impl
 			a->text = "B:";
 			a->expandX = false;
 
-			auto* temp = new Gui::LineEdit;
+			auto* temp = new Gui::LineFloatEdit;
 			outerGrid->SetChild(1, rowIndex, Std::Box{ temp });
-			temp->text = "0.000";
 		}
 	}
 
@@ -346,21 +358,18 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
 
-	constexpr char mainThreadString[] = "MainThread";
-	Std::NameThisThread({ mainThreadString, sizeof(mainThreadString) - 1 });
+	Std::NameThisThread(Std::CStrToSpan("MainThread"));
 
 	auto appCtx = App::impl::Initialize();
 
-	App::Extent windowExtent = { 900, 900 };
-	constexpr char mainWindowTitle[] = "Main window";
 	auto mainWindowInfo = appCtx.NewWindow(
-		{ mainWindowTitle, sizeof(mainWindowTitle) - 1 }, // Title
-		windowExtent);
+		Std::CStrToSpan("Main window"),
+		{ 900, 900 });
 
 	// Initialize the renderer
 	auto gfxWsiConnection = impl::MyGfxWsiInterfacer{};
 	gfxWsiConnection.appCtx = &appCtx;
-	auto requiredInstanceExtensions = App::RequiredVulkanInstanceExtensions();
+	auto requiredInstanceExtensions = App::GetRequiredVkInstanceExtensions();
 	impl::GfxLogger gfxLogger = {};
 	gfxLogger.appCtx = &appCtx;
 	impl::GfxTexAssetInterfacer gfxTexAssetInterfacer{};
@@ -395,6 +404,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 		if (appCtx.GetWindowCount() == 0)
 			break;
 
+
 		// Temporary stuff
 		std::vector<Gfx::GuiVertex> vertices;
 		std::vector<u32> indices;
@@ -409,19 +419,23 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 			.drawCmds = drawCmds,
 			.windowUpdates = windowUpdates, };
 		guiCtx.Render2(renderParams);
+		if (!windowUpdates.empty()) {
+			Gfx::DrawParams drawParams = {};
+			drawParams.guiDrawCmds = drawCmds;
+			drawParams.guiIndices = indices;
+			drawParams.guiVertices = vertices;
+			drawParams.nativeWindowUpdates = windowUpdates;
 
-		Gfx::DrawParams drawParams = {};
-		drawParams.guiDrawCmds = drawCmds;
-		drawParams.guiIndices = indices;
-		drawParams.guiVertices = vertices;
-		drawParams.nativeWindowUpdates = windowUpdates;
-		for (auto& windowUpdate : drawParams.nativeWindowUpdates)
-		{
-			auto const windowEvents = appCtx.GetWindowEvents((App::WindowID)windowUpdate.id);
-			if (windowEvents.resize)
-				windowUpdate.event = Gfx::NativeWindowEvent::Resize;
+			for (auto& windowUpdate : drawParams.nativeWindowUpdates)
+			{
+				auto const windowEvents = appCtx.GetWindowEvents((App::WindowID)windowUpdate.id);
+				if (windowEvents.resize)
+					windowUpdate.event = Gfx::NativeWindowEvent::Resize;
+				if (windowEvents.restore)
+					windowUpdate.event = Gfx::NativeWindowEvent::Restore;
+			}
+			gfxCtx.Draw(drawParams);
 		}
-		gfxCtx.Draw(drawParams);
 	}
 
 	return 0;

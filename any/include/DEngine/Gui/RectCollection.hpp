@@ -9,7 +9,7 @@
 #include <DEngine/Std/Utility.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Trait.hpp>
 
 #include <DEngine/Math/Common.hpp>

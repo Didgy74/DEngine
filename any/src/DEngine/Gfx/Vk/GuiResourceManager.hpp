@@ -4,7 +4,7 @@
 #include "VMAIncluder.hpp"
 #include "ForwardDeclarations.hpp"
 
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/AllocRef.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
 #include <DEngine/Std/Containers/Span.hpp>

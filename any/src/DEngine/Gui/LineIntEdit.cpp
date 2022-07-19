@@ -9,54 +9,30 @@
 using namespace DEngine;
 using namespace DEngine::Gui;
 
-namespace DEngine::Gui::impl
-{
-	enum class PointerType : u8 { Primary, Secondary };
-	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
-	{
-		switch (in)
-		{
-			case CursorButton::Primary: return PointerType::Primary;
-			case CursorButton::Secondary: return PointerType::Secondary;
-			default: break;
-		}
-		DENGINE_IMPL_UNREACHABLE();
-		return {};
-	}
-
-	static constexpr u8 cursorPointerId = ~static_cast<u8>(0);
-
-	struct PointerPress_Pointer
-	{
-		u8 id;
-		Math::Vec2 pos;
-		PointerType type;
-		bool pressed;
-		bool consumed;
-	};
-
-	struct PointerPress_Params
-	{
-		Context& ctx;
-		LineIntEdit& widget;
-		RectCollection const& rectCollection;
-		Rect const& widgetRect;
-		Rect const& visibleRect;
-		PointerPress_Pointer const& pointer;
-	};
-}
-
 struct LineIntEdit::Impl
 {
 	struct CustomData
 	{
 		explicit CustomData(RectCollection::AllocRefT const& alloc) :
-			glyphRects{ alloc }
-		{}
+			glyphRects{ alloc } {}
 
-		Extent textOuterExtent;
+		Extent textOuterExtent = {};
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
+
+	enum class PointerType : u8 { Primary, Secondary };
+	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
+	{
+		switch (in) {
+			case CursorButton::Primary: return PointerType::Primary;
+			case CursorButton::Secondary: return PointerType::Secondary;
+			default:
+				DENGINE_IMPL_UNREACHABLE();
+				return {};
+		}
+	}
+
+	static constexpr u8 cursorPointerId = ~static_cast<u8>(0);
 
 	static void UpdateValue(LineIntEdit& widget, bool updateText)
 	{
@@ -92,28 +68,34 @@ struct LineIntEdit::Impl
 		}
 	}
 
-	static void StartInputConnection(LineIntEdit& widget, Context& ctx)
+	static void BeginInputSession(LineIntEdit& widget, Context& ctx)
 	{
-		SoftInputFilter filter = SoftInputFilter::SignedInteger;
-		if (widget.min > 0)
-			filter = SoftInputFilter::UnsignedInteger;
 		ctx.TakeInputConnection(
 			widget,
-			filter,
+			Gui::SoftInputFilter::SignedInteger,
 			{ widget.text.data(), widget.text.length() });
 		widget.inputConnectionCtx = &ctx;
 	}
 
-	static void ClearInputConnection(LineIntEdit& widget)
+	struct PointerPress_Pointer
 	{
-		DENGINE_IMPL_GUI_ASSERT(widget.inputConnectionCtx);
-		widget.inputConnectionCtx->ClearInputConnection(widget);
-		widget.inputConnectionCtx = nullptr;
+		u8 id;
+		Math::Vec2 pos;
+		PointerType type;
+		bool pressed;
+		bool consumed;
+	};
 
-		UpdateValue(widget, true);
-	}
-
-	[[nodiscard]] static bool PointerPress(impl::PointerPress_Params const& in) noexcept
+	struct PointerPress_Params
+	{
+		Context& ctx;
+		RectCollection const& rectCollection;
+		LineIntEdit& widget;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
+		PointerPress_Pointer const& pointer;
+	};
+	[[nodiscard]] static bool PointerPress(PointerPress_Params const& in) noexcept
 	{
 		auto& widget = in.widget;
 		auto& ctx = in.ctx;
@@ -123,21 +105,18 @@ struct LineIntEdit::Impl
 
 		bool eventConsumed = pointer.consumed;
 
-		auto const pointerInside =
-			widgetRect.PointIsInside(pointer.pos) &&
-			visibleRect.PointIsInside(pointer.pos);
+		auto const pointerInside = PointIsInAll(pointer.pos, { widgetRect, visibleRect });
 
 		// The field is currently being held.
-		if (widget.pointerId.HasValue())
+		if (widget.pointerId.Has())
 		{
-			auto const currPointerId = widget.pointerId.Value();
+			auto const currPointerId = widget.pointerId.Get();
 
 			// It's a integration error if we received a click down on a pointer id
 			// that's already holding this widget. I think?
 			DENGINE_IMPL_GUI_ASSERT(!(currPointerId == pointer.id && pointer.pressed));
 
-			if (currPointerId == pointer.id && !pointer.pressed)
-			{
+			if (currPointerId == pointer.id && !pointer.pressed) {
 				widget.pointerId = Std::nullOpt;
 			}
 
@@ -146,59 +125,42 @@ struct LineIntEdit::Impl
 				pointerInside &&
 				currPointerId == pointer.id &&
 				!pointer.pressed &&
-				pointer.type == impl::PointerType::Primary;
-			if (beginInputSession)
-			{
-				StartInputConnection(widget, ctx);
+				pointer.type == PointerType::Primary;
+			if (beginInputSession) {
+				BeginInputSession(widget, ctx);
 				eventConsumed = true;
 			}
 		}
-		else // The widget is not currently being held.
-		{
+		else {
+			// The field is not currently being held.
+
 			if (widget.HasInputSession())
 			{
-				// There are two scenarios in which we want to end the
-				// input session.
 				bool shouldEndInputSession = false;
 
-
-				// First is if we pressed somewhere and
-				// we hit something else before this widget is processed.
-				shouldEndInputSession =
-					shouldEndInputSession ||
-					eventConsumed &&
-					pointer.pressed;
-
-				// Second is if we are processing this widget and we hit
-				// outside it.
-				shouldEndInputSession =
-					shouldEndInputSession ||
-					!eventConsumed &&
-					pointer.pressed &&
-					!pointerInside;
+				shouldEndInputSession = shouldEndInputSession ||
+				                        eventConsumed &&
+				                        pointer.pressed;
+				shouldEndInputSession = shouldEndInputSession ||
+				                        !eventConsumed &&
+				                        pointer.pressed &&
+				                        !pointerInside;
 
 				if (shouldEndInputSession)
 				{
-					widget.inputConnectionCtx->ClearInputConnection(widget);
-					widget.inputConnectionCtx = nullptr;
+					widget.ClearInputConnection();
+					eventConsumed = true;
 				}
 			}
 			else
 			{
-				// Remember pointerId that is holding our widget
-				// if the event is not consumed yet.
-				// And we are pressed down,
-				// and we are inside
-				// with a primary pointer-type.
-				bool rememberPointerId =
+				bool startHoldingOnWidget =
 					!eventConsumed &&
 					pointer.pressed &&
 					pointerInside &&
-					pointer.type == impl::PointerType::Primary;
-				if (rememberPointerId)
-				{
+					pointer.type == PointerType::Primary;
+				if (startHoldingOnWidget) {
 					widget.pointerId = pointer.id;
-					eventConsumed = true;
 				}
 			}
 		}
@@ -215,8 +177,15 @@ LineIntEdit::~LineIntEdit()
 {
 	if (inputConnectionCtx)
 	{
-		Impl::ClearInputConnection(*this);
+		ClearInputConnection();
 	}
+}
+
+void LineIntEdit::ClearInputConnection()
+{
+	DENGINE_IMPL_GUI_ASSERT(this->inputConnectionCtx);
+	this->inputConnectionCtx->ClearInputConnection(*this);
+	this->inputConnectionCtx = nullptr;
 }
 
 SizeHint LineIntEdit::GetSizeHint2(
@@ -325,17 +294,41 @@ bool LineIntEdit::CursorPress2(
 	Rect const& visibleRect,
 	bool consumed)
 {
-	impl::PointerPress_Pointer pointer = {};
-	pointer.id = impl::cursorPointerId;
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.id = Impl::cursorPointerId;
 	pointer.pressed = params.event.pressed;
-	pointer.type = impl::ToPointerType(params.event.button);
+	pointer.type = Impl::ToPointerType(params.event.button);
 	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
 	pointer.consumed = consumed;
 
-	impl::PointerPress_Params temp = {
+	Impl::PointerPress_Params temp = {
 		.ctx = params.ctx,
-		.widget = *this,
 		.rectCollection = params.rectCollection,
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer, };
+
+	return Impl::PointerPress(temp);
+}
+
+bool LineIntEdit::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pressed = params.event.pressed;
+	pointer.type = Impl::PointerType::Primary;
+	pointer.pos = params.event.position;
+	pointer.consumed = consumed;
+
+	Impl::PointerPress_Params temp = {
+		.ctx = params.ctx,
+		.rectCollection = params.rectCollection,
+		.widget = *this,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
 		.pointer = pointer, };
@@ -348,6 +341,8 @@ void LineIntEdit::SetValue(i64 in)
 	std::ostringstream out;
 	out << in;
 	text = out.str();
+
+	value = in;
 }
 
 void LineIntEdit::TextInput(
@@ -398,6 +393,6 @@ void LineIntEdit::EndTextInputSession(
 {
 	if (HasInputSession())
 	{
-		Impl::ClearInputConnection(*this);
+		ClearInputConnection();
 	}
 }

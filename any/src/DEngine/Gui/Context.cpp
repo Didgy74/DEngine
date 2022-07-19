@@ -84,21 +84,19 @@ namespace DEngine::Gui::impl
 		implData.postEventAlloc.Reset();
 	}
 
-	// All rects should be relative to window position, not visible rect
 	void BuildRectCollection(
 		Context const& ctx,
+		Context::Impl const& implData,
 		TextManager& textManager,
 		RectCollection& rectCollection,
 		bool includeRendering,
 		Std::FrameAlloc& transientAlloc)
 	{
-		auto& implData = ctx.Internal_ImplData();
-
 		rectCollection.Prepare(includeRendering);
 
-		for (auto& windowNode : implData.windows)
+		for (auto const& windowNode : implData.windows)
 		{
-			if (!windowNode.data.topLayout)
+			if (!windowNode.data.topLayout || windowNode.data.isMinimized)
 				continue;
 
 			auto const& windowRect = windowNode.data.rect;
@@ -136,11 +134,10 @@ namespace DEngine::Gui::impl
 			transientAlloc.Reset();
 		}
 
-
 		// Then build rects
 		for (auto& windowNode : implData.windows)
 		{
-			if (!windowNode.data.topLayout)
+			if (!windowNode.data.topLayout || windowNode.data.isMinimized)
 				continue;
 
 			auto const& windowRect = windowNode.data.rect;
@@ -307,12 +304,12 @@ void Context::PushEvent(CursorPressEvent const& event)
 	auto windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
 	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
-
 	implData.cursorWindowId = event.windowId;
 
 	impl::ImplData_PreDispatchStuff(implData);
 	impl::BuildRectCollection(
 		*this,
+		implData,
 		textManager,
 		rectCollection,
 		false,
@@ -386,6 +383,7 @@ void Context::PushEvent(TouchMoveEvent const& event)
 	impl::ImplData_PreDispatchStuff(implData);
 	impl::BuildRectCollection(
 		*this,
+		implData,
 		textManager,
 		rectCollection,
 		false,
@@ -452,6 +450,7 @@ void Context::PushEvent(TouchPressEvent const& event)
 	impl::ImplData_PreDispatchStuff(implData);
 	impl::BuildRectCollection(
 		*this,
+		implData,
 		textManager,
 		rectCollection,
 		false,
@@ -519,6 +518,7 @@ void Context::PushEvent(CursorMoveEvent const& event)
 	impl::ImplData_PreDispatchStuff(implData);
 	impl::BuildRectCollection(
 		*this,
+		implData,
 		textManager,
 		rectCollection,
 		false,
@@ -620,6 +620,18 @@ void Context::PushEvent(WindowFocusEvent const& event)
 	}
 }
 
+void Context::PushEvent(WindowMinimizeEvent const& event)
+{
+	auto& implData = Internal_ImplData();
+	auto& windowNodes = implData.windows;
+
+	auto windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+
+	windowNode.data.isMinimized = event.wasMinimized;
+}
+
 void Context::PushEvent(WindowMoveEvent const& event)
 {
 	auto& implData = Internal_ImplData();
@@ -655,6 +667,7 @@ void Context::Render2(Render2_Params const& params) const
 
 	impl::BuildRectCollection(
 		*this,
+		implData,
 		textManager,
 		rectCollection,
 		true,
@@ -662,7 +675,7 @@ void Context::Render2(Render2_Params const& params) const
 
 	for (auto const& windowNode : implData.windows)
 	{
-		if (windowNode.data.isMinimized || !windowNode.data.topLayout)
+		if (!windowNode.data.topLayout || windowNode.data.isMinimized)
 			continue;
 
 		auto const& windowRect = windowNode.data.rect;
@@ -769,225 +782,3 @@ void Context::PushPostEventJob_Inner(
 
 	implData.postEventJobs.emplace_back(newJob);
 }
-
-/*
-void Context::PushEvent(TouchMoveEvent const& event)
-{
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
-	for (auto& windowNode : implData.windows)
-	{
-		auto modifiedEvent = event;
-		modifiedEvent.position -= Math::Vec2{
-			(f32)windowNode.data.rect.position.x,
-			(f32)windowNode.data.rect.position.y };
-
-		auto const& rect = windowNode.data.rect;
-		Math::Vec2Int visiblePos = {
-			rect.position.x + (i32)windowNode.data.visibleOffset.x,
-			rect.position.y + (i32)windowNode.data.visibleOffset.y };
-		Rect const visibleRect = { visiblePos, windowNode.data.visibleExtent };
-
-		bool touchOccluded = false;
-
-		if (windowNode.frontmostLayer)
-		{
-			auto& layer = *windowNode.frontmostLayer;
-			bool const temp = layer.TouchMove(
-				*this,
-				visibleRect,
-				visibleRect,
-				modifiedEvent,
-				touchOccluded);
-
-			touchOccluded = temp;
-		}
-
-		if (!windowNode.data.topLayout)
-			continue;
-		
-		windowNode.data.topLayout->TouchMoveEvent(
-			*this,
-			windowNode.id,
-			visibleRect,
-			visibleRect,
-			event,
-			touchOccluded);
-	}
-}
-*/
-
-/*
-void Context::PushEvent(TouchPressEvent const& event)
-{
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
-
-	for (auto& windowNode : implData.windows)
-	{
-		auto modifiedEvent = event;
-		modifiedEvent.position -= Math::Vec2{
-			(f32)windowNode.data.rect.position.x,
-			(f32)windowNode.data.rect.position.y };
-
-		auto const& visibleOffset = windowNode.data.visibleOffset;
-		Math::Vec2Int const visiblePos =
-			windowNode.data.rect.position +
-			Math::Vec2Int{ (i32)visibleOffset.x, (i32)visibleOffset.y };
-
-		Rect const windowRect = { {}, windowNode.data.rect.extent };
-		auto visibleRect = windowNode.data.visibleRect;
-		visibleRect.position -= windowNode.data.rect.position;
-
-		bool eventConsumed = false;
-		bool destroyMenu = false;
-
-		if (windowNode.frontmostLayer)
-		{
-			auto& layer = *windowNode.frontmostLayer;
-			auto const temp = layer.TouchPress(
-				*this,
-				windowRect,
-				visibleRect,
-				modifiedEvent);
-
-			eventConsumed = temp.eventConsumed;
-			destroyMenu = temp.destroy;
-		}
-		if (destroyMenu)
-			windowNode.frontmostLayer = nullptr;
-
-		if (!windowNode.data.topLayout || (eventConsumed && modifiedEvent.pressed))
-			continue;
-
-		windowNode.data.topLayout->TouchPressEvent(
-			*this,
-			windowNode.id,
-			visibleRect,
-			visibleRect,
-			modifiedEvent);
-	}
-}
-
-void Context::PushEvent(WindowCloseEvent const& event)
-{
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
-	auto windowIt = Std::FindIf(
-		implData.windows.begin(),
-		implData.windows.end(),
-		[event](auto const& node) -> bool { return node.id == event.windowId; });
-	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
-	WindowID windowId = windowIt->id;
-	implData.windows.erase(windowIt);
-	implData.windowHandler->CloseWindow(windowId);
-}
-
-void Context::PushEvent(WindowCursorEnterEvent const& event)
-{
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	auto windowIt = Std::FindIf(
-		implData.windows.begin(),
-		implData.windows.end(),
-		[event](auto const& node) -> bool { return node.id == event.windowId; });
-	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
-	auto& windowData = windowIt->data;
-}
-
-void Context::PushEvent(WindowMinimizeEvent const& event)
-{
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	auto windowIt = Std::FindIf(
-		implData.windows.begin(),
-		implData.windows.end(),
-		[event](auto const& node) -> bool { return node.id == event.windowId; });
-	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
-	auto& windowData = windowIt->data;
-	windowData.isMinimized = event.wasMinimized;
-}
-
-void Context::PushEvent(WindowMoveEvent const& event)
-{
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	auto windowIt = Std::FindIf(
-		implData.windows.begin(),
-		implData.windows.end(),
-		[event](auto const& node) -> bool { return node.id == event.windowId; });
-	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
-	auto& windowData = windowIt->data;
-	windowData.rect.position = event.position;
-	windowData.visibleRect.position = windowData.rect.position;
-}
-
-void Context::PushEvent(WindowResizeEvent const& event)
-{
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(pImplData);
-	auto windowIt = Std::FindIf(
-		implData.windows.begin(),
-		implData.windows.end(),
-		[event](auto const& node) -> bool { return node.id == event.windowId; });
-	DENGINE_IMPL_GUI_ASSERT(windowIt != implData.windows.end());
-	auto& windowData = windowIt->data;
-	windowData.rect.extent = event.extent;
-	windowData.visibleRect = event.visibleRect;
-}
-
-void Context::Render(
-	std::vector<Gfx::GuiVertex>& vertices,
-	std::vector<u32>& indices,
-	std::vector<Gfx::GuiDrawCmd>& drawCmds,
-	std::vector<Gfx::NativeWindowUpdate>& windowUpdates) const
-{
-	auto& implData = *static_cast<impl::ImplData*>(pImplData);
-
-	for (auto& windowNode : implData.windows)
-	{
-		if (windowNode.data.isMinimized)
-			continue;
-
-		windowNode.data.drawCmdOffset = (u32)drawCmds.size();
-
-		Rect const windowRect = { {}, windowNode.data.rect.extent };
-		auto visibleRect = windowNode.data.visibleRect;
-		visibleRect.position -= windowNode.data.rect.position;
-
-		DrawInfo drawInfo = {
-			windowNode.data.rect.extent,
-			vertices,
-			indices,
-			drawCmds };
-
-		if (windowNode.data.topLayout)
-		{
-			windowNode.data.topLayout->Render(
-				*this,
-				windowNode.data.rect.extent,
-				visibleRect,
-				visibleRect,
-				drawInfo);
-		}
-
-		if (windowNode.frontmostLayer)
-		{
-			auto const& layer = *windowNode.frontmostLayer;
-			layer.Render(
-				*this,
-				windowRect,
-				visibleRect,
-				drawInfo);
-		}
-
-		windowNode.data.drawCmdCount = (u32)drawCmds.size() - windowNode.data.drawCmdOffset;
-
-		Gfx::NativeWindowUpdate newUpdate = {};
-		newUpdate.id = Gfx::NativeWindowID(windowNode.id);
-		newUpdate.clearColor = windowNode.data.clearColor;
-		newUpdate.drawCmdOffset = windowNode.data.drawCmdOffset;
-		newUpdate.drawCmdCount = windowNode.data.drawCmdCount;
-		auto windowEvents = App::GetWindowEvents(App::WindowID(windowNode.id));
-		if (windowEvents.restore)
-			newUpdate.event = Gfx::NativeWindowEvent::Restore;
-		else if (windowEvents.resize)
-			newUpdate.event = Gfx::NativeWindowEvent::Resize;
-
-		windowUpdates.push_back(newUpdate);
-	}
-}
-*/

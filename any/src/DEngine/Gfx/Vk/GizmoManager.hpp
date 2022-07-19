@@ -1,7 +1,7 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Math/Vector.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
@@ -46,7 +46,7 @@ namespace DEngine::Gfx::Vk
 			QueueData const* queues;
 			VmaAllocator const* vma;
 			DeletionQueue* delQueue;
-			Std::FrameAllocator* frameAlloc;
+			Std::BumpAllocator* frameAlloc;
 			DebugUtilsDispatch const* debugUtils;
 			APIData const* apiData;
 			Std::Span<Math::Vec3 const> arrowMesh;

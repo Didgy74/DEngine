@@ -603,7 +603,7 @@ Std::Vec<Rect, AllocRef> Gui::impl::DA_WindowNode_BuildTabRects(
 	int const tabCount = (int) tabs.Size();
 
 	// First gather all the desired widths.
-	auto desiredWidths = Std::MakeVec<int>(transientAlloc);
+	auto desiredWidths = Std::NewVec<int>(transientAlloc);
 	desiredWidths.Resize(tabCount);
 	for (int i = 0 ; i < tabCount ; i += 1)
 	{
@@ -620,7 +620,7 @@ Std::Vec<Rect, AllocRef> Gui::impl::DA_WindowNode_BuildTabRects(
 
 	auto const sizeRatio = (f32) titlebarRect.extent.width / (f32) sumDesired;
 
-	auto rects = Std::MakeVec<Rect>(transientAlloc);
+	auto rects = Std::NewVec<Rect>(transientAlloc);
 	rects.Resize(tabCount);
 	int remainingWidth = (int)titlebarRect.extent.width;
 	int horizontalPosOffset = 0;
@@ -750,7 +750,7 @@ void Gui::impl::Render_WindowNode(
 		}
 		drawInfo.PushFilledQuad(rect, color);
 
-		auto glyphRects = Std::MakeVec<Rect>(transientAlloc);
+		auto glyphRects = Std::NewVec<Rect>(transientAlloc);
 		glyphRects.Resize(tab.title.size());
 		auto textExtent = textManager.GetOuterExtent(
 			{ tab.title.data(), tab.title.size() },

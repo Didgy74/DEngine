@@ -12,7 +12,11 @@ add_subdirectory("../../any" "any")
 add_library(dengine SHARED
 	"src/BackendData.hpp"
     "src/application.cpp"
-	"src/FileInputStream.cpp")
+	"src/FileInputStream.cpp"
+	"src/HandleCustomEvent.hpp"
+	"src/HandleCustomEvent.cpp"
+	"src/HandleInputEvent.hpp"
+	"src/HandleInputEvent.cpp")
 target_compile_features(dengine PRIVATE cxx_std_20)
 set_target_properties(dengine PROPERTIES
 		CXX_STANDARD 20

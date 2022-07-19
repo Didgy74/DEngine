@@ -24,8 +24,9 @@ namespace DEngine::Gui
 
 		Math::Vec4 backgroundColor = { 0.3f, 0.3f, 0.3f, 1.f };
 		u32 margin = 0;
+
 		static constexpr u8 defaultDecimalPoints = 0;
-		u8 decimalPoints = 0;
+		u8 decimalPoints = defaultDecimalPoints;
 
 		[[nodiscard]] bool HasInputSession() const noexcept { return inputConnectionCtx; }
 		void SetValue(f64 in);
@@ -66,6 +67,8 @@ namespace DEngine::Gui
 		friend Impl;
 
 	protected:
+		void ClearInputConnection();
+
 		Std::Opt<u8> pointerId;
 		Context* inputConnectionCtx = nullptr;
 		std::string text = "0.0";

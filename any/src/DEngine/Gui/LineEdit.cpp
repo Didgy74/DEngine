@@ -15,7 +15,6 @@ struct LineEdit::Impl
 		explicit CustomData(RectCollection::AllocRefT const& alloc) :
 			glyphRects{ alloc } {}
 
-
 		Extent textOuterExtent = {};
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
@@ -53,11 +52,13 @@ struct LineEdit::Impl
 		PointerPress_Pointer const& pointer;
 	};
 
+
+
 	static void BeginInputSession(LineEdit& widget, Context& ctx)
 	{
 		ctx.TakeInputConnection(
 			widget,
-			Gui::SoftInputFilter::NoFilter,
+			Gui::SoftInputFilter::SignedFloat,
 			{ widget.text.data(), widget.text.length() });
 		widget.inputConnectionCtx = &ctx;
 	}
@@ -98,8 +99,9 @@ struct LineEdit::Impl
 				eventConsumed = true;
 			}
 		}
-		else
-		{
+		else {
+			// The field is not currently being held.
+
 			if (widget.HasInputSession())
 			{
 				bool shouldEndInputSession = false;
@@ -107,7 +109,6 @@ struct LineEdit::Impl
 				shouldEndInputSession = shouldEndInputSession ||
 					eventConsumed &&
 					pointer.pressed;
-
 				shouldEndInputSession = shouldEndInputSession ||
 					!eventConsumed &&
 					pointer.pressed &&
@@ -115,8 +116,7 @@ struct LineEdit::Impl
 
 				if (shouldEndInputSession)
 				{
-					widget.inputConnectionCtx->ClearInputConnection(widget);
-					widget.inputConnectionCtx = nullptr;
+					widget.ClearInputConnection();
 					eventConsumed = true;
 				}
 			}
@@ -321,7 +321,6 @@ void LineEdit::TextInput(
 			int begin = (int)event.oldIndex + (int)event.oldCount;
 			for (int i = begin; i < oldSize; i += 1)
 				text[i + sizeDifference] = text[i];
-
 			text.resize(text.size() + sizeDifference);
 		}
 

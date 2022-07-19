@@ -153,7 +153,7 @@ struct StackLayout::Impl
 	{
 		auto const childCount = (int)sizeHints.Size();
 		if (childCount <= 0)
-			return Std::MakeVec<Rect>(transientAlloc);
+			return Std::NewVec<Rect>(transientAlloc);
 
 		auto parentExtent = GetDirRefs(dir, parentRect.extent);
 
@@ -168,7 +168,7 @@ struct StackLayout::Impl
 		auto const sumNonExpandedChildMinDir = GetNonExpandedChildrenSumDirLength(dir, sizeHints);
 		u32 const expandedChildCount = GetExpandChildrenCount(dir, sizeHints);
 
-		auto returnVal = Std::MakeVec<Rect>(transientAlloc);
+		auto returnVal = Std::NewVec<Rect>(transientAlloc);
 		returnVal.Resize(childCount);
 
 		auto remainingLength = usableExtent.dir;
@@ -431,7 +431,7 @@ SizeHint StackLayout::GetSizeHint2(GetSizeHint2_Params const& params) const
 
 	SizeHint returnVal = {};
 
-	auto childSizeHints = Std::MakeVec<SizeHint>(params.transientAlloc);
+	auto childSizeHints = Std::NewVec<SizeHint>(params.transientAlloc);
 	childSizeHints.Resize(childCount);
 	for (int i = 0; i < childCount; i += 1)
 		childSizeHints[i] = children[i]->GetSizeHint2(params);
@@ -465,12 +465,12 @@ void StackLayout::BuildChildRects(
 
 	uSize const childCount = children.size();
 
-	auto childEntries = Std::MakeVec<RectCollection::It>(transientAlloc);
+	auto childEntries = Std::NewVec<RectCollection::It>(transientAlloc);
 	childEntries.Resize(childCount);
 	for (uSize i = 0; i < childCount; i += 1)
 		childEntries[i] = pusher.GetEntry(*children[i]);
 
-	auto childSizeHints = Std::MakeVec<SizeHint>(transientAlloc);
+	auto childSizeHints = Std::NewVec<SizeHint>(transientAlloc);
 	childSizeHints.Resize(childCount);
 	for (uSize i = 0; i < childCount; i += 1)
 		childSizeHints[i] = pusher.GetSizeHint(childEntries[i]);

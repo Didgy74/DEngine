@@ -9,25 +9,22 @@ using namespace DEngine::Gui;
 namespace DEngine::Gui::impl
 {
 	[[nodiscard]] static constexpr Extent BuildChildRect(
-		Extent const& contentArea,
+		Extent const& contentView,
 		u32 scrollbarThickness,
 		SizeHint const& childSizeHint)
 	{
 		Extent childRect = {};
-		childRect.width = contentArea.width - scrollbarThickness;
+		childRect.width = contentView.width - scrollbarThickness;
 
 		if (childSizeHint.expandY)
-		{
-			childRect.height = Math::Max(childSizeHint.minimum.height, contentArea.height);
-		}
+			childRect.height = Math::Max(childSizeHint.minimum.height, contentView.height);
 		else
-		{
 			childRect.height = childSizeHint.minimum.height;
-		}
+
 		return childRect;
 	}
 
-	[[nodiscard]] static Rect GetContentArea(
+	[[nodiscard]] static Rect GetContentViewRect(
 		Rect const& widgetRect,
 		u32 scrollbarThickness)
 	{
@@ -48,17 +45,17 @@ namespace DEngine::Gui::impl
 		childRect.position = widgetRect.position;
 		childRect.extent = BuildChildRect(widgetRect.extent, scrollbarThickness, childSizeHint);
 		if (!childSizeHint.expandY && (childRect.extent.height > widgetRect.extent.height))
-			childRect.position.y -= scrollbarPos;
+			childRect.position.y -= (i32)scrollbarPos;
 		return childRect;
 	}
 
 	[[nodiscard]] static u32 GetScrollbarHeight(
-		u32 contentAreaHeight,
+		u32 contentViewHeight,
 		u32 childHeight)
 	{
-		f32 factor = (f32)contentAreaHeight / (f32)childHeight;
+		f32 factor = (f32)contentViewHeight / (f32)childHeight;
 		factor = Math::Min(factor, 1.f);
-		return (u32)Math::Round((f32)contentAreaHeight * factor);
+		return (u32)Math::Round((f32)contentViewHeight * factor);
 	}
 
 	[[nodiscard]] static Rect GetScrollbarRect(
@@ -69,34 +66,32 @@ namespace DEngine::Gui::impl
 	{
 		Rect scrollbarRect = {};
 		scrollbarRect.extent.width = thickness;
-		scrollbarRect.extent.height = GetScrollbarHeight(
-			widgetRect.extent.height,
-			childHeight);
-		scrollbarRect.position.x = (i32)widgetRect.position.x + widgetRect.extent.width - thickness;
+		scrollbarRect.extent.height = GetScrollbarHeight(widgetRect.extent.height, childHeight);
+		scrollbarRect.position.x = widgetRect.position.x + (i32)widgetRect.extent.width - (i32)thickness;
 		scrollbarRect.position.y = widgetRect.position.y;
-		if (widgetRect.extent.height < childHeight)
-		{
-			f32 test = (f32)position / (f32)(childHeight - widgetRect.extent.height);
 
-			scrollbarRect.position.y += test * (f32)(widgetRect.extent.height - scrollbarRect.extent.height);
+		if (widgetRect.extent.height < childHeight) {
+			f32 test = (f32)position / (f32)(childHeight - widgetRect.extent.height);
+			scrollbarRect.position.y += (int)Math::Round(
+				test * (f32)(widgetRect.extent.height - scrollbarRect.extent.height));
 		}
 		return scrollbarRect;
 	}
 
 	[[nodiscard]] static constexpr u32 GetCorrectedScrollbarPos(
-		u32 contentHeight,
+		u32 contentViewHeight,
 		u32 totalChildheight,
 		u32 currScrollbarPos) noexcept
 	{
 		// We can fit the entire child into our content,
 		// means no scrollbar offset needed.
-		if (contentHeight >= totalChildheight)
+		if (contentViewHeight >= totalChildheight)
 			return 0;
-		else if (contentHeight + currScrollbarPos >= contentHeight)
+		else if (totalChildheight + currScrollbarPos >= contentViewHeight)
 		{
 			// The offset makes the content be offset longer that it should be.
 			// Correct it to be maximum offset possible.
-			return Math::Min(currScrollbarPos, totalChildheight - contentHeight);
+			return Math::Min(currScrollbarPos, totalChildheight);
 		}
 		else
 			return currScrollbarPos;
@@ -177,7 +172,7 @@ bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params const& params)
 	auto& visibleRect = params.visibleRect;
 	auto& pointer = params.pointer;
 
-	auto const contentArea = impl::GetContentArea(widgetRect, scrollArea.scrollbarThickness);
+	auto const contentArea = impl::GetContentViewRect(widgetRect, scrollArea.scrollbarThickness);
 
 	// First we want to see if we hovered the scrollbar.
 	u32 correctedScrollbarPos = 0;
@@ -195,15 +190,17 @@ bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params const& params)
 			if (pointer.id == holdData.pointerId)
 			{
 				// The scroll-bar is currently pressed so we need to move it with the pointer.
-
-				u32 scrollBarHeight = GetScrollbarHeight(contentArea.extent.height, childRect.extent.height);
+				u32 scrollBarHeight = GetScrollbarHeight(
+					contentArea.extent.height,
+					childRect.extent.height);
 
 				// Set the pixel offset of the scrolling based on where the pointer is.
 				// I honestly don't remember how the math works.
 				f32 test = pointer.pos.y - (f32)contentArea.position.y - holdData.pointerRelativePosY;
 				f32 factor = test / (f32)(widgetRect.extent.height - scrollBarHeight);
 				factor = Math::Clamp(factor, 0.f, 1.f);
-				scrollArea.currScrollbarPos = (u32)Math::Round(factor * (f32)(childRect.extent.height - widgetRect.extent.height));
+				scrollArea.currScrollbarPos = (u32)Math::Round(
+				factor * (f32)(childRect.extent.height - widgetRect.extent.height));
 			}
 		}
 		else
@@ -277,7 +274,7 @@ bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params const& params)
 
 	bool newConsumed = params.eventConsumed;
 
-	auto const contentArea = impl::GetContentArea(widgetRect, scrollArea.scrollbarThickness);
+	auto const contentArea = impl::GetContentViewRect(widgetRect, scrollArea.scrollbarThickness);
 
 	// First check if we hit the scrollbar
 	u32 correctedScrollbarPos = 0;
@@ -399,7 +396,7 @@ void ScrollArea::BuildChildRects(
 		auto const childEntry = pusher.GetEntry(childWidget);
 		auto const& childSizeHint = pusher.GetSizeHint(childEntry);
 
-		auto const contentArea = impl::GetContentArea(widgetRect, scrollbarThickness);
+		auto const contentArea = impl::GetContentViewRect(widgetRect, scrollbarThickness);
 
 		auto correctedScrollbarPos = impl::GetCorrectedScrollbarPos(
 			contentArea.extent.height,
@@ -439,12 +436,10 @@ void ScrollArea::Render2(
 		DENGINE_IMPL_GUI_ASSERT(childRectComboPtr);
 		childRectCombo = *childRectComboPtr;
 
-		if (!childRectCombo.visibleRect.IsNothing())
-		{
+		if (!childRectCombo.visibleRect.IsNothing()) {
 			auto const scopedScissor = DrawInfo::ScopedScissor(
 				drawInfo,
 				childRectCombo.visibleRect);
-
 			child->Render2(
 				params,
 				childRectCombo.widgetRect,
@@ -486,7 +481,7 @@ void ScrollArea::Render2(
 	for (auto i = 0; i < 4; i++)
 		color[i] = Math::Clamp(color[i], 0.f, 1.f);
 
-	params.drawInfo.PushFilledQuad(scrollBarRect, color);
+	drawInfo.PushFilledQuad(scrollBarRect, color);
 }
 
 void ScrollArea::CursorExit(Context& ctx)

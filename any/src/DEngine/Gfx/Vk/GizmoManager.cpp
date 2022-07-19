@@ -5,7 +5,7 @@
 #include "QueueData.hpp"
 #include "Vk.hpp"
 
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
 
 #include <DEngine/Math/LinearTransform3D.hpp>
@@ -341,7 +341,7 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::MakeVec<char>(transientAlloc);
+		auto vertCode = Std::NewVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -360,7 +360,7 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::MakeVec<char>(transientAlloc);
+		auto fragCode = Std::NewVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
@@ -491,7 +491,7 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::MakeVec<char>(transientAlloc);
+		auto vertCode = Std::NewVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -510,7 +510,7 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::MakeVec<char>(transientAlloc);
+		auto fragCode = Std::NewVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
@@ -628,7 +628,7 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto vertCode = Std::MakeVec<char>(transientAlloc);
+		auto vertCode = Std::NewVec<char>(transientAlloc);
 		vertCode.Resize((uSize)vertFileLength);
 		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
@@ -647,7 +647,7 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		auto fragCode = Std::MakeVec<char>(transientAlloc);
+		auto fragCode = Std::NewVec<char>(transientAlloc);
 		fragCode.Resize((uSize)fragFileLength);
 		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();

@@ -293,23 +293,21 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
 
-	constexpr char mainThreadName[] = "MainThread";
-	Std::NameThisThread({ mainThreadName, sizeof(mainThreadName) - 1 });
+	Std::NameThisThread(Std::CStrToSpan("MainThread"));
 
 	Time::Initialize();
 
 	auto appCtx = App::impl::Initialize();
 
-	constexpr char mainWindow[] = "Main window";
 	auto mainWindowCreateResult = appCtx.NewWindow(
-		{ mainWindow, sizeof(mainWindow) - 1 },
+		Std::CStrToSpan("Main window"),
 		{ 1280, 800 });
 
 	impl::GfxWsiConnection gfxWsiConnection = {};
 	gfxWsiConnection.appCtx = &appCtx;
 
 	// Initialize the renderer
-	auto requiredInstanceExtensions = App::RequiredVulkanInstanceExtensions();
+	auto requiredInstanceExtensions = App::GetRequiredVkInstanceExtensions();
 	impl::GfxLogger gfxLogger = {};
 	gfxLogger.appCtx = &appCtx;
 	impl::GfxTexAssetInterfacer gfxTexAssetInterfacer{};
@@ -378,7 +376,7 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	{
 		Time::TickStart();
 
-		App::impl::ProcessEvents(appCtx, false);
+		App::impl::ProcessEvents(appCtx, false, 0, false);
 		if (appCtx.GetWindowCount() == 0)
 			break;
 
@@ -489,6 +487,8 @@ void DEngine::impl::SubmitRendering(
 	for (auto& windowUpdate : params.nativeWindowUpdates)
 	{
 		auto const windowEvents = appCtx.GetWindowEvents((App::WindowID)windowUpdate.id);
+		if (windowEvents.restore)
+			windowUpdate.event = Gfx::NativeWindowEvent::Restore;
 		if (windowEvents.resize)
 			windowUpdate.event = Gfx::NativeWindowEvent::Resize;
 	}

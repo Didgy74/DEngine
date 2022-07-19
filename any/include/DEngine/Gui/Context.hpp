@@ -7,7 +7,7 @@
 #include <DEngine/Gui/Layer.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
-#include <DEngine/Std/FrameAllocator.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 
@@ -59,7 +59,7 @@ namespace DEngine::Gui
 		struct Render2_Params
 		{
 			Gui::RectCollection& rectCollection;
-			Std::FrameAllocator& transientAlloc;
+			Std::BumpAllocator& transientAlloc;
 
 			// Temporary stuff
 			std::vector<Gfx::GuiVertex>& vertices;

@@ -19,6 +19,7 @@ constexpr void* operator new(
 
 namespace DEngine::Std
 {
+	// Determines whether a type can be used with Std::Vec
 	template<class T>
 	concept CanBeUsedForVec =
 		Trait::isMoveConstructible<T> &&
@@ -223,7 +224,7 @@ namespace DEngine::Std
 
 			bool needNewAlloc = false;
 			if (data)
-				needNewAlloc = !alloc.Realloc(data, newCapacity * sizeof(T));
+				needNewAlloc = !alloc.Resize(data, newCapacity * sizeof(T));
 			else
 				needNewAlloc = true;
 
@@ -251,5 +252,5 @@ namespace DEngine::Std
 	};
 
 	template<class T, class AllocRefT>
-	inline auto MakeVec(AllocRefT const& alloc) { return Std::Vec<T, AllocRefT>{ alloc }; }
+	inline auto NewVec(AllocRefT const& alloc) { return Std::Vec<T, AllocRefT>{ alloc }; }
 }

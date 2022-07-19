@@ -10,17 +10,14 @@
 
 namespace DEngine::Application::impl
 {
-	[[nodiscard]] static constexpr bool IsValid(Button in) noexcept
-	{
-		return static_cast<unsigned int>(in) < static_cast<unsigned int>(Button::COUNT);
+	[[nodiscard]] static constexpr bool IsValid(Button in) noexcept {
+		return (unsigned int)in < (unsigned int)Button::COUNT;
 	}
-	[[nodiscard]] static constexpr bool IsValid(GamepadKey in) noexcept
-	{
-		return static_cast<unsigned int>(in) < static_cast<unsigned int>(GamepadKey::COUNT);
+	[[nodiscard]] static constexpr bool IsValid(GamepadKey in) noexcept {
+		return (unsigned int)in < (unsigned int)GamepadKey::COUNT;
 	}
-	[[nodiscard]] static constexpr bool IsValid(GamepadAxis in) noexcept
-	{
-		return static_cast<unsigned int>(in) < static_cast<unsigned int>(GamepadAxis::COUNT);
+	[[nodiscard]] static constexpr bool IsValid(GamepadAxis in) noexcept {
+		return (unsigned int)in < (unsigned int)GamepadAxis::COUNT;
 	}
 
 	static void FlushQueuedEventCallbacks(Context& appCtx);
@@ -46,122 +43,17 @@ auto Application::Context::GetImplData() const noexcept -> Impl const&
 	return *m_implData;
 }
 
-static void Application::impl::FlushQueuedEventCallbacks(Context& appCtx)
+static void Application::impl::FlushQueuedEventCallbacks(Context& ctx)
 {
-	auto& implData = appCtx.GetImplData();
-	for (auto const& job : implData.queuedEventCallbacks)
-	{
-		switch (job.type)
-		{
-			case EventType::ButtonEvent:
-			{
-				auto const& event = EventUnion_Get<EventType::ButtonEvent>(job.eventUnion);
-				job.ptr->ButtonEvent(
-					event.windowId,
-					event.btn,
-					event.state);
-				break;
-			}
-			case EventType::CursorMoveEvent:
-			{
-				auto const& event = EventUnion_Get<EventType::CursorMoveEvent>(job.eventUnion);
-				job.ptr->CursorMove(
-					appCtx,
-					event.windowId,
-					event.pos,
-					event.delta);
-				break;
-			}
+	auto& implData = ctx.GetImplData();
 
-			case EventType::TextInputEvent:
-			{
-				auto const& event = EventUnion_Get<EventType::TextInputEvent>(job.eventUnion);
-				DENGINE_IMPL_APPLICATION_ASSERT(event.newTextOffset + event.newTextSize <= implData.textInputDatas.size());
-				job.ptr->TextInputEvent(
-					appCtx,
-					event.windowId,
-					event.oldIndex,
-					event.oldCount,
-					{ implData.textInputDatas.data() + event.newTextOffset, event.newTextSize });
-				break;
-			}
-
-			case EventType::EndTextInputSessionEvent:
-			{
-				auto const& event = EventUnion_Get<EventType::EndTextInputSessionEvent>(job.eventUnion);
-				job.ptr->EndTextInputSessionEvent(appCtx, event.windowId);
-				break;
-			}
-
-			case EventType::TouchEvent:
-			{
-				auto const& event = EventUnion_Get<EventType::TouchEvent>(job.eventUnion);
-				job.ptr->TouchEvent(
-					event.windowId,
-					event.id,
-					event.type,
-					{ event.x, event.y });
-				break;
-			}
-			case EventType::WindowCursorEnterEvent:
-			{
-				auto const& event = EventUnion_Get<EventType::WindowCursorEnterEvent>(job.eventUnion);
-				job.ptr->WindowCursorEnter(
-					event.window,
-					event.entered);
-				break;
-			}
-
-			case EventType::WindowCloseSignalEvent:
-			{
-				auto const& event = EventUnion_Get<EventType::WindowCloseSignalEvent>(job.eventUnion);
-				bool const destroyWindow = job.ptr->WindowCloseSignal(
-					appCtx,
-					event.window);
-				if (destroyWindow)
-				{
-					constexpr bool useLock = false;
-					DestroyWindow(implData, event.window, useLock);
-				}
-				break;
-			}
-			case EventType::WindowFocusEvent:
-			{
-				auto const& event = EventUnion_Get<EventType::WindowFocusEvent>(job.eventUnion);
-				job.ptr->WindowFocus(
-					event.window,
-					event.focusGained);
-				break;
-			}
-			case EventType::WindowMoveEvent:
-			{
-				auto const& event = EventUnion_Get<EventType::WindowMoveEvent>(job.eventUnion);
-				job.ptr->WindowMove(
-					event.window,
-					event.position);
-				break;
-			}
-			case EventType::WindowResizeEvent:
-			{
-				auto const& event = EventUnion_Get<EventType::WindowResizeEvent>(job.eventUnion);
-				job.ptr->WindowResize(
-					appCtx,
-					event.window,
-					event.extent,
-					event.safeAreaOffset,
-					event.safeAreaExtent);
-				break;
-			}
-
-			default:
-				DENGINE_IMPL_APPLICATION_UNREACHABLE();
-				break;
-		}
+	for(auto const& job : implData.queuedEventCallbacks) {
+		for (auto* eventForwarder : implData.eventForwarders)
+			job(ctx, implData, *eventForwarder);
 	}
 	implData.queuedEventCallbacks.clear();
-
+	implData.queuedEvents_InnerBuffer.Reset(false);
 }
-
 
 void Application::impl::DestroyWindow(
 	Context::Impl& implData,
@@ -370,6 +262,17 @@ WindowEvents Context::GetWindowEvents(WindowID in) const noexcept
 	return windowNode.events;
 }
 
+bool Context::IsWindowMinimized(WindowID in) const noexcept {
+	auto& implData = GetImplData();
+
+	std::scoped_lock lock { implData.windowsLock };
+
+	auto const* windowNodePtr = implData.GetWindowNode(in);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
+	auto const& windowNode = *windowNodePtr;
+	return windowNode.windowData.isMinimized;
+}
+
 auto Context::CreateVkSurface(
 	WindowID window,
 	uSize vkInstance,
@@ -497,23 +400,20 @@ WindowID Application::Context::Impl::GetWindowId(void* platformHandle) const
 
 namespace DEngine::Application::impl
 {
-	template<class T>
-	void PushEvent(Context::Impl& implData, T const& in)
-	{
-		for (auto const& eventCallback : implData.eventForwarders)
-		{
-			EventCallbackJob job = {};
-			job.ptr = eventCallback;
-			job.type = GetEventType<T>();
-			auto& jobMember = EventUnion_Get<T>(job.eventUnion);
-			jobMember = in;
+	template<class Callable>
+	void EnqueueEvent2(Context::Impl& implData, Callable&& in) {
 
-			implData.queuedEventCallbacks.push_back(job);
-		}
+		auto* tempPtr = (Callable*)implData.queuedEvents_InnerBuffer.Alloc(sizeof(Callable), alignof(Callable));
+		DENGINE_IMPL_APPLICATION_ASSERT(tempPtr != nullptr);
+		new(tempPtr) Callable(Std::Move(in));
+
+		implData.queuedEventCallbacks.emplace_back(*tempPtr);
 	}
 }
 
-void Application::impl::BackendInterface::UpdateWindowCursorEnter(
+using namespace DEngine::Application::impl;
+
+void BackendInterface::UpdateWindowCursorEnter(
 	Context::Impl& implData,
 	WindowID id,
 	bool entered)
@@ -522,27 +422,68 @@ void Application::impl::BackendInterface::UpdateWindowCursorEnter(
 	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 
-	WindowCursorEnterEvent event = {};
-	event.window = id;
-	event.entered = entered;
+	windowNode.events.cursorEnter = true;
 
-	PushEvent(implData, event);
+	EnqueueEvent2(
+		implData,
+		[=](Context&, Context::Impl&, EventForwarder& forwarder) {
+			forwarder.WindowCursorEnter(id, entered);
+		});
 }
 
-void Application::impl::BackendInterface::PushWindowCloseSignal(
+void BackendInterface::WindowReorientation(
 	Context::Impl& implData,
-	WindowID id)
+	WindowID id,
+	Orientation newOrientation)
 {
 	auto windowNodePtr = implData.GetWindowNode(id);
 	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 
-	WindowCloseSignalEvent event = {};
-	event.window = windowNode.id;
-	PushEvent(implData, event);
+	windowNode.events.orientation = true;
+
+	//DENGINE_IMPL_APPLICATION_ASSERT(windowData.orientation != newOrientation);
 }
 
-void Application::impl::BackendInterface::UpdateWindowPosition(
+void BackendInterface::PushWindowCloseSignal(Context::Impl& implData, WindowID id){
+	auto windowNodePtr = implData.GetWindowNode(id);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+
+	EnqueueEvent2(
+		implData,
+		[=](Context& ctx, Context::Impl& implData, EventForwarder& forwarder) {
+			auto destroyWindow = forwarder.WindowCloseSignal(ctx, id);
+			if (destroyWindow) {
+				constexpr bool useLock = false;
+				DestroyWindow(implData, id, useLock);
+			}
+		});
+}
+
+void BackendInterface::PushWindowMinimizeSignal(
+	Context::Impl& implData,
+	WindowID id,
+	bool minimize)
+{
+	auto windowNodePtr = implData.GetWindowNode(id);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+	windowNode.windowData.isMinimized = minimize;
+
+	if (minimize)
+		windowNode.events.minimize = true;
+	else
+		windowNode.events.restore = true;
+
+	EnqueueEvent2(
+		implData,
+		[=](Context&, Context::Impl&, EventForwarder& forwarder) {
+			forwarder.WindowMinimize(id, minimize);
+		});
+}
+
+void BackendInterface::UpdateWindowPosition(
 	Context::Impl& implData,
 	WindowID id,
 	Math::Vec2Int newPosition)
@@ -554,34 +495,43 @@ void Application::impl::BackendInterface::UpdateWindowPosition(
 	windowNode.windowData.position = newPosition;
 	windowNode.events.move = true;
 
-	WindowMoveEvent event = {};
-	event.position = newPosition;
-	event.window = windowNode.id;
-	PushEvent(implData, event);
+	EnqueueEvent2(
+		implData,
+		[=](Context& ctx, Context::Impl& implData, EventForwarder& forwarder) {
+			forwarder.WindowMove(id, newPosition);
+		});
 }
 
-void Application::impl::BackendInterface::UpdateWindowSize(
+void BackendInterface::UpdateWindowSize(
 	Context::Impl& implData,
 	WindowID id,
-	Extent newSize)
+	Extent windowExtent,
+	u32 safeAreaOffsetX,
+	u32 safeAreaOffsetY,
+	Extent safeAreaExtent)
 {
 	auto windowNodePtr = implData.GetWindowNode(id);
 	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 
-	windowNode.windowData.extent = newSize;
+	windowNode.windowData.extent = windowExtent;
+	windowNode.windowData.visibleOffset = { safeAreaOffsetX, safeAreaOffsetY };
+	windowNode.windowData.visibleExtent = safeAreaExtent;
 	windowNode.events.resize = true;
 
-
-	WindowResizeEvent event = {};
-	event.window = windowNode.id;
-	event.extent = newSize;
-	event.safeAreaOffset = {};
-	event.safeAreaExtent = newSize;
-	PushEvent(implData, event);
+	EnqueueEvent2(
+		implData,
+		[=](Context& ctx, Context::Impl& implData, EventForwarder& forwarder) {
+			forwarder.WindowResize(
+				ctx,
+				id,
+				windowExtent,
+				{ safeAreaOffsetX, safeAreaOffsetY },
+				safeAreaExtent);
+		});
 }
 
-void Application::impl::BackendInterface::UpdateWindowFocus(
+void BackendInterface::UpdateWindowFocus(
 	Context::Impl& implData,
 	WindowID id,
 	bool focusGained)
@@ -590,10 +540,11 @@ void Application::impl::BackendInterface::UpdateWindowFocus(
 	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 
-	WindowFocusEvent event = {};
-	event.window = windowNode.id;
-	event.focusGained = focusGained;
-	PushEvent(implData, event);
+	EnqueueEvent2(
+		implData,
+		[=](Context& ctx, Context::Impl& implData, EventForwarder& forwarder) {
+			forwarder.WindowFocus(id, focusGained);
+		});
 }
 
 namespace DEngine::Application::impl::BackendInterface
@@ -609,11 +560,15 @@ namespace DEngine::Application::impl::BackendInterface
 		cursorData.position = (newRelativePos + windowNode.windowData.position);
 		cursorData.positionDelta += delta;
 
-		CursorMoveEvent event = {};
-		event.windowId = windowNode.id;
-		event.pos = newRelativePos;
-		event.delta = cursorData.positionDelta;
-		PushEvent(implData, event);
+		EnqueueEvent2(
+			implData,
+			[=](Context& ctx, Context::Impl& implData, EventForwarder& forwarder) {
+				forwarder.CursorMove(
+					ctx,
+					windowNode.id,
+					newRelativePos,
+					cursorData.positionDelta);
+			});
 	}
 
 	static void UpdateCursor(
@@ -634,7 +589,7 @@ namespace DEngine::Application::impl::BackendInterface
 	}
 }
 
-void Application::impl::BackendInterface::UpdateCursorPosition(
+void BackendInterface::UpdateCursorPosition(
 	Context::Impl& implData,
 	WindowID id,
 	Math::Vec2Int newRelativePosition,
@@ -651,7 +606,7 @@ void Application::impl::BackendInterface::UpdateCursorPosition(
 		delta);
 }
 
-void Application::impl::BackendInterface::UpdateCursorPosition(
+void BackendInterface::UpdateCursorPosition(
 	Context::Impl& implData,
 	WindowID id,
 	Math::Vec2Int newRelativePosition)
@@ -666,7 +621,7 @@ void Application::impl::BackendInterface::UpdateCursorPosition(
 		newRelativePosition);
 }
 
-void Application::impl::BackendInterface::UpdateTouch(
+void BackendInterface::UpdateTouch(
 	Context::Impl& implData,
 	WindowID windowId,
 	TouchEventType eventType,
@@ -678,16 +633,18 @@ void Application::impl::BackendInterface::UpdateTouch(
 	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
 
-	TouchEvent event = {};
-	event.windowId = windowId;
-	event.id = touchId;
-	event.type = eventType;
-	event.x = x;
-	event.y = y;
-	PushEvent(implData, event);
+	EnqueueEvent2(
+		implData,
+		[=](Context& ctx, Context::Impl& implData, EventForwarder& forwarder) {
+			forwarder.TouchEvent(
+				windowId,
+				touchId,
+				eventType,
+				{ x, y });
+		});
 }
 
-void Application::impl::BackendInterface::UpdateButton(
+void BackendInterface::UpdateButton(
 	Context::Impl& implData,
 	WindowID id,
 	Button button,
@@ -699,22 +656,18 @@ void Application::impl::BackendInterface::UpdateButton(
 	implData.buttonEvents[(int)button] = pressed ? KeyEventType::Pressed : KeyEventType::Unpressed;
 
 	if (pressed)
-	{
 		implData.buttonHeldStart[(int)button] = implData.currentNow;
-	}
 	else
-	{
 		implData.buttonHeldStart[(int)button] = std::chrono::high_resolution_clock::time_point();
-	}
 
-	ButtonEvent event = {};
-	event.windowId = id;
-	event.btn = button;
-	event.state = pressed;
-	PushEvent(implData, event);
+	EnqueueEvent2(
+		implData,
+		[=](Context& ctx, Context::Impl& implData, EventForwarder& forwarder) {
+			forwarder.ButtonEvent(id, button, pressed);
+		});
 }
 
-void Application::impl::BackendInterface::PushTextInputEvent(
+void BackendInterface::PushTextInputEvent(
 	Context::Impl& implData,
 	WindowID id,
 	uSize oldIndex,
@@ -730,22 +683,30 @@ void Application::impl::BackendInterface::PushTextInputEvent(
 
 	implData.textInputSelectedIndex = oldIndex + newText.Size();
 
-	TextInputEvent event = {};
-	event.windowId = id;
-	event.oldIndex = oldIndex;
-	event.oldCount = oldCount;
-	event.newTextOffset = oldTextDataSize;
-	event.newTextSize = newText.Size();
-	PushEvent(implData, event);
+	auto newTextOffset = oldTextDataSize;
+	auto newTextSize = newText.Size();
+	EnqueueEvent2(
+		implData,
+		[=](Context& ctx, Context::Impl& implData, EventForwarder& forwarder) {
+			DENGINE_IMPL_APPLICATION_ASSERT(newTextOffset + newTextSize <= implData.textInputDatas.size());
+			forwarder.TextInputEvent(
+				ctx,
+				id,
+				oldIndex,
+				oldCount,
+				{ implData.textInputDatas.data() + newTextOffset, newTextSize });
+		});
 }
 
-[[maybe_unused]] void Application::impl::BackendInterface::PushEndTextInputSessionEvent(
+void BackendInterface::PushEndTextInputSessionEvent(
 	Context::Impl& implData,
 	WindowID id)
 {
-	EndTextInputSessionEvent event = {};
-	event.windowId = id;
-	PushEvent(implData, event);
+	EnqueueEvent2(
+		implData,
+		[=](Context& ctx, Context::Impl& implData, EventForwarder& forwarder) {
+			forwarder.EndTextInputSessionEvent(ctx, id);
+		});
 }
 
 bool Application::GamepadState::GetKeyState(GamepadKey btn) const noexcept
