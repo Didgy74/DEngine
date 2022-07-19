@@ -18,6 +18,3 @@
 	path = desktop/external/glfw
 	url = https://github.com/glfw/glfw.git
 	branch = 3.3.2
-[submodule "any/external/Tracy"]
-	path = any/external/Tracy
-	url = https://github.com/wolfpld/tracy.git
