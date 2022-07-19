@@ -1,3 +1,8 @@
+Git command for Didgy:
+```
+git clone --recursive --branch didgy-dev --shallow-submodules --single-branch --depth 1 git@github.com:Didgy74/DEngine.git
+```
+
 # Build instructions
 This document contains instructions for building this project on Windows, Linux and Android.
 
