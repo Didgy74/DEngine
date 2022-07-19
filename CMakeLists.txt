@@ -54,7 +54,7 @@ if(NOT ${glfw3_FOUND})
 	set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
 	set(GLFW_VULKAN_STATIC OFF CACHE BOOL "" FORCE)
 
-	add_subdirectory("desktop/external/glfw" glfw3)
+	add_subdirectory("desktop/external/glfw")
 else()
 	if (${DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT})
 		message(CHECK_PASS "Found. Using system GLFW package.")
@@ -66,3 +66,6 @@ endif()
 target_link_libraries(${DENGINE_EXECUTABLE_NAME}
 		PRIVATE
 		glfw)
+
+add_subdirectory(any/external/Tracy TracyLib)
+target_link_libraries(${DENGINE_EXECUTABLE_NAME} PUBLIC TracyClient)
