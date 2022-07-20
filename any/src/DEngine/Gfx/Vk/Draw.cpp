@@ -1,13 +1,41 @@
 #include "Vk.hpp"
-#include <DEngine/Gfx/detail/Assert.hpp>
+#include <DEngine/Gfx/impl/Assert.hpp>
 
+#include <DEngine/Std/Containers/Defer.hpp>
+#include <DEngine/Std/Containers/Vec.hpp>
 #include <DEngine/Math/LinearTransform3D.hpp>
 #include <DEngine/Std/Utility.hpp>
 
-#include "Init.hpp"
+#include "Draw_Gui.hpp"
 
 using namespace DEngine;
 using namespace DEngine::Gfx;
+
+void Vk::APIData::Draw(
+	DrawParams const& drawParams)
+{
+	APIData& apiData = *this;
+
+	if constexpr (Gfx::enableDedicatedThread)
+	{
+		std::unique_lock lock{ apiData.threadLock };
+
+		auto& threadData = apiData.thread;
+		thread.drawParamsCondVarProducer.wait(
+			lock,
+			[&threadData]() { return !threadData.drawParamsReady; });
+
+		threadData.drawParams = drawParams;
+		threadData.drawParamsReady = true;
+		threadData.nextCmd = APIData::Thread::NextCmd::Draw;
+
+		thread.drawParamsCondVarWorker.notify_one();
+	}
+	else
+	{
+		apiData.InternalDraw(drawParams);
+	}
+}
 
 namespace DEngine::Gfx::Vk
 {
@@ -33,226 +61,12 @@ namespace DEngine::Gfx::Vk
 		device.beginCommandBuffer(cmdBuffer, beginInfo);
 	}
 
-	void RecordGUICmdBuffer(
-		GlobUtils const& globUtils,
-		GuiResourceManager const& guiResManager,
-		ViewportManager const& viewportManager,
-		WindowGuiData const& guiData,
-		vk::CommandBuffer cmdBuffer,
-		vk::Framebuffer framebuffer,
-		NativeWindowUpdate const& windowUpdate,
-		Std::Span<GuiDrawCmd const> guiDrawCmds,
-		u8 inFlightIndex)
-	{
-		DeviceDispatch const& device = globUtils.device;
-
-		{
-			vk::RenderPassBeginInfo rpBegin{};
-			rpBegin.framebuffer = framebuffer;
-			rpBegin.renderPass = globUtils.guiRenderPass;
-			rpBegin.renderArea.extent = guiData.extent;
-			rpBegin.clearValueCount = 1;
-			vk::ClearColorValue clearVal{};
-			for (uSize i = 0; i < 4; i++)
-				clearVal.float32[i] = windowUpdate.clearColor[i];
-			vk::ClearValue test = clearVal;
-			rpBegin.pClearValues = &test;
-
-			device.cmdBeginRenderPass(cmdBuffer, rpBegin, vk::SubpassContents::eInline);
-
-			{
-				vk::Viewport viewport{};
-				viewport.width = (float)guiData.extent.width;
-				viewport.height = (float)guiData.extent.height;
-				device.cmdSetViewport(cmdBuffer, 0, viewport);
-				vk::Rect2D scissor{};
-				scissor.extent = guiData.extent;
-				device.cmdSetScissor(cmdBuffer, 0, scissor);
-			}
-
-			for (GuiDrawCmd const& drawCmd : guiDrawCmds)
-			{
-				switch (drawCmd.type)
-				{
-				case GuiDrawCmd::Type::Scissor:
-				{
-					vk::Rect2D scissor{};
-					vk::Extent2D rotatedFramebufferExtent = guiData.extent;
-					if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90 ||
-						guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)
-						std::swap(rotatedFramebufferExtent.width, rotatedFramebufferExtent.height);
-					scissor.extent.width = u32(Math::Round(drawCmd.rectExtent.x * rotatedFramebufferExtent.width));
-					scissor.extent.height = u32(Math::Round(drawCmd.rectExtent.y * rotatedFramebufferExtent.height));
-					i32 scissorPosX = i32(Math::Round(drawCmd.rectPosition.x * rotatedFramebufferExtent.width));
-					i32 scissorPosY = i32(Math::Round(drawCmd.rectPosition.y * rotatedFramebufferExtent.height));
-					if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eIdentity)
-					{
-						scissor.offset.x = scissorPosX;
-						scissor.offset.y = scissorPosY;
-					}
-					else if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90)
-					{
-						scissor.offset.x = rotatedFramebufferExtent.height - scissor.extent.height - scissorPosY;
-						scissor.offset.y = scissorPosX;
-					}
-					else if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)
-					{
-						scissor.offset.x = scissorPosY;
-						scissor.offset.y = rotatedFramebufferExtent.width - scissor.extent.width - scissorPosX;
-					}
-					else if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate180)
-					{
-						scissor.offset.x = rotatedFramebufferExtent.width - scissor.extent.width - scissorPosX;
-						scissor.offset.y = rotatedFramebufferExtent.height - scissor.extent.height - scissorPosY;
-					}
-					if (guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90 ||
-							guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)
-						std::swap(scissor.extent.width, scissor.extent.height);
-					device.cmdSetScissor(cmdBuffer, 0, scissor);
-				}
-				break;
-
-				case GuiDrawCmd::Type::FilledMesh:
-				{
-					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResManager.filledMeshPipeline);
-					GuiResourceManager::FilledMeshPushConstant pushConstant{};
-					pushConstant.color = drawCmd.filledMesh.color;
-					pushConstant.orientation = guiData.rotation;
-					pushConstant.rectExtent = drawCmd.rectExtent;
-					pushConstant.rectOffset = drawCmd.rectPosition;
-					device.cmdPushConstants(
-						cmdBuffer,
-						guiResManager.filledMeshPipelineLayout,
-						vk::ShaderStageFlagBits::eVertex,
-						0,
-						32,
-						&pushConstant);
-					device.cmdPushConstants(
-						cmdBuffer,
-						guiResManager.filledMeshPipelineLayout,
-						vk::ShaderStageFlagBits::eFragment,
-						32,
-						sizeof(pushConstant.color),
-						&pushConstant.color);
-					device.cmdBindVertexBuffers(
-						cmdBuffer,
-						0,
-						guiResManager.vtxBuffer,
-						(guiResManager.vtxInFlightCapacity * inFlightIndex) + (drawCmd.filledMesh.mesh.vertexOffset * sizeof(GuiVertex)));
-					device.cmdBindIndexBuffer(
-						cmdBuffer,
-						guiResManager.indexBuffer,
-						(guiResManager.indexInFlightCapacity * inFlightIndex) + (drawCmd.filledMesh.mesh.indexOffset * sizeof(u32)),
-						vk::IndexType::eUint32);
-					device.cmdDrawIndexed(
-						cmdBuffer,
-						drawCmd.filledMesh.mesh.indexCount,
-						1,
-						0,
-						0,
-						0);
-				}
-					break;
-
-				case GuiDrawCmd::Type::TextGlyph:
-				{
-					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResManager.font_pipeline);
-					GuiResourceManager::FontPushConstant pushConstant{};
-					pushConstant.color = drawCmd.textGlyph.color;
-					pushConstant.orientation = guiData.rotation;
-					pushConstant.rectExtent = drawCmd.rectExtent;
-					pushConstant.rectOffset = drawCmd.rectPosition;
-					device.cmdPushConstants(
-						cmdBuffer,
-						guiResManager.font_pipelineLayout,
-						vk::ShaderStageFlagBits::eVertex,
-						0,
-						32,
-						&pushConstant);
-					device.cmdPushConstants(
-						cmdBuffer,
-						guiResManager.font_pipelineLayout,
-						vk::ShaderStageFlagBits::eFragment,
-						32,
-						sizeof(pushConstant.color),
-						&pushConstant.color);
-					GuiResourceManager::GlyphData glyphData{};
-					if (drawCmd.textGlyph.utfValue < GuiResourceManager::lowUtfGlyphDatasSize)
-					{
-						glyphData = guiResManager.lowUtfGlyphDatas[drawCmd.textGlyph.utfValue];
-					}
-					else
-					{
-						auto glyphDataIt = guiResManager.glyphDatas.find((u32)drawCmd.textGlyph.utfValue);
-						if (glyphDataIt == guiResManager.glyphDatas.end())
-							throw std::runtime_error("DEngine - Vulkan: Unable to find glyph.");
-						glyphData = glyphDataIt->second;
-					}
-
-					
-					device.cmdBindDescriptorSets(
-						cmdBuffer,
-						vk::PipelineBindPoint::eGraphics,
-						guiResManager.font_pipelineLayout,
-						0,
-						glyphData.descrSet,
-						nullptr);
-					device.cmdDraw(
-						cmdBuffer,
-						6,
-						1,
-						0,
-						0);
-				}
-					break;
-
-				case GuiDrawCmd::Type::Viewport:
-				{
-					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, guiResManager.viewportPipeline);
-					GuiResourceManager::ViewportPushConstant pushConstant{};
-					pushConstant.orientation = guiData.rotation;
-					pushConstant.rectExtent = drawCmd.rectExtent;
-					pushConstant.rectOffset = drawCmd.rectPosition;
-					device.cmdPushConstants(
-						cmdBuffer,
-						guiResManager.viewportPipelineLayout,
-						vk::ShaderStageFlagBits::eVertex,
-						0,
-						sizeof(pushConstant),
-						&pushConstant);
-					auto const& viewportData = *std::find_if(
-						viewportManager.viewportNodes.begin(),
-						viewportManager.viewportNodes.end(),
-						[&drawCmd](decltype(viewportManager.viewportNodes)::value_type const& val) -> bool {
-							return drawCmd.viewport.id == val.id; });
-					device.cmdBindDescriptorSets(
-						cmdBuffer,
-						vk::PipelineBindPoint::eGraphics,
-						guiResManager.viewportPipelineLayout,
-						0,
-						viewportData.viewport.descrSet,
-						nullptr);
-					device.cmdDraw(
-						cmdBuffer,
-						6,
-						1,
-						0,
-						0);
-				}
-					break;
-				}
-			}
-
-			device.cmdEndRenderPass(cmdBuffer);
-		}
-	}
-	
 	void RecordGraphicsCmdBuffer(
 		GlobUtils const& globUtils, 
 		vk::CommandBuffer cmdBuffer,
 		ObjectDataManager const& objectDataManager,
 		TextureManager const& textureManager,
-		ViewportData const& viewportData,
+		ViewportMgr_ViewportData const& viewportData,
 		ViewportUpdate const& viewportUpdate,
 		DrawParams const& drawParams,
 		u8 inFlightIndex,
@@ -332,53 +146,49 @@ namespace DEngine::Gfx::Vk
 	}
 }
 
-void Vk::APIData::Draw(
-	DrawParams const& drawParams)
-{
-	APIData& apiData = *this;
-
-	std::unique_lock lock{ apiData.drawParamsLock };
-	
-	apiData.drawParamsCondVarProducer.wait(lock, [&apiData]() -> bool { return !apiData.drawParamsReady; });
-
-	apiData.drawParams = drawParams;
-	apiData.drawParamsReady = true;
-
-	lock.unlock();
-	apiData.drawParamsCondVarWorker.notify_one();
-}
-
 void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 {
-	vk::Result vkResult{};
+	vk::Result vkResult = {};
 	APIData& apiData = *this;
-	DevDispatch const& device = globUtils.device;
+	auto const& device = globUtils.device;
+	auto& delQueue = apiData.delQueue;
+	auto const& transientAlloc = Std::AllocRef{ apiData.frameAllocator };
+	Std::Defer allocCleanup { [&apiData]() {
+		apiData.frameAllocator.Reset();
+	}};
 
-	NativeWindowManager::ProcessEvents(
+	NativeWinMgr::ProcessEvents(
 		apiData.nativeWindowManager,
 		globUtils,
+		delQueue,
+		transientAlloc,
 		{ drawParams.nativeWindowUpdates.data(), drawParams.nativeWindowUpdates.size() });
 	// Deletes and creates viewports when needed.
 	ViewportManager::ProcessEvents(
 		apiData.viewportManager,
 		globUtils,
+		delQueue,
+		transientAlloc,
 		{ drawParams.viewportUpdates.data(), drawParams.viewportUpdates.size() },
 		apiData.guiResourceManager);
 	// Resizes the buffer if the new size is too large.
 	ObjectDataManager::HandleResizeEvent(
 		apiData.objectDataManager,
 		globUtils,
+		delQueue,
 		drawParams.transforms.size());
 	TextureManager::Update(
 		apiData.textureManager,
 		globUtils,
+		delQueue,
 		drawParams,
-		*apiData.test_textureAssetInterface);
+		*apiData.test_textureAssetInterface,
+		transientAlloc);
 
 	u8 const currentInFlightIndex = apiData.currInFlightIndex;
 
-	// Wait for fences, so we know the resources are available.
-	vkResult = globUtils.device.waitForFences(
+	// Wait for main fence, so we know the resources are available.
+	vkResult = device.waitForFences(
 		apiData.mainFences[currentInFlightIndex],
 		true,
 		3000000000); // Added a 3s timeout for testing purposes
@@ -417,8 +227,8 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		auto const viewportDataIt = Std::FindIf(
 			apiData.viewportManager.viewportNodes.begin(),
 			apiData.viewportManager.viewportNodes.end(),
-			[&viewportUpdate](auto const& val) -> bool { return viewportUpdate.id == val.id; });
-		DENGINE_DETAIL_GFX_ASSERT(viewportDataIt != apiData.viewportManager.viewportNodes.end());
+			[&viewportUpdate](auto const& val) { return viewportUpdate.id == val.id; });
+		DENGINE_IMPL_GFX_ASSERT(viewportDataIt != apiData.viewportManager.viewportNodes.end());
 		ViewportManager::Node const& viewportNode = *viewportDataIt;
 		
 		if (!cmdBufferBegun)
@@ -444,25 +254,26 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 			apiData);
 	}
 
-
 	// Record all the GUI shit.
-	std::vector<u32> swapchainIndices(drawParams.nativeWindowUpdates.size());
-	std::vector<vk::SwapchainKHR> swapchains(drawParams.nativeWindowUpdates.size());
-	std::vector<vk::Semaphore> swapchainImageReadySemaphores(drawParams.nativeWindowUpdates.size());
-	std::vector<vk::PipelineStageFlags> swapchainImageReadyStages(drawParams.nativeWindowUpdates.size());
+	auto swapchainIndices = Std::NewVec<u32>(transientAlloc);
+	swapchainIndices.Resize(drawParams.nativeWindowUpdates.size());
+	auto swapchains = Std::NewVec<vk::SwapchainKHR>(transientAlloc);
+	swapchains.Resize(drawParams.nativeWindowUpdates.size());
+	auto swapchainImageReadySemaphores = Std::NewVec<vk::Semaphore>(transientAlloc);
+	swapchainImageReadySemaphores.Resize(drawParams.nativeWindowUpdates.size());
+	auto swapchainImageReadyStages = Std::NewVec<vk::PipelineStageFlags>(transientAlloc);
+	swapchainImageReadyStages.Resize(drawParams.nativeWindowUpdates.size());
 	for (auto& item : swapchainImageReadyStages)
 		item = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	for (uSize i = 0; i < drawParams.nativeWindowUpdates.size(); i += 1)
 	{
-		// First assert that this ID doesn't already exist?
-
 		auto const& windowUpdate = drawParams.nativeWindowUpdates[i];
 		// First find the window in the database
 		auto const windowDataIt = Std::FindIf(
-			apiData.nativeWindowManager.nativeWindows.begin(),
-			apiData.nativeWindowManager.nativeWindows.end(),
-			[&windowUpdate](auto const& node) -> bool { return node.id == windowUpdate.id; });
-		DENGINE_DETAIL_GFX_ASSERT(windowDataIt != apiData.nativeWindowManager.nativeWindows.end());
+			apiData.nativeWindowManager.main.nativeWindows.begin(),
+			apiData.nativeWindowManager.main.nativeWindows.end(),
+			[&windowUpdate](auto const& node) { return node.id == windowUpdate.id; });
+		DENGINE_IMPL_GFX_ASSERT(windowDataIt != apiData.nativeWindowManager.main.nativeWindows.end());
 		auto const& nativeWindow = *windowDataIt;
 
 		if (!cmdBufferBegun)
@@ -479,7 +290,7 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		Std::Span<GuiDrawCmd const> drawCmds;
 		if (!drawParams.guiDrawCmds.empty())
 		{
-			DENGINE_DETAIL_GFX_ASSERT((u64)windowUpdate.drawCmdOffset + (u64)windowUpdate.drawCmdCount <= drawParams.guiDrawCmds.size());
+			DENGINE_IMPL_GFX_ASSERT((u64)windowUpdate.drawCmdOffset + (u64)windowUpdate.drawCmdCount <= drawParams.guiDrawCmds.size());
 			drawCmds = { &drawParams.guiDrawCmds[windowUpdate.drawCmdOffset], windowUpdate.drawCmdCount };
 		}
 
@@ -498,16 +309,17 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 
 		vk::Framebuffer guiFramebuffer = nativeWindow.windowData.framebuffers[index];
 
-		RecordGUICmdBuffer(
-			globUtils,
-			apiData.guiResourceManager,
-			apiData.viewportManager,
-			nativeWindow.gui,
-			mainCmdBuffer,
-			guiFramebuffer,
-			windowUpdate,
-			drawCmds,
-			currentInFlightIndex);
+		RecordGuiCmds_Params recordGuiParams = {
+			.globUtils = globUtils,
+			.guiResManager = apiData.guiResourceManager,
+			.viewportManager = apiData.viewportManager,
+			.guiData = nativeWindow.gui,
+			.windowUpdate = windowUpdate };
+		recordGuiParams.cmdBuffer = mainCmdBuffer;
+		recordGuiParams.guiDrawCmds = drawCmds;
+		recordGuiParams.framebuffer = guiFramebuffer;
+		recordGuiParams.inFlightIndex = currentInFlightIndex;
+		RecordGuiCmds(recordGuiParams);
 	}
 
 	if (cmdBufferBegun)
@@ -517,17 +329,17 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		vk::SubmitInfo submitInfo = {};
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &mainCmdBuffer;
-		submitInfo.pWaitDstStageMask = swapchainImageReadyStages.data();
-		submitInfo.pWaitSemaphores = swapchainImageReadySemaphores.data();
-		submitInfo.waitSemaphoreCount = (u32)swapchainImageReadySemaphores.size();
+		submitInfo.pWaitDstStageMask = swapchainImageReadyStages.Data();
+		submitInfo.pWaitSemaphores = swapchainImageReadySemaphores.Data();
+		submitInfo.waitSemaphoreCount = (u32)swapchainImageReadySemaphores.Size();
 		globUtils.queues.graphics.submit(submitInfo, apiData.mainFences[currentInFlightIndex]);
 
-		if (!swapchainIndices.empty())
+		if (!swapchainIndices.Empty())
 		{
 			vk::PresentInfoKHR presentInfo{};
-			presentInfo.pImageIndices = swapchainIndices.data();
-			presentInfo.pSwapchains = swapchains.data();
-			presentInfo.swapchainCount = (u32)swapchains.size();
+			presentInfo.pImageIndices = swapchainIndices.Data();
+			presentInfo.pSwapchains = swapchains.Data();
+			presentInfo.swapchainCount = (u32)swapchains.Size();
 			vkResult = globUtils.queues.graphics.presentKHR(presentInfo);
 			if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eSuboptimalKHR && vkResult != vk::Result::eErrorOutOfDateKHR)
 				throw std::runtime_error("DEngine - Vulkan: Presentation submission did not return success result.");
@@ -535,9 +347,9 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	}
 
 
-	// Let the deletion-queue run it's tick.
+	// Let the deletion-queue run its tick.
 	DeletionQueue::ExecuteTick(
-		apiData.globUtils.delQueue,
+		apiData.delQueue,
 		globUtils,
 		currentInFlightIndex);
 
@@ -545,12 +357,21 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 	apiData.currInFlightIndex = (apiData.currInFlightIndex + 1) % apiData.globUtils.inFlightCount;
 }
 
-DEngine::Gfx::NativeWindowID DEngine::Gfx::Vk::APIData::NewNativeWindow(WsiInterface& wsiConnection)
+void Vk::APIData::NewNativeWindow(NativeWindowID windowId)
 {
 	APIData& apiData = *this;
 
-	return NativeWindowManager::PushCreateWindowJob(
+	return NativeWinMgr_PushCreateWindowJob(
 		apiData.nativeWindowManager,
-		wsiConnection);
+		windowId);
+}
+
+void Vk::APIData::DeleteNativeWindow(NativeWindowID windowId)
+{
+	APIData& apiData = *this;
+
+	return NativeWinMgr_PushDeleteWindowJob(
+		apiData.nativeWindowManager,
+		windowId);
 }
 

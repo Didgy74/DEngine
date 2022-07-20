@@ -2,7 +2,10 @@
 
 #include "VulkanIncluder.hpp"
 #include "VMAIncluder.hpp"
+#include "ForwardDeclarations.hpp"
 
+#include <DEngine/Std/BumpAllocator.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
@@ -18,10 +21,6 @@ namespace DEngine::Gfx
 
 namespace DEngine::Gfx::Vk
 {
-	class DebugUtilsDispatch;
-	class DeviceDispatch;
-	class GlobUtils;
-	
 	class GuiResourceManager
 	{
 	public:
@@ -87,6 +86,7 @@ namespace DEngine::Gfx::Vk
 			VmaAllocator vma,
 			u8 inFlightCount,
 			vk::RenderPass guiRenderPass,
+			Std::AllocRef const& transientAlloc,
 			DebugUtilsDispatch const* debugUtils);
 
 		static void Update(
@@ -104,6 +104,5 @@ namespace DEngine::Gfx::Vk
 			u32 height,
 			u32 pitch,
 			Std::Span<std::byte const> data);
-
 	};
 }

@@ -8,8 +8,6 @@
 #include <string>
 #include <functional>
 
-namespace DEngine::Gui::impl { struct LineFloatEditImpl; }
-
 namespace DEngine::Gui
 {
 	class LineFloatEdit : public Widget
@@ -17,66 +15,64 @@ namespace DEngine::Gui
 	public:
 		static constexpr f64 defaultMin = Std::Limits<f64>::lowest;
 		static constexpr f64 defaultMax = Std::Limits<f64>::highest;
+		// Set minimum to 0.0 or higher to get an unsigned text input session.
 		f64 min = defaultMin;
 		f64 max = defaultMax;
 
-		using TextChangedFnT = void(LineFloatEdit& widget, f64 newValue);
-		std::function<TextChangedFnT> valueChangedFn;
+		using ValueChangedFnT = void(LineFloatEdit& widget, f64 newValue);
+		std::function<ValueChangedFnT> valueChangedFn;
 
-		Math::Vec4 backgroundColor = { 0.0f, 0.0f, 0.0f, 0.25f };
+		Math::Vec4 backgroundColor = { 0.3f, 0.3f, 0.3f, 1.f };
+		u32 margin = 0;
 
-		[[nodiscard]] inline bool CurrentlyBeingEdited() const noexcept { return inputConnectionCtx; }
+		static constexpr u8 defaultDecimalPoints = 0;
+		u8 decimalPoints = defaultDecimalPoints;
+
+		[[nodiscard]] bool HasInputSession() const noexcept { return inputConnectionCtx; }
+		void SetValue(f64 in);
 
 		virtual ~LineFloatEdit() override;
 
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override;
+		virtual SizeHint GetSizeHint2(
+			GetSizeHint2_Params const& params) const override;
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual void Render2(
+			Render_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
 
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
-
-		virtual void CharEnterEvent(
-			Context& ctx) override;
-
-		virtual void CharEvent(
+		virtual void TextInput(
 			Context& ctx,
-			u32 charEvent) override;
-
-		virtual void CharRemoveEvent(
-			Context& ctx) override;
-
-		virtual void InputConnectionLost() override;
-
-		virtual bool CursorPress(
+			AllocRef const& transientAlloc,
+			TextInputEvent const& event) override;
+		virtual void EndTextInputSession(
 			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorClickEvent event) override;
+			AllocRef const& transientAlloc,
+			EndTextInputSessionEvent const& event) override;
 
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
+		struct Impl;
+		friend Impl;
 
 	protected:
+		void ClearInputConnection();
+
 		Std::Opt<u8> pointerId;
 		Context* inputConnectionCtx = nullptr;
 		std::string text = "0.0";
-		f64 currentValue = 0.0;
-		u8 decimalPoints = 3;
+		f64 value = 0.0;
 
-		void EndEditingSession();
-		void StartInputConnection(Context& ctx);
-		void ClearInputConnection();
-
-		friend impl::LineFloatEditImpl;
 	};
 }

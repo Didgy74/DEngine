@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Math/impl/Assert.hpp>
 
 namespace DEngine::Math
 {
@@ -14,17 +15,35 @@ namespace DEngine::Math
 	[[nodiscard]] f32 Ceil(f32 input);
 	[[nodiscard]] f64 Ceil(f64 input);
 
-	template<typename T>
-	[[nodiscard]] constexpr auto CeilToMultiple(T const& value, T const& multiple) noexcept
+	[[nodiscard]] constexpr u64 CeilToPowerOfTwo(u64 value, u8 factor) noexcept
 	{
-		return value + multiple - T(1) - (value - T(1)) % multiple;
+		auto const minus1 = factor - 1;
+		auto const result = (value + minus1) & ~minus1;
+		return result;
 	}
-	/*
-	[[nodiscard]] constexpr u8 CeilToMultiple(u8 value, u8 multiple);
-	[[nodiscard]] constexpr u16 CeilToMultiple(u16 value, u16 multiple);
-	[[nodiscard]] constexpr u32 CeilToMultiple(u32 value, u32 multiple);
-	[[nodiscard]] constexpr u64 CeilToMultiple(u64 value, u64 multiple);
-	 */
+
+	template<typename T>
+	[[nodiscard]] constexpr auto CeilToMultiple_Inner(T const& value, T const& multiple) noexcept
+	{
+		DENGINE_IMPL_MATH_ASSERT(multiple != T(0));
+		T modulo = value % multiple;
+		// Calculate how much we need to add to get to next multiple.
+		T remainderToMultiple = T(multiple - modulo);
+		// Then take into account if our value is already a multiple.
+		remainderToMultiple *= modulo != 0;
+		return value + remainderToMultiple;
+	}
+	// Just a few compile tests to see if the algorithm is correct
+	static_assert(CeilToMultiple_Inner((u8)3, (u8)4) == 4);
+	static_assert(CeilToMultiple_Inner((u8)7, (u8)3) == 9);
+	static_assert(CeilToMultiple_Inner((u8)5, (u8)5) == 5);
+	static_assert(CeilToMultiple_Inner((u8)0, (u8)11) == 0);
+
+	[[nodiscard]] constexpr u8 CeilToMultiple(u8 value, u8 multiple) noexcept;
+	[[nodiscard]] constexpr u16 CeilToMultiple(u16 value, u16 multiple) noexcept;
+	[[nodiscard]] constexpr u32 CeilToMultiple(u32 value, u32 multiple) noexcept;
+	[[nodiscard]] constexpr u64 CeilToMultiple(u64 value, u64 multiple) noexcept;
+
 
 	[[nodiscard]] constexpr i8 Clamp(i8 value, i8 min, i8 max);
 	[[nodiscard]] constexpr i16 Clamp(i16 value, i16 min, i16 max);
@@ -38,6 +57,7 @@ namespace DEngine::Math
 	[[nodiscard]] constexpr f64 Clamp(f64 value, f64 min, f64 max);
 
 	[[nodiscard]] f32 Floor(f32 input);
+	[[nodiscard]] f64 Floor(f64 input);
 
 	[[nodiscard]] constexpr f32 Lerp(f32 a, f32 b, f32 delta);
 	[[nodiscard]] constexpr f64 Lerp(f64 a, f64 b, f64 delta);
@@ -123,12 +143,12 @@ constexpr DEngine::i64 DEngine::Math::Abs(i64 input) { return detail::Abs(input)
 constexpr DEngine::f32 DEngine::Math::Abs(f32 input) { return detail::Abs(input); }
 constexpr DEngine::f64 DEngine::Math::Abs(f64 input) { return detail::Abs(input); }
 
-/*
-constexpr DEngine::u8 DEngine::Math::CeilToMultiple(u8 value, u8 multiple) { return detail::CeilToMultiple_Unsigned(value, multiple); }
-constexpr DEngine::u16 DEngine::Math::CeilToMultiple(u16 value, u16 multiple) { return detail::CeilToMultiple_Unsigned(value, multiple); }
-constexpr DEngine::u32 DEngine::Math::CeilToMultiple(u32 value, u32 multiple) { return detail::CeilToMultiple_Unsigned(value, multiple); }
-constexpr DEngine::u64 DEngine::Math::CeilToMultiple(u64 value, u64 multiple) { return detail::CeilToMultiple_Unsigned(value, multiple); }
-*/
+
+constexpr DEngine::u8 DEngine::Math::CeilToMultiple(u8 value, u8 multiple) noexcept { return CeilToMultiple_Inner(value, multiple); }
+constexpr DEngine::u16 DEngine::Math::CeilToMultiple(u16 value, u16 multiple) noexcept { return CeilToMultiple_Inner(value, multiple); }
+constexpr DEngine::u32 DEngine::Math::CeilToMultiple(u32 value, u32 multiple) noexcept { return CeilToMultiple_Inner(value, multiple); }
+constexpr DEngine::u64 DEngine::Math::CeilToMultiple(u64 value, u64 multiple) noexcept { return CeilToMultiple_Inner(value, multiple); }
+
 
 constexpr DEngine::i8 DEngine::Math::Clamp(i8 value, i8 min, i8 max) { return detail::Clamp(value, min, max); }
 constexpr DEngine::i16 DEngine::Math::Clamp(i16 value, i16 min, i16 max) { return detail::Clamp(value, min, max); }

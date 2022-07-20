@@ -1,8 +1,13 @@
-#include <DEngine/detail/Assert.hpp>
+#include <DEngine/impl/Assert.hpp>
 
 #include <iostream>
 
-namespace DEngine::detail
+#ifdef _MSC_VER
+#   include <intrin.h>
+#	define DENGINE_IMPL_BREAKPOINT() __debugbreak()
+#endif
+
+namespace DEngine::impl
 {
 	[[noreturn]] void Assert(
 		char const* conditionString,
@@ -11,18 +16,20 @@ namespace DEngine::detail
 		const char* msg) noexcept
 	{
 		std::cout << std::endl;
-		std::cout << "#################" << std::endl;
-		std::cout << std::endl;
+		std::cout << "#################" << std::endl << std::endl;
 		std::cout << "Assertion failure" << std::endl;
-		std::cout << std::endl;
-		std::cout << "#################" << std::endl;
-		std::cout << "Expression: " << conditionString << std::endl;
+		std::cout << "#################" << std::endl << std::endl;
+		if (conditionString)
+			std::cout << "Expression: " << conditionString << std::endl;
 		std::cout << "File: " << file << std::endl;
 		std::cout << "Line: " << line << std::endl;
 		if (msg != nullptr)
 			std::cout << "Info: '" << msg << "'" << std::endl;
 		std::cout << std::endl;
 
+#ifdef DENGINE_IMPL_BREAKPOINT
+		//DENGINE_IMPL_BREAKPOINT();
+#endif
 
 		std::abort();
 	}

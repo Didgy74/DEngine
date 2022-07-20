@@ -14,22 +14,34 @@ namespace DEngine::Std
 
 		using ValueType = T;
 
-		constexpr Box() noexcept;
-		constexpr Box(decltype(nullptr)) noexcept;
+		constexpr Box() noexcept : data{ nullptr } {}
+
+		constexpr Box(decltype(nullptr)) noexcept : data(nullptr) {}
+		// To disable accidental implicit conversion from integer to nullptr.
+		explicit Box(int) = delete;
+
 		Box(Box const&) = delete;
-		constexpr Box(Box&&) noexcept;
-		template<class U> requires Trait::isBaseOf<T, U>
-		constexpr Box(Box<U>&& in) noexcept : data(in.data)
-		{
+
+		constexpr Box(Box&& other) noexcept :
+			data { other.data } {
+			other.data = nullptr;
+		}
+
+		template<class U> requires (Trait::hasVirtualDestructor<T>)
+		constexpr Box(Box<U>&& in) noexcept :
+			data{ in.data } {
 			in.data = nullptr;
 		}
-		explicit Box(T* ptr) noexcept;
 
-		~Box();
+		explicit constexpr Box(T* ptr) noexcept : data{ ptr } {}
+
+		~Box() {
+			Clear();
+		}
 
 		Box& operator=(Box const&) = delete;
 		Box& operator=(Box&&) noexcept;
-		template<class U> requires Trait::isBaseOf<T, U>
+		template<class U> requires (Trait::hasVirtualDestructor<T>)
 		constexpr Box& operator=(Box<U>&& in) noexcept
 		{
 			Clear();
@@ -40,7 +52,6 @@ namespace DEngine::Std
 		}
 		Box& operator=(decltype(nullptr)) noexcept;
 
-
 		[[nodiscard]] T* Get() noexcept;
 		[[nodiscard]] T const* Get() const noexcept;
 		[[nodiscard]] T* operator->() noexcept;
@@ -48,7 +59,7 @@ namespace DEngine::Std
 		[[nodiscard]] T& operator*() noexcept;
 		[[nodiscard]] T const& operator*() const noexcept;
 
-		[[nodiscard]] operator bool() const noexcept;
+		[[nodiscard]] explicit operator bool() const noexcept;
 
 		[[nodiscard]] bool operator==(Box const&) const noexcept;
 		[[nodiscard]] bool operator==(T const*) const noexcept;
@@ -59,40 +70,8 @@ namespace DEngine::Std
 		void Clear() noexcept;
 
 	protected:
-		
 		T* data = nullptr;
 	};
-
-	template<typename T>
-	constexpr Box<T>::Box() noexcept :
-		data(nullptr)
-	{
-	}
-
-	template<typename T>
-	constexpr Box<T>::Box(decltype(nullptr)) noexcept : data(nullptr)
-	{
-
-	}
-
-	template<typename T>
-	constexpr Box<T>::Box(Box&& other) noexcept :
-		data(other.data)
-	{
-		other.data = nullptr;
-	}
-
-	template<typename T>
-	inline Box<T>::Box(T* ptr) noexcept :
-		data(ptr)
-	{
-	}
-
-	template<typename T>
-	inline Box<T>::~Box()
-	{
-		Clear();
-	}
 
 	template<typename T>
 	inline Box<T>& Box<T>::operator=(

@@ -9,9 +9,35 @@ using namespace DEngine;
 using namespace DEngine::Gfx;
 using namespace DEngine::Gfx::Vk;
 
+PFN_vkGetInstanceProcAddr Vk::loadInstanceProcAddressPFN()
+{
+	PFN_vkGetInstanceProcAddr procAddr = nullptr;
+
+#if defined(__linux__)
+	void* m_library = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
+	if (m_library == nullptr)
+		throw std::runtime_error("Vulkan: Unable to load the system libvulkan.so for dynamic dispatching");
+	procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(m_library, "vkGetInstanceProcAddr"));
+	dlclose(m_library);
+#elif defined(_WIN32)
+	HMODULE m_library = LoadLibrary(TEXT("vulkan-1.dll"));
+	if (m_library == nullptr)
+		throw std::runtime_error("Vulkan: Unable to load the system vulkan-1.dll for dynamic dispatching");
+	procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(m_library, "vkGetInstanceProcAddr"));
+	FreeLibrary(m_library);
+#else
+#error Unsupported platform
+#endif
+
+	if (procAddr == nullptr)
+		throw std::runtime_error("Vulkan: Unable to load the vkGetInstanceProcAddr function pointer.");
+
+	return procAddr;
+}
+
 BaseDispatchRaw BaseDispatchRaw::Build(PFN_vkGetInstanceProcAddr getInstanceProcAddr)
 {
-	BaseDispatchRaw returnVal{};
+	BaseDispatchRaw returnVal = {};
 	returnVal.vkCreateInstance = (PFN_vkCreateInstance)getInstanceProcAddr(nullptr, "vkCreateInstance");
 	returnVal.vkEnumerateInstanceExtensionProperties = (PFN_vkEnumerateInstanceExtensionProperties)getInstanceProcAddr(nullptr, "vkEnumerateInstanceExtensionProperties");
 	returnVal.vkEnumerateInstanceLayerProperties = (PFN_vkEnumerateInstanceLayerProperties)getInstanceProcAddr(nullptr, "vkEnumerateInstanceLayerProperties");
@@ -169,7 +195,7 @@ void BaseDispatch::BuildInPlace(
 	dispatcher.raw = BaseDispatchRaw::Build(procAddr);
 }
 
-vk::Instance BaseDispatch::createInstance(
+vk::Instance BaseDispatch::CreateInstance(
 	vk::InstanceCreateInfo const& createInfo, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -183,7 +209,7 @@ vk::Instance BaseDispatch::createInstance(
 	return returnVal;
 }
 
-vk::Result BaseDispatch::enumerateInstanceExtensionProperties(
+vk::Result BaseDispatch::EnumerateInstanceExtensionProperties(
 	char const* pLayerName, 
 	std::uint32_t* pPropertyCount,
 	vk::ExtensionProperties* pProperties) const
@@ -194,7 +220,7 @@ vk::Result BaseDispatch::enumerateInstanceExtensionProperties(
 		reinterpret_cast<VkExtensionProperties*>(pProperties)));
 }
 
-vk::Result BaseDispatch::enumerateInstanceLayerProperties(
+vk::Result BaseDispatch::EnumerateInstanceLayerProperties(
 	std::uint32_t* pPropertyCount, 
 	vk::LayerProperties* pProperties) const
 {
@@ -203,9 +229,9 @@ vk::Result BaseDispatch::enumerateInstanceLayerProperties(
 		reinterpret_cast<VkLayerProperties*>(pProperties)));
 }
 
-std::uint32_t BaseDispatch::enumerateInstanceVersion() const
+std::uint32_t BaseDispatch::EnumerateInstanceVersion() const
 {
-	vk::Result vkResult{};
+	vk::Result vkResult = {};
 	std::uint32_t returnVal;
 	if (raw.vkEnumerateInstanceVersion)
 	{
@@ -245,7 +271,7 @@ vk::Device InstanceDispatch::createDevice(
 	return outDevice;
 }
 
-void InstanceDispatch::destroy(vk::Optional<vk::AllocationCallbacks> allocator) const
+void InstanceDispatch::Destroy(vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	raw.vkDestroyInstance(
 		static_cast<VkInstance>(handle),
@@ -336,7 +362,7 @@ vk::DebugUtilsMessengerEXT DebugUtilsDispatch::createDebugUtilsMessengerEXT(
 	return returnVal;
 }
 
-void DebugUtilsDispatch::destroyDebugUtilsMessengerEXT(
+void DebugUtilsDispatch::Destroy(
 	vk::Instance instance, 
 	vk::DebugUtilsMessengerEXT messenger,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
@@ -356,33 +382,7 @@ void DebugUtilsDispatch::setDebugUtilsObjectNameEXT(
 		reinterpret_cast<VkDebugUtilsObjectNameInfoEXT const*>(&nameInfo));
 }
 
-PFN_vkGetInstanceProcAddr Vk::loadInstanceProcAddressPFN()
-{
-	PFN_vkGetInstanceProcAddr procAddr = nullptr;
-
-#if defined(__linux__)
-	void* m_library = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
-	if (m_library == nullptr)
-		throw std::runtime_error("Vulkan: Unable to load the system libvulkan.so for dynamic dispatching");
-	procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(m_library, "vkGetInstanceProcAddr"));
-	dlclose(m_library);
-#elif defined(_WIN32)
-	HMODULE m_library = LoadLibrary(TEXT("vulkan-1.dll"));
-	if (m_library == nullptr)
-		throw std::runtime_error("Vulkan: Unable to load the system vulkan-1.dll for dynamic dispatching");
-	procAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(m_library, "vkGetInstanceProcAddr"));
-	FreeLibrary(m_library);
-#else
-#error Unsupported platform
-#endif
-
-	if (procAddr == nullptr)
-		throw std::runtime_error("Vulkan: Unable to load the vkGetInstanceProcAddr function pointer.");
-
-	return procAddr;
-}
-
-void InstanceDispatch::destroy(
+void InstanceDispatch::Destroy(
 	vk::SurfaceKHR in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -437,7 +437,7 @@ bool InstanceDispatch::getPhysicalDeviceSurfaceSupportKHR(
 	std::uint32_t queueFamilyIndex,
 	vk::SurfaceKHR surface) const
 {
-	VkBool32 surfaceSupported;
+	VkBool32 surfaceSupported = 0;
 	vk::Result vkResult = static_cast<vk::Result>(surfaceRaw.vkGetPhysicalDeviceSurfaceSupportKHR(
 		static_cast<VkPhysicalDevice>(physDevice),
 		queueFamilyIndex,
@@ -912,6 +912,11 @@ vk::Result DeviceDispatch::createGraphicsPipelines(
 		reinterpret_cast<VkPipeline*>(pPipelines)));
 }
 
+void DeviceDispatch::Destroy() const
+{
+	return raw.vkDestroyDevice((VkDevice)handle, nullptr);
+}
+
 #define DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(typeName) \
 	raw.vkDestroy ##typeName( \
 		static_cast<VkDevice>(handle), \
@@ -919,56 +924,63 @@ vk::Result DeviceDispatch::createGraphicsPipelines(
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator))); \
 		
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::CommandPool in,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(CommandPool)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::DescriptorPool in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(DescriptorPool)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::Fence in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Fence)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::Framebuffer in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Framebuffer)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::Image in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Image)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::ImageView in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(ImageView)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
+	vk::Semaphore in,
+	vk::Optional<vk::AllocationCallbacks> allocator) const
+{
+	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(Semaphore)
+}
+
+void DeviceDispatch::Destroy(
 	vk::RenderPass in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	DENGINE_GFX_VK_DEVICEDISPATCH_MAKEDESTROYFUNC(RenderPass)
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::ShaderModule in, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
@@ -1107,7 +1119,7 @@ vk::SwapchainKHR DeviceDispatch::createSwapchainKHR(
 	return outSwapchain;
 }
 
-void DeviceDispatch::destroy(
+void DeviceDispatch::Destroy(
 	vk::SwapchainKHR in,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {

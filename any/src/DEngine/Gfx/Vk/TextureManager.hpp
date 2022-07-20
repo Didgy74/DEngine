@@ -1,7 +1,9 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
-#include "DEngine/Gfx/Gfx.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
+#include <DEngine/Gfx/Gfx.hpp>
 
 #include "DynamicDispatch.hpp"
 #include "QueueData.hpp"
@@ -43,7 +45,9 @@ namespace DEngine::Gfx::Vk
 		static void Update(
 			TextureManager& manager,
 			GlobUtils const& globUtils,
+			DelQueue& delQueue,
 			DrawParams const& drawParams,
-			Gfx::TextureAssetInterface const& texAssetInterface);
+			Gfx::TextureAssetInterface const& texAssetInterface,
+			Std::AllocRef const& transientAlloc);
 	};
 }

@@ -36,7 +36,6 @@ namespace DEngine::Std
 	}
 	*/
 
-
 	// Using a moved-from Variant is UB.
 	template<class ...Ts>
 	class Variant
@@ -105,14 +104,14 @@ namespace DEngine::Std
 		template<typename T> requires isInPack<T>
 		decltype(auto) Get() noexcept
 		{
-			constexpr auto i = Trait::indexOf<T, Ts...>;
+			[[maybe_unused]] constexpr auto i = Trait::indexOf<T, Ts...>;
 			DENGINE_IMPL_CONTAINERS_ASSERT(typeTracker == i);
 			return *reinterpret_cast<T*>(data);
 		}
 		template<typename T> requires isInPack<T>
 		decltype(auto) Get() const noexcept
 		{
-			constexpr auto i = Trait::indexOf<T, Ts...>;
+			[[maybe_unused]] constexpr auto i = Trait::indexOf<T, Ts...>;
 			DENGINE_IMPL_CONTAINERS_ASSERT(typeTracker == i);
 			return *reinterpret_cast<T const*>(data);
 		}

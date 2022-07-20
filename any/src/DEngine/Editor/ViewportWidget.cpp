@@ -32,8 +32,8 @@ namespace DEngine::Editor::impl
 		Math::Vec3 planeNormal,
 		Math::Vec3 pointOnPlane) noexcept
 	{
-		DENGINE_DETAIL_ASSERT(Math::Abs(rayDirection.Magnitude() - 1.f) <= 0.00001f);
-		DENGINE_DETAIL_ASSERT(Math::Abs(planeNormal.Magnitude() - 1.f) <= 0.00001f);
+		DENGINE_IMPL_ASSERT(Math::Abs(rayDirection.Magnitude() - 1.f) <= 0.00001f);
+		DENGINE_IMPL_ASSERT(Math::Abs(planeNormal.Magnitude() - 1.f) <= 0.00001f);
 
 		f32 d = Math::Dot(planeNormal, pointOnPlane);
 
@@ -145,7 +145,7 @@ namespace DEngine::Editor::impl
 	{
 		// Reference implementation can be found in Real-Time Collision Detection p. 195
 
-		DENGINE_DETAIL_ASSERT(Math::Abs(rayDir.Magnitude() - 1.f) <= 0.0001f);
+		DENGINE_IMPL_ASSERT(Math::Abs(rayDir.Magnitude() - 1.f) <= 0.0001f);
 
 		// Also referred to as "d"
 		Math::Vec3 const cylinderAxis = cylinderVertB - cylinderVertA;
@@ -679,7 +679,7 @@ namespace DEngine::Editor::impl
 	static void Gizmo_HandleTranslation(
 		InternalViewportWidget const& widget,
 		Gui::Rect widgetRect,
-		InternalViewportWidget::HoldingGizmoData const& gizmoHoldingData,
+		ViewportWidget::HoldingGizmoData const& gizmoHoldingData,
 		Math::Vec2 pointerPos,
 		Transform& transform)
 	{
@@ -761,7 +761,7 @@ namespace DEngine::Editor::impl
 	static void Gizmo_HandleScaling(
 		InternalViewportWidget const& widget,
 		Gui::Rect widgetRect,
-		InternalViewportWidget::HoldingGizmoData const& holdingData,
+		ViewportWidget::HoldingGizmoData const& holdingData,
 		Math::Vec2 pointerPos,
 		Transform& transform)
 	{
@@ -830,42 +830,30 @@ namespace DEngine::Editor::impl
 		return {};
 	}
 
-	struct PointerPress_Pointer
-	{
+	struct PointerMove_Pointer {
 		Math::Vec2 pos;
-		u8 id;
-		bool pressed;
-		PointerType type;
-	};
-	
-	[[nodiscard]] static bool PointerPress(
-		InternalViewportWidget& widget,
-		Gui::Context& ctx,
-		Gui::WindowID windowId,
-		Gui::Rect const& widgetRect,
-		Gui::Rect const& visibleRect,
-		PointerPress_Pointer const& pointer);
-
-	struct PointerMove_Pointer
-	{
-		Math::Vec2 pos;
+		Math::Vec2 posDelta;
 		u8 id;
 		bool occluded;
 	};
-	[[nodiscard]] static bool PointerMove(
-		InternalViewportWidget& widget,
-		Gui::Context& ctx,
-		Gui::WindowID windowId,
-		Gui::Rect const& widgetRect,
-		Gui::Rect const& visibleRect,
-		PointerMove_Pointer const& pointer,
-		Gui::CursorMoveEvent const* cursorMove)
-	{
+	struct PointerMove_Params {
+		InternalViewportWidget& widget;
+		Gui::Context& ctx;
+		Gui::Rect const& widgetRect;
+		Gui::Rect const& visibleRect;
+		PointerMove_Pointer const& pointer;
+	};
+	[[nodiscard]] static bool PointerMove(PointerMove_Params const& params) {
+		auto& widget = params.widget;
+		auto const& widgetRect = params.widgetRect;
+		auto const& visibleRect = params.visibleRect;
+		auto const& pointer = params.pointer;
+
 		bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
 
-		if (widget.state == InternalViewportWidget::BehaviorState::Gizmo)
+		if (widget.state == ViewportWidget::BehaviorState::Gizmo)
 		{
-			DENGINE_DETAIL_ASSERT(widget.holdingGizmoData.HasValue());
+			DENGINE_IMPL_ASSERT(widget.holdingGizmoData.HasValue());
 			Entity entity = {};
 			Transform* transformPtr = nullptr;
 			auto const& gizmoHoldingData = widget.holdingGizmoData.Value();
@@ -878,8 +866,7 @@ namespace DEngine::Editor::impl
 			}
 			if (transformPtr != nullptr)
 			{
-				Transform& transform = *transformPtr;
-
+				auto& transform = *transformPtr;
 				auto const currGizmo = gizmoHoldingData.gizmoType;
 				if (currGizmo == GizmoType::Translate)
 				{
@@ -913,12 +900,11 @@ namespace DEngine::Editor::impl
 			}
 		}
 
-		if (widget.state == InternalViewportWidget::BehaviorState::FreeLooking &&
+		if (widget.state == ViewportWidget::BehaviorState::FreeLooking &&
 			pointer.id == cursorPointerId)
 		{
-			DENGINE_IMPL_GUI_ASSERT(cursorMove);
 			f32 sensitivity = 0.2f;
-			Math::Vec2 amount = { (f32)cursorMove->positionDelta.x, (f32)-cursorMove->positionDelta.y };
+			Math::Vec2 amount = { pointer.posDelta.x, -pointer.posDelta.y };
 			widget.ApplyCameraRotation(amount * sensitivity * Math::degToRad);
 		}
 
@@ -929,143 +915,162 @@ namespace DEngine::Editor::impl
 using namespace DEngine;
 using namespace DEngine::Editor;
 
-static bool impl::PointerPress(
-	InternalViewportWidget& widget,
-	Gui::Context& ctx,
-	Gui::WindowID windowId,
-	Gui::Rect const& widgetRect,
-	Gui::Rect const& visibleRect,
-	PointerPress_Pointer const& pointer)
-{
-	bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
-	if (!pointerInside && pointer.pressed)
-		return false;
+namespace DEngine::Editor::impl {
+	struct PointerPress_Pointer {
+		Math::Vec2 pos;
+		u8 id;
+		bool pressed;
+		PointerType type;
+	};
+	struct PointerPress_Params {
+		InternalViewportWidget& widget;
+		Gui::Context& ctx;
+		Gui::Rect const& widgetRect;
+		Gui::Rect const& visibleRect;
+		PointerPress_Pointer const& pointer;
+		bool eventConsumed;
+	};
+	[[nodiscard]] static bool PointerPress(PointerPress_Params const& params) {
+		auto& widget = params.widget;
+		auto const& widgetRect = params.widgetRect;
+		auto const& visibleRect = params.visibleRect;
+		auto const& pointer = params.pointer;
+		auto const& oldEventConsumed = params.eventConsumed;
 
-	if (widget.holdingGizmoData.HasValue() && 
-		widget.holdingGizmoData.Value().pointerId == pointer.id && 
-		!pointer.pressed)
-	{
-		widget.holdingGizmoData = Std::nullOpt;
-		widget.state = InternalViewportWidget::BehaviorState::Normal;
-		return false;
-	}
+		DENGINE_IMPL_ASSERT(widget.editorImpl);
+		auto& editorImpl = *widget.editorImpl;
 
-	// Initiate free-look
-	if (pointerInside && 
-		pointer.pressed && 
-		widget.state == InternalViewportWidget::BehaviorState::Normal &&
-		pointer.type == PointerType::Secondary)
-	{
-		widget.state = InternalViewportWidget::BehaviorState::FreeLooking;
-		App::LockCursor(true);
-		return true;
-	}
+		bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+		if (!pointerInside && pointer.pressed)
+			return false;
 
-	// Stop free-look
-	if (!pointer.pressed && 
-		widget.state == InternalViewportWidget::BehaviorState::FreeLooking &&
-		pointer.type == PointerType::Secondary)
-	{
-		widget.state = InternalViewportWidget::BehaviorState::Normal;
-		App::LockCursor(false);
-		return true;
-	}
-
-	DENGINE_DETAIL_ASSERT(widget.editorImpl);
-	auto& editorImpl = *widget.editorImpl;
-	Scene const& scene = editorImpl.GetActiveScene();
-
-	// We don't want to do gizmo stuff if it was the secondary cursor button
-	bool doGizmoStuff =
-		pointerInside &&
-		pointer.pressed &&
-		widget.state == InternalViewportWidget::BehaviorState::Normal &&
-		pointer.type == PointerType::Primary;
-	if (doGizmoStuff)
-	{
-		bool hitGizmo = false;
-		// If we have selected an entity, and it has a Transform component,
-		// We want to see if we hit it's gizmo.
-		Entity ent = Entity::Invalid;
-		Transform const* transformPtr = nullptr;
-		if (widget.editorImpl->GetSelectedEntity().HasValue())
+		if (widget.holdingGizmoData.HasValue() &&
+			widget.holdingGizmoData.Value().pointerId == pointer.id &&
+			!pointer.pressed)
 		{
-			ent = widget.editorImpl->GetSelectedEntity().Value();
-			transformPtr = scene.GetComponent<Transform>(ent);
+			widget.holdingGizmoData = Std::nullOpt;
+			widget.state = ViewportWidget::BehaviorState::Normal;
+			return false;
 		}
-		if (transformPtr)
+
+		// Initiate free-look
+		if (!oldEventConsumed &&
+			pointerInside &&
+			pointer.pressed &&
+			widget.state == ViewportWidget::BehaviorState::Normal &&
+			pointer.type == PointerType::Secondary)
 		{
-			Transform const& transform = *transformPtr;
-			auto const currGizmoType = editorImpl.GetCurrentGizmoType();
-			auto const& hitTestOpt = impl::GizmoHitTest(
-				widget,
-				widgetRect,
-				pointer.pos,
-				transform.position,
-				transform.rotation,
-				currGizmoType);
-			if (hitTestOpt.HasValue())
+			widget.state = ViewportWidget::BehaviorState::FreeLooking;
+			editorImpl.appCtx->LockCursor(true);
+			return true;
+		}
+
+		// Stop free-look
+		if (!pointer.pressed &&
+			widget.state == ViewportWidget::BehaviorState::FreeLooking &&
+			pointer.type == PointerType::Secondary)
+		{
+			widget.state = ViewportWidget::BehaviorState::Normal;
+			editorImpl.appCtx->LockCursor(false);
+			return false;
+		}
+
+
+		Scene const& scene = editorImpl.GetActiveScene();
+
+		// We don't want to do gizmo stuff if it was the secondary cursor button
+		bool doGizmoStuff =
+			!oldEventConsumed &&
+			pointerInside &&
+			pointer.pressed &&
+			widget.state == ViewportWidget::BehaviorState::Normal &&
+			pointer.type == PointerType::Primary;
+		if (doGizmoStuff)
+		{
+			bool hitGizmo = false;
+			// If we have selected an entity, and it has a Transform component,
+			// We want to see if we hit it's gizmo.
+			Entity ent = Entity::Invalid;
+			Transform const* transformPtr = nullptr;
+			if (widget.editorImpl->GetSelectedEntity().HasValue())
 			{
-				auto const& hit = hitTestOpt.Value();
-				InternalViewportWidget::HoldingGizmoData holdingGizmoData = {};
-				holdingGizmoData.gizmoType = currGizmoType;
-				holdingGizmoData.holdingPart = hit.part;
-				holdingGizmoData.initialPos = transform.position;
-				holdingGizmoData.normalizedOffsetGizmo = hit.normalizedHitPoint_Gizmo;
-				holdingGizmoData.pointerId = pointer.id;
-				holdingGizmoData.initialObjectScale = transform.scale;
-				holdingGizmoData.relativeHitPointObject = hit.relativeHitPoint_Object;
-				holdingGizmoData.rotationOffset = hit.rotationOffset;
-				widget.holdingGizmoData = holdingGizmoData;
-				widget.state = InternalViewportWidget::BehaviorState::Gizmo;
-				hitGizmo = true;
-				return pointerInside;
+				ent = widget.editorImpl->GetSelectedEntity().Value();
+				transformPtr = scene.GetComponent<Transform>(ent);
 			}
-		}
-		// If we didn't hit a gizmo, we want to see if we hit any selectable colliders.
-		if (!hitGizmo)
-		{
-			// Collapse this shit into a function
-			Std::Opt<Std::Pair<f32, Entity>> hitEntity;
-
-			Math::Vec3 rayOrigin = widget.cam.position;
-			Math::Vec3 rayDir = widget.BuildRayDirection(widgetRect, pointer.pos);
-			// Iterate over all physics components that also have a transform component
-			for (auto const& [entity, rb] : scene.GetAllComponents<Physics::Rigidbody2D>())
+			if (transformPtr)
 			{
-				Transform const* transform = widget.editorImpl->scene->GetComponent<Transform>(entity);
-				if (transform)
+				Transform const& transform = *transformPtr;
+				auto const currGizmoType = editorImpl.GetCurrentGizmoType();
+				auto const& hitTestOpt = impl::GizmoHitTest(
+					widget,
+					widgetRect,
+					pointer.pos,
+					transform.position,
+					transform.rotation,
+					currGizmoType);
+				if (hitTestOpt.HasValue())
 				{
-					Math::Vec2 vertices[4] = {
-						{-0.5f, 0.5f },
-						{ 0.5f, 0.5f },
-						{ 0.5f, -0.5f },
-						{ -0.5f, -0.5f } };
-					Std::Opt<f32> distanceOpt = Intersect_Ray_PhysicsCollider2D(
-						widget,
-						{ vertices, 4 },
-						transform->position.AsVec2(),
-						transform->rotation,
-						transform->scale,
-						rayOrigin,
-						rayDir);
-					if (distanceOpt.HasValue())
-					{
-						auto const newDist = distanceOpt.Value();
-						if (!hitEntity.HasValue() || newDist <= hitEntity.Value().a)
-							hitEntity = { newDist, entity };
-					}
+					auto const& hit = hitTestOpt.Value();
+					ViewportWidget::HoldingGizmoData holdingGizmoData = {};
+					holdingGizmoData.gizmoType = currGizmoType;
+					holdingGizmoData.holdingPart = hit.part;
+					holdingGizmoData.initialPos = transform.position;
+					holdingGizmoData.normalizedOffsetGizmo = hit.normalizedHitPoint_Gizmo;
+					holdingGizmoData.pointerId = pointer.id;
+					holdingGizmoData.initialObjectScale = transform.scale;
+					holdingGizmoData.relativeHitPointObject = hit.relativeHitPoint_Object;
+					holdingGizmoData.rotationOffset = hit.rotationOffset;
+					widget.holdingGizmoData = holdingGizmoData;
+					widget.state = ViewportWidget::BehaviorState::Gizmo;
+					hitGizmo = true;
+					return pointerInside;
 				}
 			}
-			if (hitEntity.HasValue())
+			// If we didn't hit a gizmo, we want to see if we hit any selectable colliders.
+			if (!hitGizmo)
 			{
-				widget.editorImpl->SelectEntity(hitEntity.Value().b);
-				return pointerInside;
+				// Collapse this shit into a function
+				Std::Opt<Std::Pair<f32, Entity>> hitEntity;
+
+				Math::Vec3 rayOrigin = widget.cam.position;
+				Math::Vec3 rayDir = widget.BuildRayDirection(widgetRect, pointer.pos);
+				// Iterate over all physics components that also have a transform component
+				for (auto const& [entity, rb] : scene.GetAllComponents<Physics::Rigidbody2D>())
+				{
+					Transform const* transform = widget.editorImpl->scene->GetComponent<Transform>(entity);
+					if (transform)
+					{
+						Math::Vec2 vertices[4] = {
+							{-0.5f, 0.5f },
+							{ 0.5f, 0.5f },
+							{ 0.5f, -0.5f },
+							{ -0.5f, -0.5f } };
+						Std::Opt<f32> distanceOpt = Intersect_Ray_PhysicsCollider2D(
+							widget,
+							{ vertices, 4 },
+							transform->position.AsVec2(),
+							transform->rotation,
+							transform->scale,
+							rayOrigin,
+							rayDir);
+						if (distanceOpt.HasValue())
+						{
+							auto const newDist = distanceOpt.Value();
+							if (!hitEntity.HasValue() || newDist <= hitEntity.Value().a)
+								hitEntity = { newDist, entity };
+						}
+					}
+				}
+				if (hitEntity.HasValue())
+				{
+					widget.editorImpl->SelectEntity(hitEntity.Value().b);
+					return pointerInside;
+				}
 			}
 		}
-	}
 
-	return pointerInside;
+		return pointerInside;
+	}
 }
 
 // Target_size in pixels
@@ -1074,11 +1079,11 @@ static bool impl::PointerPress(
 	Math::Mat4 const& projection,
 	Gui::Extent viewportSize) noexcept
 {
-	u32 smallestViewportExtent = Math::Min(viewportSize.width, viewportSize.height);
-	u32 targetSizePx = smallestViewportExtent * Gizmo::defaultGizmoSizeRelative;
-	f32 const pixelSize = 1.f / viewportSize.height;
+	auto minExtent = Math::Min(viewportSize.width, viewportSize.height);
+	auto targetSizePx = (u32)Math::Round((f32)minExtent * Gizmo::defaultGizmoSizeRelative);
+	auto const pixelSize = 1.f / (f32)viewportSize.height;
 	Math::Vec4 zVec = { worldTransform.At(3, 0), worldTransform.At(3, 1), worldTransform.At(3, 2), worldTransform.At(3, 3) };
-	return targetSizePx * pixelSize * (projection * zVec).w;
+	return (f32)targetSizePx * pixelSize * (projection * zVec).w;
 }
 
 InternalViewportWidget::InternalViewportWidget(
@@ -1134,7 +1139,7 @@ Math::Vec3 InternalViewportWidget::BuildRayDirection(
 	// but with no camera transform applied.
 	auto normalizedCoordPos = pointerNormPos.AsVec4(1.f, 1.f);
 	auto perspMatInvOpt = perspMat.GetInverse();
-	DENGINE_DETAIL_ASSERT(perspMatInvOpt.HasValue());
+	DENGINE_IMPL_ASSERT(perspMatInvOpt.HasValue());
 	auto const& perspMatInv = perspMatInvOpt.Value();
 	auto vector = perspMatInv * normalizedCoordPos;
 	for (auto& item : vector)
@@ -1207,13 +1212,12 @@ namespace DEngine::Editor::impl
 	}
 }
 
-Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
-	Context const& editor,
+Gfx::ViewportUpdate InternalViewportWidget::BuildViewportUpdate(
 	std::vector<Math::Vec3>& lineVertices,
 	std::vector<Gfx::LineDrawCmd>& lineDrawCmds) const noexcept
 {
-	EditorImpl const& editorImpl = editor.ImplData();
-	Scene const& scene = editorImpl.GetActiveScene();
+	DENGINE_IMPL_ASSERT(editorImpl);
+	Scene const& scene = editorImpl->GetActiveScene();
 
 	Gfx::ViewportUpdate returnVal = {};
 	returnVal.id = viewportId;
@@ -1226,9 +1230,9 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 
 	returnVal.transform = projMat;
 
-	if (editorImpl.GetSelectedEntity().HasValue())
+	if (editorImpl->GetSelectedEntity().HasValue())
 	{
-		Entity selected = editorImpl.GetSelectedEntity().Value();
+		Entity selected = editorImpl->GetSelectedEntity().Value();
 		// Find Transform component of this entity
 
 		auto transformPtr = scene.GetComponent<Transform>(selected);
@@ -1240,7 +1244,7 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 
 			returnVal.gizmoOpt = Gfx::ViewportUpdate::Gizmo{};
 			Gfx::ViewportUpdate::Gizmo& gizmo = returnVal.gizmoOpt.Value();
-			gizmo.type = impl::ToGfxGizmoType(editorImpl.GetCurrentGizmoType());
+			gizmo.type = impl::ToGfxGizmoType(editorImpl->GetCurrentGizmoType());
 			gizmo.position = transform.position;
 			gizmo.rotation = transform.rotation;
 
@@ -1289,135 +1293,134 @@ Gfx::ViewportUpdate InternalViewportWidget::GetViewportUpdate(
 	return returnVal;
 }
 
-bool InternalViewportWidget::CursorPress(
-	Gui::Context& ctx,
-	Gui::WindowID windowId,
-	Gui::Rect widgetRect,
-	Gui::Rect visibleRect,
-	Math::Vec2Int cursorPos,
-	Gui::CursorClickEvent event)
+Gui::SizeHint InternalViewportWidget::GetSizeHint2(
+	Gui::Widget::GetSizeHint2_Params const& params) const
 {
-	impl::PointerPress_Pointer pointer = {};
-	pointer.id = impl::cursorPointerId;
-	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	pointer.pressed = event.clicked;
-	pointer.type = impl::ToPointerType(event.button);
-	return impl::PointerPress(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		pointer);
-}
+	auto& pusher = params.pusher;
 
-bool InternalViewportWidget::CursorMove(
-	Gui::Context& ctx,
-	Gui::WindowID windowId,
-	Gui::Rect widgetRect,
-	Gui::Rect visibleRect,
-	Gui::CursorMoveEvent event,
-	bool occluded)
-{
-	impl::PointerMove_Pointer pointer = {};
-	pointer.id = impl::cursorPointerId;
-	pointer.occluded = occluded;
-	pointer.pos = { (f32)event.position.x, (f32)event.position.y };
-	return impl::PointerMove(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		pointer,
-		&event);
-}
-
-bool InternalViewportWidget::TouchPressEvent(
-	Gui::Context& ctx,
-	Gui::WindowID windowId,
-	Gui::Rect widgetRect,
-	Gui::Rect visibleRect,
-	Gui::TouchPressEvent event)
-{
-	impl::PointerPress_Pointer pointer = {};
-	pointer.id = event.id;
-	pointer.pos = event.position;
-	pointer.pressed = event.pressed;
-	pointer.type = impl::PointerType::Primary;
-	return impl::PointerPress(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		pointer);
-}
-
-bool InternalViewportWidget::TouchMoveEvent(
-	Gui::Context& ctx,
-	Gui::WindowID windowId,
-	Gui::Rect widgetRect,
-	Gui::Rect visibleRect,
-	Gui::TouchMoveEvent event,
-	bool occluded)
-{
-	impl::PointerMove_Pointer pointer = {};
-	pointer.id = event.id;
-	pointer.occluded = occluded;
-	pointer.pos = event.position;
-	return impl::PointerMove(
-		*this,
-		ctx,
-		windowId,
-		widgetRect,
-		visibleRect,
-		pointer,
-		nullptr);
-}
-
-Gui::SizeHint InternalViewportWidget::GetSizeHint(Gui::Context const& ctx) const
-{
 	Gui::SizeHint returnVal = {};
-	returnVal.preferred = { 450, 450 };
+	returnVal.minimum = { 450, 450 };
 	returnVal.expandX = true;
 	returnVal.expandY = true;
+
+	auto entry = pusher.AddEntry(*this);
+	pusher.SetSizeHint(entry, returnVal);
+
 	return returnVal;
 }
 
-void InternalViewportWidget::Render(
-	Gui::Context const& ctx,
-	Gui::Extent framebufferExtent,
-	Gui::Rect widgetRect,
-	Gui::Rect visibleRect,
-	Gui::DrawInfo& drawInfo) const
+void InternalViewportWidget::Render2(
+	Gui::Widget::Render_Params const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect) const
 {
-	isVisible = true;
-	currentlyResizing = newExtent != widgetRect.extent;
-	newExtent = widgetRect.extent;
-
 	// First draw the viewport.
 	Gfx::GuiDrawCmd drawCmd = {};
 	drawCmd.type = Gfx::GuiDrawCmd::Type::Viewport;
 	drawCmd.viewport.id = viewportId;
-	drawCmd.rectPosition.x = (f32)widgetRect.position.x / framebufferExtent.width;
-	drawCmd.rectPosition.y = (f32)widgetRect.position.y / framebufferExtent.height;
-	drawCmd.rectExtent.x = (f32)widgetRect.extent.width / framebufferExtent.width;
-	drawCmd.rectExtent.y = (f32)widgetRect.extent.height / framebufferExtent.height;
-	drawInfo.drawCmds->push_back(drawCmd);
+	drawCmd.rectPosition.x = (f32)widgetRect.position.x / params.framebufferExtent.width;
+	drawCmd.rectPosition.y = (f32)widgetRect.position.y / params.framebufferExtent.height;
+	drawCmd.rectExtent.x = (f32)widgetRect.extent.width / params.framebufferExtent.width;
+	drawCmd.rectExtent.y = (f32)widgetRect.extent.height / params.framebufferExtent.height;
+
+	params.drawInfo.drawCmds->push_back(drawCmd);
+}
+
+bool InternalViewportWidget::CursorPress2(
+	Gui::Widget::CursorPressParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	pointer.pressed = params.event.pressed;
+	pointer.type = impl::ToPointerType(params.event.button);
+
+	impl::PointerPress_Params temp = {
+		.widget = *this,
+		.ctx = params.ctx,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.eventConsumed = consumed, };
+
+	return impl::PointerPress(temp);
+}
+
+bool InternalViewportWidget::CursorMove(
+	Gui::Widget::CursorMoveParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool occluded)
+{
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
+	pointer.posDelta = { (f32)params.event.positionDelta.x, (f32)params.event.positionDelta.y };
+	pointer.occluded = occluded;
+
+	impl::PointerMove_Params temp = {
+		.widget = *this,
+		.ctx = params.ctx,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer, };
+	return impl::PointerMove(temp);
+}
+
+bool InternalViewportWidget::TouchMove2(
+	TouchMoveParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool occluded)
+{
+	impl::PointerMove_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.posDelta = {};
+	pointer.occluded = occluded;
+
+	impl::PointerMove_Params temp = {
+		.widget = *this,
+		.ctx = params.ctx,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer, };
+	return impl::PointerMove(temp);
+}
+
+bool InternalViewportWidget::TouchPress2(
+	TouchPressParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.pressed = params.event.pressed;
+	pointer.type = impl::PointerType::Primary;
+
+	impl::PointerPress_Params temp = {
+		.widget = *this,
+		.ctx = params.ctx,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.eventConsumed = consumed, };
+	return impl::PointerPress(temp);
 }
 
 ViewportWidget::ViewportWidget(EditorImpl& implData) :
-	Gui::StackLayout(Gui::StackLayout::Direction::Vertical),
 	editorImpl(&implData)
 {
-	implData.viewportWidgets.push_back(this);
+	auto* anchorArea = this;
 
-	Gui::AnchorArea* anchorArea = new Gui::AnchorArea;
-	AddWidget(Std::Box{ anchorArea });
+	implData.viewportWidgetPtrs.push_back(this);
 
-	Joystick* leftJoystick = new Joystick;
-	this->leftJoystick = leftJoystick;
+	leftJoystick = new Joystick;
 	Gui::AnchorArea::Node leftJoystickNode = {};
 	leftJoystickNode.anchorX = Gui::AnchorArea::AnchorX::Left;
 	leftJoystickNode.anchorY = Gui::AnchorArea::AnchorY::Bottom;
@@ -1425,8 +1428,7 @@ ViewportWidget::ViewportWidget(EditorImpl& implData) :
 	leftJoystickNode.widget = Std::Box{ leftJoystick };
 	anchorArea->nodes.push_back(Std::Move(leftJoystickNode));
 
-	Joystick* rightJoystick = new Joystick;
-	this->rightJoystick = rightJoystick;
+	rightJoystick = new Joystick;
 	Gui::AnchorArea::Node rightJoystickNode = {};
 	rightJoystickNode.anchorX = Gui::AnchorArea::AnchorX::Right;
 	rightJoystickNode.anchorY = Gui::AnchorArea::AnchorY::Bottom;
@@ -1435,22 +1437,18 @@ ViewportWidget::ViewportWidget(EditorImpl& implData) :
 	anchorArea->nodes.push_back(Std::Move(rightJoystickNode));
 
 	// Background
-	InternalViewportWidget* viewport = new InternalViewportWidget(implData);
-	this->viewport = viewport;
-
-	Gui::AnchorArea::Node background = {};
-	background.widget = Std::Box{ viewport };
-	anchorArea->nodes.push_back(Std::Move(background));
+	viewport = new InternalViewportWidget(implData);
+	anchorArea->backgroundWidget = Std::Box{ viewport };
 }
 
 Editor::ViewportWidget::~ViewportWidget()
 {
 	auto ptrIt = Std::FindIf(
-		editorImpl->viewportWidgets.begin(),
-		editorImpl->viewportWidgets.end(),
+		editorImpl->viewportWidgetPtrs.begin(),
+		editorImpl->viewportWidgetPtrs.end(),
 		[this](auto const& val) -> bool { return val == this; });
-	DENGINE_DETAIL_ASSERT(ptrIt != editorImpl->viewportWidgets.end());
-	editorImpl->viewportWidgets.erase(ptrIt);
+	DENGINE_IMPL_ASSERT(ptrIt != editorImpl->viewportWidgetPtrs.end());
+	editorImpl->viewportWidgetPtrs.erase(ptrIt);
 }
 
 void Editor::ViewportWidget::Tick(float deltaTime) noexcept

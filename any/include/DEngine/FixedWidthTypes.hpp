@@ -13,7 +13,7 @@ namespace DEngine
 	using u64 = unsigned long long;
 
 	using uSize = decltype(sizeof(void*));
-	using iSize = decltype((char*)0 - (char*)0);
+	using iSize = decltype((char*)nullptr - (char*)nullptr);
 
 	using f32 = float;
 	using f64 = double;

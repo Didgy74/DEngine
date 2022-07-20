@@ -1,15 +1,18 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/Trait.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 
 #include <DEngine/Std/Containers/impl/Assert.hpp>
+
+#include <initializer_list>
 
 namespace DEngine::Std
 {
 	// Constant-capacity vector.
 	// Use for small vectors of fixed capacity.
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	class StackVec
 	{
 	public:
@@ -17,8 +20,40 @@ namespace DEngine::Std
 
 		StackVec() noexcept;
 		StackVec(uSize length);
-		StackVec(StackVec<T, capacity> const&);
-		StackVec(StackVec<T, capacity>&&) noexcept;
+		StackVec(StackVec const& in) noexcept
+			requires (Trait::isCopyConstructible<T>)
+			: size(in.size)
+		{
+			for (int i = 0; i < size; i++)
+				new(values + i) T(in[i]);
+		}
+		StackVec(StackVec&& in) noexcept
+			requires (Trait::isMoveConstructible<T>)
+			: size(in.size)
+		{
+			for (int i = 0; i < size; i++)
+				new(values + i) T(static_cast<T&&>(in[i]));
+			in.Clear();
+		}
+		template<unsigned int otherCap>
+		StackVec(StackVec<T, otherCap> const& in) noexcept
+			requires (Trait::isCopyConstructible<T> && otherCap < capacity)
+			: size{ otherCap }
+		{
+			for (int i = 0; i < otherCap; i++)
+				new(values + i) T(in[i]);
+		}
+		StackVec(std::initializer_list<T> const& in) noexcept
+			requires (Trait::isCopyConstructible<T>)
+			: size{ in.size() }
+		{
+			DENGINE_IMPL_CONTAINERS_ASSERT(in.size());
+			int i = 0;
+			for (auto const& inItem : in) {
+				new(values + i) T(inItem);
+				i++;
+			}
+		}
 		~StackVec();
 
 		StackVec<T, capacity>& operator=(StackVec<T, capacity> const&);
@@ -27,7 +62,7 @@ namespace DEngine::Std
 		[[nodiscard]] constexpr Span<T> ToSpan() noexcept;
 		[[nodiscard]] constexpr Span<T const> ToSpan() const noexcept;
 		constexpr operator Span<T>() noexcept;
-		constexpr operator Span<T const>() noexcept;
+		constexpr operator Span<T const>() const noexcept;
 
 		[[nodiscard]] bool CanPushBack() const noexcept;
 		[[nodiscard]] static constexpr uSize Capacity() noexcept;
@@ -57,55 +92,27 @@ namespace DEngine::Std
 	private:
 		union
 		{
-			alignas(T) unsigned char unused = 0;
+			alignas(T) unsigned char unused;
 			T values[capacity];
 		};
 		uSize size = 0;
 	};
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	StackVec<T, capacity>::StackVec() noexcept {}
 
-	template<typename T, uSize capacity>
-	StackVec<T, capacity>::StackVec(uSize length) :
-		size(length)
-	{
-		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
-			length <= capacity, 
-			"Attempted to create a StackVec of size larger than it's capacity.");
-		new(values) T[length];
-	}
-
-	template<typename T, uSize capacity>
-	StackVec<T, capacity>::StackVec(StackVec<T, capacity> const& other) :
-		size(other.size)
-	{
-		for (uSize i = 0; i < size; i += 1)
-			new(values + i) T(other[i]);
-	}
-
-	template<typename T, uSize capacity>
-	StackVec<T, capacity>::StackVec(StackVec<T, capacity>&& other) noexcept :
-		size(other.size)
-	{
-		for (uSize i = 0; i < size; i += 1)
-			new(values + i) T(static_cast<T&&>(other[i]));
-		other.Clear();
-	}
-
-	template<typename T, uSize capacity>
-	StackVec<T, capacity>::~StackVec()
-	{
+	template<class T, unsigned int capacity>
+	StackVec<T, capacity>::~StackVec() {
 		Clear();
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	StackVec<T, capacity>& StackVec<T, capacity>::operator=(StackVec<T, capacity> const& other)
 	{
 		if (this == &other)
 			return *this;
 
-		uSize i = 0;
+		int i = 0;
 		for (; i < (size < other.size ? size : other.size); i++)
 			values[i] = other[i];
 		for (; i < size; i++)
@@ -118,7 +125,7 @@ namespace DEngine::Std
 		return *this;
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	StackVec<T, capacity>& StackVec<T, capacity>::operator=(StackVec<T, capacity>&& other) noexcept
 	{
 		if (this == &other)
@@ -137,75 +144,66 @@ namespace DEngine::Std
 		return *this;
 	}
 
-	template<typename T, uSize capacity>
-	constexpr Span<T> StackVec<T, capacity>::ToSpan() noexcept
-	{
+	template<class T, unsigned int capacity>
+	constexpr Span<T> StackVec<T, capacity>::ToSpan() noexcept {
 		return Span<T>(values, size);
 	}
 
-	template<typename T, uSize capacity>
-	constexpr Span<T const> StackVec<T, capacity>::ToSpan() const noexcept
-	{
+	template<class T, unsigned int capacity>
+	constexpr Span<T const> StackVec<T, capacity>::ToSpan() const noexcept {
 		return Span<T const>(values, size);
 	}
 
-	template<typename T, uSize capacity>
-	constexpr StackVec<T, capacity>::operator Span<T>() noexcept
-	{
+	template<class T, unsigned int capacity>
+	constexpr StackVec<T, capacity>::operator Span<T>() noexcept {
 		return ToSpan();
 	}
 
-	template<typename T, uSize capacity>
-	constexpr StackVec<T, capacity>::operator Span<T const>() noexcept
-	{
+	template<class T, unsigned int capacity>
+	constexpr StackVec<T, capacity>::operator Span<T const>() const noexcept {
 		return ToSpan();
 	}
 
-	template<typename T, uSize capacity>
-	bool StackVec<T, capacity>::CanPushBack() const noexcept
-	{
+	template<class T, unsigned int capacity>
+	bool StackVec<T, capacity>::CanPushBack() const noexcept {
 		return size < capacity;
 	}
 
-	template<typename T, uSize capacity>
-	constexpr uSize StackVec<T, capacity>::Capacity() noexcept
-	{
+	template<class T, unsigned int capacity>
+	constexpr uSize StackVec<T, capacity>::Capacity() noexcept {
 		return capacity;
 	}
 
-	template<typename T, uSize capacity>
-	T* StackVec<T, capacity>::Data() noexcept
-	{
+	template<class T, unsigned int capacity>
+	T* StackVec<T, capacity>::Data() noexcept {
 		return values;
 	}
 
-	template<typename T, uSize capacity>
-	T const* StackVec<T, capacity>::Data() const noexcept
-	{
+	template<class T, unsigned int capacity>
+	T const* StackVec<T, capacity>::Data() const noexcept {
 		return values;
 	}
 
-	template<typename T, uSize capacity>
-	bool StackVec<T, capacity>::IsEmpty() const noexcept
-	{
+	template<class T, unsigned int capacity>
+	bool StackVec<T, capacity>::IsEmpty() const noexcept {
 		return size == 0;
 	}
 
-	template<typename T, uSize capacity>
-	uSize StackVec<T, capacity>::Size() const noexcept
-	{
+	template<class T, unsigned int capacity>
+	uSize StackVec<T, capacity>::Size() const noexcept {
 		return size;
 	}
 
-	template<typename T, uSize capacity>
-	void StackVec<T, capacity>::Clear()
-	{
-		for (uSize i = 0; i < size; i += 1)
-			values[i].~T();
+	template<class T, unsigned int capacity>
+	void StackVec<T, capacity>::Clear() {
+		if constexpr (!Trait::isTriviallyDestructible<T>) {
+			for (uSize i = 0; i < size; i += 1)
+				values[i].~T();
+		}
 		size = 0;
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	void StackVec<T, capacity>::Erase(uSize index)
 	{
 		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
@@ -213,11 +211,12 @@ namespace DEngine::Std
 			"Attempted to .Erase() a StackVec with an out-of-bounds index.");
 		for (uSize i = index; i < size - 1; i += 1)
 			values[i] = static_cast<T&&>(values[i + 1]);
-		values[size - 1].~T();
+		if constexpr (!Trait::isTriviallyDestructible<T>)
+			values[size - 1].~T();
 		size -= 1;
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	void StackVec<T, capacity>::EraseUnsorted(uSize index)
 	{
 		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
@@ -228,7 +227,7 @@ namespace DEngine::Std
 		size -= 1;
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	void StackVec<T, capacity>::Insert(uSize index, T&& in)
 	{
 		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
@@ -244,7 +243,7 @@ namespace DEngine::Std
 		new(&values[index]) T(static_cast<T&&>(in));
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	void StackVec<T, capacity>::PushBack(T const& in)
 	{
 		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
@@ -254,7 +253,7 @@ namespace DEngine::Std
 		size += 1;
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	void StackVec<T, capacity>::PushBack(T&& in)
 	{
 		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
@@ -264,26 +263,23 @@ namespace DEngine::Std
 		size += 1;
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	void StackVec<T, capacity>::Resize(uSize newSize)
 	{
 		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
 			size <= capacity,
 			"Attempted to .Resize() a StackVec beyond it's capacity.");
-		if (newSize > size)
-		{
-			for (uSize i = size; i < newSize; i += 1)
+		if (newSize > size) {
+			for (int i = size; i < newSize; i += 1)
 				new(values + i) T();
-		}
-		else
-		{
-			for (uSize i = newSize; i < size; i += 1)
+		} else {
+			for (int i = newSize; i < size; i += 1)
 				values[i].~T();
 		}
 		size = newSize;
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	T& StackVec<T, capacity>::At(uSize i) noexcept
 	{
 		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
@@ -292,7 +288,7 @@ namespace DEngine::Std
 		return values[i];
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	T const& StackVec<T, capacity>::At(uSize i) const noexcept
 	{
 		DENGINE_IMPL_CONTAINERS_ASSERT_MSG(
@@ -301,28 +297,25 @@ namespace DEngine::Std
 		return values[i];
 	}
 
-	template<typename T, uSize capacity>
-	T& StackVec<T, capacity>::operator[](uSize i) noexcept
-	{
+	template<class T, unsigned int capacity>
+	T& StackVec<T, capacity>::operator[](uSize i) noexcept {
 		return At(i);
 	}
 
-	template<typename T, uSize capacity>
-	T const& StackVec<T, capacity>::operator[](uSize i) const noexcept
-	{
+	template<class T, unsigned int capacity>
+	T const& StackVec<T, capacity>::operator[](uSize i) const noexcept {
 		return At(i);
 	}
 
-	template<typename T, uSize capacity>
-	T* StackVec<T, capacity>::begin() noexcept
-	{
+	template<class T, unsigned int capacity>
+	T* StackVec<T, capacity>::begin() noexcept {
 		if (size == 0)
 			return nullptr;
 		else
 			return values;
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	T const* StackVec<T, capacity>::begin() const noexcept
 	{
 		if (size == 0)
@@ -331,7 +324,7 @@ namespace DEngine::Std
 			return values;
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	T* StackVec<T, capacity>::end() noexcept
 	{
 		if (size == 0)
@@ -340,7 +333,7 @@ namespace DEngine::Std
 			return values + size;
 	}
 
-	template<typename T, uSize capacity>
+	template<class T, unsigned int capacity>
 	T const* StackVec<T, capacity>::end() const noexcept
 	{
 		if (size == 0)

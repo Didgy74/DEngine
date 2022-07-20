@@ -1,10 +1,12 @@
 #include "GuiResourceManager.hpp"
 
-#include "DEngine/Gfx/Gfx.hpp"
+#include <DEngine/Gfx/Gfx.hpp>
 #include "DynamicDispatch.hpp"
 #include "GlobUtils.hpp"
 
 #include <DEngine/Std/Containers/Array.hpp>
+#include <DEngine/Std/Containers/Vec.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
 
 // For file IO
 #include <DEngine/Application.hpp>
@@ -14,7 +16,7 @@ using namespace DEngine::Gfx;
 
 namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 {
-	static constexpr Std::Array<vk::VertexInputAttributeDescription, 2> BuildShaderVertexInputAttrDescr()
+	static Std::Array<vk::VertexInputAttributeDescription, 2> BuildShaderVertexInputAttrDescr()
 	{
 		vk::VertexInputAttributeDescription position{};
 		position.binding = 0;
@@ -31,7 +33,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		return { position, uv };
 	}
 
-	static constexpr Std::Array<vk::VertexInputBindingDescription, 1> BuildShaderVertexInputBindingDescr()
+	static Std::Array<vk::VertexInputBindingDescription, 1> BuildShaderVertexInputBindingDescr()
 	{
 		vk::VertexInputBindingDescription binding{};
 		binding.binding = 0;
@@ -45,6 +47,7 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		GuiResourceManager& manager,
 		DeviceDispatch const& device,
 		vk::RenderPass guiRenderPass,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils)
 	{
 		vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -126,29 +129,33 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> vertCode((uSize)vertFileLength);
-		vertFile.Read(vertCode.data(), vertFileLength);
-		vk::ShaderModuleCreateInfo vertModCreateInfo{};
+		auto vertCode = Std::NewVec<char>(transientAlloc);
+		vertCode.Resize((uSize)vertFileLength);
+		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
-		vertModCreateInfo.codeSize = vertCode.size();
-		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
+		vk::ShaderModuleCreateInfo vertModCreateInfo{};
+		vertModCreateInfo.codeSize = vertCode.Size();
+		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
 		vk::ShaderModule vertModule = device.createShaderModule(vertModCreateInfo);
 		vk::PipelineShaderStageCreateInfo vertStageInfo{};
 		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
 		vertStageInfo.module = vertModule;
 		vertStageInfo.pName = "main";
+
+
 		App::FileInputStream fragFile{ "data/gui/FilledMesh/frag.spv" };
 		if (!fragFile.IsOpen())
 			throw std::runtime_error("Could not open fragment shader file");
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> fragCode((uSize)fragFileLength);
-		fragFile.Read(fragCode.data(), fragFileLength);
+		auto fragCode = Std::NewVec<char>(transientAlloc);
+		fragCode.Resize((uSize)fragFileLength);
+		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
 		vk::ShaderModuleCreateInfo fragModInfo{};
-		fragModInfo.codeSize = fragCode.size();
-		fragModInfo.pCode = reinterpret_cast<u32 const*>(fragCode.data());
+		fragModInfo.codeSize = fragCode.Size();
+		fragModInfo.pCode = reinterpret_cast<u32 const*>(fragCode.Data());
 		vk::ShaderModule fragModule = device.createShaderModule(fragModInfo);
 		vk::PipelineShaderStageCreateInfo fragStageInfo{};
 		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
@@ -195,14 +202,15 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 				"GuiResourceManager - FilledMesh Pipeline");
 		}
 
-		device.destroy(vertModule);
-		device.destroy(fragModule);
+		device.Destroy(vertModule);
+		device.Destroy(fragModule);
 	}
 
 	static void CreateViewportShader(
 		GuiResourceManager& manager,
 		DeviceDispatch const& device,
 		vk::RenderPass guiRenderPass,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils)
 	{
 		vk::DescriptorSetLayoutBinding imgDescrBinding{};
@@ -301,29 +309,33 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> vertCode((uSize)vertFileLength);
-		vertFile.Read(vertCode.data(), vertFileLength);
-		vk::ShaderModuleCreateInfo vertModCreateInfo{};
+		auto vertCode = Std::NewVec<char>(transientAlloc);
+		vertCode.Resize((uSize)vertFileLength);
+		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
-		vertModCreateInfo.codeSize = vertCode.size();
-		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
+		vk::ShaderModuleCreateInfo vertModCreateInfo{};
+		vertModCreateInfo.codeSize = vertCode.Size();
+		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
 		vk::ShaderModule vertModule = device.createShaderModule(vertModCreateInfo);
 		vk::PipelineShaderStageCreateInfo vertStageInfo{};
 		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
 		vertStageInfo.module = vertModule;
 		vertStageInfo.pName = "main";
+		
+		
 		App::FileInputStream fragFile{ "data/gui/Viewport/frag.spv" };
 		if (!fragFile.IsOpen())
 			throw std::runtime_error("Could not open fragment shader file");
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> fragCode((uSize)fragFileLength);
-		fragFile.Read(fragCode.data(), fragFileLength);
+		auto fragCode = Std::NewVec<char>(transientAlloc);
+		fragCode.Resize((uSize)fragFileLength);
+		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
 		vk::ShaderModuleCreateInfo fragModInfo{};
-		fragModInfo.codeSize = fragCode.size();
-		fragModInfo.pCode = reinterpret_cast<u32 const*>(fragCode.data());
+		fragModInfo.codeSize = fragCode.Size();
+		fragModInfo.pCode = reinterpret_cast<u32 const*>(fragCode.Data());
 		vk::ShaderModule fragModule = device.createShaderModule(fragModInfo);
 		vk::PipelineShaderStageCreateInfo fragStageInfo{};
 		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
@@ -369,14 +381,15 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 				"GuiResourceManager - Viewport Pipeline");
 		}
 
-		device.destroy(vertModule);
-		device.destroy(fragModule);
+		device.Destroy(vertModule);
+		device.Destroy(fragModule);
 	}
 
 	static void CreateTextShader(
 		GuiResourceManager& manager,
 		DeviceDispatch const& device,
 		vk::RenderPass guiRenderPass,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils)
 	{
 		vk::DescriptorPoolSize sampledImgDescrPoolSize{};
@@ -504,44 +517,48 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> vertCode((uSize)vertFileLength);
-		vertFile.Read(vertCode.data(), vertFileLength);
-		vk::ShaderModuleCreateInfo vertModCreateInfo{};
+		auto vertCode = Std::NewVec<char>(transientAlloc);
+		vertCode.Resize((uSize)vertFileLength);
+		vertFile.Read(vertCode.Data(), vertFileLength);
 		vertFile.Close();
-		vertModCreateInfo.codeSize = vertCode.size();
-		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
+		vk::ShaderModuleCreateInfo vertModCreateInfo{};
+		vertModCreateInfo.codeSize = vertCode.Size();
+		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
 		vk::ShaderModule vertModule = device.createShaderModule(vertModCreateInfo);
 		vk::PipelineShaderStageCreateInfo vertStageInfo{};
 		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
 		vertStageInfo.module = vertModule;
 		vertStageInfo.pName = "main";
+
+
 		App::FileInputStream fragFile{ "data/gui/Text/frag.spv" };
 		if (!fragFile.IsOpen())
 			throw std::runtime_error("Could not open fragment shader file");
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> fragCode((uSize)fragFileLength);
-		fragFile.Read(fragCode.data(), fragFileLength);
+		auto fragCode = Std::NewVec<char>(transientAlloc);
+		fragCode.Resize((uSize)fragFileLength);
+		fragFile.Read(fragCode.Data(), fragFileLength);
 		fragFile.Close();
 		vk::ShaderModuleCreateInfo fragModInfo{};
-		fragModInfo.codeSize = fragCode.size();
-		fragModInfo.pCode = reinterpret_cast<u32 const*>(fragCode.data());
+		fragModInfo.codeSize = fragCode.Size();
+		fragModInfo.pCode = reinterpret_cast<u32 const*>(fragCode.Data());
 		vk::ShaderModule fragModule = device.createShaderModule(fragModInfo);
-		vk::PipelineShaderStageCreateInfo fragStageInfo{};
+		vk::PipelineShaderStageCreateInfo fragStageInfo = {};
 		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
 		fragStageInfo.module = fragModule;
 		fragStageInfo.pName = "main";
 
 		Std::Array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = { vertStageInfo, fragStageInfo };
 
-    vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
-    depthStencilInfo.depthTestEnable = 0;
-    depthStencilInfo.depthCompareOp = vk::CompareOp::eLess;
-    depthStencilInfo.stencilTestEnable = 0;
-    depthStencilInfo.depthWriteEnable = 0;
-    depthStencilInfo.minDepthBounds = 0.f;
-    depthStencilInfo.maxDepthBounds = 1.f;
+		vk::PipelineDepthStencilStateCreateInfo depthStencilInfo{};
+		depthStencilInfo.depthTestEnable = 0;
+		depthStencilInfo.depthCompareOp = vk::CompareOp::eLess;
+		depthStencilInfo.stencilTestEnable = 0;
+		depthStencilInfo.depthWriteEnable = 0;
+		depthStencilInfo.minDepthBounds = 0.f;
+		depthStencilInfo.maxDepthBounds = 1.f;
 
 		vk::GraphicsPipelineCreateInfo pipelineInfo{};
 		pipelineInfo.layout = manager.font_pipelineLayout;
@@ -572,8 +589,8 @@ namespace DEngine::Gfx::Vk::GuiResourceManagerImpl
 				"GuiResourceManager - Text Pipeline");
 		}
 
-		device.destroy(vertModule);
-		device.destroy(fragModule);
+		device.Destroy(vertModule);
+		device.Destroy(fragModule);
 	}
 }
 
@@ -583,6 +600,7 @@ void Vk::GuiResourceManager::Init(
 	VmaAllocator vma,
 	u8 inFlightCount,
 	vk::RenderPass guiRenderPass,
+	Std::AllocRef const& transientAlloc,
 	DebugUtilsDispatch const* debugUtils)
 {
 	vk::Result vkResult{};
@@ -647,18 +665,21 @@ void Vk::GuiResourceManager::Init(
 		manager,
 		device,
 		guiRenderPass,
+		transientAlloc,
 		debugUtils);
 	
 	GuiResourceManagerImpl::CreateTextShader(
 		manager,
 		device,
 		guiRenderPass,
+		transientAlloc,
 		debugUtils);
 
 	GuiResourceManagerImpl::CreateViewportShader(
 		manager,
 		device,
 		guiRenderPass,
+		transientAlloc,
 		debugUtils);
 }
 
@@ -669,19 +690,19 @@ void Vk::GuiResourceManager::Update(
 	Std::Span<u32 const> guiIndices,
 	u8 inFlightIndex)
 {
-	DENGINE_DETAIL_GFX_ASSERT(inFlightIndex < globUtils.inFlightCount);
-	DENGINE_DETAIL_GFX_ASSERT(manager.vtxMappedMem.Size() % globUtils.inFlightCount == 0);
+	DENGINE_IMPL_GFX_ASSERT(inFlightIndex < globUtils.inFlightCount);
+	DENGINE_IMPL_GFX_ASSERT(manager.vtxMappedMem.Size() % globUtils.inFlightCount == 0);
 
 	uSize srcVtxDataSize = guiVertices.Size() * sizeof(decltype(guiVertices)::ValueType);
-	DENGINE_DETAIL_GFX_ASSERT(srcVtxDataSize <= manager.vtxInFlightCapacity);
+	DENGINE_IMPL_GFX_ASSERT(srcVtxDataSize <= manager.vtxInFlightCapacity);
 	std::memcpy(
 		manager.vtxMappedMem.Data() + manager.vtxInFlightCapacity * inFlightIndex,
 		guiVertices.Data(),
 		srcVtxDataSize);
 
-	DENGINE_DETAIL_GFX_ASSERT(manager.indexMappedMem.Size() % globUtils.inFlightCount == 0);
+	DENGINE_IMPL_GFX_ASSERT(manager.indexMappedMem.Size() % globUtils.inFlightCount == 0);
 	uSize srcIndexDataSize = guiIndices.Size() * sizeof(decltype(guiIndices)::ValueType);
-	DENGINE_DETAIL_GFX_ASSERT(srcIndexDataSize <= manager.indexInFlightCapacity);
+	DENGINE_IMPL_GFX_ASSERT(srcIndexDataSize <= manager.indexInFlightCapacity);
 	std::memcpy(
 		manager.indexMappedMem.Data() + manager.indexInFlightCapacity * inFlightIndex,
 		guiIndices.Data(),
@@ -896,8 +917,8 @@ void Vk::GuiResourceManager::NewFontTexture(
 		throw std::runtime_error("Unable to wait on fence after uploading glyph.");
 
 	vmaDestroyBuffer(globUtils.vma, (VkBuffer)tempBuffer, tempBufferVmaAlloc);
-	device.destroy(fence);
-	device.destroy(cmdPoolResult.value);
+	device.Destroy(fence);
+	device.Destroy(cmdPoolResult.value);
 
 	if (utfValue < lowUtfGlyphDatasSize)
 	{

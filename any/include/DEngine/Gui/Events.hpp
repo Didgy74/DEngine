@@ -9,7 +9,14 @@ namespace DEngine::Gui
 	{
 		WindowID windowId;
 		Extent extent;
-		Rect visibleRect;
+		Math::Vec2UInt safeAreaOffset;
+		Extent safeAreaExtent;
+	};
+
+	struct WindowFocusEvent
+	{
+		WindowID windowId;
+		bool gainedFocus;
 	};
 
 	struct WindowMoveEvent
@@ -29,14 +36,14 @@ namespace DEngine::Gui
 		WindowID windowId;
 	};
 
-	struct WindowCursorEnterEvent
+	struct WindowCursorExitEvent
 	{
 		WindowID windowId;
-		bool entered;
 	};
 
 	struct CursorMoveEvent
 	{
+		WindowID windowId;
 		Math::Vec2Int position;
 		Math::Vec2Int positionDelta;
 	};
@@ -47,14 +54,16 @@ namespace DEngine::Gui
 		Secondary,
 		COUNT
 	};
-	struct CursorClickEvent
+	struct CursorPressEvent
 	{
+		WindowID windowId;
 		CursorButton button;
-		bool clicked;
+		bool pressed;
 	};
 
 	struct TouchPressEvent
 	{
+		WindowID windowId;
 		u8 id;
 		Math::Vec2 position;
 		bool pressed;
@@ -62,16 +71,38 @@ namespace DEngine::Gui
 
 	struct TouchMoveEvent
 	{
+		WindowID windowId;
 		u8 id;
 		Math::Vec2 position;
 	};
 
-	struct CharEnterEvent {};
-
-	struct CharEvent
+	struct TextInputEvent
 	{
-		u32 utfValue;
+		WindowID windowId;
+
+		// The index of the substring that should be replaced
+		// This can be the end of the entire string, in which case
+		// string needs to grow.
+		//
+		// It is not legal for it to be more than 1 past the string-size.
+		uSize oldIndex;
+
+		// The size of the substring that should be replaced.
+		uSize oldCount;
+
+		// The new substring to insert.
+		// This may be a nullptr, in which case means the destination
+		// substring should be completely removed and replaced with nothing.
+		//
+		// This substring is NOT null-terminated
+		u32 const* newTextData;
+
+		// Size of the new substring to insert.
+		uSize newTextSize;
 	};
 
-	struct CharRemoveEvent {};
+	struct EndTextInputSessionEvent
+	{
+		WindowID windowId;
+	};
 }

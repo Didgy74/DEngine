@@ -19,7 +19,9 @@ namespace DEngine::Gfx
 		virtual void Draw(DrawParams const& drawParams) = 0;
 
 		// Needs to be thread-safe
-		virtual NativeWindowID NewNativeWindow(WsiInterface& wsiConnection) = 0;
+		virtual void NewNativeWindow(NativeWindowID windowId) = 0;
+		// Needs to be thread-safe
+		virtual void DeleteNativeWindow(NativeWindowID windowId) = 0;
 
 		// Needs to be thread-safe
 		virtual void NewViewport(ViewportID& viewportID) = 0;

@@ -1,42 +1,51 @@
 #include <DEngine/Gui/LineList.hpp>
+#include <DEngine/Gui/TextManager.hpp>
 
-#include <DEngine/Gui/Context.hpp>
-
-#include <DEngine/Math/Common.hpp>
-
-#include "ImplData.hpp"
+#include <DEngine/Std/Containers/Vec.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
 
 namespace DEngine::Gui::impl
 {
-	[[nodiscard]] static constexpr uSize LineList_GetFirstVisibleLine(
-		u32 lineHeight,
-		i32 widgetPosY,
-		i32 visiblePosY) noexcept
-	{
-		return static_cast<uSize>((visiblePosY - widgetPosY) / (f32)lineHeight);
-	}
-
-	[[nodiscard]] static constexpr uSize LineList_GetVisibleLineCount(
-		u32 lineHeight,
-		u32 visibleHeight) noexcept
-	{
-		return static_cast<uSize>(visibleHeight / (f32)lineHeight) + 2;
-	}
-
-	[[nodiscard]] static constexpr uSize LineList_GetLastVisibleLine(
+	[[nodiscard]] static uSize LineList_GetFirstVisibleLine(
 		u32 lineHeight,
 		i32 widgetPosY,
 		i32 visiblePosY,
-		u32 visibleHeight) noexcept
+		uSize linecount) noexcept
 	{
-		uSize const visibleBegin = impl::LineList_GetFirstVisibleLine(lineHeight, widgetPosY, visiblePosY);
-		return visibleBegin + impl::LineList_GetVisibleLineCount(lineHeight, visibleHeight);
+		auto temp = visiblePosY - widgetPosY;
+		auto b = (uSize)Math::Floor((f32)temp / (f32)lineHeight);
+		DENGINE_IMPL_ASSERT(b >= 0);
+		b = Math::Min(linecount, b);
+		return b;
 	}
 
-	[[nodiscard]] static constexpr Rect GetLineRect(
+	[[nodiscard]] static uSize LineList_GetVisibleLineCount(
+		u32 lineHeight,
+		u32 visibleHeight) noexcept
+	{
+		return (uSize)Math::Ceil((f32)visibleHeight / (f32)lineHeight);
+	}
+
+	[[nodiscard]] static uSize LineList_GetLastVisibleLine(
+		u32 lineHeight,
+		i32 widgetPosY,
+		i32 visiblePosY,
+		u32 visibleHeight,
+		uSize linecount) noexcept
+	{
+		uSize const visibleBegin = impl::LineList_GetFirstVisibleLine(
+			lineHeight,
+			widgetPosY,
+			visiblePosY,
+			linecount);
+		auto temp = visibleBegin + impl::LineList_GetVisibleLineCount(lineHeight, visibleHeight);
+		temp = Math::Min(linecount, temp);
+		return temp;
+	}
+
+	[[nodiscard]] static Rect GetLineRect(
 		Math::Vec2Int widgetPosition,
 		u32 widgetWidth,
 		u32 lineHeight,
@@ -50,7 +59,7 @@ namespace DEngine::Gui::impl
 		return returnVal;
 	}
 
-	[[nodiscard]] static constexpr uSize GetHoveredIndex(
+	[[nodiscard]] static uSize GetHoveredIndex(
 		i32 pointerPosY,
 		i32 widgetPosY,
 		u32 lineHeight) noexcept
@@ -60,6 +69,49 @@ namespace DEngine::Gui::impl
 		DENGINE_IMPL_GUI_ASSERT(hoveredIndex >= 0);
 		return hoveredIndex;
 	}
+}
+
+void LineList::RemoveLine(uSize index)
+{
+	DENGINE_IMPL_GUI_ASSERT(index < lines.size());
+
+	lines.erase(lines.begin() + index);
+	if (selectedLine.HasValue())
+	{
+		if (selectedLine.Value() == index)
+		{
+			selectedLine = Std::nullOpt;
+			if (selectedLineChangedFn)
+				selectedLineChangedFn(*this, nullptr);
+		}
+		else if (selectedLine.Value() < index)
+		{
+			selectedLine.Value() -= 1;
+			if (selectedLineChangedFn)
+				selectedLineChangedFn(*this, nullptr);
+		}
+	}
+}
+
+struct LineList::Impl
+{
+	// A reference for the serialized struct we use.
+	struct CustomData
+	{
+		explicit CustomData(RectCollection::AllocRefT const& alloc) noexcept :
+			lineGlyphRects{ alloc },
+			lineGlyphRectOffsets{ alloc}
+		{
+		}
+
+		// Does NOT include any margins.
+		u32 lineHeight = {};
+
+		// Only included when we are rendering
+		Std::Vec<Rect, RectCollection::AllocRefT> lineGlyphRects;
+		Std::Vec<uSize, RectCollection::AllocRefT> lineGlyphRectOffsets;
+	};
+
 
 	static constexpr u8 cursorPointerId = (u8)-1;
 
@@ -76,7 +128,7 @@ namespace DEngine::Gui::impl
 		return {};
 	}
 
-	struct PointerPressEvent
+	struct PointerPress_Pointer
 	{
 		u8 id;
 		PointerType type;
@@ -84,296 +136,166 @@ namespace DEngine::Gui::impl
 		bool pressed;
 	};
 
+	struct PointerPress_Params
+	{
+		Context& ctx;
+		LineList& widget;
+		RectCollection const& rectCollection;
+		TextManager& textManager;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
+		PointerPress_Pointer const& pointer;
+		bool eventConsumed;
+	};
+
+	struct PointerMove_Pointer
+	{
+		u8 id;
+		Math::Vec2 pos;
+	};
 	struct PointerMove_Params
 	{
-		LineList* widget = nullptr;
-		Context* ctx = nullptr;
-		Rect const* widgetRect = nullptr;
-		Rect const* visibleRect = nullptr;
-		u8 pointerId = 0;
-		Math::Vec2 pointerPos = {};
-		bool pointerOccluded = false;
+		LineList& widget;
+		RectCollection const& rectCollection;
+		TextManager& textManager;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
+		PointerMove_Pointer const& pointer;
+		bool pointerOccluded;
 	};
-}
 
-class [[maybe_unused]] impl::LineListImpl
-{
-public:
 	[[nodiscard]] static bool PointerPress(
-		LineList& widget,
-		Context& ctx,
-		Rect const& widgetRect,
-		Rect const& visibleRect,
-		PointerPressEvent const& pointer)
-	{
-		bool pressConsumed = false;
-
-		auto const pointerInside =
-			widgetRect.PointIsInside(pointer.pos) &&
-			visibleRect.PointIsInside(pointer.pos);
-
-		if (pointerInside)
-			pressConsumed = true;
-
-		if (pointer.type != PointerType::Primary)
-			return pointerInside;
-
-		auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-		auto const textHeight = implData.textManager.lineheight;
-		auto const lineHeight = textHeight + (widget.textMargin * 2);
-
-		// We are not currently pressing a line, check if we hit a new line
-		auto const hoveredIndex = impl::GetHoveredIndex(
-			(i32)pointer.pos.y,
-			widgetRect.position.y,
-			lineHeight);
-
-		if (widget.currPressedLine.HasValue())
-		{
-			auto const pressedLine = widget.currPressedLine.Value();
-			if (!pointer.pressed && pressedLine.pointerId == pointer.id)
-			{
-				widget.currPressedLine = Std::nullOpt;
-
-				bool selectedLineChanged = false;
-				if (pressedLine.lineIndex.HasValue())
-				{
-					// We are currently holding an existing line.
-					// Check if we unpressed that same line
-					auto const lineIndex = pressedLine.lineIndex.Value();
-					if (lineIndex == hoveredIndex)
-					{
-						widget.selectedLine = lineIndex;
-						selectedLineChanged = true;
-					}
-				}
-				else
-				{
-					// We were currently not holding a line
-					// Check if we unpressed outside any lines
-					if (hoveredIndex >= widget.lines.size())
-					{
-						widget.selectedLine = Std::nullOpt;
-						selectedLineChanged = true;
-					}
-				}
-
-				if (selectedLineChanged && widget.selectedLineChangedFn)
-					widget.selectedLineChangedFn(widget);
-			}
-		}
-		else
-		{
-			if (pointer.pressed && pointerInside)
-			{
-				// We don't want to go into pressed state if we
-				// pressed a line that is already selected.
-				auto const hoveringSelectingLine =
-					widget.selectedLine.HasValue() &&
-					widget.selectedLine.Value() == hoveredIndex;
-				if (!hoveringSelectingLine)
-				{
-					// We did not press a line that is already selected.
-					LineList::PressedLine_T newPressedLine = {};
-					newPressedLine.pointerId = pointer.id;
-					if (hoveredIndex < widget.lines.size())
-						newPressedLine.lineIndex = hoveredIndex;
-					else
-						newPressedLine.lineIndex = Std::nullOpt;
-					widget.currPressedLine = newPressedLine;
-				}
-			}
-		}
-
-		return pressConsumed;
-	}
+		PointerPress_Params const& params);
 
 	[[nodiscard]] static bool PointerMove(
-		PointerMove_Params const& params) noexcept
-	{
-		auto& widget = *params.widget;
-		auto& ctx = *params.ctx;
-		auto& widgetRect = *params.widgetRect;
-		auto& visibleRect = *params.visibleRect;
-
-		auto const pointerInside =
-			widgetRect.PointIsInside(params.pointerPos) &&
-			visibleRect.PointIsInside(params.pointerPos);
-
-		auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-		auto const textHeight = implData.textManager.lineheight;
-		auto const lineHeight = textHeight + (widget.textMargin * 2);
-
-		if (params.pointerId == cursorPointerId)
-		{
-			if (!pointerInside || params.pointerOccluded)
-				widget.lineCursorHover = Std::nullOpt;
-			else
-			{
-				auto const hoveredIndex = impl::GetHoveredIndex(
-					(i32)params.pointerPos.y,
-					widgetRect.position.y,
-					lineHeight);
-				if (hoveredIndex < widget.lines.size())
-					widget.lineCursorHover = hoveredIndex;
-				else
-					widget.lineCursorHover = Std::nullOpt;
-			}
-		}
-
-		return pointerInside;
-	}
+		PointerMove_Params const& params);
 };
 
-void LineList::RemoveLine(uSize index)
+SizeHint LineList::GetSizeHint2(
+	Widget::GetSizeHint2_Params const& params) const
 {
-	DENGINE_IMPL_GUI_ASSERT(index < lines.size());
+	auto& pusher = params.pusher;
+	auto& transientAlloc = params.transientAlloc;
+	auto& textManager = params.textManager;
 
-	lines.erase(lines.begin() + index);
-	if (selectedLine.HasValue())
+	auto const& pusherIt = pusher.AddEntry(*this);
+
+	auto customData = Impl::CustomData{ pusher.Alloc() };
+	customData.lineHeight = textManager.GetLineheight();
+
+	SizeHint returnValue = {};
+	returnValue.minimum.width = 100;
+	returnValue.minimum.height = customData.lineHeight * lines.size();
+	returnValue.minimum.height += textMargin * 2 * lines.size();
+
+	pusher.AttachCustomData(pusherIt, Std::Move(customData));
+	pusher.SetSizeHint(pusherIt, returnValue);
+
+	return returnValue;
+}
+
+void LineList::BuildChildRects(
+	Widget::BuildChildRects_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	auto& pusher = params.pusher;
+	auto& textManager = params.textManager;
+
+	if (pusher.IncludeRendering())
 	{
-		if (selectedLine.Value() == index)
-		{
-			selectedLine = Std::nullOpt;
-			if (selectedLineChangedFn)
-				selectedLineChangedFn(*this);
+		auto* customDataPtr = pusher.GetCustomData2<Impl::CustomData>(*this);
+		DENGINE_IMPL_ASSERT(customDataPtr);
+		auto& customData = *customDataPtr;
+
+		auto const totalLineHeight = customData.lineHeight + textMargin * 2;
+		auto const linecount = (int)lines.size();
+
+		auto visibleBegin = (int)impl::LineList_GetFirstVisibleLine(
+			totalLineHeight,
+			widgetRect.position.y,
+			visibleRect.position.y,
+			linecount);
+		auto visibleEnd = (int)impl::LineList_GetLastVisibleLine(
+			totalLineHeight,
+			widgetRect.position.y,
+			visibleRect.position.y,
+			visibleRect.extent.height,
+			linecount);
+
+		// First count up the total amount of Rects we need
+		auto const visibleLineCount = visibleEnd - visibleBegin;
+
+		customData.lineGlyphRectOffsets.Resize(visibleLineCount);
+		uSize rectCount = 0;
+		for (int i = 0; i < visibleLineCount; i += 1) {
+			customData.lineGlyphRectOffsets[i] = rectCount;
+			auto const lineIndex = i + visibleBegin;
+			rectCount += lines[lineIndex].size();
 		}
-		else if (selectedLine.Value() < index)
+
+		// Then allocate the space we need for these rects, and load into them.
+		customData.lineGlyphRects.Resize(rectCount);
+		for (int i = 0; i < visibleLineCount; i += 1)
 		{
-			selectedLine.Value() -= 1;
-			if (selectedLineChangedFn)
-				selectedLineChangedFn(*this);
+			auto const lineIndex = i + visibleBegin;
+
+			auto posOffset = widgetRect.position;
+			posOffset.y += (i32)totalLineHeight * lineIndex;
+			posOffset.x += (i32)textMargin;
+			posOffset.y += (i32)textMargin;
+
+			auto const& line = lines[lineIndex];
+			auto const lineGlyphRectOffset = customData.lineGlyphRectOffsets[i];
+			auto* lineGlyphRects = &customData.lineGlyphRects[lineGlyphRectOffset];
+
+			textManager.GetOuterExtent(
+				{ line.data(), line.size() },
+				posOffset,
+				lineGlyphRects);
 		}
 	}
 }
 
-SizeHint LineList::GetSizeHint(Context const& ctx) const
-{
-	auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-	auto const textHeight = implData.textManager.lineheight;
-	auto const lineHeight = textHeight + (textMargin * 2);
-	SizeHint returnVal = {};
-	returnVal.preferred.height = lineHeight * lines.size();
-	for (auto const& line : lines)
-	{
-		auto const sizeHint = impl::TextManager::GetSizeHint(
-			implData.textManager, 
-			{ line.data(), line.size() });
-		returnVal.preferred.width = Math::Max(
-			returnVal.preferred.width,
-			sizeHint.preferred.width);
-	}
-	return returnVal;
-}
-
-bool LineList::CursorMove(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	CursorMoveEvent event,
-	bool occluded)
-{
-	impl::PointerMove_Params params = {};
-	params.widget = this;
-	params.ctx = &ctx;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
-	params.pointerId = impl::cursorPointerId;
-	params.pointerPos = { (f32)event.position.x, (f32)event.position.y };
-	params.pointerOccluded = occluded;
-
-	return impl::LineListImpl::PointerMove(params);
-}
-
-bool LineList::CursorPress(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Math::Vec2Int cursorPos,
-	CursorClickEvent event)
-{
-	impl::PointerPressEvent pointer = {};
-	pointer.id = impl::cursorPointerId;
-	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	pointer.pressed = event.clicked;
-	pointer.type = impl::ToPointerType(event.button);
-	return impl::LineListImpl::PointerPress(
-		*this,
-		ctx,
-		widgetRect,
-		visibleRect,
-		pointer);
-}
-
-bool LineList::TouchMoveEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchMoveEvent event,
-	bool occluded)
-{
-	impl::PointerMove_Params params = {};
-	params.widget = this;
-	params.ctx = &ctx;
-	params.widgetRect = &widgetRect;
-	params.visibleRect = &visibleRect;
-	params.pointerId = event.id;
-	params.pointerPos = event.position;
-	params.pointerOccluded = occluded;
-
-	return impl::LineListImpl::PointerMove(params);
-}
-
-bool LineList::TouchPressEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchPressEvent event)
-{
-	impl::PointerPressEvent pointer = {};
-	pointer.id = event.id;
-	pointer.pos = event.position;
-	pointer.pressed = event.pressed;
-	pointer.type = impl::PointerType::Primary;
-	return impl::LineListImpl::PointerPress(
-		*this,
-		ctx,
-		widgetRect,
-		visibleRect,
-		pointer);
-}
-
-void LineList::Render(
-	Context const& ctx,
-	Extent framebufferExtent,
-	Rect widgetRect,
-	Rect visibleRect,
-	DrawInfo& drawInfo) const
+void LineList::Render2(
+	Widget::Render_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
 {
 	if (Rect::Intersection(widgetRect, visibleRect).IsNothing())
 		return;
 
-	impl::ImplData& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
+	auto& rectCollection = params.rectCollection;
+	auto& drawInfo = params.drawInfo;
 
-	auto const textHeight = implData.textManager.lineheight;
-	auto const lineHeight = textHeight + (textMargin * 2);
-	uSize const visibleBegin = impl::LineList_GetFirstVisibleLine(lineHeight, widgetRect.position.y, visibleRect.position.y);
-	uSize const visibleEnd = impl::LineList_GetLastVisibleLine(
-		lineHeight,
+	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
+	DENGINE_IMPL_ASSERT(customDataPtr);
+	auto const& customData = *customDataPtr;
+
+	auto const totalLineHeight = customData.lineHeight + textMargin * 2;
+
+	auto const linecount = lines.size();
+
+	auto const visibleBegin = impl::LineList_GetFirstVisibleLine(
+		totalLineHeight,
 		widgetRect.position.y,
 		visibleRect.position.y,
-		visibleRect.extent.height);
+		linecount);
+	auto const visibleEnd = impl::LineList_GetLastVisibleLine(
+		totalLineHeight,
+		widgetRect.position.y,
+		visibleRect.position.y,
+		visibleRect.extent.height,
+		linecount);
+
+	auto const visibleLineCount = visibleEnd - visibleBegin;
 
 	for (uSize i = visibleBegin; i < visibleEnd; i += 1)
 	{
 		auto const lineRect = impl::GetLineRect(
 			widgetRect.position,
 			widgetRect.extent.width,
-			lineHeight,
+			totalLineHeight,
 			i);
 
 		if (selectedLine.HasValue() && selectedLine.Value() == i)
@@ -390,22 +312,247 @@ void LineList::Render(
 		}
 	}
 
-	for (uSize i = visibleBegin; i < Math::Min(visibleEnd, lines.size()); i++)
+	for (uSize i = 0; i < visibleLineCount; i++)
 	{
-		auto textRect = impl::GetLineRect(
-			widgetRect.position,
-			widgetRect.extent.height,
-			lineHeight,
-			i);
-		textRect.position.x += textMargin;
-		textRect.position.y += textMargin;
+		auto const lineIndex = i + visibleBegin;
+		auto& line = lines[lineIndex];
+		auto const lineRectOffset = customData.lineGlyphRectOffsets[i];
+		auto const* lineRects = &customData.lineGlyphRects[lineRectOffset];
 
-		auto& line = lines[i];
-		impl::TextManager::RenderText(
-			implData.textManager,
+		drawInfo.PushText(
 			{ line.data(), line.size() },
-			{ 1.f, 1.f, 1.f, 1.f },
-			textRect,
-			drawInfo);
+			lineRects,
+			{ 1.f, 1.f, 1.f, 1.f });
 	}
+}
+
+bool LineList::Impl::PointerPress(
+	PointerPress_Params const& params)
+{
+	auto& ctx = params.ctx;
+	auto& widget = params.widget;
+	auto& rectCollection = params.rectCollection;
+	auto& widgetRect = params.widgetRect;
+	auto& visibleRect = params.visibleRect;
+	auto& pointer = params.pointer;
+
+	auto newConsumed = params.eventConsumed;
+
+	if (pointer.type != PointerType::Primary)
+		return newConsumed;
+
+	auto const pointerInside =
+		widgetRect.PointIsInside(pointer.pos) &&
+		visibleRect.PointIsInside(pointer.pos);
+	newConsumed = newConsumed || pointerInside;
+
+	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(widget);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+	auto const& customData = *customDataPtr;
+
+	auto const totalLineHeight = customData.lineHeight + widget.textMargin * 2;
+
+	auto const hoveredIndex = impl::GetHoveredIndex(
+		(i32)pointer.pos.y,
+		widgetRect.position.y,
+		totalLineHeight);
+
+	if (widget.currPressedLine.HasValue())
+	{
+		auto const pressedLine = widget.currPressedLine.Value();
+		if (!pointer.pressed && pressedLine.pointerId == pointer.id)
+		{
+			widget.currPressedLine = Std::nullOpt;
+
+			bool selectedLineChanged = false;
+			if (pressedLine.lineIndex.HasValue())
+			{
+				// We are currently holding an existing line.
+				// Check if we unpressed that same line
+				auto const lineIndex = pressedLine.lineIndex.Value();
+				if (lineIndex == hoveredIndex)
+				{
+					widget.selectedLine = lineIndex;
+					selectedLineChanged = true;
+				}
+			}
+			else
+			{
+				// We were currently not holding a line
+				// Check if we unpressed outside any lines
+				if (hoveredIndex >= widget.lines.size())
+				{
+					widget.selectedLine = Std::nullOpt;
+					selectedLineChanged = true;
+				}
+			}
+
+			if (selectedLineChanged && widget.selectedLineChangedFn)
+				widget.selectedLineChangedFn(widget, &ctx);
+		}
+	}
+	else
+	{
+		// We are not currently pressing a line, check if we hit a new line
+		// on the event if it was not already consumed
+		if (pointer.pressed && pointerInside && !params.eventConsumed)
+		{
+			// We don't want to go into pressed state if we
+			// pressed a line that is already selected.
+			auto const hoveringSelectingLine =
+				widget.selectedLine.HasValue() &&
+				widget.selectedLine.Value() == hoveredIndex;
+			if (!hoveringSelectingLine)
+			{
+				// We did not press a line that is already selected.
+				LineList::PressedLine_T newPressedLine = {};
+				newPressedLine.pointerId = pointer.id;
+				if (hoveredIndex < widget.lines.size())
+					newPressedLine.lineIndex = hoveredIndex;
+				else
+					newPressedLine.lineIndex = Std::nullOpt;
+				widget.currPressedLine = newPressedLine;
+			}
+		}
+	}
+
+	return newConsumed;
+}
+
+bool LineList::Impl::PointerMove(
+	PointerMove_Params const& params)
+{
+	auto& widget = params.widget;
+	auto const& rectCollection = params.rectCollection;
+	auto const& widgetRect = params.widgetRect;
+	auto const& visibleRect = params.visibleRect;
+	auto const& pointer = params.pointer;
+
+	auto newOccluded = params.pointerOccluded;
+
+	auto const pointerInside =
+		widgetRect.PointIsInside(pointer.pos) &&
+		visibleRect.PointIsInside(pointer.pos);
+
+	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(widget);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+	auto const& customData = *customDataPtr;
+
+	auto const totalLineHeight = customData.lineHeight + widget.textMargin * 2;
+
+	if (pointer.id == cursorPointerId)
+	{
+		if (!pointerInside || params.pointerOccluded)
+			widget.lineCursorHover = Std::nullOpt;
+		else
+		{
+			auto const hoveredIndex = impl::GetHoveredIndex(
+				(i32)pointer.pos.y,
+				widgetRect.position.y,
+				totalLineHeight);
+			if (hoveredIndex < widget.lines.size())
+				widget.lineCursorHover = hoveredIndex;
+			else
+				widget.lineCursorHover = Std::nullOpt;
+		}
+	}
+
+	newOccluded = newOccluded || pointerInside;
+
+	return newOccluded;
+}
+
+bool LineList::CursorPress2(
+	Widget::CursorPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.id = Impl::cursorPointerId;
+	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	pointer.type = Impl::ToPointerType(params.event.button);
+	pointer.pressed = params.event.pressed;
+
+	Impl::PointerPress_Params temp = {
+		.ctx = params.ctx,
+		.widget = *this,
+		.rectCollection = params.rectCollection,
+		.textManager = params.textManager,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.eventConsumed = consumed };
+	return Impl::PointerPress(temp);
+}
+
+bool LineList::CursorMove(
+	Widget::CursorMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	Impl::PointerMove_Pointer pointer = {};
+	pointer.id = Impl::cursorPointerId;
+	pointer.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
+
+	Impl::PointerMove_Params temp = {
+		.widget = *this,
+		.rectCollection = params.rectCollection,
+		.textManager = params.textManager,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.pointerOccluded = occluded };
+	return Impl::PointerMove(temp);
+}
+
+bool LineList::TouchMove2(
+	TouchMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool occluded)
+{
+	Impl::PointerMove_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+
+	Impl::PointerMove_Params temp = {
+		.widget = *this,
+		.rectCollection = params.rectCollection,
+		.textManager = params.textManager,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.pointerOccluded = occluded };
+	return Impl::PointerMove(temp);
+}
+
+bool LineList::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
+{
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.type = Impl::PointerType::Primary;
+	pointer.pressed = params.event.pressed;
+
+	Impl::PointerPress_Params temp = {
+		.ctx = params.ctx,
+		.widget = *this,
+		.rectCollection = params.rectCollection,
+		.textManager = params.textManager,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.eventConsumed = consumed };
+	return Impl::PointerPress(temp);
+}
+
+void LineList::CursorExit(Context& ctx)
+{
+	lineCursorHover = Std::nullOpt;
 }

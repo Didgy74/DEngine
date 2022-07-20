@@ -12,9 +12,173 @@ using namespace DEngine;
 using namespace DEngine::Gfx;
 using namespace DEngine::Gfx::Vk;
 
-namespace DEngine::Gfx::Vk::DeletionQueueImpl
+namespace DEngine::Gfx::Vk::impl
 {
 	constexpr uSize customDataAlignment = sizeof(u64);
+
+	class DeletionQueueImpl
+	{
+	public:
+		static void FlushQueue(
+			DeletionQueue::InFlightQueue& queue,
+			GlobUtils const& globUtils)
+		{
+			DENGINE_IMPL_GFX_ASSERT((uSize)queue.customData.data() % customDataAlignment == 0);
+			for (auto const& item : queue.jobs)
+			{
+				item.callback(
+					globUtils,
+					{ queue.customData.data() + item.dataOffset, item.dataSize });
+			}
+			queue.jobs.clear();
+			queue.customData.clear();
+		}
+
+		static void FlushFencedQueue(
+			DeletionQueue::FencedJobQueue& currQueue,
+			DeletionQueue::FencedJobQueue& nextQueue,
+			GlobUtils const& globUtils)
+		{
+			DENGINE_IMPL_GFX_ASSERT(&currQueue != &nextQueue);
+
+			// We go over the fenced-jobs planned for this tick.
+			// For any fence that is not yet signalled: The fence, the job it's tied to and
+			// its custom-data will be pushed to the next tick.
+			for (auto const& item : currQueue.jobs)
+			{
+				vk::Result waitResult = globUtils.device.getFenceStatus(item.fence);
+				if (waitResult == vk::Result::eSuccess)
+				{
+					// Fence is ready, execute the job and delete the fence.
+					item.job.callback(
+						globUtils,
+						{ currQueue.customData.data() + item.job.dataOffset, item.job.dataSize });
+					globUtils.device.Destroy(item.fence);
+				}
+				else if (waitResult == vk::Result::eNotReady)
+				{
+					// Fence not ready, we push the job to the next tick.
+					DeletionQueue::FencedJob newJob;
+					newJob.fence = item.fence;
+					newJob.job.callback = item.job.callback;
+					newJob.job.dataOffset = nextQueue.customData.size();
+					newJob.job.dataSize = item.job.dataSize;
+					nextQueue.jobs.push_back(newJob);
+
+					// Then we pad to align to 8 bytes.
+					uSize addSize = Math::CeilToMultiple((u64)newJob.job.dataSize, (u64)customDataAlignment);
+
+					nextQueue.customData.resize(nextQueue.customData.size() + addSize);
+
+					// Copy the custom data
+					std::memcpy(
+						nextQueue.customData.data() + newJob.job.dataOffset,
+						currQueue.customData.data() + item.job.dataOffset,
+						newJob.job.dataSize);
+				}
+				else
+				{
+					// If we got any other result, it' an error
+					throw std::runtime_error("DEngine - Vulkan: Deletion queue encountered invalid "
+											 "VkResult value when waiting for fence of fenced job.");
+				}
+			}
+			currQueue.jobs.clear();
+			currQueue.customData.clear();
+		}
+
+		static void FlushFencedQueue_All(
+			DeletionQueue::FencedJobQueue& queue,
+			GlobUtils const& globUtils)
+		{
+			for (auto const& item : queue.jobs)
+			{
+				vk::Result waitResult = globUtils.device.getFenceStatus(item.fence);
+				if (waitResult == vk::Result::eSuccess)
+				{
+					// Fence is ready, execute the job and delete the fence.
+					item.job.callback(
+						globUtils,
+						{ queue.customData.data() + item.job.dataOffset, item.job.dataSize });
+					globUtils.device.Destroy(item.fence);
+				}
+				else
+					DENGINE_IMPL_GFX_UNREACHABLE();
+			}
+
+			queue.jobs.clear();
+			queue.customData.clear();
+		}
+
+		template<typename T>
+		static inline void DestroyInstanceLevelHandle(
+			DeletionQueue& queue,
+			T in)
+		{
+			DENGINE_IMPL_GFX_ASSERT(in != T{});
+
+			using CType = typename T::CType;
+			DeletionQueue::CallbackPFN callback = [](GlobUtils const& globUtils, Std::Span<char const> customData)
+			{
+				DENGINE_IMPL_GFX_ASSERT(!customData.Empty());
+				DENGINE_IMPL_GFX_ASSERT(customData.Size() == sizeof(CType));
+				DENGINE_IMPL_GFX_ASSERT((std::intptr_t)(customData.Data()) % alignof(CType) == 0);
+				CType cHandle = *reinterpret_cast<CType const*>(customData.Data());
+				globUtils.instance.Destroy((T)cHandle);
+			};
+
+			auto const cHandle = (CType)in;
+			Std::Span span = { &cHandle, 1 };
+			queue.Destroy(callback, span.ToConstByteSpan());
+		}
+
+		template<typename T>
+		static inline void DestroyDeviceLevelHandle(
+			DeletionQueue& queue,
+			T in)
+		{
+			DENGINE_IMPL_GFX_ASSERT(in != T{});
+
+			using CType = typename T::CType;
+
+			DeletionQueue::CallbackPFN callback = [](GlobUtils const& globUtils, Std::Span<char const> customData)
+			{
+				DENGINE_IMPL_GFX_ASSERT(!customData.Empty());
+				DENGINE_IMPL_GFX_ASSERT(customData.Size() == sizeof(CType));
+				DENGINE_IMPL_GFX_ASSERT((std::intptr_t)(customData.Data()) % alignof(CType) == 0);
+				CType cHandle = *reinterpret_cast<CType const*>(customData.Data());
+				globUtils.device.Destroy((T)cHandle);
+			};
+
+			auto const cHandle = (CType)in;
+			Std::Span span = { &cHandle, 1 };
+			queue.Destroy(callback, span.ToConstByteSpan());
+		}
+
+		template<class T>
+		static void DestroyDeviceLevelHandle(
+			DeletionQueue& queue,
+			vk::Fence fence,
+			T in)
+		{
+			DENGINE_IMPL_GFX_ASSERT(in != T{});
+
+			using CType = typename T::CType;
+
+			DeletionQueue::CallbackPFN callback = [](GlobUtils const& globUtils, Std::Span<char const> customData)
+			{
+				DENGINE_IMPL_GFX_ASSERT(!customData.Empty());
+				DENGINE_IMPL_GFX_ASSERT(customData.Size() == sizeof(CType));
+				DENGINE_IMPL_GFX_ASSERT((std::intptr_t)(customData.Data()) % alignof(CType) == 0);
+				CType cHandle = *reinterpret_cast<CType const*>(customData.Data());
+				globUtils.device.Destroy((T)cHandle);
+			};
+
+			auto const cHandle = (CType)in;
+			Std::Span span = { &cHandle, 1 };
+			queue.Destroy(fence, callback, span.ToConstByteSpan());
+		}
+	};
 }
 
 bool DeletionQueue::Init(DeletionQueue& delQueue, u8 resourceSetCount)
@@ -29,20 +193,10 @@ void DeletionQueue::ExecuteTick(
 	GlobUtils const& globUtils, 
 	u8 currentInFlightIndex)
 {
-	std::lock_guard lockGuard{ queue.accessMutex };
-	
 	{
 		// First we execute all the deletion-job planned for this tick
 		auto& currentQueue = queue.jobQueues[currentInFlightIndex];
-		DENGINE_DETAIL_GFX_ASSERT((uSize)currentQueue.customData.data() % DeletionQueueImpl::customDataAlignment == 0);
-		for (auto const& item : currentQueue.jobs)
-		{
-			item.callback(
-				globUtils,
-				{ currentQueue.customData.data() + item.dataOffset, item.dataSize });
-		}
-		currentQueue.jobs.clear();
-		currentQueue.customData.clear();
+		impl::DeletionQueueImpl::FlushQueue(currentQueue, globUtils);
 		// Then we switch out the active queue with the temporary one
 		// This is to make sure we defer deletion-jobs to the next time we
 		// hit this resourceSetIndex. If we didn't do it, we would immediately
@@ -50,71 +204,44 @@ void DeletionQueue::ExecuteTick(
 		std::swap(currentQueue, queue.tempQueue);
 	}
 
+	int nextFencedQueueIndex = (queue.currFencedJobQueueIndex + 1) % DeletionQueue::fencedJobQueueCount;
 	{
-		// We go over the fenced-jobs planned for this tick.
-		// For any fence that is not yet signalled: The fence, the job it's tied to and
-		// it's custom-data will be pushed to the next tick.
-		auto& currentQueue = queue.fencedJobQueues[queue.currFencedJobQueueIndex];
-		for (auto const& item : currentQueue.jobs)
-		{
-			vk::Result waitResult = globUtils.device.getFenceStatus(item.fence);
-			if (waitResult == vk::Result::eSuccess)
-			{
-				// Fence is ready, execute the job and delete the fence.
-				item.job.callback(
-					globUtils, 
-					{ currentQueue.customData.data() + item.job.dataOffset, item.job.dataSize });
-				globUtils.device.destroy(item.fence);
-			}
-			else if (waitResult == vk::Result::eNotReady)
-			{
-				// Fence not ready, we push the job to the next tick.
-				auto& nextQueue = queue.fencedJobQueues[!queue.currFencedJobQueueIndex];
-
-				FencedJob newJob{};
-				newJob.fence = item.fence;
-				newJob.job.callback = item.job.callback;
-				newJob.job.dataOffset = nextQueue.customData.size();
-				newJob.job.dataSize = item.job.dataSize;
-				nextQueue.jobs.push_back(newJob);
-
-				// Then we pad to align to 8 bytes.
-				uSize addSize = Math::CeilToMultiple(newJob.job.dataSize, DeletionQueueImpl::customDataAlignment);
-
-				nextQueue.customData.resize(nextQueue.customData.size() + addSize);
-
-				// Copy the custom data
-				std::memcpy(
-					nextQueue.customData.data() + newJob.job.dataOffset,
-					currentQueue.customData.data() + item.job.dataOffset,
-					newJob.job.dataSize);
-			}
-			else
-			{
-				// If we got any other result, it' an error
-				throw std::runtime_error("DEngine - Vulkan: Deletion queue encountered invalid "
-										 "VkResult value when waiting for fence of fenced job.");
-			}
-		}
-		currentQueue.jobs.clear();
-		currentQueue.customData.clear();
+		impl::DeletionQueueImpl::FlushFencedQueue(
+			queue.fencedJobQueues[queue.currFencedJobQueueIndex],
+			queue.fencedJobQueues[nextFencedQueueIndex],
+			globUtils);
 	}
-
-	queue.currFencedJobQueueIndex = !queue.currFencedJobQueueIndex;
+	queue.currFencedJobQueueIndex = nextFencedQueueIndex;
 }
 
-void Vk::DeletionQueue::Destroy(VmaAllocation vmaAlloc, vk::Image img) const
+void DeletionQueue::FlushAllJobs(
+	DeletionQueue& queue,
+	GlobUtils const& globUtils)
 {
-	DENGINE_DETAIL_GFX_ASSERT(vmaAlloc != nullptr);
+	for (int i = 0; i < queue.jobQueues.Size(); i += 1)
+	{
+		auto& innerQueue = queue.jobQueues[i];
+		impl::DeletionQueueImpl::FlushQueue(innerQueue, globUtils);
+	}
+
+	for (int i = 0; i < DeletionQueue::fencedJobQueueCount; i += 1)
+	{
+		auto& innerQueue = queue.fencedJobQueues[i];
+		impl::DeletionQueueImpl::FlushFencedQueue_All(innerQueue, globUtils);
+	}
+}
+
+void Vk::DeletionQueue::Destroy(VmaAllocation vmaAlloc, vk::Image img)
+{
+	DENGINE_IMPL_GFX_ASSERT(vmaAlloc != nullptr);
+	DENGINE_IMPL_GFX_ASSERT(img != vk::Image{});
 	struct Data
 	{
-		VmaAllocation alloc{};
-		vk::Image img{};
+		VmaAllocation alloc;
+		VkImage img;
 	};
-	Data source{};
-	source.alloc = vmaAlloc;
-	source.img = img;
-	TestCallback<Data> callback = [](GlobUtils const& globUtils, Data source)
+	Data source { vmaAlloc, (VkImage)img };
+	TestCallback<Data> callback = [](GlobUtils const& globUtils, Data const& source)
 	{
 		vmaDestroyImage(globUtils.vma, static_cast<VkImage>(source.img), source.alloc);
 	};
@@ -122,20 +249,19 @@ void Vk::DeletionQueue::Destroy(VmaAllocation vmaAlloc, vk::Image img) const
 	DestroyTest(callback, source);
 }
 
-void DeletionQueue::Destroy(VmaAllocation vmaAlloc, vk::Buffer buff) const
+void DeletionQueue::Destroy(VmaAllocation vmaAlloc, vk::Buffer buffer)
 {
-	DENGINE_DETAIL_GFX_ASSERT(vmaAlloc != nullptr);
+	DENGINE_IMPL_GFX_ASSERT(vmaAlloc != nullptr);
+	DENGINE_IMPL_GFX_ASSERT(buffer != vk::Buffer{});
 	struct Data
 	{
-		VmaAllocation alloc{};
-		vk::Buffer buff{};
+		VmaAllocation alloc;
+		VkBuffer buffer;
 	};
-	Data source{};
-	source.alloc = vmaAlloc;
-	source.buff = buff;
-	TestCallback<Data> callback = [](GlobUtils const& globUtils, Data source)
+	Data source { vmaAlloc, (VkBuffer)buffer };
+	TestCallback<Data> callback = [](GlobUtils const& globUtils, Data const& source)
 	{
-		vmaDestroyBuffer(globUtils.vma, static_cast<VkBuffer>(source.buff), source.alloc);
+		vmaDestroyBuffer(globUtils.vma, (VkBuffer)source.buffer, source.alloc);
 	};
 	// Push the job to the queue
 	DestroyTest(callback, source);
@@ -143,60 +269,40 @@ void DeletionQueue::Destroy(VmaAllocation vmaAlloc, vk::Buffer buff) const
 
 namespace DEngine::Gfx::Vk::DeletionQueueImpl
 {
-	template<typename T>
-	static void DestroyDeviceLevelHandle(
-			DeletionQueue const& queue,
-			T in,
-			vk::Optional<vk::AllocationCallbacks> callbacks)
+	template<class T>
+	static inline void DestroyDeviceLevelHandle(
+		DeletionQueue& queue,
+		Std::Span<T const> in)
 	{
-		struct Data
-		{
-			T handle;
-			vk::Optional<vk::AllocationCallbacks> callbacks;
-			Data(T handle, vk::Optional<vk::AllocationCallbacks> callbacks) :
-				handle(handle), callbacks(callbacks) {}
-		};
-		Data source(in, callbacks);
-		DeletionQueue::TestCallback<Data> callback = [](GlobUtils const& globUtils, Data source)
-		{
-			globUtils.device.destroy(source.handle, source.callbacks);
-		};
-		queue.DestroyTest(callback, source);
-	}
+		DENGINE_IMPL_GFX_ASSERT(
+			Std::AllOf(
+				in.AsRange(),
+				[](auto const& cmdBuffer) { return cmdBuffer != T{}; }));
 
-	template<typename T>
-	static void DestroyDeviceLevelHandle(
-			DeletionQueue const& queue,
-			vk::Fence fence,
-			T in,
-			vk::Optional<vk::AllocationCallbacks> callbacks)
-	{
-		struct Data
+		DeletionQueue::CallbackPFN callback = [](GlobUtils const& globUtils, Std::Span<char const> data)
 		{
-			T handle{};
-			vk::Optional<vk::AllocationCallbacks> callbacks = nullptr;
+			DENGINE_IMPL_GFX_ASSERT((uSize)data.Data() % alignof(T) == 0);
+			DENGINE_IMPL_GFX_ASSERT((uSize)data.Size() % sizeof(T) == 0);
+			Std::Span handles = { reinterpret_cast<T const*>(data.Data()), data.Size() / sizeof(T) };
+
+			for (auto const& handle : handles)
+			{
+				globUtils.device.Destroy(handle);
+			}
 		};
-		Data source{};
-		source.handle = in;
-		source.callbacks = callbacks;
-		DeletionQueue::TestCallback<Data> callback = [](GlobUtils const& globUtils, Data source)
-		{
-			globUtils.device.destroy(source.handle, source.callbacks);
-		};
-		queue.DestroyTest(fence, callback, source);
+		queue.Destroy(callback, in.ToConstByteSpan());
 	}
 }
 
 void DeletionQueue::Destroy(
 	vk::CommandPool cmdPool, 
-	Std::Span<vk::CommandBuffer const> cmdBuffers) const
+	Std::Span<vk::CommandBuffer const> cmdBuffers)
 {
-	DENGINE_DETAIL_GFX_ASSERT(cmdPool != vk::CommandPool());
-	DENGINE_DETAIL_GFX_ASSERT(
-		Std::AllOf(cmdBuffers.AsRange(),
-		[](vk::CommandBuffer cmdBuffer) -> bool { return cmdBuffer != vk::CommandBuffer{}; }));
-
-	std::lock_guard lockGuard{ accessMutex };
+	DENGINE_IMPL_GFX_ASSERT(cmdPool != vk::CommandPool());
+	DENGINE_IMPL_GFX_ASSERT(
+		Std::AllOf(
+			cmdBuffers.AsRange(),
+			[](auto const& cmdBuffer) { return cmdBuffer != vk::CommandBuffer{}; }));
 
 	// We are storing the data like this:
 	//
@@ -208,15 +314,17 @@ void DeletionQueue::Destroy(
 	static constexpr uSize cmdBufferCount_Offset = cmdPool_Offset + sizeof(vk::CommandPool);
 	static constexpr uSize cmdBuffers_Offset = cmdBufferCount_Offset + sizeof(u64);
 
-	CallbackPFN callback = [](GlobUtils const& globUtils, Std::Span<u8> customData)
+	CallbackPFN callback = [](GlobUtils const& globUtils, Std::Span<char const> customData)
 	{
-		vk::CommandPool cmdPool = *reinterpret_cast<vk::CommandPool*>(customData.Data() + cmdPool_Offset);
+		auto const& cmdPool = *reinterpret_cast<vk::CommandPool const*>(customData.Data() + cmdPool_Offset);
 
-		uSize cmdBufferCount = *reinterpret_cast<uSize*>(customData.Data() + cmdBufferCount_Offset);
+		auto const& cmdBufferCount = *reinterpret_cast<uSize const*>(customData.Data() + cmdBufferCount_Offset);
+
+		auto cmdBuffersPtr = reinterpret_cast<vk::CommandBuffer const*>(customData.Data() + cmdBuffers_Offset);
 
 		globUtils.device.freeCommandBuffers(
-			cmdPool, 
-			{ (u32)cmdBufferCount, reinterpret_cast<vk::CommandBuffer const*>(customData.Data() + cmdBuffers_Offset) });
+			cmdPool,
+			{ (u32)cmdBufferCount, cmdBuffersPtr });
 	};
 
 	auto& currentQueue = tempQueue;
@@ -227,7 +335,7 @@ void DeletionQueue::Destroy(
 	currentQueue.jobs.push_back(newJob);
 
 	// Then we pad to align to 8 bytes.
-	uSize addSize = Math::CeilToMultiple(newJob.dataSize, DeletionQueueImpl::customDataAlignment);
+	uSize addSize = Math::CeilToMultiple((u64)newJob.dataSize, (u64)impl::customDataAlignment);
 
 	currentQueue.customData.resize(currentQueue.customData.size() + addSize);
 
@@ -250,94 +358,86 @@ void DeletionQueue::Destroy(
 }
 
 void DeletionQueue::Destroy(
-	vk::CommandPool in, 
-	vk::Optional<vk::AllocationCallbacks> callbacks) const
+	vk::CommandPool in)
 {
-	DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in, callbacks);
+	impl::DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in);
 }
 
 void DeletionQueue::Destroy(
 	vk::Fence fence, 
-	vk::CommandPool in, 
-	vk::Optional<vk::AllocationCallbacks> callbacks) const
+	vk::CommandPool in)
 {
-	DENGINE_DETAIL_GFX_ASSERT(fence != vk::Fence());
-	DENGINE_DETAIL_GFX_ASSERT(in != vk::CommandPool());
-	DeletionQueueImpl::DestroyDeviceLevelHandle(*this, fence, in, callbacks);
+	impl::DeletionQueueImpl::DestroyDeviceLevelHandle(*this, fence, in);
 }
 
-void DEngine::Gfx::Vk::DeletionQueue::Destroy(
-		vk::DescriptorPool in,
-		vk::Optional<vk::AllocationCallbacks> callbacks) const
+void DeletionQueue::Destroy(
+	vk::DescriptorPool in)
 {
-	DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in, callbacks);
+	impl::DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in);
 }
 
-void DEngine::Gfx::Vk::DeletionQueue::Destroy(
-		vk::Fence fence,
-		vk::DescriptorPool in,
-		vk::Optional<vk::AllocationCallbacks> callbacks) const
+void DeletionQueue::Destroy(
+	vk::Fence fence,
+	vk::DescriptorPool in)
 {
-	DENGINE_DETAIL_GFX_ASSERT(fence != vk::Fence());
-	DENGINE_DETAIL_GFX_ASSERT(in != vk::DescriptorPool());
-	DeletionQueueImpl::DestroyDeviceLevelHandle(*this, fence, in, callbacks);
+	impl::DeletionQueueImpl::DestroyDeviceLevelHandle(*this, fence, in);
 }
 
-void DEngine::Gfx::Vk::DeletionQueue::Destroy(
-	vk::Framebuffer in,
-	vk::Optional<vk::AllocationCallbacks> callbacks) const
+void DeletionQueue::Destroy(
+	vk::Framebuffer in)
 {
-	DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in, callbacks);
+	impl::DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in);
 }
 
-void DEngine::Gfx::Vk::DeletionQueue::Destroy(
-	vk::ImageView in, 
-	vk::Optional<vk::AllocationCallbacks> callbacks) const
+void DeletionQueue::Destroy(
+	Std::Span<vk::Framebuffer const> in)
 {
-	DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in, callbacks);
+	DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in);
 }
 
-void DEngine::Gfx::Vk::DeletionQueue::Destroy(
-	vk::SurfaceKHR in, 
-	vk::Optional<vk::AllocationCallbacks> callbacks) const
+void DeletionQueue::Destroy(
+	vk::ImageView in)
 {
-	struct Data
-	{
-		vk::SurfaceKHR handle{};
-		vk::Optional<vk::AllocationCallbacks> callbacks = nullptr;
-	};
-	Data source{};
-	source.handle = in;
-	source.callbacks = callbacks;
-	DeletionQueue::TestCallback<Data> callback = [](GlobUtils const& globUtils, Data source)
-	{
-		globUtils.instance.destroy(source.handle, source.callbacks);
-	};
-	DestroyTest(callback, source);
+	impl::DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in);
 }
 
-void DEngine::Gfx::Vk::DeletionQueue::Destroy(
-	vk::SwapchainKHR in, 
-	vk::Optional<vk::AllocationCallbacks> callbacks) const
+void DeletionQueue::Destroy(
+	Std::Span<vk::ImageView const> in)
 {
-	DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in, callbacks);
+	DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in);
 }
 
-void DEngine::Gfx::Vk::DeletionQueue::Destroy(
+void DeletionQueue::Destroy(
+	vk::Semaphore in)
+{
+	impl::DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in);
+}
+
+void DeletionQueue::Destroy(
+	vk::SurfaceKHR in)
+{
+	impl::DeletionQueueImpl::DestroyInstanceLevelHandle(*this, in);
+}
+
+void DeletionQueue::Destroy(
+	vk::SwapchainKHR in)
+{
+	impl::DeletionQueueImpl::DestroyDeviceLevelHandle(*this, in);
+}
+
+void DeletionQueue::Destroy(
 	CallbackPFN callback, 
-	Std::Span<u8 const> customData) const
+	Std::Span<char const> customData)
 {
-	std::lock_guard lockGuard{ accessMutex };
-
 	auto& currentQueue = tempQueue;
-	Job newJob{};
+	Job newJob = {};
 	newJob.callback = callback;
 	newJob.dataOffset = currentQueue.customData.size();
 	newJob.dataSize = customData.Size();
-	currentQueue.jobs.push_back(newJob);
+	currentQueue.jobs.emplace_back(newJob);
 
 	// Then we pad to align to 8 bytes.
-	uSize addSize = Math::CeilToMultiple(newJob.dataSize, DeletionQueueImpl::customDataAlignment);
+	uSize addSize = Math::CeilToMultiple((u64)newJob.dataSize, (u64)impl::customDataAlignment);
 
 	currentQueue.customData.resize(currentQueue.customData.size() + addSize);
 
@@ -348,23 +448,21 @@ void DEngine::Gfx::Vk::DeletionQueue::Destroy(
 		customData.Size());
 }
 
-void DEngine::Gfx::Vk::DeletionQueue::Destroy(
+void DeletionQueue::Destroy(
 	vk::Fence fence,
 	CallbackPFN callback,
-	Std::Span<u8 const> customData) const
+	Std::Span<char const> customData)
 {
-	std::lock_guard lockGuard{ accessMutex };
-
 	auto& currentQueue = fencedJobQueues[currFencedJobQueueIndex];
-	FencedJob newJob{};
+	FencedJob newJob = {};
 	newJob.fence = fence;
 	newJob.job.callback = callback;
 	newJob.job.dataOffset = currentQueue.customData.size();
 	newJob.job.dataSize = customData.Size();
-	currentQueue.jobs.push_back(newJob);
+	currentQueue.jobs.emplace_back(newJob);
 
 	// Then we pad to align to 8 bytes.
-	uSize addSize = Math::CeilToMultiple(newJob.job.dataSize, DeletionQueueImpl::customDataAlignment);
+	uSize addSize = Math::CeilToMultiple((u64)newJob.job.dataSize, (u64)impl::customDataAlignment);
 
 	currentQueue.customData.resize(currentQueue.customData.size() + addSize);
 

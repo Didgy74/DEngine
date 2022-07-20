@@ -8,8 +8,6 @@
 #include <string>
 #include <vector>
 
-namespace DEngine::Gui::impl { class LineListImpl; }
-
 namespace DEngine::Gui
 {
 	class LineList : public Widget
@@ -25,51 +23,45 @@ namespace DEngine::Gui
 		std::vector<std::string> lines;
 		u32 textMargin = 0;
 
-		using Callback = std::function<void(LineList&)>;
+		using Callback = std::function<void(LineList&, Context* ctx)>;
 		Callback selectedLineChangedFn = nullptr;
 
-		[[nodiscard]] virtual SizeHint GetSizeHint(Context const& ctx) const override;
-	
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
-
+		virtual SizeHint GetSizeHint2(
+			GetSizeHint2_Params const& params) const override;
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual void Render2(
+			Render_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
 		virtual bool CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event,
+			CursorMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool occluded) override;
-
-		virtual bool CursorPress(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorClickEvent event) override;
-
-		virtual bool TouchMoveEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchMoveEvent event,
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+		virtual void CursorExit(
+			Context& ctx) override;
+		virtual bool TouchMove2(
+			TouchMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool occluded) override;
-
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
 
 	protected:
-		friend impl::LineListImpl;
+		struct Impl;
+		friend Impl;
 
 		struct PressedLine_T
 		{

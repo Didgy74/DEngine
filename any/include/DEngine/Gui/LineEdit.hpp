@@ -7,21 +7,11 @@
 #include <functional>
 #include <string>
 
-namespace DEngine::Gui::impl { struct LineEditImpl; }
-
 namespace DEngine::Gui
 {
 	class LineEdit : public Widget
 	{
 	public:
-		enum class Type
-		{
-			Float,
-			Integer,
-			UnsignedInteger,
-		};
-		Type type = Type::Float;
-
 		Math::Vec4 backgroundColor = { 0.3f, 0.3f, 0.3f, 1.f };
 		u32 margin = 0;
 
@@ -32,43 +22,36 @@ namespace DEngine::Gui
 
 		virtual ~LineEdit();
 
-		[[nodiscard]] constexpr bool CurrentlyBeingEdited() const;
+		[[nodiscard]] constexpr bool HasInputSession() const;
 
-		[[nodiscard]] virtual SizeHint GetSizeHint(Context const& ctx) const override;
-
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
-
-		virtual void CharEnterEvent(
-			Context& ctx) override;
-
-		virtual void CharEvent(
+		virtual SizeHint GetSizeHint2(
+			GetSizeHint2_Params const& params) const override;
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual void Render2(
+			Render_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+		void TextInput(
 			Context& ctx,
-			u32 charEvent) override;
-
-		virtual void CharRemoveEvent(
-			Context& ctx) override;
-
-		virtual void InputConnectionLost() override;
-
-		virtual bool CursorPress(
+			AllocRef const& transientAlloc,
+			TextInputEvent const& event) override;
+		void EndTextInputSession(
 			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorClickEvent event) override;
-
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
+			AllocRef const& transientAlloc,
+			EndTextInputSessionEvent const& event) override;
 
 	protected:
 		// Holds the pointer ID if the widget is currently pressed.
@@ -78,8 +61,9 @@ namespace DEngine::Gui
 
 		void ClearInputConnection();
 
-		friend impl::LineEditImpl;
+		struct Impl;
+		friend Impl;
 	};
 
-	constexpr bool LineEdit::CurrentlyBeingEdited() const { return inputConnectionCtx; }
+	constexpr bool LineEdit::HasInputSession() const { return inputConnectionCtx; }
 }

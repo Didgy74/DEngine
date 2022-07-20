@@ -12,14 +12,11 @@
 
 namespace DEngine::Gui
 {
-	namespace impl { struct BtnGroupImpl; }
-
 	class ButtonGroup : public Widget
 	{
 	public:
 		u32 activeIndex = 0;
-		struct InternalButton
-		{
+		struct InternalButton {
 			std::string title;
 		};
 		std::vector<InternalButton> buttons;
@@ -29,53 +26,58 @@ namespace DEngine::Gui
 		using ActiveChangedCallbackT = void(ButtonGroup& widget, u32 newIndex);
 		std::function<ActiveChangedCallbackT> activeChangedCallback;
 
-		Math::Vec4 inactiveColor = { 0.3f, 0.3f, 0.3f, 1.f };
-		Math::Vec4 hoveredColor = { 0.4f, 0.4f, 0.4f, 1.f };
-		Math::Vec4 activeColor = { 0.6f, 0.6f, 0.6f, 1.f };
+		struct Colors
+		{
+			Math::Vec4 inactiveColor = { 0.3f, 0.3f, 0.3f, 1.f };
+			Math::Vec4 hoveredColor = { 0.4f, 0.4f, 0.4f, 1.f };
+			Math::Vec4 activeColor = { 0.6f, 0.6f, 0.6f, 1.f };
+		};
+		Colors colors = {};
 
 		void AddButton(std::string const& title);
 		[[nodiscard]] u32 GetButtonCount() const;
 		[[nodiscard]] u32 GetActiveButtonIndex() const;
 
-		[[nodiscard]] virtual SizeHint GetSizeHint(Context const& ctx) const override;
+		virtual SizeHint GetSizeHint2(
+			GetSizeHint2_Params const& params) const override;
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual void Render2(
+			Render_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
 
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
+		virtual void CursorExit(
+			Context& ctx) override;
 
 		virtual bool CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event,
+			CursorMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool occluded) override;
 
-		virtual bool CursorPress(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorClickEvent event) override;
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
 
-		virtual bool TouchMoveEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchMoveEvent event,
+		virtual bool TouchMove2(
+			TouchMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool occluded) override;
 
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+
+
+		struct Impl;
 
 	protected:
 		struct HeldPointerData
@@ -86,6 +88,7 @@ namespace DEngine::Gui
 		Std::Opt<HeldPointerData> heldPointerData;
 		Std::Opt<uSize> cursorHoverIndex;
 
-		friend impl::BtnGroupImpl;
+
+		friend Impl;
 	};
 }

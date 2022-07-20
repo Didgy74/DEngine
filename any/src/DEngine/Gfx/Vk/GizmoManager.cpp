@@ -5,6 +5,9 @@
 #include "QueueData.hpp"
 #include "Vk.hpp"
 
+#include <DEngine/Std/BumpAllocator.hpp>
+#include <DEngine/Std/Containers/Vec.hpp>
+
 #include <DEngine/Math/LinearTransform3D.hpp>
 #include <DEngine/Application.hpp> // VERY WIP. NEEDS TO BE SWITCHED OUT FOR SOMETHING AGNOSTIC
 
@@ -21,7 +24,23 @@ namespace DEngine::Gfx::Vk::impl
 		VmaAllocator vma = {};
 		VmaAllocation alloc = {};
 
-		void Release() noexcept { handle = vk::Buffer{}; }
+		struct Release_ReturnT
+		{
+			vk::Buffer handle;
+			VmaAllocator vma;
+			VmaAllocation alloc;
+		};
+		[[nodiscard]] Release_ReturnT Release() noexcept
+		{
+			Release_ReturnT returnValue;
+			returnValue.handle = handle;
+			returnValue.alloc = alloc;
+			returnValue.vma = vma;
+
+			handle = vk::Buffer{};
+
+			return returnValue;
+		}
 
 		~BoxVkBuffer() noexcept
 		{
@@ -42,13 +61,18 @@ namespace DEngine::Gfx::Vk::impl
 		vk::CommandPool handle = {};
 		DeviceDispatch const* device = nullptr;
 
-		void Release() noexcept { handle = vk::CommandPool{}; }
+		[[nodiscard]] vk::CommandPool Release() noexcept
+		{
+			auto returnValue = handle;
+			handle = vk::CommandPool{};
+			return returnValue;
+		}
 
 		~BoxVkCmdPool() noexcept
 		{
 			if (handle != vk::CommandPool{})
 			{
-				device->destroy(handle);
+				device->Destroy(handle);
 			}
 		}
 	};
@@ -65,7 +89,7 @@ namespace DEngine::Gfx::Vk::impl
 		DevDispatch const& device,
 		VmaAllocator vma,
 		QueueData const& queues,
-		DeletionQueue const& delQueue,
+		DeletionQueue& delQueue,
 		Std::Span<char const> bytes) noexcept
 	{
 		GizmoManager_Helper_TestReturn returnVal = {};
@@ -177,30 +201,14 @@ namespace DEngine::Gfx::Vk::impl
 		vk::Fence fence = device.createFence({});
 		queues.graphics.submit(submit, fence);
 
-		struct DestroyData
-		{
-			vk::Buffer vtxBuffer_Staging;
-			VmaAllocation vtxVmaAlloc_Staging;
-			vk::CommandPool cmdPool;
-		};
-		DestroyData destroyData = {};
-		destroyData.vtxBuffer_Staging = vtxBuffer_Staging.handle;
-		destroyData.vtxVmaAlloc_Staging = vtxBuffer_Staging.alloc;
-		vtxBuffer_Staging.Release();
-		destroyData.cmdPool = cmdPool.handle;
-		cmdPool.Release();
-		DeletionQueue::TestCallback<DestroyData> destroyCallback = [](
-			GlobUtils const& globUtils,
-			DestroyData destroyData)
-		{
-			vmaDestroyBuffer(globUtils.vma, (VkBuffer)destroyData.vtxBuffer_Staging, destroyData.vtxVmaAlloc_Staging);
-			globUtils.device.destroy(destroyData.cmdPool);
-		};
-		delQueue.DestroyTest(fence, destroyCallback, destroyData);
 
-		returnVal.buffer = dstBuffer.handle;
-		returnVal.alloc = dstBuffer.alloc;
-		dstBuffer.Release();
+		delQueue.Destroy(cmdPool.Release());
+		auto vtxBufferStagingRelease = vtxBuffer_Staging.Release();
+		delQueue.Destroy(vtxBufferStagingRelease.alloc, vtxBufferStagingRelease.handle);
+
+		auto dstBufferRelease = dstBuffer.Release();
+		returnVal.buffer = dstBufferRelease.handle;
+		returnVal.alloc = dstBufferRelease.alloc;
 		return returnVal;
 	}
 
@@ -209,7 +217,7 @@ namespace DEngine::Gfx::Vk::impl
 		DeviceDispatch const& device,
 		QueueData const& queues,
 		VmaAllocator vma,
-		DeletionQueue const& delQueue,
+		DeletionQueue& delQueue,
 		DebugUtilsDispatch const* debugUtils,
 		Std::Span<Math::Vec3 const> arrowMesh)
 	{
@@ -240,7 +248,7 @@ namespace DEngine::Gfx::Vk::impl
 		DeviceDispatch const& device,
 		QueueData const& queues,
 		VmaAllocator vma,
-		DeletionQueue const& delQueue,
+		DeletionQueue& delQueue,
 		DebugUtilsDispatch const* debugUtils,
 		Std::Span<Math::Vec3 const> circleLineMesh)
 	{
@@ -271,7 +279,7 @@ namespace DEngine::Gfx::Vk::impl
 		DeviceDispatch const& device,
 		QueueData const& queues,
 		VmaAllocator vma,
-		DeletionQueue const& delQueue,
+		DeletionQueue& delQueue,
 		DebugUtilsDispatch const* debugUtils,
 		Std::Span<Math::Vec3 const> scaleArrow2d)
 	{
@@ -300,6 +308,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_InitializeArrowShader(
 		GizmoManager& manager,
 		DeviceDispatch const& device,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils,
 		APIData const& apiData)
 	{
@@ -324,7 +333,7 @@ namespace DEngine::Gfx::Vk::impl
 		pipelineLayoutInfo.pSetLayouts = layouts.Data();
 		pipelineLayoutInfo.pushConstantRangeCount = (u32)pushConstantRanges.Size();
 		pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.Data();
-		manager.pipelineLayout = apiData.globUtils.device.createPipelineLayout(pipelineLayoutInfo);
+		manager.pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
 
 		App::FileInputStream vertFile{ "data/Gizmo/Arrow/vert.spv" };
 		if (!vertFile.IsOpen())
@@ -332,13 +341,14 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> vertCode((uSize)vertFileLength);
-		vertFile.Read(vertCode.data(), vertFileLength);
-
+		auto vertCode = Std::NewVec<char>(transientAlloc);
+		vertCode.Resize((uSize)vertFileLength);
+		vertFile.Read(vertCode.Data(), vertFileLength);
+		vertFile.Close();
 		vk::ShaderModuleCreateInfo vertModCreateInfo{};
-		vertModCreateInfo.codeSize = vertCode.size();
-		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
-		vk::ShaderModule vertModule = apiData.globUtils.device.createShaderModule(vertModCreateInfo);
+		vertModCreateInfo.codeSize = vertCode.Size();
+		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
+		vk::ShaderModule vertModule = device.createShaderModule(vertModCreateInfo);
 		vk::PipelineShaderStageCreateInfo vertStageInfo{};
 		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
 		vertStageInfo.module = vertModule;
@@ -350,12 +360,13 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> fragCode((uSize)fragFileLength);
-		fragFile.Read(fragCode.data(), fragFileLength);
-
+		auto fragCode = Std::NewVec<char>(transientAlloc);
+		fragCode.Resize((uSize)fragFileLength);
+		fragFile.Read(fragCode.Data(), fragFileLength);
+		fragFile.Close();
 		vk::ShaderModuleCreateInfo fragModInfo{};
-		fragModInfo.codeSize = fragCode.size();
-		fragModInfo.pCode = reinterpret_cast<u32 const*>(fragCode.data());
+		fragModInfo.codeSize = fragCode.Size();
+		fragModInfo.pCode = reinterpret_cast<u32 const*>(fragCode.Data());
 		vk::ShaderModule fragModule = apiData.globUtils.device.createShaderModule(fragModInfo);
 		vk::PipelineShaderStageCreateInfo fragStageInfo{};
 		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
@@ -461,13 +472,14 @@ namespace DEngine::Gfx::Vk::impl
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to make graphics pipeline.");
 
-		apiData.globUtils.device.destroy(vertModule);
-		apiData.globUtils.device.destroy(fragModule);
+		apiData.globUtils.device.Destroy(vertModule);
+		apiData.globUtils.device.Destroy(fragModule);
 	}
 
 	static void GizmoManager_InitializeQuadShader(
 		GizmoManager& manager,
 		DeviceDispatch const& device,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils,
 		APIData const& apiData)
 	{
@@ -479,13 +491,14 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> vertCode((uSize)vertFileLength);
-		vertFile.Read(vertCode.data(), vertFileLength);
-
+		auto vertCode = Std::NewVec<char>(transientAlloc);
+		vertCode.Resize((uSize)vertFileLength);
+		vertFile.Read(vertCode.Data(), vertFileLength);
+		vertFile.Close();
 		vk::ShaderModuleCreateInfo vertModCreateInfo{};
-		vertModCreateInfo.codeSize = vertCode.size();
-		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
-		vk::ShaderModule vertModule = apiData.globUtils.device.createShaderModule(vertModCreateInfo);
+		vertModCreateInfo.codeSize = vertCode.Size();
+		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
+		vk::ShaderModule vertModule = device.createShaderModule(vertModCreateInfo);
 		vk::PipelineShaderStageCreateInfo vertStageInfo{};
 		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
 		vertStageInfo.module = vertModule;
@@ -497,13 +510,14 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> fragCode((uSize)fragFileLength);
-		fragFile.Read(fragCode.data(), fragFileLength);
-
+		auto fragCode = Std::NewVec<char>(transientAlloc);
+		fragCode.Resize((uSize)fragFileLength);
+		fragFile.Read(fragCode.Data(), fragFileLength);
+		fragFile.Close();
 		vk::ShaderModuleCreateInfo fragModInfo{};
-		fragModInfo.codeSize = fragCode.size();
-		fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.data());
-		vk::ShaderModule fragModule = apiData.globUtils.device.createShaderModule(fragModInfo);
+		fragModInfo.codeSize = fragCode.Size();
+		fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.Data());
+		vk::ShaderModule fragModule = device.createShaderModule(fragModInfo);
 		vk::PipelineShaderStageCreateInfo fragStageInfo{};
 		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
 		fragStageInfo.module = fragModule;
@@ -587,7 +601,7 @@ namespace DEngine::Gfx::Vk::impl
 		pipelineInfo.stageCount = (u32)shaderStages.Size();
 		pipelineInfo.pStages = shaderStages.Data();
 
-		vkResult = apiData.globUtils.device.createGraphicsPipelines(
+		vkResult = device.createGraphicsPipelines(
 			vk::PipelineCache(),
 			{ 1, &pipelineInfo },
 			nullptr,
@@ -595,13 +609,14 @@ namespace DEngine::Gfx::Vk::impl
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to make graphics pipeline.");
 
-		apiData.globUtils.device.destroy(vertModule);
-		apiData.globUtils.device.destroy(fragModule);
+		device.Destroy(vertModule);
+		device.Destroy(fragModule);
 	}
 
 	static void GizmoManager_InitializeLineShader(
 		GizmoManager& manager,
 		DeviceDispatch const& device,
+		Std::AllocRef const& transientAlloc,
 		DebugUtilsDispatch const* debugUtils,
 		APIData const& apiData)
 	{
@@ -613,13 +628,14 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 vertFileLength = vertFile.Tell().Value();
 		vertFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> vertCode((uSize)vertFileLength);
-		vertFile.Read(vertCode.data(), vertFileLength);
-
+		auto vertCode = Std::NewVec<char>(transientAlloc);
+		vertCode.Resize((uSize)vertFileLength);
+		vertFile.Read(vertCode.Data(), vertFileLength);
+		vertFile.Close();
 		vk::ShaderModuleCreateInfo vertModCreateInfo{};
-		vertModCreateInfo.codeSize = vertCode.size();
-		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.data());
-		vk::ShaderModule vertModule = apiData.globUtils.device.createShaderModule(vertModCreateInfo);
+		vertModCreateInfo.codeSize = vertCode.Size();
+		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
+		vk::ShaderModule vertModule = device.createShaderModule(vertModCreateInfo);
 		vk::PipelineShaderStageCreateInfo vertStageInfo{};
 		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
 		vertStageInfo.module = vertModule;
@@ -631,12 +647,13 @@ namespace DEngine::Gfx::Vk::impl
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 		u64 fragFileLength = fragFile.Tell().Value();
 		fragFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
-		std::vector<char> fragCode((uSize)fragFileLength);
-		fragFile.Read(fragCode.data(), fragFileLength);
-
+		auto fragCode = Std::NewVec<char>(transientAlloc);
+		fragCode.Resize((uSize)fragFileLength);
+		fragFile.Read(fragCode.Data(), fragFileLength);
+		fragFile.Close();
 		vk::ShaderModuleCreateInfo fragModInfo{};
-		fragModInfo.codeSize = fragCode.size();
-		fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.data());
+		fragModInfo.codeSize = fragCode.Size();
+		fragModInfo.pCode = reinterpret_cast<const u32*>(fragCode.Data());
 		vk::ShaderModule fragModule = apiData.globUtils.device.createShaderModule(fragModInfo);
 		vk::PipelineShaderStageCreateInfo fragStageInfo{};
 		fragStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
@@ -726,7 +743,7 @@ namespace DEngine::Gfx::Vk::impl
 		pipelineInfo.stageCount = (u32)shaderStages.Size();
 		pipelineInfo.pStages = shaderStages.Data();
 
-		vkResult = apiData.globUtils.device.createGraphicsPipelines(
+		vkResult = device.createGraphicsPipelines(
 			vk::PipelineCache(),
 			{ 1, &pipelineInfo },
 			nullptr,
@@ -734,8 +751,8 @@ namespace DEngine::Gfx::Vk::impl
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to make graphics pipeline.");
 
-		apiData.globUtils.device.destroy(vertModule);
-		apiData.globUtils.device.destroy(fragModule);
+		apiData.globUtils.device.Destroy(vertModule);
+		apiData.globUtils.device.Destroy(fragModule);
 	}
 
 	static void GizmoManager_InitializeLineVtxBuffer(
@@ -745,7 +762,7 @@ namespace DEngine::Gfx::Vk::impl
 		VmaAllocator const& vma,
 		DebugUtilsDispatch const* debugUtils)
 	{
-		vk::Result vkResult{};
+		vk::Result vkResult = {};
 
 		vk::BufferCreateInfo vtxBufferInfo{};
 		vtxBufferInfo.sharingMode = vk::SharingMode::eExclusive;
@@ -781,7 +798,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_RecordTranslateGizmoDrawCalls(
 		GlobUtils const& globUtils,
 		GizmoManager const& gizmoManager,
-		ViewportData const& viewportData,
+		ViewportMgr_ViewportData const& viewportData,
 		ViewportUpdate::Gizmo const& gizmo,
 		vk::CommandBuffer cmdBuffer,
 		u8 inFlightIndex)
@@ -894,7 +911,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_RotateGizmo_RecordoDrawCalls(
 		GlobUtils const& globUtils,
 		GizmoManager const& gizmoManager,
-		ViewportData const& viewportData,
+		ViewportMgr_ViewportData const& viewportData,
 		ViewportUpdate::Gizmo const& gizmo,
 		vk::CommandBuffer cmdBuffer,
 		u8 inFlightIndex)
@@ -941,7 +958,7 @@ namespace DEngine::Gfx::Vk::impl
 	static void GizmoManager_ScaleGizmo_RecordDrawCalls(
 		GlobUtils const& globUtils,
 		GizmoManager const& manager,
-		ViewportData const& viewportData,
+		ViewportMgr_ViewportData const& viewportData,
 		ViewportUpdate::Gizmo const& gizmo,
 		vk::CommandBuffer cmdBuffer,
 		u8 inFlightIndex)
@@ -1092,18 +1109,21 @@ void Vk::GizmoManager::Initialize(GizmoManager& manager, InitInfo const& initInf
 	impl::GizmoManager_InitializeArrowShader(
 		manager,
 		*initInfo.device,
+		*initInfo.frameAlloc,
 		initInfo.debugUtils,
 		*initInfo.apiData);
 
 	impl::GizmoManager_InitializeQuadShader(
 		manager,
 		*initInfo.device,
+		*initInfo.frameAlloc,
 		initInfo.debugUtils,
 		*initInfo.apiData);
 
 	impl::GizmoManager_InitializeLineShader(
 		manager,
 		*initInfo.device,
+		*initInfo.frameAlloc,
 		initInfo.debugUtils,
 		*initInfo.apiData);
 
@@ -1122,7 +1142,7 @@ void Vk::GizmoManager::UpdateLineVtxBuffer(
 	Std::Span<Math::Vec3 const> vertices)
 {
 	uSize const ptrOffset = manager.lineVtxBufferCapacity * manager.lineVtxElementSize * inFlightIndex;
-	DENGINE_DETAIL_GFX_ASSERT(ptrOffset + manager.lineVtxElementSize * vertices.Size() < manager.lineVtxBufferMappedMem.Size());
+	DENGINE_IMPL_GFX_ASSERT(ptrOffset + manager.lineVtxElementSize * vertices.Size() < manager.lineVtxBufferMappedMem.Size());
 
 	u8* ptr = manager.lineVtxBufferMappedMem.Data() + ptrOffset;
 
@@ -1132,7 +1152,7 @@ void Vk::GizmoManager::UpdateLineVtxBuffer(
 void Vk::GizmoManager::DebugLines_RecordDrawCalls(
 	GizmoManager const& manager,
 	GlobUtils const& globUtils,
-	ViewportData const& viewportData,
+	ViewportMgr_ViewportData const& viewportData,
 	Std::Span<LineDrawCmd const> lineDrawCmds,
 	vk::CommandBuffer cmdBuffer,
 	u8 inFlightIndex) noexcept
@@ -1199,8 +1219,8 @@ void Vk::GizmoManager::DebugLines_RecordDrawCalls(
 
 void Vk::GizmoManager::Gizmo_RecordDrawCalls(
 	GizmoManager const& gizmoManager,
-	GlobUtils const& globUtils, 
-	ViewportData const& viewportData,
+	GlobUtils const& globUtils,
+	ViewportMgr_ViewportData const& viewportData,
 	ViewportUpdate::Gizmo const& gizmo,
 	vk::CommandBuffer cmdBuffer, 
 	u8 inFlightIndex) noexcept
@@ -1238,7 +1258,7 @@ void Vk::GizmoManager::Gizmo_RecordDrawCalls(
 			break;
 
 		default:
-			DENGINE_IMPL_UNREACHABLE();
+			DENGINE_IMPL_GFX_UNREACHABLE();
 			break;
 	};
 }

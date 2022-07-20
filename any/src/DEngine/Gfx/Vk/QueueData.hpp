@@ -1,15 +1,14 @@
 #pragma once
 
-#include "DEngine/FixedWidthTypes.hpp"
+#include <DEngine/FixedWidthTypes.hpp>
 #include "VulkanIncluder.hpp"
+
+#include "ForwardDeclarations.hpp"
 
 #include <mutex>
 
 namespace DEngine::Gfx::Vk
 {
-    class DebugUtilsDispatch;
-    class DeviceDispatch;
-
     struct QueueIndices
     {
         static constexpr u32 invalidIndex = static_cast<u32>(-1);

@@ -1,17 +1,17 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 31
+    compileSdkVersion 32
     defaultConfig {
         applicationId  "didgy.dengine.editor"
         minSdkVersion 27
-        targetSdkVersion 31
+        targetSdkVersion 32
         versionCode  1
         versionName  "0.1"
-        //ndkVersion "23.0.7599858" // e.g.,  ndkVersion '21.3.6528147'
+        ndkVersion "23.0.7599858" // e.g.,  ndkVersion '21.3.6528147'
         externalNativeBuild {
             cmake {
-                // version "3.19.1"
+                //version "3.18.1"
                 abiFilters 'armeabi-v7a', 'arm64-v8a'//, 'x86', 'x86_64'
             }
         }
@@ -59,7 +59,7 @@ android {
             }
         }
 
-        debug_profiling {
+        relWithDebInfo {
             proguardFiles getDefaultProguardFile(
                 'proguard-android-optimize.txt'),
                 'proguard-rules.pro'
@@ -99,6 +99,12 @@ android {
             }
         }
     }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    ndkVersion '24.0.8215888'
+    buildToolsVersion '31.0.0'
 }
 
 dependencies {

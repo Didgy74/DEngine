@@ -7,8 +7,9 @@
 
 namespace DEngine::Gui
 {
-	struct DrawInfo
+	class DrawInfo
 	{
+	public:
 		std::vector<Gfx::GuiVertex>* vertices;
 		std::vector<u32>* indices;
 		std::vector<Gfx::GuiDrawCmd>* drawCmds;
@@ -16,7 +17,7 @@ namespace DEngine::Gui
 		Extent framebufferExtent;
 		std::vector<Rect> scissors;
 	public:
-		Extent GetFramebufferExtent() const { return framebufferExtent; }
+		[[nodiscard]] Extent GetFramebufferExtent() const { return framebufferExtent; }
 
 		DrawInfo(
 			Extent framebufferExtent,
@@ -64,13 +65,39 @@ namespace DEngine::Gui
 			indices->push_back(3);
 		}
 
-		Gfx::GuiDrawCmd::MeshSpan GetQuadMesh() const
+		[[nodiscard]] Gfx::GuiDrawCmd::MeshSpan GetQuadMesh() const
 		{
-			Gfx::GuiDrawCmd::MeshSpan newMeshSpan;
+			Gfx::GuiDrawCmd::MeshSpan newMeshSpan = {};
 			newMeshSpan.vertexOffset = quadVertexOffset;
 			newMeshSpan.indexOffset = quadIndexOffset;
 			newMeshSpan.indexCount = 6;
 			return newMeshSpan;
+		}
+
+		void PushText(
+			Std::Span<char const> text,
+			Rect const* rects,
+			Math::Vec4 color)
+		{
+			int const length = (int)text.Size();
+			for (int i = 0; i < length; i += 1)
+			{
+				auto const& glyphRect = rects[i];
+
+				if (!glyphRect.IsNothing())
+				{
+					Gfx::GuiDrawCmd cmd = {};
+					cmd.type = Gfx::GuiDrawCmd::Type::TextGlyph;
+					cmd.textGlyph.utfValue = (u32)(unsigned char)text[i];
+					cmd.textGlyph.color = color;
+					cmd.rectPosition.x = (f32)glyphRect.position.x / (f32)framebufferExtent.width;
+					cmd.rectPosition.y = (f32)glyphRect.position.y / (f32)framebufferExtent.height;
+					cmd.rectExtent.x = (f32)glyphRect.extent.width / (f32)framebufferExtent.width;
+					cmd.rectExtent.y = (f32)glyphRect.extent.height / (f32)framebufferExtent.height;
+
+					drawCmds->emplace_back(cmd);
+				}
+			}
 		}
 
 		void PushScissor(Rect rect)
@@ -128,19 +155,40 @@ namespace DEngine::Gui
 		class ScopedScissor
 		{
 		public:
-			ScopedScissor(DrawInfo& drawInfo, Rect scissor) : drawInfo{ &drawInfo }
+			ScopedScissor(
+				DrawInfo& drawInfoIn,
+				Rect const& widgetRect,
+				Rect const& visibleRect)
+			{
+				if (!widgetRect.FitsInside(visibleRect)) {
+					drawInfo = &drawInfoIn;
+					drawInfo->PushScissor(Intersection(widgetRect, visibleRect));
+				}
+			}
+			ScopedScissor(DrawInfo& drawInfo, Rect const& scissor) : drawInfo{ &drawInfo }
 			{
 				drawInfo.PushScissor(scissor);
 			}
 			ScopedScissor(ScopedScissor const&) = delete;
-			ScopedScissor(ScopedScissor&) = delete;
+			ScopedScissor(ScopedScissor&& other) noexcept : drawInfo{ other.drawInfo }
+			{
+				other.drawInfo = nullptr;
+			}
 			
 			ScopedScissor& operator=(ScopedScissor const&) = delete;
-			ScopedScissor& operator=(ScopedScissor&&) = delete;
+			ScopedScissor& operator=(ScopedScissor&& other) noexcept
+			{
+				if (this == &other)
+					return *this;
+				drawInfo = other.drawInfo;
+				other.drawInfo = nullptr;
+				return *this;
+			}
 
 			~ScopedScissor()
 			{
-				drawInfo->PopScissor();
+				if (drawInfo)
+					drawInfo->PopScissor();
 			}
 
 		protected:

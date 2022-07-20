@@ -1,22 +1,17 @@
 #pragma once
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Math/Vector.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
 
 #include "VulkanIncluder.hpp"
 #include "VMAIncluder.hpp"
-#include "ViewportManager.hpp"
+#include "ForwardDeclarations.hpp"
 
 namespace DEngine::Gfx::Vk
 {
-	class APIData;
-	class DebugUtilsDispatch;
-	class DeletionQueue;
-	class DeviceDispatch;
-	class QueueData;
-
 	class GizmoManager
 	{
 	public:
@@ -50,14 +45,17 @@ namespace DEngine::Gfx::Vk
 			DeviceDispatch const* device;
 			QueueData const* queues;
 			VmaAllocator const* vma;
-			DeletionQueue const* delQueue;
+			DeletionQueue* delQueue;
+			Std::BumpAllocator* frameAlloc;
 			DebugUtilsDispatch const* debugUtils;
 			APIData const* apiData;
 			Std::Span<Math::Vec3 const> arrowMesh;
 			Std::Span<Math::Vec3 const> circleLineMesh;
 			Std::Span<Math::Vec3 const> arrowScaleMesh2d;
 		};
-		static void Initialize(GizmoManager& manager, InitInfo const& initInfo);
+		static void Initialize(
+			GizmoManager& manager,
+			InitInfo const& initInfo);
 
 		static void UpdateLineVtxBuffer(
 			GizmoManager& manager,
@@ -68,7 +66,7 @@ namespace DEngine::Gfx::Vk
 		static void DebugLines_RecordDrawCalls(
 			GizmoManager const& manager,
 			GlobUtils const& globUtils,
-			ViewportData const& viewportData,
+			ViewportMgr_ViewportData const& viewportData,
 			Std::Span<LineDrawCmd const> lineDrawCmds,
 			vk::CommandBuffer cmdBuffer,
 			u8 inFlightIndex) noexcept;
@@ -76,7 +74,7 @@ namespace DEngine::Gfx::Vk
 		static void Gizmo_RecordDrawCalls(
 			GizmoManager const& manager,
 			GlobUtils const& globUtils,
-			ViewportData const& viewportData,
+			ViewportMgr_ViewportData const& viewportData,
 			ViewportUpdate::Gizmo const& gizmo,
 			vk::CommandBuffer cmdBuffer,
 			u8 inFlightIndex) noexcept;

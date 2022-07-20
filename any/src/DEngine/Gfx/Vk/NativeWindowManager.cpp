@@ -5,20 +5,23 @@
 #include "QueueData.hpp"
 
 #include <DEngine/Math/Common.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Utility.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
+#include <DEngine/Std/Containers/Vec.hpp>
 
 #include <string>
 
-namespace DEngine::Gfx::Vk::NativeWinManImpl
+namespace DEngine::Gfx::Vk::NativeWinMgrImpl
 {
 	struct SwapchainSettings
 	{
-		vk::PresentModeKHR presentMode{};
-		vk::SurfaceFormatKHR surfaceFormat{};
-		vk::SurfaceTransformFlagBitsKHR transform{};
-		vk::CompositeAlphaFlagBitsKHR compositeAlphaFlag{};
-		vk::Extent2D extents{};
-		u32 numImages{};
+		vk::PresentModeKHR presentMode = {};
+		vk::SurfaceFormatKHR surfaceFormat = {};
+		vk::SurfaceTransformFlagBitsKHR transform = {};
+		vk::CompositeAlphaFlagBitsKHR compositeAlphaFlag = {};
+		vk::Extent2D extents = {};
+		u32 numImages = {};
 	};
 
 	[[nodiscard]] static SwapchainSettings BuildSwapchainSettings(
@@ -61,15 +64,15 @@ namespace DEngine::Gfx::Vk::NativeWinManImpl
 		switch (transform)
 		{
 		case vk::SurfaceTransformFlagBitsKHR::eIdentity:
-			return Math::Mat2{ { { 1, 0, 0, 1 } } };
+			return Math::Mat2{ 1, 0, 0, 1 };
 		case vk::SurfaceTransformFlagBitsKHR::eRotate90:
-			return Math::Mat2{ { { 0, -1, 1, 0 } } };
+			return Math::Mat2{ 0, -1, 1, 0 };
 		case vk::SurfaceTransformFlagBitsKHR::eRotate180:
-			return Math::Mat2{ { { -1, 0, 0, -1 } } };
+			return Math::Mat2{ -1, 0, 0, -1 };
 		case vk::SurfaceTransformFlagBitsKHR::eRotate270:
-			return Math::Mat2{ { { 0, 1, -1, 0 } } };
+			return Math::Mat2{ 0, 1, -1, 0 };
 		default:
-			DENGINE_IMPL_UNREACHABLE();
+			DENGINE_IMPL_GFX_UNREACHABLE();
 			return Math::Mat2();
 		}
 	}
@@ -109,74 +112,94 @@ namespace DEngine::Gfx::Vk::NativeWinManImpl
 		DebugUtilsDispatch const* debugUtils);
 
 	static void HandleCreationJobs(
-		NativeWindowManager& manager,
-		GlobUtils const& globUtils);
+		NativeWinMgr& manager,
+		GlobUtils const& globUtils,
+		Std::AllocRef const& transientAlloc);
+
+	static void HandleDeletionJobs(
+		NativeWinMgr& manager,
+		GlobUtils const& globUtils,
+		DelQueue& delQueue,
+		Std::AllocRef const& transientAlloc);
 
 	static void HandleWindowResize(
-		NativeWindowManager& manager,
+		NativeWinMgr& manager,
 		GlobUtils const& globUtils,
-		NativeWindowManager::Node& windowNode);
+		DelQueue& delQueue,
+		NativeWinMgr::Node& windowNode);
 
 	static void HandleWindowRestore(
-		NativeWindowManager& manager,
+		NativeWinMgr& manager,
 		GlobUtils const& globUtils,
-		NativeWindowManager::Node& windowNode);
+		DelQueue& delQueue,
+		NativeWinMgr::Node& windowNode);
 }
 
 using namespace DEngine;
 using namespace DEngine::Gfx;
 using namespace DEngine::Gfx::Vk;
-namespace DEngine::Gfx::Vk
-{
-	using NativeWinMan = NativeWindowManager;
+
+namespace DEngine::Gfx::Vk {
+	[[nodiscard]] static bool HasAnyResizeEvents(Std::Span<NativeWindowUpdate const> const& windowUpdates) {
+		for (auto const& item : windowUpdates)
+		{
+			switch (item.event)
+			{
+				case NativeWindowEvent::Resize:
+				case NativeWindowEvent::Restore:
+					return true;
+				default: {}
+			}
+		}
+		return false;
+	}
 }
 
-void NativeWinMan::ProcessEvents(
-	NativeWinMan& manager,
+void NativeWinMgr::ProcessEvents(
+	NativeWinMgr& manager,
 	GlobUtils const& globUtils,
+	DeletionQueue& delQueue,
+	Std::AllocRef const& transientAlloc,
 	Std::Span<NativeWindowUpdate const> windowUpdates)
 {
-	NativeWinManImpl::HandleCreationJobs(
+	NativeWinMgrImpl::HandleCreationJobs(
 		manager,
-		globUtils);
+		globUtils,
+		transientAlloc);
+	NativeWinMgrImpl::HandleDeletionJobs(
+		manager,
+		globUtils,
+		delQueue,
+		transientAlloc);
 
 	// First we see if there are resizes at all, so we know if we have to stall the device.
-	bool needToStall = false;
-	for (auto const& item : windowUpdates)
-	{
-		switch (item.event)
-		{
-		case NativeWindowEvent::Resize:
-		case NativeWindowEvent::Restore:
-			needToStall = true;
-			break;
-		default:
-			break;
-		}
-	}
+	bool needToStall = HasAnyResizeEvents(windowUpdates);
 	if (needToStall)
 		globUtils.device.waitIdle();
+
 	for (auto const& item : windowUpdates)
 	{
 		auto const windowNodeIt = Std::FindIf(
-			manager.nativeWindows.begin(),
-			manager.nativeWindows.end(),
-			[&item](auto const& val) -> bool { return item.id == val.id; });
-		DENGINE_DETAIL_GFX_ASSERT(windowNodeIt != manager.nativeWindows.end());
+			manager.main.nativeWindows.begin(),
+			manager.main.nativeWindows.end(),
+			[&item](auto const& val) { return item.id == val.id; });
+		DENGINE_IMPL_GFX_ASSERT(windowNodeIt != manager.main.nativeWindows.end());
 		auto& windowNode = *windowNodeIt;
 
 		switch (item.event)
 		{
 		case NativeWindowEvent::Resize:
-			NativeWinManImpl::HandleWindowResize(
+			NativeWinMgrImpl::HandleWindowResize(
 				manager,
 				globUtils,
+				delQueue,
 				windowNode);
 			break;
 		case NativeWindowEvent::Restore:
-			NativeWinManImpl::HandleWindowRestore(
+			NativeWinMgrImpl::HandleWindowRestore(
 				manager,
 				globUtils,
+				delQueue,
 				windowNode);
 			break;
 		default:
@@ -185,115 +208,67 @@ void NativeWinMan::ProcessEvents(
 	}
 }
 
-void NativeWindowManager::Initialize(
-	NativeWindowManager& manager,
-	DeviceDispatch const& device,
-	QueueData const& queues,
-	DebugUtilsDispatch const* debugUtils)
+void NativeWinMgr::Initialize(
+	InitInfo const& initInfo)
 {
-
-
+	NativeWinMgr_PushCreateWindowJob(
+		initInfo.manager,
+		initInfo.initialWindow,
+		initInfo.surface);
 }
 
-void NativeWindowManager::BuildInitialNativeWindow(
-	NativeWindowManager& manager,
+void NativeWinMgr::Destroy(
+	NativeWinMgr& manager,
 	InstanceDispatch const& instance,
-	DeviceDispatch const& device,
-	vk::PhysicalDevice physDevice,
-	QueueData const& queues,
-	DeletionQueue const& delQueue,
-	SurfaceInfo const& surfaceInfo,
-	VmaAllocator vma,
-	u8 inFlightCount,
-	WsiInterface& initialWindowConnection,
-	vk::SurfaceKHR surface,
-	vk::RenderPass guiRenderPass,
-	DebugUtilsDispatch const* debugUtils)
+	DeviceDispatch const& device)
 {
-	NativeWindowData windowData = {};
-	windowData.wsiConnection = &initialWindowConnection;
-	windowData.surface = surface;
-	if (debugUtils)
+	for (auto& element : manager.main.nativeWindows)
 	{
-		debugUtils->Helper_SetObjectName(
-			device.handle,
-			windowData.surface,
-			"NativeWindow #0 - Surface");
+		auto& windowData = element.windowData;
+
+		for (auto fb : windowData.framebuffers)
+			device.Destroy(fb);
+
+		for (auto imgView : windowData.swapchainImgViews)
+			device.Destroy(imgView);
+
+		device.Destroy(windowData.swapchain);
+
+		device.Destroy(windowData.swapchainImgReadySem);
+
+		instance.Destroy(windowData.surface);
 	}
 
-	NativeWinManImpl::SwapchainSettings swapchainSettings = NativeWinManImpl::BuildSwapchainSettings(
-		instance,
-		physDevice,
-		surface,
-		surfaceInfo);
-
-	windowData.swapchain = NativeWinManImpl::CreateSwapchain(
-		device,
-		NativeWindowID(0),
-		windowData.surface,
-		swapchainSettings,
-		windowData.swapchain,
-		debugUtils);
-
-	windowData.swapchainImages = NativeWinManImpl::GetSwapchainImages(
-		device,
-		(NativeWindowID)0,
-		windowData.swapchain,
-		debugUtils);
-
-	// Make imageview for each swapchain image
-	windowData.swapchainImgViews = NativeWinManImpl::CreateSwapchainImgViews(
-		device,
-		(NativeWindowID)0,
-		swapchainSettings.surfaceFormat.format,
-		windowData.swapchainImages,
-		debugUtils);
-
-	// Build framebuffer for each swapchain image
-	windowData.framebuffers = NativeWinManImpl::CreateSwapchainFramebuffers(
-		device,
-		(NativeWindowID)0,
-		windowData.swapchainImgViews,
-		guiRenderPass,
-		swapchainSettings.extents,
-		debugUtils);
-
-	windowData.swapchainImgReadySem = NativeWinManImpl::CreateImageReadySemaphore(
-		device,
-		(NativeWindowID)0,
-		debugUtils);
-
-	WindowGuiData gui{};
-
-	gui.extent = swapchainSettings.extents;
-	gui.rotation = NativeWinManImpl::RotationToMatrix(swapchainSettings.transform);
-	gui.surfaceRotation = swapchainSettings.transform;
-
-	Node newNode{};
-	newNode.id = NativeWindowID(0);
-	newNode.windowData = windowData;
-	newNode.gui = gui;
-	manager.nativeWindows.push_back(newNode);
-	manager.nativeWindowIdTracker += 1;
+	manager.main.nativeWindows.clear();
 }
 
-Gfx::NativeWindowID NativeWinMan::PushCreateWindowJob(
-	NativeWinMan& manager,
-	WsiInterface& windowConnection)
+void Vk::NativeWinMgr_PushCreateWindowJob(
+	NativeWinMgr& manager,
+	NativeWindowID windowId,
+	Std::Opt<vk::SurfaceKHR> const& surface)
 {
-	std::lock_guard _{ manager.createQueueLock };
+	NativeWinMgr::CreateJob newJob = {};
+	newJob.id = windowId;
+	newJob.surface = surface;
 
-	CreateJob newJob{};
-	newJob.id = (NativeWindowID)manager.nativeWindowIdTracker;
-	manager.nativeWindowIdTracker++;
-	newJob.windowConnection = &windowConnection;
+	std::scoped_lock _{ manager.insertionJobs.lock };
 
-	manager.createJobs.push_back(newJob);
-
-	return newJob.id;
+	manager.insertionJobs.createQueue.push_back(newJob);
 }
 
-static vk::SwapchainKHR NativeWinManImpl::CreateSwapchain(
+void Vk::NativeWinMgr_PushDeleteWindowJob(
+	NativeWinMgr& manager,
+	NativeWindowID windowId)
+{
+	NativeWinMgr::DeleteJob newJob = {};
+	newJob.id = windowId;
+
+	std::scoped_lock _{ manager.insertionJobs.lock };
+
+	manager.insertionJobs.deleteQueue.push_back(newJob);
+}
+
+static vk::SwapchainKHR NativeWinMgrImpl::CreateSwapchain(
 	DeviceDispatch const& device,
 	NativeWindowID windowID,
 	vk::SurfaceKHR surface,
@@ -328,11 +303,12 @@ static vk::SwapchainKHR NativeWinManImpl::CreateSwapchain(
 	return swapchain;
 }
 
-Std::StackVec<vk::Image, Constants::maxSwapchainLength> NativeWinManImpl::GetSwapchainImages(
+auto NativeWinMgrImpl::GetSwapchainImages(
 	DeviceDispatch const& device, 
 	NativeWindowID windowID, 
 	vk::SwapchainKHR swapchain, 
 	DebugUtilsDispatch const* debugUtils)
+	-> Std::StackVec<vk::Image, Constants::maxSwapchainLength>
 {
 	vk::Result vkResult{};
 	Std::StackVec<vk::Image, Constants::maxSwapchainLength> returnVal;
@@ -364,7 +340,7 @@ Std::StackVec<vk::Image, Constants::maxSwapchainLength> NativeWinManImpl::GetSwa
 	return returnVal;
 }
 
-[[nodiscard]] static Std::StackVec<vk::ImageView, Const::maxSwapchainLength> NativeWinManImpl::CreateSwapchainImgViews(
+Std::StackVec<vk::ImageView, Const::maxSwapchainLength> NativeWinMgrImpl::CreateSwapchainImgViews(
 	DeviceDispatch const& device,
 	NativeWindowID windowId,
 	vk::Format format,
@@ -399,7 +375,7 @@ Std::StackVec<vk::Image, Constants::maxSwapchainLength> NativeWinManImpl::GetSwa
 	return returnVal;
 }
 
-Std::StackVec<vk::Framebuffer, Const::maxSwapchainLength> NativeWinManImpl::CreateSwapchainFramebuffers(
+Std::StackVec<vk::Framebuffer, Const::maxSwapchainLength> NativeWinMgrImpl::CreateSwapchainFramebuffers(
 	DeviceDispatch const& device,
 	NativeWindowID windowId, 
 	Std::Span<vk::ImageView const> imgViews, 
@@ -432,7 +408,7 @@ Std::StackVec<vk::Framebuffer, Const::maxSwapchainLength> NativeWinManImpl::Crea
 	return returnVal;
 }
 
-vk::Semaphore NativeWinManImpl::CreateImageReadySemaphore(
+vk::Semaphore NativeWinMgrImpl::CreateImageReadySemaphore(
 	DeviceDispatch const& device, 
 	NativeWindowID windowID, 
 	DebugUtilsDispatch const* debugUtils)
@@ -454,98 +430,177 @@ vk::Semaphore NativeWinManImpl::CreateImageReadySemaphore(
 	return returnVal;
 }
 
-static void NativeWinManImpl::HandleCreationJobs(
-	NativeWinMan& manager,
-	GlobUtils const& globUtils)
+static void NativeWinMgrImpl::HandleCreationJobs(
+	NativeWinMgr& manager,
+	GlobUtils const& globUtils,
+	Std::AllocRef const& transientAlloc)
 {
-	std::lock_guard createQueueLock{ manager.createQueueLock };
+	auto const* debugUtils = globUtils.DebugUtilsPtr();
+
+	// Copy the jobs over so we can release the mutex early
+	auto tempCreateJobs = Std::NewVec<NativeWinMgr::CreateJob>(transientAlloc);
+	{
+		std::scoped_lock lock{ manager.insertionJobs.lock };
+		tempCreateJobs.Resize(manager.insertionJobs.createQueue.size());
+		for (auto i = 0; i < tempCreateJobs.Size(); i += 1)
+			tempCreateJobs[i] = manager.insertionJobs.createQueue[i];
+		manager.insertionJobs.createQueue.clear();
+	}
 
 	vk::Result vkResult = {};
 
 	// We need to go through each creation job and create them
-	for (auto& createJob : manager.createJobs)
+	for (auto const& createJob : tempCreateJobs)
 	{
 		// Check if the ID already exists
-		DENGINE_DETAIL_GFX_ASSERT(
-			Std::FindIf(
-				manager.nativeWindows.begin(),
-				manager.nativeWindows.end(),
-				[&createJob](auto const& val) -> bool { return val.id == createJob.id; }) == manager.nativeWindows.end());
+		[[maybe_unused]] auto idExists = [&manager](NativeWindowID id) {
+			return Std::AnyOf(
+				manager.main.nativeWindows.begin(),
+				manager.main.nativeWindows.end(),
+				[id](auto const& item) { return item.id == id; });
+		};
+		DENGINE_IMPL_GFX_ASSERT(!idExists(createJob.id));
 
-		manager.nativeWindows.push_back({});
+		manager.main.nativeWindows.push_back({});
 
-		auto& newNode = manager.nativeWindows.back();
-		newNode.windowData.wsiConnection = createJob.windowConnection;
+		auto& newNode = manager.main.nativeWindows.back();
+		newNode.id = createJob.id;
 
-		u64 newSurface = 0;
-		vkResult = (vk::Result)newNode.windowData.wsiConnection->CreateVkSurface(
-			(uSize)(VkInstance)globUtils.instance.handle,
-			nullptr,
-			newSurface);
-		if (vkResult != vk::Result::eSuccess)
-			throw std::runtime_error("DEngine - Vulkan: Could not create VkSurfaceKHR");
-		newNode.windowData.surface = (vk::SurfaceKHR)(VkSurfaceKHR)newSurface;
-		if (globUtils.UsingDebugUtils())
+		if (createJob.surface.Has()) {
+			newNode.windowData.surface = createJob.surface.Get();
+		} else {
+			auto createSurfaceResult = globUtils.wsiInterface->CreateVkSurface(
+				createJob.id,
+				(uSize)(VkInstance)globUtils.instance.handle,
+				nullptr);
+			vkResult = (vk::Result)createSurfaceResult.vkResult;
+			if (vkResult != vk::Result::eSuccess)
+				throw std::runtime_error("DEngine - Vulkan: Could not create VkSurfaceKHR");
+
+			newNode.windowData.surface = (vk::SurfaceKHR)(VkSurfaceKHR)createSurfaceResult.vkSurface;
+		}
+
+		if (debugUtils)
 		{
 			std::string name;
 			name += "NativeWindow #";
 			name += std::to_string((u64)createJob.id);
 			name += " - Surface";
-			globUtils.debugUtils.Helper_SetObjectName(globUtils.device.handle, newNode.windowData.surface, name.c_str());
+			debugUtils->Helper_SetObjectName(globUtils.device.handle, newNode.windowData.surface, name.c_str());
 		}
 
-		bool physDeviceSupportsPresentation = globUtils.instance.getPhysicalDeviceSurfaceSupportKHR(
+		bool const physDeviceSupportsPresentation = globUtils.instance.getPhysicalDeviceSurfaceSupportKHR(
 			globUtils.physDevice.handle,
 			globUtils.queues.graphics.FamilyIndex(),
 			newNode.windowData.surface);
 		if (!physDeviceSupportsPresentation)
 			throw std::runtime_error("DEngine - Vulkan: Physical device queue family does not support this surface.");
 
-		NativeWinManImpl::SwapchainSettings swapchainSettings = NativeWinManImpl::BuildSwapchainSettings(
+		NativeWinMgrImpl::SwapchainSettings swapchainSettings = NativeWinMgrImpl::BuildSwapchainSettings(
 			globUtils.instance,
 			globUtils.physDevice.handle,
 			newNode.windowData.surface,
 			globUtils.surfaceInfo);
 
-		newNode.windowData.swapchain = NativeWinManImpl::CreateSwapchain(
+		auto const oldSwapchain = newNode.windowData.swapchain;
+		newNode.windowData.swapchain = NativeWinMgrImpl::CreateSwapchain(
 			globUtils.device,
 			createJob.id,
 			newNode.windowData.surface,
 			swapchainSettings,
-			newNode.windowData.swapchain,
-			globUtils.DebugUtilsPtr());
+			oldSwapchain,
+			debugUtils);
+		auto const& swapchain = newNode.windowData.swapchain;
 
-		newNode.windowData.swapchainImages = NativeWinManImpl::GetSwapchainImages(
+		newNode.windowData.swapchainImages = NativeWinMgrImpl::GetSwapchainImages(
 			globUtils.device,
 			createJob.id,
 			newNode.windowData.swapchain,
-			globUtils.DebugUtilsPtr());
+			debugUtils);
+		auto const& swapchainImgs = newNode.windowData.swapchainImages;
 
-		newNode.windowData.swapchainImgReadySem = NativeWinManImpl::CreateImageReadySemaphore(
+		newNode.windowData.swapchainImgViews = NativeWinMgrImpl::CreateSwapchainImgViews(
+			globUtils.device,
+			newNode.id,
+			swapchainSettings.surfaceFormat.format,
+			swapchainImgs,
+			debugUtils);
+		auto const& swapchainImgViews = newNode.windowData.swapchainImgViews;
+
+		newNode.windowData.framebuffers = NativeWinMgrImpl::CreateSwapchainFramebuffers(
+			globUtils.device,
+			newNode.id,
+			swapchainImgViews,
+			globUtils.guiRenderPass,
+			swapchainSettings.extents,
+			debugUtils);
+
+		newNode.windowData.swapchainImgReadySem = NativeWinMgrImpl::CreateImageReadySemaphore(
 			globUtils.device,
 			createJob.id,
-			globUtils.DebugUtilsPtr());
+			debugUtils);
+
+		auto& gui = newNode.gui;
+		gui.extent = swapchainSettings.extents;
+		gui.rotation = NativeWinMgrImpl::RotationToMatrix(swapchainSettings.transform);
+		gui.surfaceRotation = swapchainSettings.transform;
 	}
-	manager.createJobs.clear();
 }
 
-void NativeWinManImpl::HandleWindowResize(
-	NativeWinMan& manager,
+static void NativeWinMgrImpl::HandleDeletionJobs(
+	NativeWinMgr& manager,
 	GlobUtils const& globUtils,
-	NativeWinMan::Node& windowNode)
+	DelQueue& delQueue,
+	Std::AllocRef const& transientAlloc)
+{
+	// Copy the jobs over so we can release the mutex early
+	auto tempDeleteJobs = Std::NewVec<NativeWinMgr::DeleteJob>(transientAlloc);
+	{
+		std::lock_guard lock{ manager.insertionJobs.lock };
+		tempDeleteJobs.Resize(manager.insertionJobs.deleteQueue.size());
+		for (auto i = 0; i < tempDeleteJobs.Size(); i += 1)
+			tempDeleteJobs[i] = manager.insertionJobs.deleteQueue[i];
+		manager.insertionJobs.deleteQueue.clear();
+	}
+
+	auto& nativeWindows = manager.main.nativeWindows;
+
+	for (auto const& deleteJob : tempDeleteJobs)
+	{
+		auto const windowNodeIt = Std::FindIf(
+			nativeWindows.begin(),
+			nativeWindows.end(),
+			[&deleteJob](auto const& val) { return val.id == deleteJob.id; });
+		DENGINE_IMPL_GFX_ASSERT(windowNodeIt != nativeWindows.end());
+		auto windowNode = Std::Move(*windowNodeIt);
+		nativeWindows.erase(windowNodeIt);
+
+		delQueue.Destroy(windowNode.windowData.framebuffers);
+		delQueue.Destroy(windowNode.windowData.swapchainImgViews);
+		delQueue.Destroy(windowNode.windowData.swapchainImgReadySem);
+		delQueue.Destroy(windowNode.windowData.swapchain);
+		delQueue.Destroy(windowNode.windowData.surface);
+	}
+}
+
+void NativeWinMgrImpl::HandleWindowResize(
+	NativeWinMgr& manager,
+	GlobUtils const& globUtils,
+	DelQueue& delQueue,
+	NativeWinMgr::Node& windowNode)
 {
 	auto& windowData = windowNode.windowData;
 
-	NativeWinManImpl::SwapchainSettings swapchainSettings = NativeWinManImpl::BuildSwapchainSettings(
+	auto swapchainSettings = NativeWinMgrImpl::BuildSwapchainSettings(
 		globUtils.instance,
 		globUtils.physDevice.handle,
 		windowData.surface,
 		globUtils.surfaceInfo);
 
-	// We need to resize this native-window and it's GUI.
+	// We need to resize this native-window and its GUI.
 
 	vk::SwapchainKHR oldSwapchain = windowData.swapchain;
-	windowData.swapchain = NativeWinManImpl::CreateSwapchain(
+	windowData.swapchain = NativeWinMgrImpl::CreateSwapchain(
 		globUtils.device,
 		windowNode.id,
 		windowData.surface,
@@ -553,10 +608,10 @@ void NativeWinManImpl::HandleWindowResize(
 		oldSwapchain,
 		globUtils.DebugUtilsPtr());
 	if (oldSwapchain != vk::SwapchainKHR())
-		globUtils.delQueue.Destroy(oldSwapchain);
+		delQueue.Destroy(oldSwapchain);
 
 	// No need to delete the old image-handles, they belong to the swapchain.
-	windowData.swapchainImages = NativeWinManImpl::GetSwapchainImages(
+	windowData.swapchainImages = NativeWinMgrImpl::GetSwapchainImages(
 		globUtils.device,
 		windowNode.id,
 		windowData.swapchain,
@@ -564,20 +619,20 @@ void NativeWinManImpl::HandleWindowResize(
 
 	for (uSize i = 0; i < windowData.swapchainImgViews.Size(); i += 1)
 	{
-		globUtils.delQueue.Destroy(windowData.framebuffers[i]);
-		globUtils.delQueue.Destroy(windowData.swapchainImgViews[i]);
+		delQueue.Destroy(windowData.framebuffers[i]);
+		delQueue.Destroy(windowData.swapchainImgViews[i]);
 	}
 	windowData.framebuffers.Clear();
 	windowData.swapchainImgViews.Clear();
 
-	windowData.swapchainImgViews = NativeWinManImpl::CreateSwapchainImgViews(
+	windowData.swapchainImgViews = NativeWinMgrImpl::CreateSwapchainImgViews(
 		globUtils.device,
 		windowNode.id,
 		swapchainSettings.surfaceFormat.format,
 		windowData.swapchainImages,
 		globUtils.DebugUtilsPtr());
 
-	windowData.framebuffers = NativeWinManImpl::CreateSwapchainFramebuffers(
+	windowData.framebuffers = NativeWinMgrImpl::CreateSwapchainFramebuffers(
 		globUtils.device,
 		windowNode.id,
 		windowData.swapchainImgViews,
@@ -585,38 +640,44 @@ void NativeWinManImpl::HandleWindowResize(
 		swapchainSettings.extents,
 		globUtils.DebugUtilsPtr());
 
-	WindowGuiData& gui = windowNode.gui;
+	auto& gui = windowNode.gui;
 	gui.extent = swapchainSettings.extents;
-	gui.rotation = NativeWinManImpl::RotationToMatrix(swapchainSettings.transform);
+	gui.rotation = NativeWinMgrImpl::RotationToMatrix(swapchainSettings.transform);
 	gui.surfaceRotation = swapchainSettings.transform;
 }
 
-void NativeWinManImpl::HandleWindowRestore(
-	NativeWinMan& manager,
+void NativeWinMgrImpl::HandleWindowRestore(
+	NativeWinMgr& manager,
 	GlobUtils const& globUtils,
-	NativeWinMan::Node& windowNode)
+	DelQueue& delQueue,
+	NativeWinMgr::Node& windowNode)
 {
 	auto& windowData = windowNode.windowData;
+	auto const& instance = globUtils.instance;
+	auto const& device = globUtils.device;
 
-	globUtils.device.waitIdle();
+	device.waitIdle();
 
 	// We have to destroy the previous swapchain and it's surface because
 	// Android destroys all the surface resources when the window is minimized
-	globUtils.device.destroy(windowData.swapchain);
+	device.Destroy(windowData.swapchain);
 	windowData.swapchain = vk::SwapchainKHR{};
-	globUtils.instance.destroy(windowData.surface);
+	instance.Destroy(windowData.surface);
 	windowData.surface = vk::SurfaceKHR{};
 
-	vk::SurfaceKHR newSurface{};
-	vk::Result result = (vk::Result)windowNode.windowData.wsiConnection->CreateVkSurface(
-		(uSize)(VkInstance)globUtils.instance.handle,
-		nullptr,
-		*reinterpret_cast<u64*>(&newSurface));
+	auto createSurfaceResult = globUtils.wsiInterface->CreateVkSurface(
+		windowNode.id,
+		(uSize)(VkInstance)instance.handle,
+		nullptr);
+
+	auto result = (vk::Result)createSurfaceResult.vkResult;
 	if (result != vk::Result::eSuccess)
 		throw std::runtime_error("DEngine - Vulkan: Unable to create new suface when restoring window.");
 
+	auto newSurface = (vk::SurfaceKHR)(VkSurfaceKHR)createSurfaceResult.vkSurface;
+
 	// Check that our surface works with our device
-	bool surfaceSupported = globUtils.instance.getPhysicalDeviceSurfaceSupportKHR(
+	bool surfaceSupported = instance.getPhysicalDeviceSurfaceSupportKHR(
 		globUtils.physDevice.handle,
 		globUtils.queues.graphics.FamilyIndex(),
 		newSurface);
@@ -628,5 +689,6 @@ void NativeWinManImpl::HandleWindowRestore(
 	HandleWindowResize(
 		manager,
 		globUtils,
+		delQueue,
 		windowNode);
 }

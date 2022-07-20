@@ -16,70 +16,30 @@
 
 namespace DEngine::Gui
 {
+	namespace impl
+	{
+		struct DA_Node;
+		struct DA_SplitNode;
+		struct DA_WindowNode;
+	}
+
 	class DockArea : public Widget
 	{
 	public:
-		struct NodeBase
-		{
-			virtual ~NodeBase() {}
-		};
-		struct Layer
-		{
-			// This rect is relative to the DockArea widget's position.
-			Rect rect = {};
-			Std::Box<NodeBase> root = nullptr;
-		};
-		std::vector<Layer> layers;
-
 		u32 gizmoSize = 75;
 		u32 resizeHandleThickness = 50;
 		u32 resizeHandleLength = 75;
 		u32 tabTextMargin = 0;
-		Math::Vec4 resizeHandleColor = { 1.f, 1.f, 1.f, 0.5f };
-		Math::Vec4 deleteLayerGizmoColor = { 1.f, 0.f, 0.f, 0.75f };
-		Math::Vec4 dockingHighlightColor = { 0.f, 0.5f, 1.f, 0.5f };
-
-		struct State_Normal {};
-		struct State_Moving
+		struct Colors
 		{
-			bool movingSplitNode;
-
-			u8 pointerId;
-			// Pointer offset relative to window origin
-			Math::Vec2 pointerOffset;
-
-			struct HoveredWindow
-			{
-				uSize layerIndex;
-				// As the impl::DA_WindowNode type
-				void const* windowNode = nullptr;
-				Std::Opt<int> gizmoHighlightOpt;
-			};
-			Std::Opt<HoveredWindow> hoveredWindowOpt;
-			Std::Opt<int> backOuterGizmoHighlightOpt;
+			Math::Vec4 resizeHandle = { 1.f, 1.f, 1.f, 0.5f };
+			Math::Vec4 deleteLayerGizmo = { 1.f, 0.f, 0.f, 0.75f };
+			Math::Vec4 dockingHighlight = { 0.f, 0.5f, 1.f, 0.5f };
 		};
-		struct State_HoldingTab
-		{
-			// This is a impl::DA_WindowNode type
-			void const* windowBeingHeld;
-			u8 pointerId;
-			// Pointer offset relative to tab origin
-			Math::Vec2 pointerOffset;
-		};
-		struct State_ResizingSplitNode
-		{
-			uSize layerIndex;
-			void const* splitNode;
-			u8 pointerId;
-		};
-		using StateDataT = Std::Variant<
-			State_Normal,
-			State_Moving,
-			State_HoldingTab,
-			State_ResizingSplitNode>;
-		StateDataT stateData = State_Normal{};
+		Colors colors = {};
 
-	public:
+		static constexpr Extent defaultLayerExtent = { 600, 600 };
+
 		DockArea();
 
 		void AddWindow(
@@ -87,57 +47,116 @@ namespace DEngine::Gui
 			Math::Vec4 color,
 			Std::Box<Widget>&& widget);
 
-		[[nodiscard]] virtual SizeHint GetSizeHint(
-			Context const& ctx) const override;
-
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
-
-		virtual bool CursorPress(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Math::Vec2Int cursorPos,
-			CursorClickEvent event) override;
-
+		virtual SizeHint GetSizeHint2(
+			GetSizeHint2_Params const& params) const override;
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual void Render2(
+			Render_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual void CursorExit(
+			Context& ctx) override;
 		virtual bool CursorMove(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			CursorMoveEvent event,
+			CursorMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool occluded) override;
-
-		virtual bool TouchPressEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchPressEvent event) override;
-
-		virtual bool TouchMoveEvent(
-			Context& ctx,
-			WindowID windowId,
-			Rect widgetRect,
-			Rect visibleRect,
-			Gui::TouchMoveEvent event,
+		virtual bool CursorPress2(
+			CursorPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+		virtual bool TouchMove2(
+			TouchMoveParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
 			bool occluded) override;
-
-		virtual void InputConnectionLost() override;
-
-		virtual void CharEnterEvent(
-			Context& ctx) override;
-
-		virtual void CharEvent(
+		virtual bool TouchPress2(
+			TouchPressParams const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect,
+			bool consumed) override;
+		virtual void TextInput(
 			Context& ctx,
-			u32 utfValue) override;
+			AllocRef const& transientAlloc,
+			TextInputEvent const& event) override;
+		virtual void EndTextInputSession(
+			Context& ctx,
+			AllocRef const& transientAlloc,
+			EndTextInputSessionEvent const& event) override;
 
-		virtual void CharRemoveEvent(
-			Context& ctx) override;
+		struct Impl;
+		friend Impl;
+	protected:
+
+
+		struct Layer
+		{
+			// We did not use Std::Box for this because the implementation
+			// needs to access the raw pointer, by reference.
+			// (Yes, it's using double pointer).
+			impl::DA_Node* root = nullptr;
+			// This rect is relative to the DockArea widgets position.
+			// Do no use this directly. Use the DA_GetLayerRect function.
+			Rect rect = {};
+			Layer() = default;
+			Layer(Layer&& other) noexcept : root{ other.root }, rect{ other.rect }
+			{
+				other.root = nullptr;
+				other.rect = {};
+			}
+			Layer& operator=(Layer&& other) noexcept
+			{
+				Clear();
+				root = other.root;
+				other.root = nullptr;
+				rect = other.rect;
+				other.rect = {};
+				return *this;
+			}
+			void Clear();
+			~Layer() { Clear(); }
+		};
+		std::vector<Layer> layers;
+
+		struct State_Normal {};
+		struct State_Moving {
+			u8 pointerId;
+			// Pointer offset relative to window origin
+			Math::Vec2 pointerOffset;
+			struct HoveredWindow {
+				// If windowNode is nullptr, it means
+				// we are hovering the back layers outer gizmos.
+				// If it is not a nullptr, we are hovering a specific windows
+				// inner gizmos.
+				impl::DA_WindowNode* windowNode = nullptr;
+				[[nodiscard]] impl::DA_WindowNode const* GetWindowNode() const { return windowNode; }
+				bool gizmoIsInner = false;
+				Std::Opt<int> gizmo;
+			};
+			Std::Opt<HoveredWindow> hoveredGizmoOpt;
+		};
+		struct State_HoldingTab {
+			// This is a impl::DA_WindowNode type
+			impl::DA_WindowNode* windowBeingHeld;
+			u8 pointerId;
+			uSize tabIndex;
+			Math::Vec2 pointerOffsetFromTab;
+		};
+		struct State_ResizingSplit
+		{
+			bool resizingBack;
+			impl::DA_SplitNode* splitNode;
+			u8 pointerId;
+		};
+		using StateDataT = Std::Variant<
+			State_Normal,
+			State_Moving,
+			State_HoldingTab,
+			State_ResizingSplit>;
+		StateDataT stateData = State_Normal{};
 	};
 }

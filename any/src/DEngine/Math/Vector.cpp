@@ -4,7 +4,7 @@
 #include <DEngine/Math/Constant.hpp>
 #include <DEngine/Math/Trigonometric.hpp>
 
-#include <DEngine/detail/Assert.hpp>
+#include <DEngine/Math/impl/Assert.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Math;
@@ -37,8 +37,8 @@ Vector<2, f32> Vector<2, f32>::GetRotated(f32 radians) const noexcept
 
 f32 Vector<2, f32>::SignedAngle(Vector<2, f32> const& a, Vector<2, f32> const& b) noexcept
 {
-	DENGINE_DETAIL_ASSERT((a.MagnitudeSqrd() - 1.f) <= 0.00001f);
-	DENGINE_DETAIL_ASSERT((b.MagnitudeSqrd() - 1.f) <= 0.00001f);
+	DENGINE_IMPL_MATH_ASSERT((a.MagnitudeSqrd() - 1.f) <= 0.00001f);
+	DENGINE_IMPL_MATH_ASSERT((b.MagnitudeSqrd() - 1.f) <= 0.00001f);
 
 	f32 temp = ArcTan2(a.y, a.x) - ArcTan2(b.y, b.x);
 	if (temp > pi)

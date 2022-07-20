@@ -1,42 +1,69 @@
 #include <DEngine/Gui/ButtonGroup.hpp>
+#include <DEngine/Gui/TextManager.hpp>
+#include <DEngine/Gui/DrawInfo.hpp>
 
-#include <DEngine/Gui/Context.hpp>
+#include <DEngine/Math/Common.hpp>
 
-#include "ImplData.hpp"
-
-#include <vector>
+#include <DEngine/Std/Containers/Vec.hpp>
 
 using namespace DEngine;
 using namespace DEngine::Gui;
 
 namespace DEngine::Gui::impl
 {
-	struct GetButtonSizes_ReturnT
+	// Returns the widths of each child
+	[[nodiscard]] static auto GetButtonWidths(
+		Std::Span<u32 const> desiredButtonWidths,
+		u32 widgetWidth,
+		AllocRef const& transientAlloc)
 	{
-		std::vector<u32> widths = {};
-		Extent outerExtent = {};
-	};
-	[[nodiscard]] static GetButtonSizes_ReturnT GetButtonSizes(
-		Std::Span<decltype(ButtonGroup::buttons)::value_type const> buttons,
-		impl::TextManager& textManager,
-		u32 margin)
-	{
-		GetButtonSizes_ReturnT returnVal = {};
+		auto const count = desiredButtonWidths.Size();
 
-		for (auto const& btn : buttons)
+		u32 sumDesiredWidth = 0;
+		for (auto const& desiredWidth : desiredButtonWidths)
+			sumDesiredWidth += desiredWidth;
+
+		f32 const scaleFactor = (f32)widgetWidth / (f32)sumDesiredWidth;
+
+		auto returnWidths = Std::NewVec<u32>(transientAlloc);
+		returnWidths.Resize(count);
+
+		u32 remainingWidth = widgetWidth;
+		for (int i = 0; i < count; i += 1)
 		{
-			DENGINE_IMPL_GUI_ASSERT(!btn.title.empty());
-			auto const btnSizeHint = impl::TextManager::GetSizeHint(textManager, { btn.title.data(), btn.title.size() });
+			u32 btnWidth;
+			// If we're not the last element, use the scale factor instead.
+			if (count >= 0 && i != count - 1)
+				btnWidth = (u32)Math::Round((f32)desiredButtonWidths[i] * scaleFactor);
+			else
+				btnWidth = remainingWidth;
 
-			auto const width = btnSizeHint.preferred.width + (margin * 2);
-			returnVal.widths.push_back(width);
-
-			returnVal.outerExtent.width += width;
-			returnVal.outerExtent.height = Math::Max(returnVal.outerExtent.height, btnSizeHint.preferred.height);
+			returnWidths[i] = btnWidth;
+			remainingWidth -= btnWidth;
 		}
-		returnVal.outerExtent.height += margin * 2;
 
-		return returnVal;
+		return returnWidths;
+	}
+
+	[[nodiscard]] static auto GetButtonRects(
+		Std::Span<u32 const> btnWidths,
+		Math::Vec2Int widgetPos,
+		u32 widgetHeight,
+		AllocRef const& transientAlloc)
+	{
+		int btnCount = (int)btnWidths.Size();
+
+		auto returnRects = Std::NewVec<u32>(transientAlloc);
+		returnRects.Resize(btnCount);
+
+		i32 rectPosOffsetX = 0;
+		for (int i = 0; i < btnCount; i++) {
+			auto const& btnWidth = btnWidths[i];
+
+			rectPosOffsetX += btnWidth;
+		}
+
+		return returnRects;
 	}
 
 	// Returns the index of the button, if any hit.
@@ -68,7 +95,37 @@ namespace DEngine::Gui::impl
 		return returnVal;
 	}
 
-	constexpr u8 cursorPointerId = (u8)-1;
+
+	[[nodiscard]] static Math::Vec2Int BuildTextOffset(Extent const& widgetExtent, Extent const& textExtent) noexcept {
+		Math::Vec2Int out = {};
+		for (int i = 0; i < 2; i++) {
+			auto temp = (i32)Math::Round((f32)widgetExtent[i] * 0.5f - (f32)textExtent[i] * 0.5f);
+			temp = Math::Max(0, temp);
+			out[i] = temp;
+		}
+		return out;
+	}
+}
+
+struct Gui::ButtonGroup::Impl
+{
+	// This data is only available when rendering.
+	struct [[maybe_unused]] CustomData
+	{
+		explicit CustomData(RectCollection::AllocRefT const& alloc) :
+			desiredBtnWidths{ alloc },
+			totalTextWidths{ alloc },
+			glyphRects{ alloc } {}
+
+		Std::Vec<u32, RectCollection::AllocRefT> desiredBtnWidths;
+
+		// Only available
+		u32 textHeight;
+		Std::Vec<u32, RectCollection::AllocRefT> totalTextWidths;
+		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
+	};
+
+	static constexpr u8 cursorPointerId = (u8)-1;
 
 	enum class PointerType : u8
 	{
@@ -95,6 +152,7 @@ namespace DEngine::Gui::impl
 		PointerType type;
 		Math::Vec2 pos;
 		bool pressed;
+		bool consumed;
 	};
 
 	struct PointerMove_Pointer
@@ -103,40 +161,50 @@ namespace DEngine::Gui::impl
 		Math::Vec2 pos;
 		bool occluded;
 	};
-}
 
-struct impl::BtnGroupImpl
-{
-public:
-	[[nodiscard]] static bool PointerMove(
-		ButtonGroup& widget,
-	  	Context& ctx,
-	  	Rect const& widgetRect,
-	  	Rect const& visibleRect,
-		PointerMove_Pointer const& pointer)
+	struct PointerMove_Params
 	{
-		auto& implData = *static_cast<impl::ImplData*>(ctx.Internal_ImplData());
-		impl::TextManager& textManager = implData.textManager;
+		ButtonGroup& widget;
+		Rect const& widgetRect;
+		Rect const& visibleRect;
+		RectCollection const& rectCollection;
+		AllocRef const& transientAlloc;
+		PointerMove_Pointer const& pointer;
+	};
+	[[nodiscard]] static bool PointerMove(
+		PointerMove_Params const& params)
+	{
+		auto& widget = params.widget;
+		auto& widgetRect = params.widgetRect;
+		auto& visibleRect = params.visibleRect;
+		auto& pointer = params.pointer;
+		auto& rectColl = params.rectCollection;
+		auto& transientAlloc = params.transientAlloc;
 
-		auto pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+		auto const* customDataPtr = rectColl.GetCustomData2<Impl::CustomData>(widget);
+		DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+		auto const& customData = *customDataPtr;
+		auto const& desiredBtnWidths = customData.desiredBtnWidths;
+
+		auto const pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
 
 		if (pointer.id == cursorPointerId)
 		{
-			if (!pointerInside)
+			if (!pointerInside || pointer.occluded)
 			{
 				widget.cursorHoverIndex = Std::nullOpt;
 			}
 			else
 			{
-				auto const btnSizes = GetButtonSizes(
-					{ widget.buttons.data(), widget.buttons.size() },
-					textManager,
-					widget.margin);
+				auto const buttonWidths = impl::GetButtonWidths(
+					desiredBtnWidths.ToSpan(),
+					widgetRect.extent.width,
+					transientAlloc);
 
-				Std::Opt<uSize> hoveredIndexOpt = CheckHitButtons(
+				auto const hoveredIndexOpt = impl::CheckHitButtons(
 					widgetRect.position,
-					{ btnSizes.widths.data(), btnSizes.widths.size() },
-					btnSizes.outerExtent.height,
+					buttonWidths.ToSpan(),
+					widgetRect.extent.height,
 					pointer.pos);
 
 				if (hoveredIndexOpt.HasValue())
@@ -149,29 +217,43 @@ public:
 		return pointerInside;
 	}
 
+	 struct PointerPress_Params
+	 {
+		 ButtonGroup& widget;
+		 Rect const& widgetRect;
+		 Rect const& visibleRect;
+		 RectCollection const& rectCollection;
+		 AllocRef const& transientAlloc;
+		 PointerPress_Pointer const& pointer;
+	 };
 	[[nodiscard]] static bool PointerPress(
-		ButtonGroup& widget,
-		Context& ctx,
-		Rect const& widgetRect,
-		Rect const& visibleRect,
-		PointerPress_Pointer const& pointer)
+		PointerPress_Params const& params)
 	{
-		auto const pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
+		auto& widget = params.widget;
+		auto& widgetRect = params.widgetRect;
+		auto& visibleRect = params.visibleRect;
+		auto& rectColl = params.rectCollection;
+		auto& transientAlloc = params.transientAlloc;
+		auto const& pointer = params.pointer;
 
 		DENGINE_IMPL_GUI_ASSERT(widget.activeIndex < widget.buttons.size());
 
-		impl::ImplData& implData = *(impl::ImplData*)ctx.Internal_ImplData();
-		impl::TextManager& textManager = implData.textManager;
+		auto const* customDataPtr = rectColl.GetCustomData2<Impl::CustomData>(widget);
+		DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+		auto const& customData = *customDataPtr;
+		auto const& desiredBtnWidths = customData.desiredBtnWidths;
 
-		auto const btnSizes = GetButtonSizes(
-			{ widget.buttons.data(), widget.buttons.size() },
-			textManager,
-			widget.margin);
+		auto const pointerInside = PointIsInAll(pointer.pos, { widgetRect, visibleRect });
 
-		auto const hoveredIndexOpt = CheckHitButtons(
+		auto const buttonWidths = impl::GetButtonWidths(
+			desiredBtnWidths.ToSpan(),
+			widgetRect.extent.width,
+			transientAlloc);
+
+		auto const hoveredIndexOpt = impl::CheckHitButtons(
 			widgetRect.position,
-			{ btnSizes.widths.data(), btnSizes.widths.size() },
-			btnSizes.outerExtent.height,
+			buttonWidths.ToSpan(),
+			widgetRect.extent.height,
 			pointer.pos);
 
 		if (widget.heldPointerData.HasValue())
@@ -192,7 +274,7 @@ public:
 		}
 		else
 		{
-			if (hoveredIndexOpt.HasValue() && pointer.pressed)
+			if (hoveredIndexOpt.HasValue() && pointer.pressed && !pointer.consumed)
 			{
 				ButtonGroup::HeldPointerData temp = {};
 				temp.buttonIndex = hoveredIndexOpt.Value();
@@ -223,161 +305,267 @@ u32 ButtonGroup::GetActiveButtonIndex() const
 	return activeIndex;
 }
 
-SizeHint ButtonGroup::GetSizeHint(Context const& ctx) const
+SizeHint ButtonGroup::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
 {
-	impl::ImplData& implData = *(impl::ImplData*)ctx.Internal_ImplData();
-	
 	SizeHint returnVal = {};
 
-	auto& textManager = implData.textManager;
+	auto& pusher = params.pusher;
+	auto& textManager = params.textManager;
 
-	for (auto const& btn : buttons)
+	auto entry = pusher.AddEntry(*this);
+
+	auto const btnCount = buttons.size();
+
+	// Count the total amount of text-glyphs
+	uSize totalGlyphCount = 0;
+	for (auto const& item : buttons)
+		totalGlyphCount += item.title.size();
+
+	auto& customData = pusher.AttachCustomData(entry, Impl::CustomData{ pusher.Alloc() });
+	customData.desiredBtnWidths.Resize(btnCount);
+	if (pusher.IncludeRendering())
 	{
-		DENGINE_IMPL_GUI_ASSERT(!btn.title.empty());
-		SizeHint btnSizeHint = impl::TextManager::GetSizeHint(textManager, { btn.title.data(), btn.title.size() });
-		returnVal.preferred.width += btnSizeHint.preferred.width + (margin * 2);
-		returnVal.preferred.height = Math::Max(returnVal.preferred.height, btnSizeHint.preferred.height);
+		customData.textHeight = textManager.GetLineheight();
+		customData.glyphRects.Resize(totalGlyphCount);
+		customData.totalTextWidths.Resize(btnCount);
 	}
-	returnVal.preferred.height = margin * 2;
 
+
+	// Tracks the offset where we will push each
+	// line of glyph rects into
+	int glyphRectsOffset = 0;
+
+	for (int i = 0; i < btnCount; i += 1)
+	{
+		auto const& btn = buttons[i];
+		DENGINE_IMPL_GUI_ASSERT(!btn.title.empty());
+
+		auto const textLength = btn.title.size();
+
+		// Load the outer extent of this button text
+		// And store the rects of each glyph
+		Extent textOuterExtent = {};
+		if (pusher.IncludeRendering())
+		{
+			textOuterExtent = textManager.GetOuterExtent(
+				{ btn.title.data(), textLength },
+				{},
+				customData.glyphRects.Data() + glyphRectsOffset);
+			glyphRectsOffset += (int)textLength;
+			customData.totalTextWidths[i] = textOuterExtent.width;
+		}
+		else
+			textOuterExtent = textManager.GetOuterExtent({ btn.title.data(), textLength });
+
+		// Store the outer extent in our custom-data for later use.
+		auto const btnWidth = textOuterExtent.width + (margin * 2);
+		customData.desiredBtnWidths[i] = btnWidth;
+
+		returnVal.minimum.width += btnWidth;
+		returnVal.minimum.height = Math::Max(returnVal.minimum.height, textOuterExtent.height);
+	}
+	returnVal.minimum.height = margin * 2;
+
+	pusher.SetSizeHint(entry, returnVal);
 	return returnVal;
 }
 
-void ButtonGroup::Render(
-	Context const& ctx, 
-	Extent framebufferExtent, 
-	Rect widgetRect, 
-	Rect visibleRect, 
-	DrawInfo& drawInfo) const
+void ButtonGroup::BuildChildRects(
+	Widget::BuildChildRects_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	auto& pusher = params.pusher;
+	auto& transientAlloc = params.transientAlloc;
+
+	auto* customDataPtr = pusher.GetCustomData2<Impl::CustomData>(*this);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+	auto& customData = *customDataPtr;
+
+	// Offset the glyphs we stored into correct positions.
+	if (pusher.IncludeRendering())
+	{
+		auto const& desiredBtnWidths = customData.desiredBtnWidths;
+		auto const btnWidths = impl::GetButtonWidths(
+			desiredBtnWidths.ToSpan(),
+			widgetRect.extent.width,
+			transientAlloc);
+
+		auto const btnCount = buttons.size();
+
+		int glyphRectIndexOffset = 0;
+		int btnRectPosOffsetX = 0;
+		for (int i = 0; i < btnCount; i += 1)
+		{
+			Extent textExtent = { customData.totalTextWidths[i], customData.textHeight };
+			Extent btnExtent = { btnWidths[i], widgetRect.extent.height };
+			auto textPos = widgetRect.position + impl::BuildTextOffset(btnExtent, textExtent);
+			textPos.x += btnRectPosOffsetX;
+
+			auto const& btn = buttons[i];
+			auto textLength = btn.title.size();
+			Std::Span lineGlyphRects = { &customData.glyphRects[glyphRectIndexOffset], textLength };
+			for (auto& glyph : lineGlyphRects)
+				glyph.position += textPos;
+
+			btnRectPosOffsetX += btnExtent.width;
+			glyphRectIndexOffset += textLength;
+		}
+
+	}
+}
+
+void ButtonGroup::Render2(
+	Widget::Render_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
 {
 	DENGINE_IMPL_GUI_ASSERT(activeIndex < buttons.size());
 
-	impl::ImplData& implData = *(impl::ImplData*)ctx.Internal_ImplData();
-	impl::TextManager& textManager = implData.textManager;
+	auto& drawInfo = params.drawInfo;
+	auto const& rectColl = params.rectCollection;
+	auto& transientAlloc = params.transientAlloc;
 
-	auto const buttonSizes = impl::GetButtonSizes(
-		{ buttons.data(), buttons.size() },
-		textManager,
-		margin);
-	
+	auto const btnCount = buttons.size();
+
+	auto entryOpt = rectColl.GetEntry(*this);
+	DENGINE_IMPL_GUI_ASSERT(entryOpt.HasValue());
+	auto entry = entryOpt.Value();
+	auto const* customDataPtr = rectColl.GetCustomData2<Impl::CustomData>(entry);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+	auto const& customData = *customDataPtr;
+
+	auto const& desiredBtnWidths = customData.desiredBtnWidths;
+
+	auto const btnWidths = impl::GetButtonWidths(
+		desiredBtnWidths.ToSpan(),
+		widgetRect.extent.width,
+		transientAlloc);
+
 	u32 horiOffset = 0;
-	for (uSize i = 0; i < buttons.size(); i += 1)
+	int glyphRectIndexOffset = 0;
+	for (uSize i = 0; i < btnCount; i += 1)
 	{
-		auto const& width = buttonSizes.widths[i];
+		auto const& width = btnWidths[i];
 
 		Rect btnRect = {};
 		btnRect.position = widgetRect.position;
 		btnRect.position.x += horiOffset;
-		btnRect.extent.width = width;
-		btnRect.extent.height = buttonSizes.outerExtent.height;
+		btnRect.extent = { width, widgetRect.extent.height };
 
-		Math::Vec4 color = inactiveColor;
+		Math::Vec4 color = colors.inactiveColor;
+
+		if (cursorHoverIndex.HasValue() && cursorHoverIndex.Value() == i)
+			color = colors.hoveredColor;
+		if (heldPointerData.HasValue() && heldPointerData.Value().buttonIndex == i)
+			color = colors.hoveredColor;
 		if (i == activeIndex)
-			color = activeColor;
-		else if (cursorHoverIndex.HasValue() && cursorHoverIndex.Value() == i)
-			color = hoveredColor;
-		else if (heldPointerData.HasValue() && heldPointerData.Value().buttonIndex == i)
-			color = hoveredColor;
+			color = colors.activeColor;
 
 		drawInfo.PushFilledQuad(btnRect, color);
 
-		auto textRect = btnRect;
-		textRect.position.x += margin;
-		textRect.position.y += margin;
-		textRect.extent.width -= margin * 2;
-		textRect.extent.height -= margin * 2;
-
-		auto const& title = buttons[i].title;
-		impl::TextManager::RenderText(
-			textManager,
-			{ title.data(), title.size() },
-			{ 1.f, 1.f, 1.f, 1.f },
-			textRect,
-			drawInfo);
+		auto const& btnText = buttons[i].title;
+		auto textLen = buttons[i].title.size();
+		Std::Span btnGlyphRects = { &customData.glyphRects[glyphRectIndexOffset], textLen };
+		drawInfo.PushText(
+			{ btnText.data(), btnText.size() },
+			btnGlyphRects.Data(),
+			{ 1.f, 1.f, 1.f, 1.f });
 
 		horiOffset += btnRect.extent.width;
+		glyphRectIndexOffset += textLen;
 	}
 }
 
 bool ButtonGroup::CursorMove(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	CursorMoveEvent event,
+	Widget::CursorMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
 	bool occluded)
 {
-	impl::PointerMove_Pointer pointer = {};
-	pointer.id = impl::cursorPointerId;
-	pointer.pos = { (f32)event.position.x, (f32)event.position.y };
+	Impl::PointerMove_Pointer pointer = {};
+	pointer.id = Impl::cursorPointerId;
+	pointer.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
 	pointer.occluded = occluded;
 
-	return impl::BtnGroupImpl::PointerMove(
-		*this,
-		ctx,
-		widgetRect,
-		visibleRect,
-		pointer);
+	Impl::PointerMove_Params tempParams {
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.rectCollection = params.rectCollection,
+		.transientAlloc = params.transientAlloc,
+		.pointer = pointer, };
+	return Impl::PointerMove(tempParams);
 }
 
-bool ButtonGroup::CursorPress(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Math::Vec2Int cursorPos,
-	CursorClickEvent event)
+bool ButtonGroup::CursorPress2(
+	Widget::CursorPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
 {
-	impl::PointerPress_Pointer pointer = {};
-	pointer.id = impl::cursorPointerId;
-	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	pointer.pressed = event.clicked;
-	pointer.type = impl::ToPointerType(event.button);
-	return impl::BtnGroupImpl::PointerPress(
-		*this,
-		ctx,
-		widgetRect,
-		visibleRect,
-		pointer);
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.id = Impl::cursorPointerId;
+	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	pointer.type = Impl::ToPointerType(params.event.button);
+	pointer.pressed = params.event.pressed;
+	pointer.consumed = consumed;
+
+	Impl::PointerPress_Params tempParams {
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.rectCollection = params.rectCollection,
+		.transientAlloc = params.transientAlloc,
+		.pointer = pointer, };
+	return Impl::PointerPress(tempParams);
 }
 
-bool ButtonGroup::TouchMoveEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchMoveEvent event,
+void ButtonGroup::CursorExit(Context& ctx)
+{
+	cursorHoverIndex = Std::nullOpt;
+}
+
+bool ButtonGroup::TouchMove2(
+	TouchMoveParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
 	bool occluded)
 {
-	impl::PointerMove_Pointer pointer = {};
-	pointer.id = event.id;
-	pointer.pos = event.position;
+	Impl::PointerMove_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
 	pointer.occluded = occluded;
 
-	return impl::BtnGroupImpl::PointerMove(
-		*this,
-		ctx,
-		widgetRect,
-		visibleRect,
-		pointer);
+	Impl::PointerMove_Params tempParams {
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.rectCollection = params.rectCollection,
+		.transientAlloc = params.transientAlloc,
+		.pointer = pointer, };
+	return Impl::PointerMove(tempParams);
 }
 
-bool ButtonGroup::TouchPressEvent(
-	Context& ctx,
-	WindowID windowId,
-	Rect widgetRect,
-	Rect visibleRect,
-	Gui::TouchPressEvent event)
+bool ButtonGroup::TouchPress2(
+	TouchPressParams const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	bool consumed)
 {
-	impl::PointerPress_Pointer pointer = {};
-	pointer.id = event.id;
-	pointer.pos = event.position;
-	pointer.pressed = event.pressed;
-	pointer.type = impl::PointerType::Primary;
-	return impl::BtnGroupImpl::PointerPress(
-		*this,
-		ctx,
-		widgetRect,
-		visibleRect,
-		pointer);
+	Impl::PointerPress_Pointer pointer = {};
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.type = Impl::PointerType::Primary;
+	pointer.pressed = params.event.pressed;
+	pointer.consumed = consumed;
+
+	Impl::PointerPress_Params tempParams {
+		.widget = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.rectCollection = params.rectCollection,
+		.transientAlloc = params.transientAlloc,
+		.pointer = pointer, };
+	return Impl::PointerPress(tempParams);
 }

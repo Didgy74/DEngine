@@ -1,120 +1,88 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.18)
 
-set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "Don't build box2d unit tests.")
-set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "Don't build box2d testbed.")
-set(BOX2D_BUILD_DOCS OFF CACHE BOOL "Don't build box2d documentation.")
+option(DENGINE_GFX_ENABLE_DEDICATED_THREAD "Enables a dedicated thread to handle the renderer." ON)
+set(DENGINE_GFX_ENABLE_DEDICATED_THREAD ON)
+
+
 project(dengine_any)
 
 find_package(Threads REQUIRED)
 
-add_subdirectory(external/box2d box2d)
-add_subdirectory(external/Texas Texas)
-
-set(CMAKE_DISABLE_FIND_PACKAGE_ZLIB TRUE)
-set(CMAKE_DISABLE_FIND_PACKAGE_BZip2 TRUE)
-set(CMAKE_DISABLE_FIND_PACKAGE_PNG TRUE)
-set(CMAKE_DISABLE_FIND_PACKAGE_HarfBuzz TRUE)
-set(CMAKE_DISABLE_FIND_PACKAGE_BrotliDec TRUE)
-add_subdirectory(external/freetype freetype)
-add_subdirectory(external/Vulkan-Headers Vulkan-Headers)
-
 file(GLOB_RECURSE DENGINE_HEADERS
 	"*.hpp"
 	"include")
+include(SourceFileList.cmake)
 
-add_library(dengine_any STATIC
-		"src/main.cpp"
-		"src/DEngine/Assert.cpp"
-		"src/DEngine/Scene.cpp"
-		"src/DEngine/Std.cpp"
-		"src/DEngine/Editor/AppIntegration.cpp"
-		"src/DEngine/Editor/ComponentWidgets.cpp"
-		"src/DEngine/Editor/Editor.cpp"
-		"src/DEngine/Editor/Joystick.cpp"
-		"src/DEngine/Editor/ViewportWidget.cpp"
-		"src/DEngine/FrameAllocator.cpp"
-		"src/DEngine/Gui/AnchorArea.cpp"
-		"src/DEngine/Gui/Button.cpp"
-		"src/DEngine/Gui/ButtonGroup.cpp"
-		"src/DEngine/Gui/CollapsingHeader.cpp"
-		"src/DEngine/Gui/Context.cpp"
-		"src/DEngine/Gui/DockArea.cpp"
-		"src/DEngine/Gui/Dropdown.cpp"
-		"src/DEngine/Gui/Image.cpp"
-		"src/DEngine/Gui/LineEdit.cpp"
-		"src/DEngine/Gui/LineFloatEdit.cpp"
-		"src/DEngine/Gui/LineList.cpp"
-		"src/DEngine/Gui/MenuButton.cpp"
-		"src/DEngine/Gui/ScrollArea.cpp"
-		"src/DEngine/Gui/StackLayout.cpp"
-		"src/DEngine/Gui/Text.cpp"
-		"src/DEngine/Physics2D.cpp"
-		"src/DEngine/Time.cpp"
-		"src/DEngine/Utility.cpp"
-		"src/DEngine/Application/Application.cpp"
-		"src/DEngine/Gfx/Gfx.cpp"
-		"src/DEngine/Gfx/Vk/DeletionQueue.cpp"
-		"src/DEngine/Gfx/Vk/Draw.cpp"
-		"src/DEngine/Gfx/Vk/DynamicDispatch.cpp"
-		"src/DEngine/Gfx/Vk/Init.cpp"
-		"src/DEngine/Gfx/Vk/GizmoManager.cpp"
-		"src/DEngine/Gfx/Vk/GuiResourceManager.cpp"
-		"src/DEngine/Gfx/Vk/NativeWindowManager.cpp"
-		"src/DEngine/Gfx/Vk/ObjectDataManager.cpp"
-		"src/DEngine/Gfx/Vk/QueueData.cpp"
-		"src/DEngine/Gfx/Vk/TextureManager.cpp"
-		"src/DEngine/Gfx/Vk/ViewportManager.cpp"
-		"src/DEngine/Gfx/Vk/Vk.cpp"
-		"src/DEngine/Gfx/Vk/vk_mem_alloc.cpp"
-		"src/DEngine/Math/Common.cpp"
-		"src/DEngine/Math/Vector.cpp")
+set(DENGINE_ANY_TARGET_NAME dengine_any)
 
-target_include_directories(dengine_any
+
+
+# Create main library
+add_library(${DENGINE_ANY_TARGET_NAME} STATIC ${DENGINE_ANY_SOURCE_FILES})
+
+target_include_directories(${DENGINE_ANY_TARGET_NAME}
 	PUBLIC
 		"include")
-target_link_libraries(dengine_any
+target_link_libraries(${DENGINE_ANY_TARGET_NAME}
 	PUBLIC
 		Threads::Threads
-		Vulkan-Headers
-		Texas
-		freetype
-		box2d
 		${CMAKE_DL_LIBS})
-target_sources(dengine_any
+target_sources(${DENGINE_ANY_TARGET_NAME}
 	PUBLIC
 		${DENGINE_HEADERS})
-target_compile_features(dengine_any PRIVATE cxx_std_20)
-set_target_properties(dengine_any PROPERTIES 
+target_compile_features(${DENGINE_ANY_TARGET_NAME} PRIVATE cxx_std_20)
+set_target_properties(${DENGINE_ANY_TARGET_NAME} PROPERTIES
 	CXX_STANDARD 20
 	CXX_EXTENSIONS OFF)
 #target_compile_options(dengine_any PUBLIC "-ftime-trace")
 
-option(DENGINE_ENABLE_ASSERT "Disabling will remove all asserts in engine" ON)
-if (${DENGINE_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_ENABLE_ASSERT)
+# Run script for linking dependencies
+include(LinkDependencies.cmake)
+DEngineAny_LinkDependencies(${DENGINE_ANY_TARGET_NAME} ${DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT})
+
+set(DENGINE_DEFAULT_ASSERT_SETTING ON)
+include(SetupAssertDefines.cmake)
+DEngineAny_SetupAssertDefines(${DENGINE_ANY_TARGET_NAME} ${DENGINE_DEFAULT_ASSERT_SETTING})
+
+# Rendering multi-threading switch
+if (${DENGINE_GFX_ENABLE_DEDICATED_THREAD})
+	target_compile_definitions(${DENGINE_ANY_TARGET_NAME} PUBLIC DENGINE_GFX_ENABLE_DEDICATED_THREAD)
 endif()
 
-option(DENGINE_APPLICATION_ENABLE_ASSERT "Asserts inside the application code" ON)
-if (${DENGINE_APPLICATION_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_APPLICATION_ENABLE_ASSERT)
-endif()
 
-option(DENGINE_CONTAINERS_ENABLE_ASSERT "Asserts inside DEngine containers" ON)	
-if (${DENGINE_CONTAINERS_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_CONTAINERS_ENABLE_ASSERT)
-endif()
 
-option(DENGINE_GFX_ENABLE_ASSERT "Asserts inside the rendering code" ON)
-if (${DENGINE_GFX_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_GFX_ENABLE_ASSERT)
-endif()
+set(DENGINE_ANY_TARGET_NAME2 dengine_any2)
+# Create main library
+add_library(${DENGINE_ANY_TARGET_NAME2} STATIC ${DENGINE_ANY_SOURCE_FILES2})
 
-option(DENGINE_GUI_ENABLE_ASSERT "Asserts inside the GUI toolkit code" ON)
-if (${DENGINE_GFX_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_GUI_ENABLE_ASSERT)
-endif()
+target_include_directories(${DENGINE_ANY_TARGET_NAME2}
+		PUBLIC
+		"include")
+target_link_libraries(${DENGINE_ANY_TARGET_NAME2}
+		PUBLIC
+		Threads::Threads
+		${CMAKE_DL_LIBS})
+target_sources(${DENGINE_ANY_TARGET_NAME2}
+		PUBLIC
+		${DENGINE_HEADERS})
+target_compile_features(${DENGINE_ANY_TARGET_NAME2} PRIVATE cxx_std_20)
+set_target_properties(${DENGINE_ANY_TARGET_NAME2} PROPERTIES
+		CXX_STANDARD 20
+		CXX_EXTENSIONS OFF)
+#target_compile_options(dengine_any PUBLIC "-ftime-trace")
 
-option(DENGINE_MATH_ENABLE_ASSERT "Asserts inside DEngine math" ON)	
-if (${DENGINE_MATH_ENABLE_ASSERT})
-	target_compile_definitions(dengine_any PUBLIC DENGINE_MATH_ENABLE_ASSERT)
+if (NOT DEFINED DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT)
+	message(FATAL_ERROR "DEngine, developer bug: CMake variable 'DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT' not set.")
+endif()
+# Run script for linking dependencies
+include(LinkDependencies.cmake)
+DEngineAny_LinkDependencies(${DENGINE_ANY_TARGET_NAME2} ${DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT})
+
+set(DENGINE_DEFAULT_ASSERT_SETTING ON)
+include(SetupAssertDefines.cmake)
+DEngineAny_SetupAssertDefines(${DENGINE_ANY_TARGET_NAME2} ${DENGINE_DEFAULT_ASSERT_SETTING})
+
+# Rendering multi-threading switch
+if (${DENGINE_GFX_ENABLE_DEDICATED_THREAD})
+	target_compile_definitions(${DENGINE_ANY_TARGET_NAME2} PUBLIC DENGINE_GFX_ENABLE_DEDICATED_THREAD)
 endif()

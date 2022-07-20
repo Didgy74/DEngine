@@ -33,6 +33,9 @@ namespace DEngine::Std::Trait::impl
 	template<class T, class U>
 	struct Conditional<false, T, U> { using Type = U; };
 
+	template<class T>
+	struct HasVirtualDestructor : public BoolValue<__has_virtual_destructor(T)> {};
+
 	template <class T, class... Ts>
 	struct IndexOf;
 	template <class T, class... Ts>
@@ -44,6 +47,27 @@ namespace DEngine::Std::Trait::impl
 	struct IsConst : public BoolValue<false> {};
 	template<class T>
 	struct IsConst<T const> : public BoolValue<true> {};
+
+	template<class T>
+	struct IsCopyConstructible : public BoolValue<__is_constructible(T, T const&)> {};
+	template<class T>
+	struct IsDefaultConstructible : public BoolValue<__is_constructible(T)> {};
+	template<class T>
+	struct IsMoveConstructible : public BoolValue<__is_constructible(T, T&&)> {};
+	template<class T>
+	struct IsTriviallyDefaultConstructible : public BoolValue<__is_trivially_constructible(T)> {};
+	template<class T>
+	struct IsTriviallyCopyable : public BoolValue<__is_trivially_copyable(T)> {};
+	template<class T>
+	struct IsTriviallyConstructible : public BoolValue<__is_trivially_constructible(T)> {};
+
+	template<class T>
+	struct IsTriviallyDestructible : public BoolValue<__has_trivial_destructor(T)> {};
+
+	template<class T>
+	struct IsCopyAssignable : public BoolValue<__is_assignable(T&, T const&)> {};
+	template<class T>
+	struct IsMoveAssignable : public BoolValue<__is_assignable(T&, T&&)> {};
 
 	template<class T>
 	struct IsRef : public BoolValue<false> {};
@@ -110,6 +134,9 @@ namespace DEngine::Std::Trait
 	template<class T, class... Ts> requires (impl::IsSame<T, Ts>::value || ...)
 	constexpr unsigned int indexOf = impl::IndexOf<T, Ts...>::value;
 
+	template<class T>
+	constexpr bool hasVirtualDestructor = impl::HasVirtualDestructor<T>::value;
+
 	template<class Base, class Derived>
 	constexpr bool isBaseOf = __is_base_of(Base, Derived);
 
@@ -118,6 +145,25 @@ namespace DEngine::Std::Trait
 
 	template<class T>
 	constexpr bool isFloatingPoint = impl::IsSame<T, float>::value || impl::IsSame<T, double>::value;
+
+	template<class T>
+	constexpr bool isCopyConstructible = impl::IsCopyConstructible<T>::value;
+	template<class T>
+	constexpr bool isDefaultConstructible = impl::IsDefaultConstructible<T>::value;
+	template<class T>
+	constexpr bool isTriviallyDefaultConstructible = impl::IsTriviallyDefaultConstructible<T>::value;
+	template<class T>
+	constexpr bool isMoveConstructible = impl::IsMoveConstructible<T>::value;
+	template<class T>
+	constexpr bool isTriviallyDestructible = impl::IsTriviallyDestructible<T>::value;
+
+	template<class T>
+	constexpr bool isTrivial = impl::IsTriviallyConstructible<T>::value && impl::IsTriviallyCopyable<T>::value;
+
+	template<class T>
+	constexpr bool isCopyAssignable = impl::IsCopyAssignable<T>::value;
+	template<class T>
+	constexpr bool isMoveAssignable = impl::IsMoveAssignable<T>::value;
 
 	template<class T>
 	constexpr bool isRef = impl::IsRef<T>::value;

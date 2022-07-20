@@ -5,25 +5,21 @@
 #include "VulkanIncluder.hpp"
 #include "Constants.hpp"
 #include "VMAIncluder.hpp"
+#include "ForwardDeclarations.hpp"
 
+#include <DEngine/Std/BumpAllocator.hpp>
+#include <DEngine/Std/Containers/AllocRef.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
+#include <DEngine/Math/Matrix.hpp>
 
 #include <vector>
 #include <mutex>
 
 namespace DEngine::Gfx::Vk
 {
-	class InstanceDispatch;
-	class DeviceDispatch;
-	class DebugUtilsDispatch;
-	class DeletionQueue;
-	class QueueData;
-	class GlobUtils;
-	struct SurfaceInfo;
-
-	struct NativeWindowData
+	class NativeWinMgr_WindowData
 	{
-		WsiInterface* wsiConnection = nullptr;
+	public:
 		vk::SurfaceKHR surface = {};
 		vk::SwapchainKHR swapchain = {};
 		Std::StackVec<vk::Image, Const::maxSwapchainLength> swapchainImages;
@@ -32,69 +28,81 @@ namespace DEngine::Gfx::Vk
 		Std::StackVec<vk::Framebuffer, Const::maxSwapchainLength> framebuffers;
 	};
 
-	struct WindowGuiData
+	class NativeWinMgr_WindowGuiData
 	{
-		vk::Extent2D extent{};
-
+	public:
+		vk::Extent2D extent = {};
 		vk::SurfaceTransformFlagBitsKHR surfaceRotation = vk::SurfaceTransformFlagBitsKHR::eIdentity;
-		Math::Mat2 rotation{};
+		Math::Mat2 rotation = {};
 	};
 
-	struct NativeWindowManager
+	// Native Window Manager
+	class NativeWinMgr
 	{
+	public:
 		// Insertion job resources
-		std::mutex createQueueLock;
-		u64 nativeWindowIdTracker = 0;
 		struct CreateJob
 		{
 			NativeWindowID id;
-			WsiInterface* windowConnection;
+			Std::Opt<vk::SurfaceKHR> surface;
 		};
-		std::vector<CreateJob> createJobs;
-		// Insertion locked resources end
-
-
-		// Main data resources start
-		// This doesn't need a lock because it's ever accessed
-		// from the rendering thread.
-		struct Node
+		struct DeleteJob
 		{
 			NativeWindowID id;
-			NativeWindowData windowData;
-			WindowGuiData gui;
 		};
-		std::vector<Node> nativeWindows;
-		// Main data resources end
+		struct InsertionJobsT
+		{
+			std::mutex lock;
+			std::vector<CreateJob> createQueue;
+			std::vector<DeleteJob> deleteQueue;
+		};
+		InsertionJobsT insertionJobs;
+		// Insertion locked resources end
 
-		// This requires the manager's mutex to already be locked.
+		struct Node
+		{
+			NativeWindowID id = {};
+			NativeWinMgr_WindowData windowData = {};
+			NativeWinMgr_WindowGuiData gui = {};
+		};
+		struct MainT
+		{
+			//std::mutex lock;
+			std::vector<Node> nativeWindows;
+		};
+		MainT main;
+
 		static void ProcessEvents(
-			NativeWindowManager& manager,
+			NativeWinMgr& manager,
 			GlobUtils const& globUtils,
+			DeletionQueue& delQueue,
+			Std::AllocRef const& transientAlloc,
 			Std::Span<NativeWindowUpdate const> windowUpdates);
 
+		struct InitInfo
+		{
+			NativeWinMgr& manager;
+			NativeWindowID initialWindow;
+			vk::SurfaceKHR surface;
+			DeviceDispatch const& device;
+			QueueData const& queues;
+			DebugUtilsDispatch const* optional_debugUtils;
+		};
 		static void Initialize(
-			NativeWindowManager& manager,
-			DeviceDispatch const& device,
-			QueueData const& queues,
-			DebugUtilsDispatch const* debugUtils);
+			InitInfo const& initInfo);
 
-		static void BuildInitialNativeWindow(
-			NativeWindowManager& manager,
+		static void Destroy(
+			NativeWinMgr& manager,
 			InstanceDispatch const& instance,
-			DeviceDispatch const& device,
-			vk::PhysicalDevice physDevice,
-			QueueData const& queues,
-			DeletionQueue const& delQueue,
-			SurfaceInfo const& surfaceInfo,
-			VmaAllocator vma,
-			u8 inFlightCount,
-			WsiInterface& initialWindowConnection,
-			vk::SurfaceKHR surface,
-			vk::RenderPass guiRenderPass,
-			DebugUtilsDispatch const* debugUtils);
-
-		[[nodiscard]] static NativeWindowID PushCreateWindowJob(
-			NativeWindowManager& manager,
-			WsiInterface& windowConnection);
+			DeviceDispatch const& device);
 	};
+
+	void NativeWinMgr_PushCreateWindowJob(
+		NativeWinMgr& manager,
+		NativeWindowID windowId,
+		Std::Opt<vk::SurfaceKHR> const& surface = Std::nullOpt);
+
+	void NativeWinMgr_PushDeleteWindowJob(
+		NativeWinMgr& manager,
+		NativeWindowID windowId);
 }

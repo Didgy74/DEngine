@@ -19,6 +19,7 @@
 #include <DEngine/Gfx/Gfx.hpp>
 
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
 #include <DEngine/Std/Containers/Pair.hpp>
@@ -62,7 +63,9 @@ namespace DEngine::Gfx::Vk
 		void InternalDraw(DrawParams const& drawParams);
 
 		// Thread safe
-		virtual NativeWindowID NewNativeWindow(WsiInterface& wsiConnection) override;
+		virtual void NewNativeWindow(NativeWindowID windowId) override;
+		// Thread safe
+		virtual void DeleteNativeWindow(NativeWindowID windowId) override;
 
 		// Thread safe
 		virtual void NewViewport(ViewportID& viewportID) override;
@@ -77,7 +80,6 @@ namespace DEngine::Gfx::Vk
 			u32 pitch,
 			Std::Span<std::byte const> data) override;
 
-		Gfx::LogInterface* logger = nullptr;
 		Gfx::TextureAssetInterface const* test_textureAssetInterface = nullptr;
 
 		u8 currInFlightIndex = 0;
@@ -89,24 +91,37 @@ namespace DEngine::Gfx::Vk
 		Std::StackVec<vk::CommandPool, Const::maxInFlightCount> mainCmdPools;
 		Std::StackVec<vk::CommandBuffer, Const::maxInFlightCount> mainCmdBuffers;
 
-		GlobUtils globUtils{};
+		GlobUtils globUtils = {};
 
-		GizmoManager gizmoManager{};
-		GuiResourceManager guiResourceManager{};
-		NativeWindowManager nativeWindowManager{};
-		ObjectDataManager objectDataManager{};
-		TextureManager textureManager{};
-		ViewportManager viewportManager{};
+		Std::BumpAllocator frameAllocator;
+		DeletionQueue delQueue;
+
+		GizmoManager gizmoManager = {};
+		GuiResourceManager guiResourceManager = {};
+		NativeWinMgr nativeWindowManager = {};
+		ObjectDataManager objectDataManager = {};
+		TextureManager textureManager = {};
+		ViewportManager viewportManager = {};
 
 		vk::PipelineLayout testPipelineLayout{};
 		vk::Pipeline testPipeline{};
 
-		std::thread renderingThread;
-
-		DrawParams drawParams;
-		bool drawParamsReady = false;
-		std::mutex drawParamsLock;
-		std::condition_variable drawParamsCondVarWorker;
-		std::condition_variable drawParamsCondVarProducer;
+		std::mutex threadLock;
+		struct Thread
+		{
+			std::thread renderingThread;
+			enum class NextCmd
+			{
+				Draw,
+				Shutdown,
+				Invalid,
+			};
+			NextCmd nextCmd = NextCmd::Invalid;
+			DrawParams drawParams;
+			bool drawParamsReady = false;
+			std::condition_variable drawParamsCondVarWorker;
+			std::condition_variable drawParamsCondVarProducer;
+		};
+		Thread thread;
 	};
 }

@@ -50,8 +50,12 @@ namespace DEngine::Editor::impl
 		Joystick& widget,
 		Gui::Rect const& widgetRect,
 		Gui::Rect const& visibleRect,
-		PointerPress_Pointer const& pointer)
+		PointerPress_Pointer const& pointer,
+		bool eventConsumed)
 	{
+		if (eventConsumed && pointer.pressed)
+			return false;
+
 		if (pointer.pressed && widget.pressedData.HasValue())
 			return false;
 
@@ -72,16 +76,12 @@ namespace DEngine::Editor::impl
 		if (!pointer.pressed)
 			return false;
 
-		bool pointerIsInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
-		if (!pointerIsInside && pointer.pressed)
-			return false;
-
 		// Calculate distance from center
 		auto outerRadius = Math::Min(widgetRect.extent.width, widgetRect.extent.height) / 2;
 		auto widgetCenter = widgetRect.position + Math::Vec2Int{ (i32)outerRadius, (i32)outerRadius };
-
 		auto relativeVec = pointer.pos - Math::Vec2{ (f32)widgetCenter.x, (f32)widgetCenter.y };
-		if (relativeVec.MagnitudeSqrd() > Math::Sqrd(outerRadius))
+		bool pointerIsInside = relativeVec.MagnitudeSqrd() <= (f32)Math::Sqrd(outerRadius);
+		if (!pointerIsInside && pointer.pressed)
 			return false;
 
 		Joystick::PressedData newData = {};
@@ -114,102 +114,34 @@ namespace DEngine::Editor::impl
 using namespace DEngine;
 using namespace DEngine::Editor;
 
-bool Joystick::CursorPress(
-	Gui::Context& ctx,
-	Gui::WindowID windowId,
-	Gui::Rect widgetRect,
-	Gui::Rect visibleRect,
-	Math::Vec2Int cursorPos,
-	Gui::CursorClickEvent event)
-{
-	impl::PointerPress_Pointer pointer = {};
-	pointer.id = impl::cursorPointerId;
-	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
-	pointer.pressed = event.clicked;
-	pointer.type = impl::ToPointerType(event.button);
-
-	return impl::Joystick_PointerPress(
-		*this,
-		widgetRect,
-		visibleRect,
-		pointer);
-}
-
-bool Joystick::CursorMove(
-	Gui::Context& ctx,
-	Gui::WindowID windowId,
-	Gui::Rect widgetRect,
-	Gui::Rect visibleRect,
-	Gui::CursorMoveEvent event,
-	bool occluded)
-{
-	return impl::Joystick_PointerMove(
-		*this,
-		widgetRect,
-		impl::cursorPointerId,
-		{ (f32)event.position.x, (f32)event.position.y });
-}
-
-bool Joystick::TouchMoveEvent(
-	Gui::Context& ctx,
-	Gui::WindowID windowId,
-	Gui::Rect widgetRect,
-	Gui::Rect visibleRect,
-	Gui::TouchMoveEvent event,
-	bool occluded)
-{
-	return impl::Joystick_PointerMove(
-		*this,
-		widgetRect,
-		event.id,
-		event.position);
-}
-
-bool Joystick::TouchPressEvent(
-	Gui::Context& ctx,
-	Gui::WindowID windowId,
-	Gui::Rect widgetRect,
-	Gui::Rect visibleRect,
-	Gui::TouchPressEvent event)
-{
-	impl::PointerPress_Pointer pointer = {};
-	pointer.id = event.id;
-	pointer.pos = event.position;
-	pointer.pressed = event.pressed;
-	pointer.type = impl::PointerType::Primary;
-
-	return impl::Joystick_PointerPress(
-		*this,
-		widgetRect,
-		visibleRect,
-		pointer);
-}
-
-Gui::SizeHint Joystick::GetSizeHint(Gui::Context const& ctx) const
+Gui::SizeHint Joystick::GetSizeHint2(Gui::Widget::GetSizeHint2_Params const& params) const
 {
 	Gui::SizeHint returnVal = {};
 	returnVal.expandX = false;
 	returnVal.expandY = false;
-	returnVal.preferred = { 150, 150 };
+	returnVal.minimum = { 150, 150 };
+
+	auto& pusher = params.pusher;
+
+	auto entry = pusher.AddEntry(*this);
+	pusher.SetSizeHint(entry, returnVal);
 	return returnVal;
 }
 
-void Joystick::Render(
-	Gui::Context const& ctx,
-	Gui::Extent framebufferExtent,
-	Gui::Rect widgetRect,
-	Gui::Rect visibleRect,
-	Gui::DrawInfo& drawInfo) const
+void Joystick::Render2(
+	Gui::Widget::Render_Params const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect) const
 {
 	// Draw a circle, start from the top, move clockwise
 	Gfx::GuiDrawCmd::MeshSpan circleMeshSpan = {};
 
 	u32 circleVertexCount = 30;
-	circleMeshSpan.vertexOffset = (u32)drawInfo.vertices->size();
-	circleMeshSpan.indexOffset = (u32)drawInfo.indices->size();
+	circleMeshSpan.vertexOffset = (u32)params.drawInfo.vertices->size();
+	circleMeshSpan.indexOffset = (u32)params.drawInfo.indices->size();
 	circleMeshSpan.indexCount = circleVertexCount * 3;
 	// Create the vertices, we insert the middle vertex first.
-	drawInfo.vertices->push_back({ 0.5f, 0.5f });
+	params.drawInfo.vertices->push_back({ 0.5f, 0.5f });
 	for (u32 i = 0; i < circleVertexCount; i++)
 	{
 		f32 currentRadians = 2 * Math::pi / circleVertexCount * i;
@@ -219,18 +151,18 @@ void Joystick::Render(
 		// Translate from [-1, 1] space to [0, 1]
 		newVertex.position += { 1.f, 1.f };
 		newVertex.position *= 0.5f;
-		drawInfo.vertices->push_back(newVertex);
+		params.drawInfo.vertices->push_back(newVertex);
 	}
 	// Build indices
 	for (u32 i = 0; i < circleVertexCount - 1; i++)
 	{
-		drawInfo.indices->push_back(i + 1);
-		drawInfo.indices->push_back(0);
-		drawInfo.indices->push_back(i + 2);
+		params.drawInfo.indices->push_back(i + 1);
+		params.drawInfo.indices->push_back(0);
+		params.drawInfo.indices->push_back(i + 2);
 	}
-	drawInfo.indices->push_back(circleVertexCount);
-	drawInfo.indices->push_back(0);
-	drawInfo.indices->push_back(1);
+	params.drawInfo.indices->push_back(circleVertexCount);
+	params.drawInfo.indices->push_back(0);
+	params.drawInfo.indices->push_back(1);
 
 	auto outerDiameter = Math::Min(widgetRect.extent.width, widgetRect.extent.height);
 
@@ -238,11 +170,11 @@ void Joystick::Render(
 	cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
 	cmd.filledMesh.color = { 0.f, 0.f, 0.f, 0.25f };
 	cmd.filledMesh.mesh = circleMeshSpan;
-	cmd.rectPosition.x = (f32)widgetRect.position.x / framebufferExtent.width;
-	cmd.rectPosition.y = (f32)widgetRect.position.y / framebufferExtent.height;
-	cmd.rectExtent.x = (f32)outerDiameter / framebufferExtent.width;
-	cmd.rectExtent.y = (f32)outerDiameter / framebufferExtent.height;
-	drawInfo.drawCmds->push_back(cmd);
+	cmd.rectPosition.x = (f32)widgetRect.position.x / params.framebufferExtent.width;
+	cmd.rectPosition.y = (f32)widgetRect.position.y / params.framebufferExtent.height;
+	cmd.rectExtent.x = (f32)outerDiameter / params.framebufferExtent.width;
+	cmd.rectExtent.y = (f32)outerDiameter / params.framebufferExtent.height;
+	params.drawInfo.drawCmds->push_back(cmd);
 
 	auto innerDiameter = outerDiameter / 2;
 
@@ -264,9 +196,75 @@ void Joystick::Render(
 	cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
 	cmd.filledMesh.color = { 1.f, 1.f, 1.f, 0.75f };
 	cmd.filledMesh.mesh = circleMeshSpan;
-	cmd.rectPosition.x = (f32)innerCirclePos.x / framebufferExtent.width;
-	cmd.rectPosition.y = (f32)innerCirclePos.y / framebufferExtent.height;
-	cmd.rectExtent.x = (f32)outerDiameter * 0.5f / framebufferExtent.width;
-	cmd.rectExtent.y = (f32)outerDiameter * 0.5f / framebufferExtent.height;
-	drawInfo.drawCmds->push_back(cmd);
+	cmd.rectPosition.x = (f32)innerCirclePos.x / params.framebufferExtent.width;
+	cmd.rectPosition.y = (f32)innerCirclePos.y / params.framebufferExtent.height;
+	cmd.rectExtent.x = (f32)outerDiameter * 0.5f / params.framebufferExtent.width;
+	cmd.rectExtent.y = (f32)outerDiameter * 0.5f / params.framebufferExtent.height;
+	params.drawInfo.drawCmds->push_back(cmd);
+}
+
+bool Joystick::CursorPress2(
+	Gui::Widget::CursorPressParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.type = impl::ToPointerType(params.event.button);
+	pointer.id = impl::cursorPointerId;
+	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
+	pointer.pressed = params.event.pressed;
+
+	return impl::Joystick_PointerPress(
+		*this,
+		widgetRect,
+		visibleRect,
+		pointer,
+		consumed);
+}
+
+bool Joystick::CursorMove(
+	Gui::Widget::CursorMoveParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool occluded)
+{
+	return impl::Joystick_PointerMove(
+		*this,
+		widgetRect,
+		impl::cursorPointerId,
+		{ (f32)params.event.position.x, (f32)params.event.position.y });
+}
+
+bool Joystick::TouchMove2(
+	TouchMoveParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool occluded)
+{
+	return impl::Joystick_PointerMove(
+		*this,
+		widgetRect,
+		params.event.id,
+		params.event.position);
+}
+
+bool Joystick::TouchPress2(
+	TouchPressParams const& params,
+	Gui::Rect const& widgetRect,
+	Gui::Rect const& visibleRect,
+	bool consumed)
+{
+	impl::PointerPress_Pointer pointer = {};
+	pointer.type = impl::PointerType::Primary;
+	pointer.id = params.event.id;
+	pointer.pos = params.event.position;
+	pointer.pressed = params.event.pressed;
+
+	return impl::Joystick_PointerPress(
+		*this,
+		widgetRect,
+		visibleRect,
+		pointer,
+		consumed);
 }

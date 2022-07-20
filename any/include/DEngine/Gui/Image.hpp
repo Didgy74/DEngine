@@ -10,12 +10,5 @@ namespace DEngine::Gui
 	{
 	public:
 		Gfx::TextureID textureID = Gfx::TextureID::Invalid;
-
-		virtual void Render(
-			Context const& ctx,
-			Extent framebufferExtent,
-			Rect widgetRect,
-			Rect visibleRect,
-			DrawInfo& drawInfo) const override;
 	};
 }

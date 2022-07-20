@@ -3,7 +3,7 @@
 #include <DEngine/Gui/Button.hpp>
 #include <DEngine/Gui/CollapsingHeader.hpp>
 #include <DEngine/Gui/Dropdown.hpp>
-#include <DEngine/Gui/LineEdit.hpp>
+#include <DEngine/Gui/LineIntEdit.hpp>
 #include <DEngine/Gui/LineFloatEdit.hpp>
 #include <DEngine/Gui/StackLayout.hpp>
 #include <DEngine/Gui/Text.hpp>
@@ -29,11 +29,11 @@ namespace DEngine::Editor
 	public:
 		using ComponentType = Transform;
 
-		Gui::LineEdit* positionInputFields[3] = {};
-		Gui::LineEdit* rotationInput = nullptr;
-		Gui::LineEdit* scaleInputFields[2] = {};
+		Gui::LineFloatEdit* positionInputFields[3] = {};
+		Gui::LineFloatEdit* rotationInput = nullptr;
+		Gui::LineFloatEdit* scaleInputFields[2] = {};
 
-		TransformWidget(EditorImpl const& editorImpl);
+		explicit TransformWidget(EditorImpl const& editorImpl);
 		void Update(ComponentType const& component);
 	};
 
@@ -42,9 +42,9 @@ namespace DEngine::Editor
 	public:
 		using ComponentType = Gfx::TextureID;
 
-		Gui::LineEdit* textureIdInput = nullptr;
+		Gui::LineIntEdit* textureIdInput = nullptr;
 		
-		SpriteRenderer2DWidget(EditorImpl const& editorImpl);
+		explicit SpriteRenderer2DWidget(EditorImpl const& editorImpl);
 		void Update(ComponentType const& component);
 	};
 
@@ -57,7 +57,7 @@ namespace DEngine::Editor
 
 		Gui::Text* debug_VelocityLabel = nullptr;
 
-		RigidbodyWidget(EditorImpl const& editorImpl);
+		explicit RigidbodyWidget(EditorImpl const& editorImpl);
 		void Update(ComponentType const& component);
 	};
 }

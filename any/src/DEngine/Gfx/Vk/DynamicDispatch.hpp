@@ -2,7 +2,9 @@
 
 #include "VulkanIncluder.hpp"
 
-#include <DEngine/Gfx/detail/Assert.hpp>
+#include <DEngine/Gfx/impl/Assert.hpp>
+
+#include <limits>
 
 namespace DEngine::Gfx::Vk
 {
@@ -173,20 +175,20 @@ namespace DEngine::Gfx::Vk
 			PFN_vkGetInstanceProcAddr procAddr);
 
 		BaseDispatchRaw raw;
-		[[nodiscard]] vk::Instance createInstance(
+		[[nodiscard]] vk::Instance CreateInstance(
 			vk::InstanceCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		[[nodiscard]] vk::Result enumerateInstanceExtensionProperties(
+		[[nodiscard]] vk::Result EnumerateInstanceExtensionProperties(
 			char const* pLayerName,
 			std::uint32_t* pPropertyCount,
 			vk::ExtensionProperties* pProperties) const;
 
-		[[nodiscard]] vk::Result enumerateInstanceLayerProperties(
+		[[nodiscard]] vk::Result EnumerateInstanceLayerProperties(
 			std::uint32_t* pPropertyCount,
 			vk::LayerProperties* pProperties) const;
 
-		[[nodiscard]] std::uint32_t enumerateInstanceVersion() const;
+		[[nodiscard]] std::uint32_t EnumerateInstanceVersion() const;
 	};
 
 	class DebugUtilsDispatch
@@ -211,7 +213,7 @@ namespace DEngine::Gfx::Vk
 			vk::DebugUtilsMessengerCreateInfoEXT const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		void destroyDebugUtilsMessengerEXT(
+		void Destroy(
 			vk::Instance instance,
 			vk::DebugUtilsMessengerEXT messenger,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
@@ -224,7 +226,7 @@ namespace DEngine::Gfx::Vk
 		void Helper_SetObjectName(vk::Device device, T handle, char const* name) const
 		{
 			using BaseType = typename T::CType;
-			DENGINE_DETAIL_GFX_ASSERT(raw.vkSetDebugUtilsObjectNameEXT != nullptr);
+			DENGINE_IMPL_GFX_ASSERT(raw.vkSetDebugUtilsObjectNameEXT != nullptr);
 			vk::DebugUtilsObjectNameInfoEXT nameInfo = {};
 			nameInfo.objectHandle = uint64_t(BaseType(handle));
 			nameInfo.objectType = T::objectType;
@@ -255,7 +257,7 @@ namespace DEngine::Gfx::Vk
 			vk::DeviceCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		void destroy(vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
 		[[nodiscard]] vk::Result enumeratePhysicalDeviceExtensionProperties(
 			vk::PhysicalDevice physDevice,
@@ -279,7 +281,7 @@ namespace DEngine::Gfx::Vk
 
 
 		KHR_SurfaceDispatchRaw surfaceRaw{};
-		void destroy(
+		void Destroy(
 			vk::SurfaceKHR in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
@@ -503,31 +505,32 @@ namespace DEngine::Gfx::Vk
 			vk::ShaderModuleCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		void destroy(
+		void Destroy() const;
+		void Destroy(
 			vk::CommandPool in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::DescriptorPool in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::Framebuffer in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::Fence in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::Image in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::ImageView in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
 			vk::RenderPass in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
-		void destroy(
-			vk::Semaphore semaphore,
-			vk::Optional<vk::AllocationCallbacks const> allocator = nullptr) const;
-		void destroy(
+		void Destroy(
+			vk::Semaphore in,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		void Destroy(
 			vk::ShaderModule in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
@@ -583,7 +586,7 @@ namespace DEngine::Gfx::Vk
 			vk::SwapchainCreateInfoKHR const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		void destroy(
+		void Destroy(
 			vk::SwapchainKHR in,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 

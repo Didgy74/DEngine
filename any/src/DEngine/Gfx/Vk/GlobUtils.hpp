@@ -4,7 +4,6 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 
-#include "DeletionQueue.hpp"
 #include "DynamicDispatch.hpp"
 #include "PhysDeviceInfo.hpp"
 #include "QueueData.hpp"
@@ -22,7 +21,9 @@ namespace DEngine::Gfx::Vk
 		GlobUtils(GlobUtils&&) = delete;
 
 		Gfx::LogInterface* logger = nullptr;
+		Gfx::WsiInterface* wsiInterface = nullptr;
 
+		BaseDispatch baseDispatch{};
 		InstanceDispatch instance{};
 
 		DebugUtilsDispatch debugUtils{};
@@ -36,8 +37,6 @@ namespace DEngine::Gfx::Vk
 		QueueData queues{};
 
 		VmaAllocator vma{};
-
-		DeletionQueue delQueue;
 
 		u8 inFlightCount = 0;
 
