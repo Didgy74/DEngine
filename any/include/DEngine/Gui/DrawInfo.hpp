@@ -7,8 +7,9 @@
 
 namespace DEngine::Gui
 {
-	struct DrawInfo
+	class DrawInfo
 	{
+	public:
 		std::vector<Gfx::GuiVertex>* vertices;
 		std::vector<u32>* indices;
 		std::vector<Gfx::GuiDrawCmd>* drawCmds;

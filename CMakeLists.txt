@@ -66,6 +66,3 @@ endif()
 target_link_libraries(${DENGINE_EXECUTABLE_NAME}
 		PRIVATE
 		glfw)
-
-add_subdirectory(any/external/Tracy TracyLib)
-target_link_libraries(${DENGINE_EXECUTABLE_NAME} PUBLIC TracyClient)

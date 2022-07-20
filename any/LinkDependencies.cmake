@@ -75,4 +75,14 @@ function(DEngineAny_LinkDependencies TARGET ENABLE_CMAKE_LOGGING)
 	target_link_libraries(${TARGET} PUBLIC Vulkan-Headers)
 
 
+	#add_compile_definitions(${TARGET} PUBLIC TRACY_ENABLE=1)
+	include(FetchContent)
+	FetchContent_Declare(
+		tracy
+		GIT_REPOSITORY https://www.github.com/wolfpld/tracy.git
+		GIT_TAG f493d4aa8ba8141d9680473fad007d8a6348628e
+		#FIND_PACKAGE_ARGS NAMES TracyClient
+	)
+	FetchContent_MakeAvailable(tracy)
+	target_link_libraries(${TARGET} PUBLIC TracyClient)
 endfunction()

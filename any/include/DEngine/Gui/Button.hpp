@@ -96,7 +96,7 @@ namespace DEngine::Gui
 		
 		void Activate();
 
-		struct Impl;
+		class Impl;
 		friend Impl;
 	};
 }

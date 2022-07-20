@@ -737,7 +737,7 @@ void Gui::impl::Render_WindowNode(
 
 
 	// Render each tab
-	for (int i = 0; i < tabs.size(); i += 1)
+	for (int i = 0; i < (int)tabs.size(); i += 1)
 	{
 		auto const& tab = tabs[i];
 		auto color = tab.color;

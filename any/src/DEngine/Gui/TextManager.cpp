@@ -143,7 +143,7 @@ void Gui::impl::InitializeTextManager(
 		throw std::runtime_error("DEngine - Editor: Unable to open font file.");
 	fontFile.Seek(0, App::FileInputStream::SeekOrigin::End);
 	u64 fileSize = fontFile.Tell().Value();
-	implData.fontFileData.resize(fileSize);
+	implData.fontFileData.resize((uSize)fileSize);
 	fontFile.Seek(0, App::FileInputStream::SeekOrigin::Start);
 	fontFile.Read((char*)implData.fontFileData.data(), fileSize);
 	fontFile.Close();

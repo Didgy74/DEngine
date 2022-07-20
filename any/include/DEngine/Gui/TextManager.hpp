@@ -18,8 +18,9 @@ namespace DEngine::Gui
 	class DrawInfo;
 
 	// Here there be no null-terminated strings allowed
-	struct TextManager
+	class TextManager
 	{
+	public:
 		void* m_implData = nullptr;
 		[[nodiscard]] void* GetImplData() { return m_implData; }
 		[[nodiscard]] void const* GetImplData() const { return m_implData; }

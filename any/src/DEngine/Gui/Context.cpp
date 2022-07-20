@@ -10,8 +10,6 @@
 #include <DEngine/Gui/RectCollection.hpp>
 #include <DEngine/Gui/TextManager.hpp>
 
-#include <vector>
-
 using namespace DEngine;
 using namespace DEngine::Gui;
 
