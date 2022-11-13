@@ -19,33 +19,33 @@ namespace DEngine::Gui
 		Layer(Layer&&) = delete;
 		inline virtual ~Layer() = 0;
 
-		struct BuildSizeHints_Params
-		{
+		struct BuildSizeHints_Params {
 			Context const& ctx;
 			TextManager& textManager;
+			EventWindowInfo const& window;
 			Rect windowRect;
 			Rect safeAreaRect;
-			Std::BumpAllocator& transientAlloc;
+			AllocRef transientAlloc;
 			RectCollection::SizeHintPusher& pusher;
 		};
 		virtual void BuildSizeHints(BuildSizeHints_Params const& params) const {}
 
-		struct BuildRects_Params
-		{
+		struct BuildRects_Params {
 			Context const& ctx;
+			EventWindowInfo const& window;
 			Rect windowRect;
 			Rect visibleRect;
 			TextManager& textManager;
-			Std::BumpAllocator& transientAlloc;
+			AllocRef transientAlloc;
 			RectCollection::RectPusher& pusher;
 		};
 		virtual void BuildRects(BuildRects_Params const& params) const {}
 
-		struct Render_Params
-		{
+		struct Render_Params {
 			Context const& ctx;
 			TextManager& textManager;
 			AllocRef transientAlloc;
+			EventWindowInfo const& window;
 			Rect windowRect;
 			Rect safeAreaRect;
 			RectCollection const& rectCollection;
@@ -53,14 +53,15 @@ namespace DEngine::Gui
 		};
 		virtual void Render(Render_Params const& params) const {}
 
-		struct CursorMoveParams
-		{
+		struct CursorMoveParams {
 			Context& ctx;
 			TextManager& textManager;
+			EventWindowInfo const& window;
 			Rect windowRect;
 			Rect safeAreaRect;
 			RectCollection const& rectCollection;
 			CursorMoveEvent const& event;
+			AllocRef const& transientAlloc;
 		};
 		// Returns true if the cursor was occluded
 		[[nodiscard]] virtual bool CursorMove(
@@ -71,9 +72,11 @@ namespace DEngine::Gui
 		{
 			Context& ctx;
 			TextManager& textManager;
+			EventWindowInfo const& window;
 			Rect windowRect;
 			Rect safeAreaRect;
 			RectCollection const& rectCollection;
+			AllocRef const& transientAlloc;
 			Math::Vec2Int cursorPos;
 			CursorPressEvent const& event;
 		};
@@ -90,9 +93,11 @@ namespace DEngine::Gui
 		{
 			Context& ctx;
 			TextManager& textManager;
+			EventWindowInfo const& window;
 			Rect const& windowRect;
 			Rect const& safeAreaRect;
 			RectCollection const& rectCollection;
+			AllocRef const& transientAlloc;
 			TouchPressEvent const& event;
 		};
 		[[nodiscard]] virtual Press_Return TouchPress2(TouchPressParams const& params, bool eventConsumed) {
@@ -103,9 +108,11 @@ namespace DEngine::Gui
 		{
 			Context& ctx;
 			TextManager& textManager;
+			EventWindowInfo const& window;
 			Rect const& windowRect;
 			Rect const& safeAreaRect;
 			RectCollection const& rectCollection;
+			AllocRef const& transientAlloc;
 			TouchMoveEvent const& event;
 		};
 		[[nodiscard]] virtual bool TouchMove2(TouchMoveParams const& params, bool occluded) {

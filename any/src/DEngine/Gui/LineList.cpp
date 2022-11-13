@@ -1,4 +1,5 @@
 #include <DEngine/Gui/LineList.hpp>
+#include <DEngine/Gui/Context.hpp>
 #include <DEngine/Gui/TextManager.hpp>
 
 #include <DEngine/Std/Containers/Vec.hpp>
@@ -108,6 +109,7 @@ struct LineList::Impl
 		u32 lineHeight = {};
 
 		// Only included when we are rendering
+		FontFaceId fontFaceId;
 		Std::Vec<Rect, RectCollection::AllocRefT> lineGlyphRects;
 		Std::Vec<uSize, RectCollection::AllocRefT> lineGlyphRectOffsets;
 	};
@@ -174,14 +176,21 @@ struct LineList::Impl
 SizeHint LineList::GetSizeHint2(
 	Widget::GetSizeHint2_Params const& params) const
 {
+	auto const& ctx = params.ctx;
+	auto const& window = params.window;
 	auto& pusher = params.pusher;
 	auto& transientAlloc = params.transientAlloc;
 	auto& textManager = params.textManager;
 
+	auto textSize = ctx.fontScale * window.contentScale;
+
 	auto const& pusherIt = pusher.AddEntry(*this);
 
 	auto customData = Impl::CustomData{ pusher.Alloc() };
-	customData.lineHeight = textManager.GetLineheight();
+	customData.lineHeight = textManager.GetLineheight(textSize, window.dpiX, window.dpiY);
+	if (pusher.IncludeRendering()) {
+		customData.fontFaceId = textManager.GetFontFaceId(textSize, window.dpiX, window.dpiY);
+	}
 
 	SizeHint returnValue = {};
 	returnValue.minimum.width = 100;
@@ -199,8 +208,12 @@ void LineList::BuildChildRects(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
+	auto const& ctx = params.ctx;
+	auto const& window = params.window;
 	auto& pusher = params.pusher;
 	auto& textManager = params.textManager;
+
+	auto textSize = ctx.fontScale * window.contentScale;
 
 	if (pusher.IncludeRendering())
 	{
@@ -247,12 +260,19 @@ void LineList::BuildChildRects(
 
 			auto const& line = lines[lineIndex];
 			auto const lineGlyphRectOffset = customData.lineGlyphRectOffsets[i];
-			auto* lineGlyphRects = &customData.lineGlyphRects[lineGlyphRectOffset];
+			Std::Span lineGlyphRects {
+				&customData.lineGlyphRects[lineGlyphRectOffset],
+				line.size() };
 
 			textManager.GetOuterExtent(
 				{ line.data(), line.size() },
-				posOffset,
-				lineGlyphRects);
+				textSize,
+				window.dpiX,
+				window.dpiY,
+				lineGlyphRects.Data());
+			// Then apply the pos offset to the rects
+			for (auto& item : lineGlyphRects)
+				item.position += posOffset;
 		}
 	}
 }
@@ -320,8 +340,10 @@ void LineList::Render2(
 		auto const* lineRects = &customData.lineGlyphRects[lineRectOffset];
 
 		drawInfo.PushText(
+			(u64)customData.fontFaceId,
 			{ line.data(), line.size() },
 			lineRects,
+			{},
 			{ 1.f, 1.f, 1.f, 1.f });
 	}
 }

@@ -1,6 +1,7 @@
 #include <DEngine/impl/AppAssert.hpp>
 #include <DEngine/impl/Application.hpp>
 #include <DEngine/Std/Utility.hpp>
+#include <DEngine/Math/Common.hpp>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -37,10 +38,13 @@ namespace DEngine::Application::impl
 		int jid,
 		int event);
 	*/
+	static void Backend_Glfw_WindowContentScaleCallback(
+		GLFWwindow* window,
+		float scaleX,
+		float scaleY);
 	static void Backend_GLFW_WindowCursorEnterCallback(
 		GLFWwindow* window,
 		int entered);
-
 	static void Backend_GLFW_WindowCloseCallback(
 		GLFWwindow* window);
 	static void Backend_GLFW_WindowFocusCallback(
@@ -156,21 +160,37 @@ auto Application::impl::Backend::NewWindow(
 	Context::Impl::WindowData windowData = {};
 
 	// Get window size
-	int widthX;
-	int heightY;
-	glfwGetWindowSize(rawHandle, &widthX, &heightY);
-	windowData.extent = { (u32)widthX, (u32)heightY };
+	int width = 0;
+	int height = 0;
+	glfwGetWindowSize(rawHandle, &width, &height);
+	windowData.extent = { (u32)width, (u32)height };
+	windowData.visibleOffset = {};
+	windowData.visibleExtent = windowData.extent;
 
 	int windowPosX = 0;
 	int windowPosY = 0;
 	glfwGetWindowPos(rawHandle, &windowPosX, &windowPosY);
 	windowData.position = { (i32)windowPosX,(i32)windowPosY };
 
-	windowData.visibleOffset = {};
-	windowData.visibleExtent = windowData.extent;
+	// Find the DPI of the monitor
+	GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+	int physSizeX = 0;
+	int physSizeY = 0;
+	glfwGetMonitorPhysicalSize(monitor, &physSizeX, &physSizeY);
+	float inchesX = (float)physSizeX / 10.f / 2.54f;
+	float inchesY = (float)physSizeY / 10.f / 2.54f;
+	auto* monitorVideoMode = glfwGetVideoMode(monitor);
+	windowData.dpiX = (float)monitorVideoMode->width / inchesX;
+	windowData.dpiY = (float)monitorVideoMode->height / inchesY;
+
+	float scaleX = 0;
+	float scaleY = 0;
+	glfwGetWindowContentScale(rawHandle, &scaleX, &scaleY);
+	windowData.contentScale = scaleX;
 
 	glfwSetCursorEnterCallback(rawHandle, &impl::Backend_GLFW_WindowCursorEnterCallback);
 
+	glfwSetWindowContentScaleCallback(rawHandle, &impl::Backend_Glfw_WindowContentScaleCallback);
 	glfwSetWindowCloseCallback(rawHandle, &impl::Backend_GLFW_WindowCloseCallback);
 	glfwSetWindowPosCallback(rawHandle, &impl::Backend_GLFW_WindowPosCallback);
 	glfwSetWindowSizeCallback(rawHandle, &impl::Backend_GLFW_WindowSizeCallback);
@@ -264,6 +284,24 @@ void Application::impl::Backend_GLFW_WindowCursorEnterCallback(
 		implData,
 		implData.GetWindowId(window),
 		entered);
+}
+
+void Application::impl::Backend_Glfw_WindowContentScaleCallback(
+	GLFWwindow* window,
+	float scaleX,
+	float scaleY)
+{
+	auto implDataPtr = static_cast<Context::Impl*>(glfwGetWindowUserPointer(window));
+	DENGINE_IMPL_APPLICATION_ASSERT(implDataPtr);
+	auto& implData = *implDataPtr;
+
+	// I don't know what to do if the scale is very different in one direction.
+	DENGINE_IMPL_APPLICATION_ASSERT(Math::Abs(scaleX - scaleY) < 0.1f);
+
+	BackendInterface::WindowContentScale(
+		implData,
+		implData.GetWindowId(window),
+		scaleX);
 }
 
 void Application::impl::Backend_GLFW_WindowCloseCallback(

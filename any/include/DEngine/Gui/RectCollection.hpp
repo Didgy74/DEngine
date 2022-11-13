@@ -101,6 +101,9 @@ namespace DEngine::Gui
 			void SetRectPair(It const& it, RectPair const& rect) {
 				Collection().SetRect(it, rect);
 			}
+			[[nodiscard]] RectPair const* RectPair(Widget const& widget) const {
+				return Collection().GetRect(widget);
+			}
 
 			[[nodiscard]] SizeHint const& GetSizeHint(It const& it) const {
 				return Collection().GetSizeHint(it);
@@ -111,7 +114,6 @@ namespace DEngine::Gui
 			[[nodiscard]] SizeHint const* GetSizeHint(Layer const& layer) const {
 				return Collection().GetSizeHint(layer);
 			}
-
 
 			template<class T>
 			[[nodiscard]] T* GetCustomData2(Widget const& widget) {

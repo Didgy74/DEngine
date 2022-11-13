@@ -1,4 +1,5 @@
 #include <DEngine/Gui/Text.hpp>
+#include <DEngine/Gui/Context.hpp>
 #include <DEngine/Gui/TextManager.hpp>
 
 using namespace DEngine;
@@ -10,11 +11,10 @@ struct Text::Impl
 	struct CustomData
 	{
 		explicit CustomData(RectCollection::AllocRefT const& alloc) :
-			glyphRects{ alloc }
-		{
-		}
+			glyphRects{ alloc } {}
 
 		Extent textOuterExtent = {};
+		FontFaceId fontFaceId;
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 };
@@ -27,6 +27,8 @@ namespace DEngine::Gui::impl {
 			temp = Math::Max(0, temp);
 			out[i] = temp;
 		}
+
+		out.x = 0.f;
 		return out;
 	}
 }
@@ -34,24 +36,32 @@ namespace DEngine::Gui::impl {
 SizeHint Text::GetSizeHint2(
 	Widget::GetSizeHint2_Params const& params) const
 {
+	auto const& ctx = params.ctx;
 	auto& textManager = params.textManager;
 	auto& pusher = params.pusher;
+	auto const& window = params.window;
 
 	SizeHint returnValue = {};
 
 	auto pusherIt = pusher.AddEntry(*this);
 
+	auto textScale = ctx.fontScale * window.contentScale * relativeScale;
+
 	if (pusher.IncludeRendering())
 	{
-		auto& transientAlloc = params.transientAlloc;
-
 		auto customData = Impl::CustomData{ pusher.Alloc() };
-
 		customData.glyphRects.Resize(text.size());
+
+		customData.fontFaceId = textManager.GetFontFaceId(
+			textScale,
+			window.dpiX,
+			window.dpiY);
 
 		auto const textOuterExtent = textManager.GetOuterExtent(
 			{ text.data(), text.size() },
-			{},
+			textScale,
+			window.dpiX,
+			window.dpiY,
 			customData.glyphRects.Data());
 
 		customData.textOuterExtent = textOuterExtent;
@@ -62,11 +72,13 @@ SizeHint Text::GetSizeHint2(
 	else
 	{
 		returnValue.minimum = textManager.GetOuterExtent(
-			{ text.data(), text.size() });
+			{ text.data(), text.size() },
+			textScale,
+			window.dpiX,
+			window.dpiY);
 	}
 
-	returnValue.minimum.width += margin * 2;
-	returnValue.minimum.height += margin * 2;
+	returnValue.minimum.AddPadding(margin);
 	returnValue.expandX = expandX;
 
 	pusher.SetSizeHint(pusherIt, returnValue);
@@ -124,7 +136,9 @@ void Text::Render2(
 	auto scissor = DrawInfo::ScopedScissor(drawInfo, textRect, widgetRect);
 
 	drawInfo.PushText(
+		(u64)customData.fontFaceId,
 		{ text.data(), text.size() },
 		customData.glyphRects.Data(),
+		{},
 		color);
 }

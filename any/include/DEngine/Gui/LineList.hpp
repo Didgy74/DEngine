@@ -21,7 +21,7 @@ namespace DEngine::Gui
 		
 		Std::Opt<uSize> selectedLine;
 		std::vector<std::string> lines;
-		u32 textMargin = 0;
+		u32 textMargin = 10;
 
 		using Callback = std::function<void(LineList&, Context* ctx)>;
 		Callback selectedLineChangedFn = nullptr;

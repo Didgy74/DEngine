@@ -14,6 +14,12 @@ namespace DEngine::Gui
 	class Context;
 	class TextManager;
 
+	struct EventWindowInfo {
+		f32 contentScale = 0;
+		f32 dpiX = 0;
+		f32 dpiY = 0;
+	};
+
 	class Widget
 	{
 	public:
@@ -25,10 +31,9 @@ namespace DEngine::Gui
 		Widget& operator=(Widget const&) = delete;
 		Widget& operator=(Widget&&) = delete;
 
-
-		struct GetSizeHint2_Params
-		{
+		struct GetSizeHint2_Params {
 			Context const& ctx;
+			EventWindowInfo const& window;
 			TextManager& textManager;
 			AllocRef const& transientAlloc;
 			RectCollection::SizeHintPusher& pusher;
@@ -43,6 +48,7 @@ namespace DEngine::Gui
 		struct BuildChildRects_Params
 		{
 			Context const& ctx;
+			EventWindowInfo const& window;
 			TextManager& textManager;
 			AllocRef const& transientAlloc;
 			RectCollection::RectPusher& pusher;
@@ -56,9 +62,9 @@ namespace DEngine::Gui
 			Rect const& widgetRect,
 			Rect const& visibleRect) const {}
 
-		struct Render_Params
-		{
+		struct Render_Params {
 			Context const& ctx;
+			EventWindowInfo const& window;
 			TextManager& textManager;
 			RectCollection const& rectCollection;
 			Extent const& framebufferExtent;
@@ -70,13 +76,13 @@ namespace DEngine::Gui
 			Rect const& widgetRect,
 			Rect const& visibleRect) const = 0;
 
-		struct CursorMoveParams
-		{
+		struct CursorMoveParams {
 			Context& ctx;
+			EventWindowInfo const& window;
 			RectCollection const& rectCollection;
 			TextManager& textManager;
 			AllocRef const& transientAlloc;
-			WindowID windowId;
+			//WindowID windowId;
 			CursorMoveEvent const& event;
 		};
 		/*
@@ -108,9 +114,9 @@ namespace DEngine::Gui
 			return false;
 		}
 
-		struct CursorPressParams
-		{
+		struct CursorPressParams {
 			Context& ctx;
+			EventWindowInfo const& window;
 			RectCollection const& rectCollection;
 			TextManager& textManager;
 			AllocRef const& transientAlloc;
@@ -135,9 +141,9 @@ namespace DEngine::Gui
 			return false;
 		}
 
-		struct TouchPressParams
-		{
+		struct TouchPressParams {
 			Context& ctx;
+			EventWindowInfo const& window;
 			RectCollection const& rectCollection;
 			TextManager& textManager;
 			AllocRef const& transientAlloc;
@@ -152,9 +158,9 @@ namespace DEngine::Gui
 		{
 			return false;
 		}
-		struct TouchMoveParams
-		{
+		struct TouchMoveParams {
 			Context& ctx;
+			EventWindowInfo const& window;
 			RectCollection const& rectCollection;
 			TextManager& textManager;
 			AllocRef const& transientAlloc;

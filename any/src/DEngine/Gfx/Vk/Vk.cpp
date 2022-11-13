@@ -55,16 +55,12 @@ Vk::APIData::~APIData()
 		auto& threadData = apiData.thread;
 		thread.drawParamsCondVarProducer.wait(
 			lock,
-			[&threadData]() { return !threadData.drawParamsReady; });
-
-		threadData.drawParamsReady = true;
-		threadData.nextCmd = APIData::Thread::NextCmd::Shutdown;
-
-		lock.unlock();
-		thread.drawParamsCondVarWorker.notify_one();
-
-		apiData.thread.renderingThread.join();
+			[&threadData]() { return !threadData.nextJobReady; });
+		threadData.nextJobReady = true;
+		threadData.shutdownThread = true;
 	}
+	thread.drawParamsCondVarWorker.notify_one();
+	apiData.thread.renderingThread.join();
 
 	globUtils.device.waitIdle();
 
@@ -118,8 +114,18 @@ void Vk::APIData::DeleteViewport(ViewportID id)
 		id);
 }
 
+void Vk::APIData::NewFontFace(FontFaceId fontFaceId)
+{
+	auto& apiData = *this;
+
+	GuiResourceManager::NewFontFace(
+		apiData.guiResourceManager,
+		fontFaceId);
+}
+
 void Vk::APIData::NewFontTexture(
-	u32 id,
+	FontFaceId fontFaceId,
+	u32 utfValue,
 	u32 width,
 	u32 height,
 	u32 pitch,
@@ -129,8 +135,8 @@ void Vk::APIData::NewFontTexture(
 
 	GuiResourceManager::NewFontTexture(
 		apiData.guiResourceManager,
-		apiData.globUtils,
-		id,
+		fontFaceId,
+		utfValue,
 		width,
 		height,
 		pitch,
@@ -157,21 +163,18 @@ namespace DEngine::Gfx::Vk
 			auto& threadData = apiData.thread;
 			threadData.drawParamsCondVarWorker.wait(
 				lock,
-				[&threadData]() -> bool { return threadData.drawParamsReady; });
+				[&threadData](){ return threadData.nextJobReady; });
 
-			DENGINE_IMPL_GFX_ASSERT(threadData.nextCmd != APIData::Thread::NextCmd::Invalid);
-			if (threadData.nextCmd == APIData::Thread::NextCmd::Draw)
-			{
-				apiData.InternalDraw(apiData.thread.drawParams);
+			DENGINE_IMPL_GFX_ASSERT(threadData.nextJobFn != nullptr);
+			threadData.nextJobFn(apiData);
 
-				threadData.drawParamsReady = false;
-				threadData.drawParamsCondVarProducer.notify_one();
-			}
-			else if (threadData.nextCmd == APIData::Thread::NextCmd::Shutdown)
-			{
-				// If we got told to shutdown, we just break out of the thread the polling loop.
+			threadData.nextJobReady = false;
+
+			if (threadData.shutdownThread)
 				break;
-			}
+
+			lock.unlock();
+			threadData.drawParamsCondVarProducer.notify_one();
 		}
 	}
 }

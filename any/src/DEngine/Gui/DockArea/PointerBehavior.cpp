@@ -21,7 +21,8 @@ namespace DEngine::Gui::impl
 		DA_TransientFn(DA_TransientFn&& in) noexcept :
 			allocRef{ in.allocRef },
 			actualFn{ in.actualFn },
-			wrapperFn{ in.wrapperFn }
+			wrapperFn{ in.wrapperFn },
+			destroyFn{ in.destroyFn }
 		{
 			in.Nullify();
 		}
@@ -37,6 +38,7 @@ namespace DEngine::Gui::impl
 			allocRef = in.allocRef;
 			actualFn = in.actualFn;
 			wrapperFn = in.wrapperFn;
+			destroyFn = in.destroyFn;
 			in.Nullify();
 		}
 
@@ -50,9 +52,13 @@ namespace DEngine::Gui::impl
 			new(newMem) Callable(in);
 
 			actualFn = newMem;
-			wrapperFn = [](void* fnIn, ArgsT... args) {
-				auto& myFn = *reinterpret_cast<Callable*>(fnIn);
+			wrapperFn = [](void const* fnIn, ArgsT... args) {
+				auto const& myFn = *reinterpret_cast<Callable const*>(fnIn);
 				return myFn(args...);
+			};
+			destroyFn = [](void* fnIn) {
+				auto& myFn = *reinterpret_cast<Callable*>(fnIn);
+				myFn.~Callable();
 			};
 		}
 
@@ -60,6 +66,7 @@ namespace DEngine::Gui::impl
 
 		void Clear() {
 			if (actualFn) {
+				destroyFn(actualFn);
 				allocRef.Free(actualFn);
 			}
 			Nullify();
@@ -71,19 +78,20 @@ namespace DEngine::Gui::impl
 		}
 
 		~DA_TransientFn() {
-			if (actualFn) {
-				allocRef.Free(actualFn);
-			}
+			Clear();
 		}
 
 	private:
 		void Nullify() {
 			wrapperFn = nullptr;
 			actualFn = nullptr;
+			destroyFn = nullptr;
 		}
 
-		using WrapperFnT = ReturnT(*)(void*, ArgsT...);
+		using WrapperFnT = ReturnT(*)(void const*, ArgsT...);
 		WrapperFnT wrapperFn = nullptr;
+		using FnDestroyT = void(*)(void*);
+		FnDestroyT destroyFn = nullptr;
 		void* actualFn = nullptr;
 		AllocRef allocRef;
 	};
@@ -95,7 +103,7 @@ namespace DEngine::Gui::impl
 		Std::Opt<DockingJob> dockingJobOpt;
 		Std::Opt<DockArea::Impl::StateDataT> newStateJob;
 		Std::Opt<uSize> pushLayerToFrontJob;
-		DA_TransientFn<void()> job;
+		DA_TransientFn<void(DockArea&)> job;
 	};
 
 	DA_PointerPress_Result DA_PointerPress_StateNormal(
@@ -103,6 +111,7 @@ namespace DEngine::Gui::impl
 		bool eventConsumed)
 	{
 		auto& dockArea = params.dockArea;
+		auto const& tabTextSize = params.tabTextSize;
 		auto& textManager = params.textManager;
 		auto const& rectCollection = params.rectCollection;
 		auto const& widgetRect = params.widgetRect;
@@ -110,7 +119,7 @@ namespace DEngine::Gui::impl
 		auto& transientAlloc = params.transientAlloc;
 		auto const& pointer = params.pointer;
 
-		auto const textheight = textManager.GetLineheight();
+		auto const textheight = textManager.GetLineheight(tabTextSize);
 		auto const totalTabHeight = textheight + dockArea.tabTextMargin * 2;
 
 		bool pointerInWidget = PointIsInAll(pointer.pos, { widgetRect, visibleRect });
@@ -199,6 +208,7 @@ namespace DEngine::Gui::impl
 					auto tabRects = DA_WindowNode_BuildTabRects(
 						titlebarRect,
 						{ windowNode.tabs.data(), windowNode.tabs.size() },
+						tabTextSize,
 						dockArea.tabTextMargin,
 						textManager,
 						transientAlloc);
@@ -208,7 +218,7 @@ namespace DEngine::Gui::impl
 						returnValue.eventConsumed = true;
 						// We hit the tab, enter holding tab state and change active tab on this
 						// windownode.
-						returnValue.job = [&windowNode, hitTabOpt]() {
+						returnValue.job = [&windowNode, hitTabOpt](DockArea&) {
 							windowNode.activeTabIndex = hitTabOpt.Value();
 						};
 						DA_State_HoldingTab newState = {};
@@ -230,7 +240,7 @@ namespace DEngine::Gui::impl
 				{
 					returnValue.eventConsumed = true;
 					DA_State_Moving newState = {};
-					newState.pointerId = pointer.id;
+					newState.heldPointerId = pointer.id;
 					auto layerPos = Math::Vec2{
 						(f32)layerRect.position.x,
 						(f32)layerRect.position.y };
@@ -260,7 +270,7 @@ namespace DEngine::Gui::impl
 			visibleRect.PointIsInside(pointer.pos);
 
 		// If we only have 0-1 layers, we shouldn't be in the moving state
-		// to begin with.
+		// to begin with. The single layer should just be constantly full-screened.
 		DENGINE_IMPL_GUI_ASSERT(DA_GetLayers(dockArea).size() >= 2);
 		auto& stateData = DA_GetStateData(dockArea).Get<DA_State_Moving>();
 
@@ -268,23 +278,41 @@ namespace DEngine::Gui::impl
 		returnValue.eventConsumed = eventConsumed;
 
 		// Check if we hit the outer docking gizmo
-
 		auto hitOuterGizmo =
 			DA_CheckHitOuterLayoutGizmo(widgetRect, dockArea.gizmoSize, pointer.pos);
-		bool undockIntoOuterGizmo =
+		bool dockIntoOuterGizmo =
 			!returnValue.dockingJobOpt.HasValue() &&
+			stateData.heldPointerId == pointer.id &&
 			!pointer.pressed &&
-			stateData.pointerId == pointer.id &&
 			pointerInsideWidget &&
 			hitOuterGizmo.Has();
-		if (undockIntoOuterGizmo)
-		{
-			// We hit something
+		if (dockIntoOuterGizmo) {
 			DockingJob dockingJob = {};
 			dockingJob.outerGizmo = hitOuterGizmo.Get();
 			dockingJob.dockIntoOuter = true;
 			returnValue.dockingJobOpt = dockingJob;
 		}
+
+		// Check if we hit delete gizmo
+		auto hitDeleteGizmo =
+			DA_CheckHitDeleteGizmo(widgetRect, dockArea.gizmoSize, pointer.pos);
+		bool deleteFrontLayer =
+			!returnValue.dockingJobOpt.HasValue() &&
+			stateData.heldPointerId == pointer.id &&
+			!pointer.pressed &&
+			pointerInsideWidget &&
+			hitDeleteGizmo;
+		if (deleteFrontLayer) {
+			returnValue.job = [](DockArea& dockArea) {
+				auto& layers = DA_GetLayers(dockArea);
+				layers.erase(layers.begin());
+				DA_State_Normal newState = {};
+				auto& stateData = DA_GetStateData(dockArea);
+				stateData = newState;
+			};
+		}
+
+
 
 		for (auto const& layerIt : DA_BuildLayerItPair(dockArea))
 		{
@@ -294,8 +322,7 @@ namespace DEngine::Gui::impl
 				pointerInsideWidget;
 
 			// If we unpressed, then we want to exit this moving state.
-			if (layerIt.layerIndex == 0 && pointer.id == stateData.pointerId && !pointer.pressed)
-			{
+			if (layerIt.layerIndex == 0 && pointer.id == stateData.heldPointerId && !pointer.pressed) {
 				DA_State_Normal newState = {};
 				returnValue.newStateJob = newState;
 			}
@@ -306,7 +333,7 @@ namespace DEngine::Gui::impl
 				!pointer.pressed &&
 				layerIt.layerIndex != 0 &&
 				pointerInsideLayer &&
-				stateData.pointerId == pointer.id;
+				stateData.heldPointerId == pointer.id;
 			if (checkForDockingGizmo)
 			{
 				auto hitResult = DA_Layer_CheckHitInnerDockingGizmo(
@@ -392,7 +419,7 @@ namespace DEngine::Gui::impl
 		auto& transientAlloc = params.transientAlloc;
 		auto& childDispatchFn = params.childDispatchFn;
 
-		u32 textHeight = textManager.GetLineheight();
+		u32 textHeight = textManager.GetLineheight(params.tabTextSize);
 		u32 totalLineHeight = textHeight + dockArea.tabTextMargin * 2;
 
 		bool newEventConsumed = eventConsumed;
@@ -474,19 +501,17 @@ bool Gui::impl::DA_PointerPress(
 	newConsumed = temp.eventConsumed;
 
 	if (temp.job.IsValid()) {
-		temp.job();
+		temp.job(dockArea);
 	}
 
-	if (temp.dockingJobOpt.HasValue())
-	{
+	if (temp.dockingJobOpt.HasValue()) {
 		DockNode(
 			dockArea,
 			temp.dockingJobOpt.Value(),
 			transientAlloc);
 	}
 
-	if (temp.pushLayerToFrontJob.HasValue())
-	{
+	if (temp.pushLayerToFrontJob.HasValue()) {
 		DA_PushLayerToFront(dockArea, temp.pushLayerToFrontJob.Value());
 	}
 
@@ -510,7 +535,7 @@ namespace DEngine::Gui::impl
 		bool pointerOccluded;
 		Std::Opt<Math::Vec2Int> frontLayerNewPos;
 		Std::Opt<DA_StateData> newStateJob;
-		DA_TransientFn<void()> job;
+		DA_TransientFn<void(DockArea&)> job;
 	};
 
 	DA_PointerMove_Return DA_PointerMove_StateNormal(
@@ -527,10 +552,11 @@ namespace DEngine::Gui::impl
 		DA_PointerMove_Return returnValue = { .job = transientAlloc, };
 		returnValue.pointerOccluded = pointerOccluded;
 
-		auto const totalTabHeight = textManager.GetLineheight() + dockArea.tabTextMargin * 2;
+		auto const totalTabHeight =
+			textManager.GetLineheight(params.tabTextSize) +
+			dockArea.tabTextMargin * 2;
 
-		for (auto const layerIt : DA_BuildLayerItPair(dockArea))
-		{
+		for (auto const layerIt : DA_BuildLayerItPair(dockArea)) {
 			auto const layerRect = layerIt.BuildLayerRect(widgetRect);
 
 			for (auto const& nodeIt : DA_BuildNodeItPair(
@@ -582,7 +608,8 @@ namespace DEngine::Gui::impl
 		auto const& visibleRect = params.visibleRect;
 		auto const& pointer = params.pointer;
 
-		auto const pointerInWidget = PointIsInAll(pointer.pos, { widgetRect, visibleRect });
+		auto const pointerInWidget =
+			PointIsInAll(pointer.pos, { widgetRect, visibleRect });
 
 		// If we only have 0-1 layers, we shouldn't be in the moving state
 		// to begin with.
@@ -610,7 +637,6 @@ namespace DEngine::Gui::impl
 			}
 		}
 
-
 		for (auto const& layerIt : DA_BuildLayerItPair(dockArea))
 		{
 			auto const& layerRect = layerIt.BuildLayerRect(widgetRect);
@@ -622,7 +648,7 @@ namespace DEngine::Gui::impl
 			// move the layer and keep iterating to layers behind
 			// us to see if we hovered over a window and display it's
 			// layout gizmos
-			if (layerIt.layerIndex == 0 && pointer.id == stateData.pointerId)
+			if (layerIt.layerIndex == 0 && pointer.id == stateData.heldPointerId)
 			{
 				// Move the window
 				auto const temp = pointer.pos - stateData.pointerOffset;
@@ -644,7 +670,7 @@ namespace DEngine::Gui::impl
 			// Haven't already found a window we are hovering during this iteration.
 			// Our pointer is inside this particular layer.
 			bool checkForHoveredWindow =
-				pointer.id == stateData.pointerId &&
+				pointer.id == stateData.heldPointerId &&
 				layerIt.layerIndex != 0 &&
 				pointerInsideLayer &&
 				!stateData.hoveredGizmoOpt.HasValue();
@@ -662,7 +688,10 @@ namespace DEngine::Gui::impl
 					newHoveredWindow.windowNode = hitWindowNode.window;
 					// We hit a window, now check if we hit a docking gizmo inside that window.
 					auto hitGizmoOpt =
-						DA_CheckHitInnerDockingGizmo(nodeRect, dockArea.gizmoSize, pointer.pos);
+						DA_CheckHitInnerDockingGizmo(
+							nodeRect,
+							dockArea.gizmoSize,
+							pointer.pos);
 					if (hitGizmoOpt.HasValue())
 						newHoveredWindow.gizmo = (int)hitGizmoOpt.Value();
 					newHoveredWindow.gizmoIsInner = true;
@@ -670,7 +699,8 @@ namespace DEngine::Gui::impl
 				}
 			}
 
-			returnValue.pointerOccluded = returnValue.pointerOccluded || pointerInsideLayer;
+			returnValue.pointerOccluded =
+				returnValue.pointerOccluded || pointerInsideLayer;
 		}
 
 
@@ -837,13 +867,14 @@ namespace DEngine::Gui::impl
 			&windowNode,
 			transientAlloc);
 
-		auto textHeight = textManager.GetLineheight();
+		auto textHeight = textManager.GetLineheight(params.tabTextSize);
 		auto totalLineheight = textHeight + dockArea.tabTextMargin * 2;
 
 		auto [titlebarRect, contentRect] = DA_WindowNode_BuildPrimaryRects(windowNodeRect, totalLineheight);
 		auto tabRects = DA_WindowNode_BuildTabRects(
 			titlebarRect,
 			{ windowNode.tabs.data(), windowNode.tabs.size() },
+			params.tabTextSize,
 			dockArea.tabTextMargin,
 			textManager,
 			transientAlloc);
@@ -860,7 +891,7 @@ namespace DEngine::Gui::impl
 		{
 			// Create a new layer that is a window node, with this tab.
 			// Then enter moving state.
-			returnValue.job = [=, &dockArea, &windowNode]() {
+			returnValue.job = [=, &windowNode](DockArea& dockArea) {
 				auto const oldState = stateData;
 
 				auto temp = pointer.pos + oldState.pointerOffsetFromTab;
@@ -870,14 +901,11 @@ namespace DEngine::Gui::impl
 
 				auto& state = DA_GetStateData(dockArea);
 				DA_State_Moving newState = {};
-				newState.pointerId = params.pointer.id;
+				newState.heldPointerId = params.pointer.id;
 				newState.pointerOffset = oldState.pointerOffsetFromTab;
 				state = newState;
 			};
 		}
-
-
-
 
 		return returnValue;
 	}
@@ -894,7 +922,8 @@ namespace DEngine::Gui::impl
 		auto& transientAlloc = params.transientAlloc;
 		auto& textManager = params.textManager;
 
-		auto totalTabHeight = textManager.GetLineheight() + dockArea.tabTextMargin * 2;
+		auto totalTabHeight = textManager.GetLineheight(params.tabTextSize)
+			+ dockArea.tabTextMargin * 2;
 
 		bool newPointerOccluded = pointerOccluded;
 		for (auto const& layerIt : DA_BuildLayerItPair(dockArea))
@@ -957,15 +986,11 @@ bool Gui::impl::DA_PointerMove(
 	else
 		DENGINE_IMPL_GUI_UNREACHABLE();
 
-
-
-	if (temp.job.IsValid())
-	{
-		temp.job.Invoke();
+	if (temp.job.IsValid()) {
+		temp.job.Invoke(dockArea);
 	}
 
-	if (temp.frontLayerNewPos.HasValue())
-	{
+	if (temp.frontLayerNewPos.HasValue()) {
 		auto const& newFrontPos = temp.frontLayerNewPos.Value();
 		auto& frontLayerRect = DA_GetLayers(dockArea).front().rect;
 		frontLayerRect.position = newFrontPos;

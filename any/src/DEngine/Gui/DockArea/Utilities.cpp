@@ -140,22 +140,22 @@ auto Gui::impl::DA_CheckHitOuterLayoutGizmo(
 }
 
 Rect Gui::impl::DA_BuildDeleteGizmoRect(
-	Rect layerRect,
+	Rect widgetRect,
 	u32 gizmoSize)
 {
-	Rect returnVal = layerRect;
+	Rect returnVal = widgetRect;
 	returnVal.extent = { gizmoSize, gizmoSize };
-	returnVal.position.x += layerRect.extent.width / 2 - gizmoSize / 2;
-	returnVal.position.y += layerRect.extent.height - gizmoSize * 2;
+	returnVal.position.x += widgetRect.extent.width / 2 - gizmoSize / 2;
+	returnVal.position.y += widgetRect.extent.height - gizmoSize * 2;
 	return returnVal;
 }
 
 bool Gui::impl::DA_CheckHitDeleteGizmo(
-	Rect layerRect,
+	Rect widgetRect,
 	u32 gizmoSize,
 	Math::Vec2 point) noexcept
 {
-	return DA_BuildDeleteGizmoRect(layerRect, gizmoSize).PointIsInside(point);
+	return DA_BuildDeleteGizmoRect(widgetRect, gizmoSize).PointIsInside(point);
 }
 
 Rect Gui::impl::DA_BuildInnerDockingGizmoRect(
@@ -596,7 +596,8 @@ auto Gui::impl::CheckHitWindowNode(
 Std::Vec<Rect, AllocRef> Gui::impl::DA_WindowNode_BuildTabRects(
 	Rect const& titlebarRect,
 	Std::Span<DA_WindowTab const> tabs,
-	u32 textMargin,
+	TextSizeInfo const& tabTextSize,
+	u32 tabTextMargin,
 	TextManager& textManager,
 	AllocRef transientAlloc)
 {
@@ -609,8 +610,11 @@ Std::Vec<Rect, AllocRef> Gui::impl::DA_WindowNode_BuildTabRects(
 	{
 		auto const& text = tabs[i].title;
 		auto& desiredWidth = desiredWidths[i];
-		desiredWidth = (int)textManager.GetOuterExtent({ text.data(), text.size() }).width;
-		desiredWidth += (int)textMargin * 2;
+		auto outerExtent = textManager.GetOuterExtent(
+			{ text.data(), text.size() },
+			tabTextSize);
+		desiredWidth = (int)outerExtent.width;
+		desiredWidth += (int)tabTextMargin * 2;
 	}
 
 	// Then figure out the sum of the desired widths.
@@ -651,12 +655,11 @@ Std::Vec<Rect, AllocRef> Gui::impl::DA_WindowNode_BuildTabRects(
 	return rects;
 }
 
-// Checks if a point overlaps with any tabs
-// Returns the index of the tab if it overlapped.
 Std::Opt<uSize> Gui::impl::DA_CheckHitTab(
 	Rect const& titlebarRect,
 	Std::Span<DA_WindowTab const> tabs,
-	u32 textMargin,
+	TextSizeInfo const& tabTextSize,
+	u32 tabTextMargin,
 	TextManager& textManager,
 	Math::Vec2 point,
 	AllocRef const& transientAlloc)
@@ -664,14 +667,12 @@ Std::Opt<uSize> Gui::impl::DA_CheckHitTab(
 	auto tabRects = DA_WindowNode_BuildTabRects(
 		titlebarRect,
 		tabs,
-		textMargin,
+		tabTextSize,
+		tabTextMargin,
 		textManager,
 		transientAlloc);
-
-	int const tabCount = (int)tabs.Size();
 	// Then check if we hit any of these rects.
-	for (int i = 0; i < tabCount; i += 1)
-	{
+	for (int i = 0; i < (int)tabs.Size(); i += 1) {
 		if (tabRects[i].PointIsInside(point))
 			return i;
 	}
@@ -679,22 +680,20 @@ Std::Opt<uSize> Gui::impl::DA_CheckHitTab(
 	return Std::nullOpt;
 }
 
-void Gui::impl::Render_WindowNode(
-	DA_WindowNode const& windowNode,
-	DockArea const& dockArea,
-	Rect const& nodeRect,
-	Rect const& visibleRect,
-	Widget::Render_Params const& params)
+void Gui::impl::Render_WindowNode(Render_WindowNode_Params const& params)
 {
-	auto& textManager = params.textManager;
-	auto& transientAlloc = params.transientAlloc;
-	auto& drawInfo = params.drawInfo;
-	auto const& tabs = windowNode.tabs;
-	auto const& activeTabIndex = windowNode.activeTabIndex;
-	auto const& tabTextMargin = dockArea.tabTextMargin;
+	auto& textManager = params.widgetRenderParams.textManager;
+	auto& transientAlloc = params.widgetRenderParams.transientAlloc;
+	auto& drawInfo = params.widgetRenderParams.drawInfo;
+	auto const& tabs = params.windowNode.tabs;
+	auto const& activeTabIndex = params.windowNode.activeTabIndex;
+	auto const& tabTextSize = params.tabTextSize;
+	auto const& tabTextMargin = params.dockArea.tabTextMargin;
+	auto const& nodeRect = params.nodeRect;
+	auto const& visibleRect = params.visibleRect;
 
-	auto const textheight = textManager.GetLineheight();
-	auto const totalTabHeight = textheight + dockArea.tabTextMargin * 2;
+	auto const textheight = textManager.GetLineheight(tabTextSize);
+	auto const totalTabHeight = textheight + tabTextMargin * 2;
 
 	auto const [titlebarRect, contentRect] = impl::DA_WindowNode_BuildPrimaryRects(nodeRect, totalTabHeight);
 
@@ -714,7 +713,7 @@ void Gui::impl::Render_WindowNode(
 		{
 			auto const& child = *activeTab.widget;
 			child.Render2(
-				params,
+				params.widgetRenderParams,
 				contentRect,
 				visibleIntersection);
 		}
@@ -731,14 +730,15 @@ void Gui::impl::Render_WindowNode(
 	auto tabRects = DA_WindowNode_BuildTabRects(
 		titlebarRect,
 		{ tabs.data(), tabs.size() },
+		tabTextSize,
 		tabTextMargin,
 		textManager,
 		transientAlloc);
 
+	auto fontFaceId = textManager.GetFontFaceId(tabTextSize);
 
 	// Render each tab
-	for (int i = 0; i < (int)tabs.size(); i += 1)
-	{
+	for (int i = 0; i < (int)tabs.size(); i += 1) {
 		auto const& tab = tabs[i];
 		auto color = tab.color;
 		auto rect = tabRects[i];
@@ -754,12 +754,12 @@ void Gui::impl::Render_WindowNode(
 		glyphRects.Resize(tab.title.size());
 		auto textExtent = textManager.GetOuterExtent(
 			{ tab.title.data(), tab.title.size() },
-			{},
+			tabTextSize,
 			glyphRects.Data());
 		// Now center these glyphs to the tab rect.
 		Math::Vec2Int centeringOffset = {
-			(i32)Math::Round(rect.extent.width * 0.5f - textExtent.width * 0.5f),
-			(i32)Math::Round(rect.extent.height * 0.5f - textExtent.height * 0.5f) };
+			(i32)Math::Round((f32)rect.extent.width * 0.5f - (f32)textExtent.width * 0.5f),
+			(i32)Math::Round((f32)rect.extent.height * 0.5f - (f32)textExtent.height * 0.5f) };
 		for (auto& item : glyphRects)
 		{
 			auto oldPos = item.position;
@@ -768,14 +768,15 @@ void Gui::impl::Render_WindowNode(
 			item.position.y = Math::Max(item.position.y, rect.position.y + oldPos.y);
 		}
 
-
 		Std::Opt<DrawInfo::ScopedScissor> optionalScissor;
 		if (textExtent.width > rect.extent.width || textExtent.height > rect.extent.height)
 			optionalScissor = DrawInfo::ScopedScissor(drawInfo, rect);
 
 		drawInfo.PushText(
+			(u64)fontFaceId,
 			{ tab.title.data(), tab.title.size() },
 			glyphRects.Data(),
+			{},
 			textColor);
 	}
 }

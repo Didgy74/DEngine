@@ -124,7 +124,7 @@ namespace DEngine::Gui
 
 		struct State_Normal {};
 		struct State_Moving {
-			u8 pointerId;
+			u8 heldPointerId;
 			// Pointer offset relative to window origin
 			Math::Vec2 pointerOffset;
 			struct HoveredWindow {

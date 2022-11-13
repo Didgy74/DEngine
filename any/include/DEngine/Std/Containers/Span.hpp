@@ -44,6 +44,11 @@ namespace DEngine::Std
 		[[nodiscard]] constexpr Range<T*> AsRange() const noexcept;
 		constexpr operator Range<T*>() const noexcept;
 
+		[[nodiscard]] constexpr Span Subspan(uSize offset, uSize count) const noexcept {
+			DENGINE_IMPL_CONTAINERS_ASSERT(offset + count <= m_size);
+			return { m_data + offset, count };
+		}
+
 		[[nodiscard]] T* Data() const noexcept;
 		[[nodiscard]] uSize Size() const noexcept;
 		[[nodiscard]] bool Empty() const noexcept;
@@ -54,7 +59,7 @@ namespace DEngine::Std
 		[[nodiscard]] T* begin() const noexcept;
 		[[nodiscard]] T* end() const noexcept;
 
-	private:
+	protected:
 		T* m_data = nullptr;
 		uSize m_size = 0;
 	};

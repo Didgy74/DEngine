@@ -4,6 +4,7 @@
 #include "DynamicDispatch.hpp"
 #include "QueueData.hpp"
 #include "Vk.hpp"
+#include "RaiiHandles.hpp"
 
 #include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
@@ -13,44 +14,6 @@
 
 namespace DEngine::Gfx::Vk::impl
 {
-	class BoxVkBuffer
-	{
-	public:
-		constexpr BoxVkBuffer() noexcept = default;
-		BoxVkBuffer(BoxVkBuffer const&) = delete;
-		BoxVkBuffer& operator=(BoxVkBuffer const&) = delete;
-
-		vk::Buffer handle = {};
-		VmaAllocator vma = {};
-		VmaAllocation alloc = {};
-
-		struct Release_ReturnT
-		{
-			vk::Buffer handle;
-			VmaAllocator vma;
-			VmaAllocation alloc;
-		};
-		[[nodiscard]] Release_ReturnT Release() noexcept
-		{
-			Release_ReturnT returnValue;
-			returnValue.handle = handle;
-			returnValue.alloc = alloc;
-			returnValue.vma = vma;
-
-			handle = vk::Buffer{};
-
-			return returnValue;
-		}
-
-		~BoxVkBuffer() noexcept
-		{
-			if (handle != vk::Buffer{})
-			{
-				vmaDestroyBuffer(vma, (VkBuffer)handle, alloc);
-			}
-		}
-	};
-
 	class BoxVkCmdPool
 	{
 	public:

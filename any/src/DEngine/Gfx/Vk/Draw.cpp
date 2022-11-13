@@ -23,16 +23,17 @@ void Vk::APIData::Draw(
 		auto& threadData = apiData.thread;
 		thread.drawParamsCondVarProducer.wait(
 			lock,
-			[&threadData]() { return !threadData.drawParamsReady; });
+			[&threadData]() { return !threadData.nextJobReady; });
 
 		threadData.drawParams = drawParams;
-		threadData.drawParamsReady = true;
-		threadData.nextCmd = APIData::Thread::NextCmd::Draw;
-
+		threadData.nextJobReady = true;
+		threadData.nextJobFn = [](APIData& apiData) {
+			apiData.InternalDraw(apiData.thread.drawParams);
+		};
+		lock.unlock();
 		thread.drawParamsCondVarWorker.notify_one();
 	}
-	else
-	{
+	else {
 		apiData.InternalDraw(drawParams);
 	}
 }
@@ -202,12 +203,14 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		{ drawParams.transforms.data(), drawParams.transforms.size() },
 		currentInFlightIndex);
 	// Update GUI vertices and indices
+	/*
 	GuiResourceManager::Update(
 		apiData.guiResourceManager,
 		globUtils,
 		{ drawParams.guiVertices.data(), drawParams.guiVertices.size() },
 		{ drawParams.guiIndices.data(), drawParams.guiIndices.size() },
 		currentInFlightIndex);
+	*/
 	ViewportManager::UpdateCameras(
 		apiData.viewportManager,
 		apiData.globUtils,
@@ -221,6 +224,27 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 
 	vk::CommandBuffer mainCmdBuffer = apiData.mainCmdBuffers[currentInFlightIndex];
 	bool cmdBufferBegun = false;
+	if (!cmdBufferBegun)
+	{
+		BeginRecordingMainCmdBuffer(
+			globUtils.device,
+			apiData.mainCmdPools[currentInFlightIndex],
+			mainCmdBuffer,
+			currentInFlightIndex,
+			globUtils.DebugUtilsPtr());
+		cmdBufferBegun = true;
+	}
+
+	GuiResourceManager::PreDraw(
+		apiData.guiResourceManager,
+		globUtils,
+		{ drawParams.guiVertices.data(), drawParams.guiVertices.size() },
+		{ drawParams.guiIndices.data(), drawParams.guiIndices.size() },
+		mainCmdBuffer,
+		delQueue,
+		transientAlloc,
+		currentInFlightIndex);
+
 
 	for (auto const& viewportUpdate : drawParams.viewportUpdates)
 	{
@@ -319,6 +343,8 @@ void Vk::APIData::InternalDraw(DrawParams const& drawParams)
 		recordGuiParams.guiDrawCmds = drawCmds;
 		recordGuiParams.framebuffer = guiFramebuffer;
 		recordGuiParams.inFlightIndex = currentInFlightIndex;
+		recordGuiParams.utfValues = { drawParams.guiUtfValues.data(), drawParams.guiUtfValues.size() };
+		recordGuiParams.glyphRects = { drawParams.guiTextGlyphRects.data(), drawParams.guiTextGlyphRects.size() };
 		RecordGuiCmds(recordGuiParams);
 	}
 

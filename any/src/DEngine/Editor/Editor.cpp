@@ -132,7 +132,7 @@ namespace DEngine::Editor
 			editorImpl->entityIdList = nullptr;
 
 			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Entities];
-			submenuLine.toggled = false;
+			submenuLine.Get<Gui::MenuButton::Line>().toggled = false;
 		}
 
 		void AddEntityToList(Entity id)
@@ -194,8 +194,7 @@ namespace DEngine::Editor
 			outerLayout->spacing = 10;
 			//outerLayout->expandNonDirection = true;
 
-			if (editorImpl->GetSelectedEntity().HasValue())
-			{
+			if (editorImpl->GetSelectedEntity().HasValue()) {
 				EntitySelected(editorImpl->GetSelectedEntity().Value());
 			}
 		}
@@ -206,7 +205,7 @@ namespace DEngine::Editor
 			editorImpl->componentList = nullptr;
 
 			auto& submenuLine = editorImpl->viewMenuButton->submenu.lines[(int)FileMenuEnum::Components];
-			submenuLine.toggled = false;
+			submenuLine.Get<Gui::MenuButton::Line>().toggled = false;
 		}
 
 		void EntitySelected(Entity id)
@@ -260,7 +259,8 @@ using namespace DEngine;
 namespace DEngine::Editor
 {
 	[[nodiscard]] static Std::Box<Gui::Widget> CreateNavigationBar(
-		EditorImpl& editorImpl)
+		EditorImpl& editorImpl,
+		Gui::Context& guiCtx)
 	{
 		auto stackLayout = new Gui::StackLayout(Gui::StackLayout::Direction::Horizontal);
 		stackLayout->spacing = Editor::Settings::defaultTextMargin;
@@ -271,7 +271,7 @@ namespace DEngine::Editor
 		menuButton->spacing = Editor::Settings::defaultTextMargin;
 		menuButton->margin = Editor::Settings::defaultTextMargin;
 		stackLayout->AddWidget(Std::Box{ menuButton });
-		menuButton->submenu.lines.resize((int)FileMenuEnum::COUNT);
+		//menuButton->submenu.lines.resize((int)FileMenuEnum::COUNT);
 		menuButton->title = "Menu";
 		{
 			// Create button for Entities window
@@ -279,9 +279,10 @@ namespace DEngine::Editor
 			line.title = "Entities";
 			line.toggled = true;
 			line.togglable = true;
-			line.callback = [&editorImpl](Gui::MenuButton::Line& line, Gui::Context* ctx) {
-				if (line.toggled)
-				{
+			line.callback = [&editorImpl](
+				Gui::MenuButton::Line& line,
+				Gui::Context* ctx) {
+				if (line.toggled) {
 					auto job = [&editorImpl](Gui::Context& ctx) {
 						editorImpl.dockArea->AddWindow(
 							"Entities",
@@ -292,7 +293,8 @@ namespace DEngine::Editor
 				}
 				line.toggled = true;
 			};
-			menuButton->submenu.lines[(int)FileMenuEnum::Entities] = Std::Move(line);
+			//menuButton->submenu.lines[(int)FileMenuEnum::Entities] = Std::Move(line);
+			menuButton->submenu.lines.emplace_back(Std::Move(line));
 		}
 		{
 			// Create button for Components window
@@ -300,7 +302,9 @@ namespace DEngine::Editor
 			line.title = "Components";
 			line.toggled = true;
 			line.togglable = true;
-			line.callback = [&editorImpl](Gui::MenuButton::Line& line, Gui::Context* ctx) {
+			line.callback = [&editorImpl](
+				Gui::MenuButton::Line& line,
+				Gui::Context* ctx) {
 				if (line.toggled)
 				{
 					auto job = [&editorImpl](Gui::Context& ctx) {
@@ -313,7 +317,8 @@ namespace DEngine::Editor
 				}
 				line.toggled = true;
 			};
-			menuButton->submenu.lines[(int)FileMenuEnum::Components] = Std::Move(line);
+			//menuButton->submenu.lines[(int)FileMenuEnum::Components] = Std::Move(line);
+			menuButton->submenu.lines.emplace_back(Std::Move(line));
 		}
 		{
 			// Create button for adding viewport
@@ -332,7 +337,28 @@ namespace DEngine::Editor
 
 				ctx->PushPostEventJob(job);
 			};
-			menuButton->submenu.lines[(int)FileMenuEnum::NewViewport] = Std::Move(line);
+			//menuButton->submenu.lines[(int)FileMenuEnum::NewViewport] = Std::Move(line);
+			menuButton->submenu.lines.emplace_back(Std::Move(line));
+		}
+		{
+			auto* layout = new Gui::StackLayout(Gui::StackLayout::Dir::Horizontal);
+			Gui::MenuButton::LineAny line = { .widget = Std::Box{ layout } };
+			menuButton->submenu.lines.emplace_back(Std::Move(line));
+			layout->spacing = Settings::defaultTextMargin;
+			{
+				auto* incrementBtn = new Gui::Button();
+				incrementBtn->text = "Font Up";
+				incrementBtn->textMargin = Settings::defaultTextMargin;
+				incrementBtn->activateFn = [&guiCtx](Gui::Button& btn) { guiCtx.fontScale += 0.1f; };
+				layout->AddWidget(Std::Box{ incrementBtn });
+			}
+			{
+				auto* decrementBtn = new Gui::Button();
+				decrementBtn->text = "Font Down";
+				decrementBtn->textMargin = Settings::defaultTextMargin;
+				decrementBtn->activateFn = [&guiCtx](Gui::Button& btn) { guiCtx.fontScale -= 0.1f; };
+				layout->AddWidget(Std::Box{ decrementBtn });
+			}
 		}
 
 		// Delta time counter at the top
@@ -390,9 +416,18 @@ Editor::Context Editor::Context::Create(
 
 	implData.appCtx->InsertEventForwarder(implData);
 
+	auto& guiWinHandler = implData;
+	auto ctx = new Gui::Context(
+		Gui::Context::Create(
+			guiWinHandler,
+			implData.appCtx,
+			implData.gfxCtx));
+	//ctx->fontScale = 3.f;
+	implData.guiCtx = Std::Box{ ctx };
+
 	auto outmostLayout = new Gui::StackLayout(Gui::StackLayout::Dir::Vertical);
 
-	outmostLayout->AddWidget(CreateNavigationBar(implData));
+	outmostLayout->AddWidget(CreateNavigationBar(implData, *implData.guiCtx));
 
 	auto dockArea = new Gui::DockArea;
 	implData.dockArea = dockArea;
@@ -415,24 +450,17 @@ Editor::Context Editor::Context::Create(
 		Std::Box{ new ViewportWidget(implData) });
 
 
-	auto& guiWinHandler = implData;
-	auto ctx = new Gui::Context(
-		Gui::Context::Create(
-			guiWinHandler,
-			implData.appCtx,
-			implData.gfxCtx));
-	implData.guiCtx = Std::Box{ ctx };
-
-
-
-	auto const clearColor = Settings::GetColor(Settings::Color::Background);
-	implData.guiCtx->AdoptWindow(
-		(Gui::WindowID)createInfo.mainWindow,
-		clearColor,
-		{ createInfo.windowPos, { createInfo.windowExtent.width, createInfo.windowExtent.height } },
-		createInfo.windowSafeAreaOffset,
-		{ createInfo.windowSafeAreaExtent.width, createInfo.windowSafeAreaExtent.height },
-		Std::Box{ outmostLayout });
+	Gui::Context::AdoptWindowInfo adoptInfo {};
+	adoptInfo.id = (Gui::WindowID)createInfo.mainWindow;
+	adoptInfo.contentScale = createInfo.windowContentScale;
+	adoptInfo.dpiX = createInfo.windowDpiX;
+	adoptInfo.dpiY = createInfo.windowDpiY;
+	adoptInfo.clearColor = Settings::GetColor(Settings::Color::Background);
+	adoptInfo.rect = { createInfo.windowPos, { createInfo.windowExtent.width, createInfo.windowExtent.height } };
+	adoptInfo.visibleExtent = { createInfo.windowSafeAreaExtent.width, createInfo.windowSafeAreaExtent.height };
+	adoptInfo.visibleOffset = createInfo.windowSafeAreaOffset;
+	adoptInfo.widget = Std::Box{ outmostLayout };
+	implData.guiCtx->AdoptWindow(Std::Move(adoptInfo));
 
 	return newCtx;
 }
@@ -482,6 +510,8 @@ void Editor::Context::ProcessEvents()
 		implData.indices.clear();
 		implData.drawCmds.clear();
 		implData.windowUpdates.clear();
+		implData.utfValues.clear();
+		implData.textGlyphRects.clear();
 
 		Gui::Context::Render2_Params renderParams {
 			.rectCollection = implData.guiRectCollection,
@@ -489,7 +519,9 @@ void Editor::Context::ProcessEvents()
 			.vertices = implData.vertices,
 			.indices = implData.indices,
 			.drawCmds = implData.drawCmds,
-			.windowUpdates = implData.windowUpdates };
+			.windowUpdates = implData.windowUpdates,
+			.utfValues = implData.utfValues,
+			.textGlyphRects = implData.textGlyphRects };
 		implData.guiCtx->Render2(renderParams);
 
 
@@ -551,6 +583,8 @@ Editor::DrawInfo Editor::Context::GetDrawInfo() const
 	returnVal.vertices = implData.vertices;
 	returnVal.indices = implData.indices;
 	returnVal.drawCmds = implData.drawCmds;
+	returnVal.textGlyphRects = implData.textGlyphRects;
+	returnVal.utfValues = implData.utfValues;
 
 	returnVal.windowUpdates = implData.windowUpdates;
 

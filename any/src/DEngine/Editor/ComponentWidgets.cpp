@@ -17,7 +17,6 @@ MoveWidget::MoveWidget(EditorImpl const& editorImpl)
 	title = "PlayerMove";
 	collapsedColor = Settings::GetColor(Settings::Color::Button_Normal);
 	expandedColor = Settings::GetColor(Settings::Color::Button_Active);
-	titleMargin = Settings::defaultTextMargin;
 
 	this->collapseFn = [&editorImpl](CollapsingHeader& widget)
 	{
@@ -59,7 +58,6 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 	title = "Transform";
 	collapsedColor = Settings::GetColor(Settings::Color::Button_Normal);
 	expandedColor = Settings::GetColor(Settings::Color::Button_Active);
-	titleMargin = Settings::defaultTextMargin;
 
 	auto* outerGrid = new Grid;
 	this->child = Std::Box{ outerGrid };
@@ -229,7 +227,6 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 	title = "SpriteRender2D";
 	collapsedColor = Settings::GetColor(Settings::Color::Button_Normal);
 	expandedColor = Settings::GetColor(Settings::Color::Button_Active);
-	titleMargin = Settings::defaultTextMargin;
 
 	auto innerStackLayout = new StackLayout(StackLayout::Dir::Vertical);
 	child = Std::Box{ innerStackLayout };
@@ -314,7 +311,6 @@ RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 	title = "Rigidbody2D";
 	collapsedColor = Settings::GetColor(Settings::Color::Button_Normal);
 	expandedColor = Settings::GetColor(Settings::Color::Button_Active);
-	titleMargin = Settings::defaultTextMargin;
 
 	auto innerStackLayout = new StackLayout(StackLayout::Dir::Vertical);
 	child = Std::Box{ innerStackLayout };
@@ -332,8 +328,8 @@ RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 		bodyTypeDropdown = new Dropdown;
 		bodyTypeLayout->AddWidget(Std::Box{ bodyTypeDropdown });
 		bodyTypeDropdown->textMargin = Settings::defaultTextMargin;
-		bodyTypeDropdown->items.push_back("Dynamic"); // Rigidbody2D::Type::Dynamic = 0
-		bodyTypeDropdown->items.push_back("Static"); // Rigidbody2D::Type::Static = 0
+		bodyTypeDropdown->items.emplace_back("Dynamic"); // Rigidbody2D::Type::Dynamic = 0
+		bodyTypeDropdown->items.emplace_back("Static"); // Rigidbody2D::Type::Static = 0
 		bodyTypeDropdown->selectedItem = (u32)Physics::Rigidbody2D::Type::Dynamic;
 		bodyTypeDropdown->selectionChangedCallback = [&editorImpl](Dropdown& dropdown)
 		{

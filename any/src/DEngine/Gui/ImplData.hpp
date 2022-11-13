@@ -28,6 +28,21 @@ namespace DEngine::Gui::impl
 		bool isMinimized = {};
 		Math::Vec4 clearColor = { 0, 0, 0, 1 };
 		Std::Box<Widget> topLayout = {};
+		f32 contentScale = 1.f;
+		f32 dpiX = 0.f;
+		f32 dpiY = 0.f;
+
+		/* Laptop values
+		 * dpiX = 141
+		 * dpiY = 141
+		 * contentScale = 1.25
+		*/
+
+		/* Phone values
+         * dpiX = 401
+         * dpiY = 401
+		 * contentScale = 1;
+		*/
 	};
 
 	struct WindowNode
@@ -64,10 +79,10 @@ struct DEngine::Gui::Context::Impl
 	Std::FrameAlloc transientAlloc = Std::FrameAlloc::PreAllocate(1024 * 1024).Value();
 
 	Std::FrameAlloc postEventAlloc = Std::FrameAlloc::PreAllocate(1024).Value();
-	struct PostEventJob
-	{
+	struct PostEventJob {
 		void* ptr = nullptr;
 		Context::PostEventJob_InvokeFnT invokeFn = nullptr;
+		Context::PostEventJob_DestroyFnT destroyFn = nullptr;
 	};
 	std::vector<PostEventJob> postEventJobs;
 

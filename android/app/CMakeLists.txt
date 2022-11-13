@@ -1,13 +1,14 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.18)
+project(dengine)
 
 set(CMAKE_SHARED_LINKER_FLAGS
     "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
-
+	
 option(DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT "Enable verbose CMake output for DEngine" ON)
 
-project(dengine)
+set(DENGINE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
-add_subdirectory("../../any" "any")
+
 
 add_library(dengine SHARED
 	"src/BackendData.hpp"
@@ -17,12 +18,18 @@ add_library(dengine SHARED
 	"src/HandleCustomEvent.cpp"
 	"src/HandleInputEvent.hpp"
 	"src/HandleInputEvent.cpp")
-target_compile_features(dengine PRIVATE cxx_std_20)
-set_target_properties(dengine PROPERTIES
-		CXX_STANDARD 20
-		CXX_EXTENSIONS OFF)
 target_link_libraries(dengine
     PRIVATE
-        dengine_any
         log
         android)
+
+# Set the DEngine defines up
+include(${DENGINE_ROOT_DIR}/cmake/SetDEngineDefines.cmake)
+set(DENGINE_OS ${DENGINE_OS_ANDROID} CACHE STRING "" FORCE)
+DEngine_SetDefines(dengine)
+
+include(${DENGINE_ROOT_DIR}/cmake/SetCompilerSettings.cmake)
+DEngine_SetCompilerSettings(dengine)
+
+add_subdirectory("${DENGINE_ROOT_DIR}/any" "any")
+target_link_libraries(dengine PUBLIC dengine_any)

@@ -73,7 +73,14 @@ void Gfx::Context::DeleteViewport(ViewportID viewportID)
 	apiData.DeleteViewport(viewportID);
 }
 
+void Gfx::Context::NewFontFace(FontFaceId fontFaceId)
+{
+	auto& apiData = *static_cast<APIDataBase*>(GetApiData());
+	return apiData.NewFontFace(fontFaceId);
+}
+
 void Gfx::Context::NewFontTexture(
+	FontFaceId fontFaceId,
 	u32 id,
 	u32 width,
 	u32 height,
@@ -83,6 +90,7 @@ void Gfx::Context::NewFontTexture(
 	auto& apiData = *static_cast<APIDataBase*>(apiDataBase);
 
 	return apiData.NewFontTexture(
+		fontFaceId,
 		id,
 		width,
 		height,

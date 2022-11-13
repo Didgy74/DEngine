@@ -5,6 +5,8 @@
 #include <DEngine/Std/Containers/FnRef.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
 
+#include <DEngine/Gui/TextManager.hpp>
+
 #include <DEngine/Std/Containers/Array.hpp>
 
 #include "Iterators.inl"
@@ -92,7 +94,8 @@ namespace DEngine::Gui::impl
 	Std::Vec<Rect, AllocRef> DA_WindowNode_BuildTabRects(
 		Rect const& titlebarRect,
 		Std::Span<DA_WindowTab const> tabs,
-		u32 textMargin,
+		TextSizeInfo const& tabTextSize,
+		u32 tabTextMargin,
 		TextManager& textManager,
 		AllocRef transientAlloc);
 	// Checks if a point overlaps with any tabs
@@ -100,16 +103,21 @@ namespace DEngine::Gui::impl
 	[[nodiscard]] Std::Opt<uSize> DA_CheckHitTab(
 		Rect const& titlebarRect,
 		Std::Span<DA_WindowTab const> tabs,
-		u32 textMargin,
+		TextSizeInfo const& tabTextSize,
+		u32 tabTextMargin,
 		TextManager& textManager,
 		Math::Vec2 point,
 		AllocRef const& transientAlloc);
-	void Render_WindowNode(
-		DA_WindowNode const& windowNode,
-		DockArea const& dockArea,
-		Rect const& nodeRect,
-		Rect const& visibleRect,
-		Widget::Render_Params const& params);
+	struct Render_WindowNode_Params {
+		DA_WindowNode const& windowNode;
+		DockArea const& dockArea;
+		Rect const& nodeRect;
+		Rect const& visibleRect;
+		TextSizeInfo const& tabTextSize;
+		u32 tabTextMargin;
+		Widget::Render_Params const& widgetRenderParams;
+	};
+	void Render_WindowNode(Render_WindowNode_Params const& params);
 
 	struct DA_WindowNodePrimaryRects
 	{
@@ -196,11 +204,11 @@ namespace DEngine::Gui::impl
 		Math::Vec2 point) noexcept;
 
 	[[nodiscard]] Rect DA_BuildDeleteGizmoRect(
-		Rect layerRect,
+		Rect widgetRect,
 		u32 gizmoSize);
 
 	[[nodiscard]] bool DA_CheckHitDeleteGizmo(
-		Rect layerRect,
+		Rect widgetRect,
 		u32 gizmoSize,
 		Math::Vec2 point) noexcept;
 
@@ -266,6 +274,7 @@ namespace DEngine::Gui::impl
 		DockArea& dockArea;
 		RectCollection const& rectCollection;
 		TextManager& textManager;
+		TextSizeInfo const& tabTextSize;
 		AllocRef transientAlloc;
 		Rect const& widgetRect;
 		Rect const& visibleRect;
@@ -287,6 +296,7 @@ namespace DEngine::Gui::impl
 		DockArea& dockArea;
 		AllocRef const& transientAlloc;
 		RectCollection const& rectCollection;
+		TextSizeInfo const& tabTextSize;
 		TextManager& textManager;
 		Rect const& widgetRect;
 		Rect const& visibleRect;

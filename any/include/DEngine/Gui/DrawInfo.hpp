@@ -5,6 +5,8 @@
 #include <DEngine/Gfx/Gfx.hpp>
 #include <vector>
 
+// All the code in this document is mostly temporary and to be redesigned.
+
 namespace DEngine::Gui
 {
 	class DrawInfo
@@ -13,6 +15,8 @@ namespace DEngine::Gui
 		std::vector<Gfx::GuiVertex>* vertices;
 		std::vector<u32>* indices;
 		std::vector<Gfx::GuiDrawCmd>* drawCmds;
+		std::vector<u32>* utfValues;
+		std::vector<Gfx::GlyphRect>* textGlyphRects;
 	protected:
 		Extent framebufferExtent;
 		std::vector<Rect> scissors;
@@ -23,10 +27,14 @@ namespace DEngine::Gui
 			Extent framebufferExtent,
 			std::vector<Gfx::GuiVertex>& verticesIn,
 			std::vector<u32>& indicesIn,
-			std::vector<Gfx::GuiDrawCmd>& drawCmdsIn) :
+			std::vector<Gfx::GuiDrawCmd>& drawCmdsIn,
+			std::vector<u32>& utfValuesIn,
+			std::vector<Gfx::GlyphRect>& textGlyphRectsIn) :
 			vertices(&verticesIn),
 			indices(&indicesIn),
 			drawCmds(&drawCmdsIn),
+			utfValues(&utfValuesIn),
+			textGlyphRects(&textGlyphRectsIn),
 			framebufferExtent(framebufferExtent)
 		{
 			BuildQuad();
@@ -75,29 +83,45 @@ namespace DEngine::Gui
 		}
 
 		void PushText(
+			u64 fontFaceId,
 			Std::Span<char const> text,
 			Rect const* rects,
+			Math::Vec2Int posOffset,
 			Math::Vec4 color)
 		{
+			auto const fbExtent = GetFramebufferExtent();
+
 			int const length = (int)text.Size();
-			for (int i = 0; i < length; i += 1)
-			{
-				auto const& glyphRect = rects[i];
 
-				if (!glyphRect.IsNothing())
-				{
-					Gfx::GuiDrawCmd cmd = {};
-					cmd.type = Gfx::GuiDrawCmd::Type::TextGlyph;
-					cmd.textGlyph.utfValue = (u32)(unsigned char)text[i];
-					cmd.textGlyph.color = color;
-					cmd.rectPosition.x = (f32)glyphRect.position.x / (f32)framebufferExtent.width;
-					cmd.rectPosition.y = (f32)glyphRect.position.y / (f32)framebufferExtent.height;
-					cmd.rectExtent.x = (f32)glyphRect.extent.width / (f32)framebufferExtent.width;
-					cmd.rectExtent.y = (f32)glyphRect.extent.height / (f32)framebufferExtent.height;
+			auto& utfValues = *this->utfValues;
+			int utfStartIndex = (int)utfValues.size();
+			utfValues.resize(utfStartIndex + length);
+			for (int i = 0; i < length; i++)
+				utfValues[i + utfStartIndex] = (u32)(unsigned char)text[i];
 
-					drawCmds->emplace_back(cmd);
-				}
+			auto& textGlyphRects = *this->textGlyphRects;
+			textGlyphRects.resize(utfStartIndex + length);
+			for (int i = 0; i < length; i++) {
+				auto const& srcRect = rects[i];
+
+				Gfx::GlyphRect outRect {};
+				outRect.pos.x = (f32)srcRect.position.x / (f32)fbExtent.width;
+				outRect.pos.y = (f32)srcRect.position.y / (f32)fbExtent.height;
+				outRect.extent.x = (f32)srcRect.extent.width / (f32)fbExtent.width;
+				outRect.extent.y = (f32)srcRect.extent.height / (f32)fbExtent.height;
+				textGlyphRects[i + utfStartIndex] = outRect;
 			}
+
+			Gfx::GuiDrawCmd cmd {};
+			cmd.type = Gfx::GuiDrawCmd::Type::Text;
+			cmd.text = {};
+			cmd.text.startIndex = utfStartIndex;
+			cmd.text.count = length;
+			cmd.text.fontFaceId = (Gfx::FontFaceId)fontFaceId;
+			cmd.text.posOffset.x = (f32)posOffset.x / (f32)fbExtent.width;
+			cmd.text.posOffset.y = (f32)posOffset.y / (f32)fbExtent.height;
+			cmd.text.color = color;
+			drawCmds->push_back(cmd);
 		}
 
 		void PushScissor(Rect rect)

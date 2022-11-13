@@ -2,6 +2,7 @@
 
 #include <DEngine/Gui/Widget.hpp>
 
+#include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/Variant.hpp>
 #include <DEngine/Std/Utility.hpp>
@@ -17,19 +18,19 @@ namespace DEngine::Gui
 	class MenuButton : public Widget
 	{
 	public:
-		struct Line
-		{
+		struct Line {
 			std::string title;
 			std::function<void(Line&, Context*)> callback;
 			bool toggled = false;
 			bool togglable = false;
 		};
-		struct Submenu
-		{
-			std::vector<Line> lines;
+		struct LineAny {
+			Std::Box<Widget> widget;
+		};
+		struct Submenu {
+			std::vector<Std::Variant<Line, LineAny>> lines;
 			Std::Opt<uSize> activeSubmenu;
-			struct PressedLineData
-			{
+			struct PressedLineData {
 				u8 pointerId = 0;
 				uSize lineIndex = 0;
 			};
@@ -52,6 +53,10 @@ namespace DEngine::Gui
 
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
+		virtual void BuildChildRects(
+			BuildChildRects_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
 		virtual void Render2(
 			Render_Params const& params,
 			Rect const& widgetRect,
