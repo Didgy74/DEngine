@@ -289,7 +289,7 @@ namespace DEngine::impl
 }
 */
 
-int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
+int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 {
 	using namespace DEngine;
 
@@ -370,6 +370,9 @@ int DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv)
 	editorCreateInfo.windowExtent = mainWindowCreateResult.extent;
 	editorCreateInfo.windowSafeAreaOffset = mainWindowCreateResult.visibleOffset;
 	editorCreateInfo.windowSafeAreaExtent = mainWindowCreateResult.visibleExtent;
+	editorCreateInfo.windowContentScale = mainWindowCreateResult.contentScale;
+	editorCreateInfo.windowDpiX = mainWindowCreateResult.dpiX;
+	editorCreateInfo.windowDpiY = mainWindowCreateResult.dpiY;
 	Editor::Context editorCtx = Editor::Context::Create(editorCreateInfo);
 
 	while (true)
@@ -484,6 +487,8 @@ void DEngine::impl::SubmitRendering(
 	params.viewportUpdates = editorDrawData.viewportUpdates;
 	params.lineVertices = editorDrawData.lineVertices;
 	params.lineDrawCmds = editorDrawData.lineDrawCmds;
+	params.guiUtfValues = editorDrawData.utfValues;
+	params.guiTextGlyphRects = editorDrawData.textGlyphRects;
 	for (auto& windowUpdate : params.nativeWindowUpdates)
 	{
 		auto const windowEvents = appCtx.GetWindowEvents((App::WindowID)windowUpdate.id);
@@ -495,8 +500,7 @@ void DEngine::impl::SubmitRendering(
 
 
 
-	if (!params.nativeWindowUpdates.empty())
-	{
+	if (!params.nativeWindowUpdates.empty()) {
 		gfxData.Draw(params);
 	}
 }

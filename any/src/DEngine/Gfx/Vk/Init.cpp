@@ -75,8 +75,8 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	auto extensionsToUse = Std::NewVec<char const*>(transientAlloc);
 	extensionsToUse.Reserve(requiredExtensionsIn.Size() + Constants::requiredInstanceExtensions.size());
 	// First copy all required instance extensions
-	for (uSize i = 0; i < requiredExtensionsIn.Size(); i++)
-		extensionsToUse.PushBack(requiredExtensionsIn[i]);
+	for (auto const& item : requiredExtensionsIn)
+		extensionsToUse.PushBack(item);
 
 	// Next add extensions required by renderer, don't add duplicates
 	for (auto requiredExtension : Constants::requiredInstanceExtensions)

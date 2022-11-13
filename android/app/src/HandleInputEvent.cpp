@@ -83,7 +83,7 @@ namespace DEngine::Application::impl
 			f32 const y = AMotionEvent_getY(event, index);
 			BackendInterface::UpdateCursorPosition(
 				implData,
-				backendData.currentWindow.Value(),
+				backendData.currWindowId.Value(),
 				{ (i32)x, (i32)y });
 			handled = true;
 		}
@@ -126,7 +126,7 @@ namespace DEngine::Application::impl
 				auto const id = AMotionEvent_getPointerId(event, index);
 				BackendInterface::UpdateTouch(
 					implData,
-					backendData.currentWindow.Get(),
+					backendData.currWindowId.Get(),
 					TouchEventType::Down,
 					(u8)id,
 					x,
@@ -145,7 +145,7 @@ namespace DEngine::Application::impl
 					auto const  id = AMotionEvent_getPointerId(event, i);
 					BackendInterface::UpdateTouch(
 						implData,
-						backendData.currentWindow.Get(),
+						backendData.currWindowId.Get(),
 						TouchEventType::Moved,
 						(u8)id,
 						x,
@@ -163,7 +163,7 @@ namespace DEngine::Application::impl
 				auto const  id = AMotionEvent_getPointerId(event, index);
 				BackendInterface::UpdateTouch(
 					implData,
-					backendData.currentWindow.Get(),
+					backendData.currWindowId.Get(),
 					TouchEventType::Up,
 					(u8)id,
 					x,

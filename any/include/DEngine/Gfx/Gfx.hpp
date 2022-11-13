@@ -29,6 +29,7 @@ namespace DEngine::Gfx
 	enum class ViewportID : u64 { Invalid = u64(-1) };
 	enum class NativeWindowID : u64 { Invalid = u64(-1) };
 	enum class NativeWindowEvent : u32;
+	enum class FontFaceId : u64 { Invalid = u64(-1) };
 
 	class Context
 	{
@@ -38,11 +39,16 @@ namespace DEngine::Gfx
 
 		// Thread safe
 		void AdoptNativeWindow(NativeWindowID);
+		// Thread safe
 		void DeleteNativeWindow(NativeWindowID);
 
 		// Thread safe
+		void NewFontFace(FontFaceId fontFaceId);
+
+		// Thread safe
 		void NewFontTexture(
-			u32 id,
+			FontFaceId fontFaceId,
+			u32 utfValue,
 			u32 width,
 			u32 height,
 			u32 pitch,
@@ -63,6 +69,8 @@ namespace DEngine::Gfx
 		TextureAssetInterface const* texAssetInterface = nullptr;
 
 		void* apiDataBase = nullptr;
+		void* GetApiData() { return apiDataBase; }
+		void const* GetApiData() const { return apiDataBase; }
 
 		friend Std::Opt<Context> Initialize(InitInfo const& initInfo);
 	};
@@ -75,8 +83,7 @@ namespace DEngine::Gfx
 		virtual char const* get(TextureID id) const = 0;
 	};
 
-	struct ViewportUpdate
-	{
+	struct ViewportUpdate {
 		ViewportID id;
 		u32 width;
 		u32 height;
@@ -84,8 +91,7 @@ namespace DEngine::Gfx
 		Math::Vec4 clearColor = { 1.f, 0.f, 0.f, 1.f };
 
 		enum class GizmoType : u8 { Translate, Rotate, Scale, COUNT };
-		struct Gizmo
-		{
+		struct Gizmo {
 			// In world space
 			Math::Vec3 position;
 			f32 rotation;
@@ -105,38 +111,35 @@ namespace DEngine::Gfx
 
 	struct GuiDrawCmd
 	{
-		enum class Type
-		{
+		enum class Type {
 			FilledMesh,
-			TextGlyph,
+			Text,
 			Viewport,
 			Scissor
 		};
 		Type type;
-		struct MeshSpan
-		{
+		struct MeshSpan {
 			u32 indexCount;
 			u32 vertexOffset;
 			u32 indexOffset;
 		};
-		struct FilledMesh
-		{
+		struct FilledMesh {
 			MeshSpan mesh;
 			Math::Vec4 color;
 		};
-		struct TextGlyph
-		{
-			u32 utfValue;
+		struct Text {
+			uSize startIndex;
+			uSize count;
 			Math::Vec4 color;
+			Math::Vec2 posOffset;
+			FontFaceId fontFaceId;
 		};
-		struct Viewport
-		{
+		struct Viewport {
 			ViewportID id;
 		};
-		union
-		{
+		union {
 			FilledMesh filledMesh;
-			TextGlyph textGlyph;
+			Text text;
 			Viewport viewport;
 		};
 		// In the range of 0-1
@@ -145,8 +148,7 @@ namespace DEngine::Gfx
 		Math::Vec2 rectExtent;
 	};
 
-	struct NativeWindowUpdate
-	{
+	struct NativeWindowUpdate {
 		NativeWindowID id;
 		NativeWindowEvent event;
 		Math::Vec4 clearColor;
@@ -154,10 +156,14 @@ namespace DEngine::Gfx
 		u32 drawCmdCount;
 	};
 
-	struct LineDrawCmd
-	{
+	struct LineDrawCmd {
 		Math::Vec4 color;
 		u32 vertCount;
+	};
+
+	struct GlyphRect {
+		Math::Vec2 pos;
+		Math::Vec2 extent;
 	};
 
 	struct DrawParams
@@ -169,11 +175,14 @@ namespace DEngine::Gfx
 		// This is decent generic stuff
 		std::vector<LineDrawCmd> lineDrawCmds;
 		std::vector<Math::Vec3> lineVertices;
+		std::vector<ViewportUpdate> viewportUpdates;
 
+		// This API is fine, but shouldn't use vectors directly in the future.
 		std::vector<GuiVertex> guiVertices;
 		std::vector<u32> guiIndices;
+		std::vector<u32> guiUtfValues;
+		std::vector<GlyphRect> guiTextGlyphRects;
 		std::vector<GuiDrawCmd> guiDrawCmds;
-		std::vector<ViewportUpdate> viewportUpdates;
 		std::vector<NativeWindowUpdate> nativeWindowUpdates;
 	};
 

@@ -17,6 +17,7 @@ struct LineIntEdit::Impl
 			glyphRects{ alloc } {}
 
 		Extent textOuterExtent = {};
+		FontFaceId fontFaceId;
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
@@ -191,30 +192,39 @@ void LineIntEdit::ClearInputConnection()
 SizeHint LineIntEdit::GetSizeHint2(
 	Widget::GetSizeHint2_Params const& params) const
 {
+	auto const& ctx = params.ctx;
+	auto const& window = params.window;
 	auto& textManager = params.textManager;
 	auto& pusher = params.pusher;
+
+	auto textScale = ctx.fontScale * window.contentScale;
 
 	auto const pusherIt = pusher.AddEntry(*this);
 
 	SizeHint returnValue = {};
 
-	if (pusher.IncludeRendering())
-	{
+	if (pusher.IncludeRendering()) {
 		auto customData = Impl::CustomData{ pusher.Alloc() };
 
-		customData.glyphRects.Resize(text.size());
+		customData.fontFaceId = textManager.GetFontFaceId(textScale, window.dpiX, window.dpiY);
 
+		customData.glyphRects.Resize(text.size());
 		customData.textOuterExtent = textManager.GetOuterExtent(
 			{ text.data(), text.size() },
-			{},
+			textScale,
+			window.dpiX,
+			window.dpiY,
 			customData.glyphRects.Data());
 		returnValue.minimum = customData.textOuterExtent;
 
 		pusher.AttachCustomData(pusherIt, Std::Move(customData));
 	}
-	else
-	{
-		returnValue.minimum = textManager.GetOuterExtent({ text.data(), text.size() });
+	else {
+		returnValue.minimum = textManager.GetOuterExtent(
+			{ text.data(), text.size() },
+			textScale,
+			window.dpiX,
+			window.dpiY);
 	}
 
 	returnValue.minimum.width += margin * 2;
@@ -283,8 +293,10 @@ void LineIntEdit::Render2(
 		scissor = DrawInfo::ScopedScissor(drawInfo, intersection);
 
 	drawInfo.PushText(
+		(u64)customData.fontFaceId,
 		{ text.data(), text.size() },
 		customData.glyphRects.Data(),
+		{},
 		{ 1.f, 1.f, 1.f, 1.f });
 }
 

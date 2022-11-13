@@ -1,25 +1,28 @@
 apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
 
 android {
-    compileSdkVersion 32
+    compileSdk 33
+    ndkVersion '25.1.8937393'
+    buildToolsVersion '33.0.0'
+    namespace 'didgy.dengine.editor'
     defaultConfig {
         applicationId  "didgy.dengine.editor"
         minSdkVersion 27
-        targetSdkVersion 32
+        targetSdkVersion 33
         versionCode  1
         versionName  "0.1"
-        ndkVersion "23.0.7599858" // e.g.,  ndkVersion '21.3.6528147'
         externalNativeBuild {
             cmake {
-                //version "3.18.1"
-                abiFilters 'armeabi-v7a', 'arm64-v8a'//, 'x86', 'x86_64'
+                version "3.22.1"
+                //abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+                abiFilters 'arm64-v8a', 'x86_64'
             }
         }
         sourceSets {
             main {
                 assets.srcDirs "../../data"
             }
-
             debug {
                 jniLibs.srcDirs "src/lib"
             }
@@ -36,8 +39,8 @@ android {
     buildTypes {
         release {
             proguardFiles getDefaultProguardFile(
-                'proguard-android-optimize.txt'),
-                'proguard-rules.pro'
+                    'proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
             minifyEnabled true
             shrinkResources true
             debuggable false
@@ -61,8 +64,8 @@ android {
 
         relWithDebInfo {
             proguardFiles getDefaultProguardFile(
-                'proguard-android-optimize.txt'),
-                'proguard-rules.pro'
+                    'proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
             signingConfig signingConfigs.debug
             versionNameSuffix ".dev"
             shrinkResources true
@@ -81,8 +84,8 @@ android {
 
         release_unsigned {
             proguardFiles getDefaultProguardFile(
-                'proguard-android-optimize.txt'),
-                'proguard-rules.pro'
+                    'proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
             signingConfig signingConfigs.debug
             versionNameSuffix ".dev"
             minifyEnabled true
@@ -103,8 +106,6 @@ android {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
     }
-    ndkVersion '24.0.8215888'
-    buildToolsVersion '31.0.0'
 }
 
 dependencies {

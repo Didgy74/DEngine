@@ -36,7 +36,9 @@ namespace DEngine::Application
 
 	enum class Orientation : u8;
 
-	enum class OS : u8;
+	enum class OS : u8 { Windows, Linux, Android };
+	// If this fails to compile, it's likely a build script issue.
+	[[maybe_unused]] constexpr OS activeOS = (OS)DENGINE_OS;
 	enum class Platform : u8;
 
 	enum class Button : u16;
@@ -125,6 +127,9 @@ namespace DEngine::Application
 			Math::Vec2Int position = {};
 			Extent visibleExtent = {};
 			Math::Vec2UInt visibleOffset = {};
+			f32 dpiX = 0.f;
+			f32 dpiY = 0.f;
+			f32 contentScale = 1.f;
 		};
 		// Thread-safe
 		[[nodiscard]] NewWindow_ReturnT NewWindow(
@@ -338,6 +343,10 @@ public:
 		TouchEventType type,
 		Math::Vec2 position) {}
 
+	virtual void WindowContentScale(
+		Context& appCtx,
+		WindowID window,
+		f32 newScale) {}
 	// Return true if window should be closed.
 	[[nodiscard]] virtual bool WindowCloseSignal(
 		Context& appCtx,

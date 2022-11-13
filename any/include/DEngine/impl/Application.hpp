@@ -13,10 +13,12 @@
 #include <vector>
 #include <mutex>
 
-#if defined(__ANDROID__)
-#	define DENGINE_APP_MAIN_ENTRYPOINT dengine_app_detail_main
+#if !defined(DENGINE_OS)
+#error "Error: DEngine-define 'DENGINE_OS' has not been defined. Likely an error in build-script."
+#elif DENGINE_OS == DENGINE_OS_VALUE_ANDROID
+#define DENGINE_MAIN_ENTRYPOINT dengine_impl_main
 #else
-#	define DENGINE_APP_MAIN_ENTRYPOINT main
+#define DENGINE_MAIN_ENTRYPOINT main
 #endif
 
 struct DEngine::Application::Context::Impl
@@ -44,6 +46,10 @@ struct DEngine::Application::Context::Impl
 		Math::Vec2UInt visibleOffset = {};
 		Extent visibleExtent = {};
 		Orientation orientation = {};
+
+		f32 dpiX = 0.f;
+		f32 dpiY = 0.f;
+		f32 contentScale = 1.f;
 
 		bool isMinimized = false;
 		bool shouldShutdown = false;
@@ -190,6 +196,11 @@ namespace DEngine::Application::impl::BackendInterface
 		Context::Impl& implData,
 		WindowID id,
 		Orientation newOrientation);
+
+	[[maybe_unused]] void WindowContentScale(
+		Context::Impl& implData,
+		WindowID id,
+		float scale);
 
 	[[maybe_unused]] void UpdateWindowFocus(
 		Context::Impl& implData,

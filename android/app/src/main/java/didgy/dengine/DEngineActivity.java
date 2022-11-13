@@ -1,11 +1,10 @@
 package didgy.dengine;
 
 import android.app.NativeActivity;
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.SurfaceHolder;
-import android.view.WindowInsetsController;
 import android.view.inputmethod.InputMethodManager;
 
 import java.util.ArrayList;
@@ -17,7 +16,7 @@ public class DEngineActivity extends NativeActivity {
     }
 
     // Return type is the pointer to the backend-data
-    public native double nativeInit();
+    public native double nativeInit(float fontScale);
 
     public static final int NATIVE_TEXT_JOB_MEMBER_COUNT = 4;
     /*
@@ -67,7 +66,6 @@ public class DEngineActivity extends NativeActivity {
             tempInts.add(item.count);
             tempInts.add(stringOffset);
             tempInts.add(item.text.length());
-
             stringBuilder.append(item.text);
         }
         assert tempInts.size() % NATIVE_TEXT_JOB_MEMBER_COUNT == 0;
@@ -84,6 +82,11 @@ public class DEngineActivity extends NativeActivity {
     public native void nativeOnNewOrientation(double backendDataPtr, int newOrientation);
     public void nativeOnNewOrientationWrapper(int newOrientation) {
         nativeOnNewOrientation(mNativeBackendDataPtr, newOrientation);
+    }
+    public native void nativeOnFontScale(double backendDataPtr, int windowId, float newScale);
+    public void nativeOnFontScaleWrapper(float newScale) {
+        assert mWindowId != INVALID_WINDOW_ID;
+        nativeOnFontScale(mNativeBackendDataPtr, mWindowId, newScale);
     }
     public native void nativeOnContentRectChanged(
             double backendDataPtr,
@@ -104,7 +107,7 @@ public class DEngineActivity extends NativeActivity {
 
     public double mNativeBackendDataPtr = 0;
     public NativeView mNativeContentView = null;
-    public Configuration mCurrentConfig = null;
+    public Configuration mCurrConfig = null;
     public static final int INVALID_WINDOW_ID = -1;
     public int mWindowId = INVALID_WINDOW_ID;
 
@@ -125,9 +128,13 @@ public class DEngineActivity extends NativeActivity {
         mNativeContentView.setFocusable(true);
         mNativeContentView.setFocusableInTouchMode(true);
 
-        mNativeBackendDataPtr = nativeInit();
+        var config = new Configuration(getResources().getConfiguration());
+        mCurrConfig = config;
 
-        mCurrentConfig = new Configuration(getResources().getConfiguration());
+        var metrics = getResources().getDisplayMetrics();
+
+        var fontScale = config.fontScale;
+        mNativeBackendDataPtr = nativeInit(fontScale);
     }
 
     @Override
@@ -137,13 +144,21 @@ public class DEngineActivity extends NativeActivity {
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
+        assert mCurrConfig != null;
+
         super.onConfigurationChanged(newConfig);
 
-        if (newConfig.orientation != mCurrentConfig.orientation) {
+        int diff = newConfig.diff(mCurrConfig);
+
+        if ((diff & ActivityInfo.CONFIG_FONT_SCALE) != 0) {
+            nativeOnFontScaleWrapper(newConfig.fontScale);
+        }
+
+        if ((diff & ActivityInfo.CONFIG_ORIENTATION) != 0) {
             nativeOnNewOrientationWrapper(newConfig.orientation);
         }
 
-        mCurrentConfig = newConfig;
+        mCurrConfig = newConfig;
     }
 
     @Override
@@ -193,8 +208,7 @@ public class DEngineActivity extends NativeActivity {
                     NativeInputFilter.fromNativeEnum(softInputFilter)));
     }
 
-    public void nativeEvent_hideSoftInput()
-    {
+    public void nativeEvent_hideSoftInput() {
         var temp = mNativeContentView;
         runOnUiThread(temp::endInputSession);
     }

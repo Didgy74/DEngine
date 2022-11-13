@@ -113,6 +113,12 @@ namespace DEngine::Gui::impl
 			return returnVal;
 		}
 
+		[[nodiscard]] auto SkipOne() const noexcept {
+			DA_LayerItPair_Inner returnVal = *this;
+			returnVal.startIndex += 1;
+			return returnVal;
+		}
+
 		[[nodiscard]] DA_LayerIt_Inner<DA_T> begin() const;
 
 		[[nodiscard]] auto end() const noexcept {

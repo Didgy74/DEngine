@@ -31,12 +31,13 @@ namespace DEngine::Gui::impl
 	constexpr u8 cursorPointerId = (u8)-1;
 
 	[[nodiscard]] static Extent DropdownLayer_BuildOuterExtent(
-		Std::Span<decltype(Dropdown::items)::value_type const> widgetItems,
+		Std::Span<std::string const> widgetItems,
 		u32 textMargin,
+		TextSizeInfo const& textSize,
 		TextManager& textManager,
 		Rect const& safeAreaRect)
 	{
-		auto const textHeight = textManager.GetLineheight();
+		auto const textHeight = textManager.GetLineheight(textSize);
 		auto const lineHeight = textHeight + (textMargin * 2);
 
 		Extent returnValue = {};
@@ -44,7 +45,9 @@ namespace DEngine::Gui::impl
 
 		for (auto const& line : widgetItems)
 		{
-			auto const textExtent = textManager.GetOuterExtent({ line.data(), line.size() });
+			auto const textExtent = textManager.GetOuterExtent(
+				{ line.data(), line.size() },
+				textSize);
 
 			returnValue.width = Math::Max(
 				returnValue.width,
@@ -64,16 +67,13 @@ namespace DEngine::Gui::impl
 		Math::Vec2 pointerPos)
 	{
 		Std::Opt<uSize> lineHit;
-		for (int i = 0; i < lineCount; i++)
-		{
+		for (int i = 0; i < lineCount; i++) {
 			Rect lineRect = {};
 			lineRect.position = rectPos;
 			lineRect.position.y += (i32)lineHeight * i;
 			lineRect.extent.width = rectWidth;
 			lineRect.extent.height = lineHeight;
-
-			if (lineRect.PointIsInside(pointerPos))
-			{
+			if (lineRect.PointIsInside(pointerPos)) {
 				lineHit = i;
 				break;
 			}
@@ -147,9 +147,9 @@ struct Dropdown::Impl
 	class DropdownLayer : public Layer
 	{
 	public:
-		Dropdown* dropdownWidget = nullptr;
-		[[nodiscard]] Dropdown& GetDropdownWidget() { return *dropdownWidget; }
-		[[nodiscard]] Dropdown const& GetDropdownWidget() const { return *dropdownWidget; }
+		Dropdown* _dropdownWidget = nullptr;
+		[[nodiscard]] Dropdown& GetDropdownWidget() { return *_dropdownWidget; }
+		[[nodiscard]] Dropdown const& GetDropdownWidget() const { return *_dropdownWidget; }
 
 		Math::Vec2Int pos = {};
 		u32 dropdownWidgetWidth = 0;
@@ -231,7 +231,7 @@ namespace DEngine::Gui::impl
 		Rect const& widgetRect)
 	{
 		auto layer = Std::Box{ new Dropdown::Impl::DropdownLayer };
-		layer->dropdownWidget = &widget;
+		layer->_dropdownWidget = &widget;
 		layer->pos = widgetRect.position;
 		layer->pos.y += (i32)widgetRect.extent.height;
 		layer->dropdownWidgetWidth = widgetRect.extent.width;
@@ -295,13 +295,19 @@ bool Dropdown::Impl::Dropdown_PointerPress(
 void Dropdown::Impl::DropdownLayer::BuildSizeHints(
 	BuildSizeHints_Params const& params) const
 {
+	auto& ctx = params.ctx;
 	auto& pusher = params.pusher;
+	auto& window = params.window;
 	auto& textManager = params.textManager;
 
 	auto const& widget = GetDropdownWidget();
 	int lineCount = (int)widget.items.size();
 
-	auto lineheight = textManager.GetLineheight();
+	TextSizeInfo textSize = {
+		.scale = window.contentScale * ctx.fontScale,
+		.dpiX = window.dpiX,
+		.dpiY = window.dpiY, };
+	auto lineheight = textManager.GetLineheight(textSize);
 
 	auto pusherIt = pusher.AddEntry(*this);
 
@@ -320,7 +326,9 @@ void Dropdown::Impl::DropdownLayer::BuildSizeHints(
 
 void Dropdown::Impl::DropdownLayer::BuildRects(BuildRects_Params const& params) const
 {
+	auto& ctx = params.ctx;
 	auto& pusher = params.pusher;
+	auto& window = params.window;
 	auto& textManager = params.textManager;
 
 	auto const usableRect = Rect::Intersection(params.windowRect, params.visibleRect);
@@ -360,6 +368,11 @@ void Dropdown::Impl::DropdownLayer::BuildRects(BuildRects_Params const& params) 
 
 	pusher.SetRectPair(pusherIt, { outerBoxRect, usableRect });
 
+	TextSizeInfo textSize = {
+		.scale = window.contentScale * ctx.fontScale,
+		.dpiX = window.dpiX,
+		.dpiY = window.dpiY, };
+
 	// Position our line glyphs correctly
 	if (pusher.IncludeRendering())
 	{
@@ -388,7 +401,7 @@ void Dropdown::Impl::DropdownLayer::BuildRects(BuildRects_Params const& params) 
 
 			auto textExtent = textManager.GetOuterExtent(
 				{ line.data(), linelength },
-				{},
+				textSize,
 				&customData.lineGlyphRects[offset]);
 
 			Rect lineRect = outerBoxRect;
@@ -410,6 +423,8 @@ void Dropdown::Impl::DropdownLayer::BuildRects(BuildRects_Params const& params) 
 
 void Dropdown::Impl::DropdownLayer::Render(Render_Params const& params) const
 {
+	auto const& ctx = params.ctx;
+	auto const& window = params.window;
 	auto const& rectColl = params.rectCollection;
 	auto& transientAlloc = params.transientAlloc;
 	auto& drawInfo = params.drawInfo;
@@ -463,10 +478,18 @@ void Dropdown::Impl::DropdownLayer::Render(Render_Params const& params) const
 		offset += strLength;
 	}
 
+	TextSizeInfo textSize = {
+		.scale = window.contentScale * ctx.fontScale,
+		.dpiX = window.dpiX,
+		.dpiY = window.dpiY, };
+	auto fontFaceId = params.textManager.GetFontFaceId(textSize);
+
 	// Next draw each line
 	drawInfo.PushText(
+		(u64)fontFaceId,
 		{ allText.Data(), allText.Size() },
 		customData.lineGlyphRects.Data(),
+		{},
 		{ 1.f, 1.f, 1.f, 1.f });
 }
 
@@ -704,8 +727,7 @@ SizeHint Dropdown::GetSizeHint2(
 	// just find the line with the longest count kek
 	int longestElementIndex = 0;
 	int linecount = (int)items.size();
-	for (int i = 0; i < linecount; i += 1)
-	{
+	for (int i = 0; i < linecount; i += 1) {
 		if (items[i].size() > items[longestElementIndex].size())
 			longestElementIndex = i;
 	}
@@ -714,7 +736,13 @@ SizeHint Dropdown::GetSizeHint2(
 
 	// We do not store the glyphs of this text, because it's not the
 	// line we want to render later. This is just the longest line.
-	auto const textOuterExtent = textManager.GetOuterExtent({ text.data(), text.size() });
+	TextSizeInfo textSize = {
+		.scale = params.ctx.fontScale * params.window.contentScale,
+		.dpiX = params.window.dpiX,
+		.dpiY = params.window.dpiY };
+	auto const textOuterExtent = textManager.GetOuterExtent(
+		{ text.data(), text.size() },
+		textSize);
 	returnValue.minimum = textOuterExtent;
 
 	returnValue.minimum.width += textMargin * 2;
@@ -737,12 +765,17 @@ void Dropdown::BuildChildRects(
 
 	auto customData = Impl::CustomData{ pusher.Alloc() };
 
+	TextSizeInfo textSize = {
+		.scale = params.ctx.fontScale * params.window.contentScale,
+		.dpiX = params.window.dpiX,
+		.dpiY = params.window.dpiY };
+
 	auto& text = items[selectedItem];
 	auto const textLength = (int)text.size();
 	customData.glyphRects.Resize(text.size());
 	auto const textExtent = textMan.GetOuterExtent(
 		{ text.data(), (uSize)textLength },
-		{},
+		textSize,
 		customData.glyphRects.Data());
 
 	Math::Vec2Int const centerOffset = {
@@ -787,10 +820,18 @@ void Dropdown::Render2(
 	if (textIsBiggerThanExtent)
 		scissor = DrawInfo::ScopedScissor(drawInfo, intersection);
 
+	TextSizeInfo textSize = {
+		.scale = params.ctx.fontScale * params.window.contentScale,
+		.dpiX = params.window.dpiX,
+		.dpiY = params.window.dpiY };
+	auto fontFaceId = params.textManager.GetFontFaceId(textSize);
+
 	auto& text = items[selectedItem];
 	drawInfo.PushText(
+		(u64)fontFaceId,
 		{ text.data(), text.size() },
 		customData.glyphRects.Data(),
+		{},
 		{ 1.f, 1.f, 1.f, 1.f });
 }
 

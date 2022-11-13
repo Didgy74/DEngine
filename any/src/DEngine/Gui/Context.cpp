@@ -64,19 +64,20 @@ namespace DEngine::Gui::impl
 			return nullptr;
 	}
 
-	void ImplData_PreDispatchStuff(Context::Impl& implData)
-	{
+	void ImplData_PreDispatchStuff(Context::Impl& implData) {
 		implData.transientAlloc.Reset();
 	}
 
-	void ImplData_FlushPostEventJobs(Context& ctx)
-	{
+	void ImplData_FlushPostEventJobs(Context& ctx) {
 		auto& implData = ctx.Internal_ImplData();
 		for (auto const& job : implData.postEventJobs)
 			job.invokeFn(job.ptr, ctx);
 		auto const length = (int)implData.postEventJobs.size();
-		for (int i = length; i != 0 ; i -= 1)
-			implData.postEventAlloc.Free(implData.postEventJobs[i - 1].ptr);
+		for (int i = length; i != 0 ; i -= 1) {
+			auto& job = implData.postEventJobs[i - 1];
+			job.destroyFn(job.ptr);
+			implData.postEventAlloc.Free(job.ptr);
+		}
 
 		implData.postEventJobs.clear();
 		implData.postEventAlloc.Reset();
@@ -104,30 +105,34 @@ namespace DEngine::Gui::impl
 				{ {}, windowRect.extent },
 				{ { (i32)visibleOffset.x, (i32)visibleOffset.y }, visibleExtent });
 
+			EventWindowInfo eventWindowInfo {
+				.contentScale = windowNode.data.contentScale,
+				.dpiX = windowNode.data.dpiX,
+				.dpiY = windowNode.data.dpiY, };
+
 			RectCollection::SizeHintPusher sizeHintPusher { rectCollection };
 
-			if (windowNode.frontmostLayer)
-			{
-				Layer::BuildSizeHints_Params params = {
-					.ctx = ctx,
-					.textManager = textManager,
-					.transientAlloc = transientAlloc,
-					.pusher = sizeHintPusher };
-				params.windowRect = visibleRect;
-				params.safeAreaRect = visibleRect;
-
-				auto const& layer = *windowNode.frontmostLayer;
-				layer.BuildSizeHints(params);
-			}
-
-			Widget::GetSizeHint2_Params params = {
+			Widget::GetSizeHint2_Params widgetParams = {
 				.ctx = ctx,
+				.window = eventWindowInfo,
 				.textManager = textManager,
 				.transientAlloc = transientAlloc,
 				.pusher = sizeHintPusher, };
-
 			auto const& widget = *windowNode.data.topLayout;
-			widget.GetSizeHint2(params);
+			widget.GetSizeHint2(widgetParams);
+
+			if (windowNode.frontmostLayer) {
+				Layer::BuildSizeHints_Params layerParams = {
+					.ctx = ctx,
+					.textManager = textManager,
+					.window = eventWindowInfo,
+					.windowRect = { {}, windowRect.extent },
+					.safeAreaRect = visibleRect,
+					.transientAlloc = transientAlloc,
+					.pusher = sizeHintPusher };
+				auto const& layer = *windowNode.frontmostLayer;
+				layer.BuildSizeHints(layerParams);
+			}
 
 			transientAlloc.Reset();
 		}
@@ -145,36 +150,38 @@ namespace DEngine::Gui::impl
 				{ {}, windowRect.extent },
 				{ { (i32)visibleOffset.x, (i32)visibleOffset.y }, visibleExtent});
 
-			RectCollection::RectPusher rectPusher {rectCollection };
+			EventWindowInfo eventWindowInfo {
+				.contentScale = windowNode.data.contentScale,
+				.dpiX = windowNode.data.dpiX,
+				.dpiY = windowNode.data.dpiY, };
+			RectCollection::RectPusher rectPusher { rectCollection };
 
-			if (windowNode.frontmostLayer)
-			{
-				auto& layer = *windowNode.frontmostLayer;
-				Layer::BuildRects_Params buildRectsParams {
-					.ctx = ctx,
-					.textManager = textManager,
-					.transientAlloc = transientAlloc,
-					.pusher = rectPusher };
-				buildRectsParams.windowRect = visibleRect;
-				buildRectsParams.visibleRect = visibleRect;
-
-				layer.BuildRects(buildRectsParams);
-			}
-
-			//Widget::BuildChildRects_Params params{ *this, sizeHintPusher2, transientAlloc };
-			Widget::BuildChildRects_Params params {
+			Widget::BuildChildRects_Params widgetParams {
 				.ctx = ctx,
+				.window = eventWindowInfo,
 				.textManager = textManager,
 				.transientAlloc = transientAlloc,
 				.pusher = rectPusher, };
-
 			auto& widget = *windowNode.data.topLayout;
-			auto childEntry = params.pusher.GetEntry(widget);
-			params.pusher.SetRectPair(childEntry, { visibleRect, visibleRect });
+			auto childEntry = rectPusher.GetEntry(widget);
+			rectPusher.SetRectPair(childEntry, { visibleRect, visibleRect });
 			widget.BuildChildRects(
-				params,
+				widgetParams,
 				visibleRect,
 				visibleRect);
+
+			if (windowNode.frontmostLayer) {
+				auto& layer = *windowNode.frontmostLayer;
+				Layer::BuildRects_Params buildRectsParams {
+					.ctx = ctx,
+					.window = eventWindowInfo,
+					.windowRect = { {}, windowRect.extent },
+					.visibleRect = visibleRect,
+					.textManager = textManager,
+					.transientAlloc = transientAlloc,
+					.pusher = rectPusher };
+				layer.BuildRects(buildRectsParams);
+			}
 
 			transientAlloc.Reset();
 		}
@@ -259,7 +266,7 @@ void Context::PushEvent(TextInputEvent const& event)
 	auto& implData = Internal_ImplData();
 
 	auto& transientAlloc = implData.transientAlloc;
-	Std::Defer _allocCleanup = [&]() { transientAlloc.Reset(); };
+	Std::Defer _allocCleanup = [&]{ transientAlloc.Reset(); };
 
 	auto* windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
 	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
@@ -278,13 +285,12 @@ void Context::PushEvent(EndTextInputSessionEvent const& event)
 	auto& implData = Internal_ImplData();
 
 	auto& transientAlloc = implData.transientAlloc;
-	Std::Defer _allocCleanup = [&]() { transientAlloc.Reset(); };
+	Std::Defer _allocCleanup = [&]{ transientAlloc.Reset(); };
 
 	auto* windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
 	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
-	if (windowNode.data.topLayout)
-	{
+	if (windowNode.data.topLayout) {
 		windowNode.data.topLayout->EndTextInputSession(
 			*this,
 			transientAlloc,
@@ -315,7 +321,8 @@ void Context::PushEvent(CursorPressEvent const& event)
 
 	if (windowNode.data.topLayout)
 	{
-		auto const localCursorPos = implData.cursorPosition - windowNode.data.rect.position;
+		auto const localCursorPos =
+			implData.cursorPosition - windowNode.data.rect.position;
 
 		Rect const& windowRect = { {}, windowNode.data.rect.extent };
 		auto const& visibleOffset = windowNode.data.visibleOffset;
@@ -324,6 +331,11 @@ void Context::PushEvent(CursorPressEvent const& event)
 			windowRect,
 			{ { (i32)visibleOffset.x, (i32)visibleOffset.y }, visibleExtent });
 
+		EventWindowInfo eventWindowInfo {
+			.contentScale = windowNode.data.contentScale,
+			.dpiX = windowNode.data.dpiX,
+			.dpiY = windowNode.data.dpiY, };
+
 		bool eventConsumed = false;
 		Layer::Press_Return pressReturn = {};
 		if (windowNode.frontmostLayer)
@@ -331,7 +343,9 @@ void Context::PushEvent(CursorPressEvent const& event)
 			Layer::CursorPressParams layerParams {
 				.ctx = *this,
 				.textManager = textManager,
+				.window = eventWindowInfo,
 				.rectCollection = rectCollection,
+				.transientAlloc = transientAlloc,
 				.event = event, };
 			layerParams.windowRect = windowRect;
 			layerParams.safeAreaRect = visibleRect;
@@ -341,13 +355,13 @@ void Context::PushEvent(CursorPressEvent const& event)
 			pressReturn = layer.CursorPress(layerParams, eventConsumed);
 			eventConsumed = eventConsumed || pressReturn.eventConsumed;
 		}
-		if (pressReturn.destroyLayer)
-		{
+		if (pressReturn.destroyLayer) {
 			windowNode.frontmostLayer = {};
 		}
 
 		Widget::CursorPressParams widgetParams {
 			.ctx = *this,
+			.window = eventWindowInfo,
 			.rectCollection = rectCollection,
 			.textManager = textManager,
 			.transientAlloc =  transientAlloc };
@@ -400,15 +414,22 @@ void Context::PushEvent(TouchMoveEvent const& event)
 			{{}, windowRect.extent},
 			{{(i32) visibleOffset.x, (i32) visibleOffset.y}, visibleExtent});
 
+		EventWindowInfo eventWindowInfo {
+			.contentScale = windowNode.data.contentScale,
+			.dpiX = windowNode.data.dpiX,
+			.dpiY = windowNode.data.dpiY, };
+
 		bool cursorOccluded = false;
 		if (windowNode.frontmostLayer)
 		{
 			Layer::TouchMoveParams layerParams {
 				.ctx = *this,
 				.textManager = textManager,
+				.window = eventWindowInfo,
 				.windowRect = windowRect,
 				.safeAreaRect = visibleRect,
 				.rectCollection = rectCollection,
+				.transientAlloc = transientAlloc,
 				.event = modifiedEvent };
 
 			auto& layer = *windowNode.frontmostLayer;
@@ -420,6 +441,7 @@ void Context::PushEvent(TouchMoveEvent const& event)
 
 		Widget::TouchMoveParams widgetParams {
 			.ctx = *this,
+			.window = eventWindowInfo,
 			.rectCollection = rectCollection,
 			.textManager = textManager,
 			.transientAlloc = transientAlloc,
@@ -463,16 +485,22 @@ void Context::PushEvent(TouchPressEvent const& event)
 			windowRect,
 			{ { (i32)visibleOffset.x, (i32)visibleOffset.y }, visibleExtent });
 
+		EventWindowInfo eventWindowInfo {
+			.contentScale = windowNode.data.contentScale,
+			.dpiX = windowNode.data.dpiX,
+			.dpiY = windowNode.data.dpiY, };
+
 		bool eventConsumed = false;
 		Layer::Press_Return pressReturn = {};
-		if (windowNode.frontmostLayer)
-		{
+		if (windowNode.frontmostLayer) {
 			Layer::TouchPressParams layerParams {
 				.ctx = *this,
 				.textManager = textManager,
+				.window = eventWindowInfo,
 				.windowRect = windowRect,
 				.safeAreaRect = visibleRect,
 				.rectCollection = rectCollection,
+				.transientAlloc = transientAlloc,
 				.event = event, };
 
 			auto& layer = *windowNode.frontmostLayer;
@@ -486,6 +514,7 @@ void Context::PushEvent(TouchPressEvent const& event)
 
 		Widget::TouchPressParams widgetParams {
 			.ctx = *this,
+			.window = eventWindowInfo,
 			.rectCollection = rectCollection,
 			.textManager = textManager,
 			.transientAlloc =  transientAlloc,
@@ -537,8 +566,12 @@ void Context::PushEvent(CursorMoveEvent const& event)
 		auto const& visibleOffset = windowNode.data.visibleOffset;
 		auto const& visibleExtent = windowNode.data.visibleExtent;
 		Rect const visibleRect = Rect::Intersection(
-			{{}, windowRect.extent},
-			{{(i32) visibleOffset.x, (i32) visibleOffset.y}, visibleExtent});
+			{ {}, windowRect.extent },
+			{ { (i32) visibleOffset.x, (i32) visibleOffset.y }, visibleExtent } );
+		EventWindowInfo eventWindowInfo {
+			.contentScale = windowNode.data.contentScale,
+			.dpiX = windowNode.data.dpiX,
+			.dpiY = windowNode.data.dpiY, };
 
 		bool cursorOccluded = false;
 		if (windowNode.frontmostLayer)
@@ -546,8 +579,10 @@ void Context::PushEvent(CursorMoveEvent const& event)
 			Layer::CursorMoveParams layerParams {
 				.ctx = *this,
 				.textManager = textManager,
+				.window = eventWindowInfo,
 				.rectCollection = rectCollection,
-				.event = modifiedEvent };
+				.event = modifiedEvent,
+				.transientAlloc = transientAlloc };
 			layerParams.windowRect = windowRect;
 			layerParams.safeAreaRect = visibleRect;
 
@@ -560,10 +595,11 @@ void Context::PushEvent(CursorMoveEvent const& event)
 
 		Widget::CursorMoveParams widgetParams {
 			.ctx = *this,
+			.window = eventWindowInfo,
 			.rectCollection = rectCollection,
 			.textManager = textManager,
 			.transientAlloc = transientAlloc,
-			.windowId = windowNode.id,
+			//.windowId = windowNode.id,
 			.event = modifiedEvent };
 
 		widget.CursorMove(
@@ -572,6 +608,17 @@ void Context::PushEvent(CursorMoveEvent const& event)
 			visibleRect,
 			cursorOccluded);
 	}
+}
+
+void Context::PushEvent(WindowContentScaleEvent const& event)
+{
+	auto& implData = Internal_ImplData();
+
+	auto windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+
+	windowNode.data.contentScale = event.scale;
 }
 
 void Context::PushEvent(WindowCursorExitEvent const& event)
@@ -687,12 +734,20 @@ void Context::Render2(Render2_Params const& params) const
 			windowNode.data.rect.extent,
 			params.vertices,
 			params.indices,
-			params.drawCmds };
+			params.drawCmds,
+			params.utfValues,
+			params.textGlyphRects };
+
+		EventWindowInfo eventWindowInfo {
+			.contentScale = windowNode.data.contentScale,
+			.dpiX = windowNode.data.dpiX,
+			.dpiY = windowNode.data.dpiY, };
 
 		auto& widget = *windowNode.data.topLayout;
 
 		Widget::Render_Params const renderParams {
 			.ctx = *this,
+			.window = eventWindowInfo,
 			.textManager = textManager,
 			.rectCollection = rectCollection,
 			.framebufferExtent = windowNode.data.rect.extent,
@@ -714,6 +769,7 @@ void Context::Render2(Render2_Params const& params) const
 				.ctx = *this,
 				.textManager = textManager,
 				.transientAlloc = transientAlloc,
+				.window = eventWindowInfo,
 				.windowRect = windowRect,
 				.safeAreaRect = visibleRect,
 				.rectCollection = rectCollection,
@@ -733,23 +789,21 @@ void Context::Render2(Render2_Params const& params) const
 	}
 }
 
-void Context::AdoptWindow(
-	WindowID id,
-	Math::Vec4 clearColor,
-	Rect rect,
-	Math::Vec2UInt visibleOffset,
-	Extent visibleExtent,
-	Std::Box<Widget>&& widget)
+void Context::AdoptWindow(AdoptWindowInfo&& windowInfo)
 {
 	auto& implData = Internal_ImplData();
 
 	impl::WindowNode newNode = {};
-	newNode.id = id;
-	newNode.data.rect = rect;
-	newNode.data.visibleOffset = visibleOffset;
-	newNode.data.visibleExtent = visibleExtent;
-	newNode.data.clearColor = clearColor;
-	newNode.data.topLayout = Std::Move(widget);
+	newNode.id = windowInfo.id;
+
+	newNode.data.clearColor = windowInfo.clearColor;
+	newNode.data.contentScale = windowInfo.contentScale;
+	newNode.data.dpiX = windowInfo.dpiX;
+	newNode.data.dpiY = windowInfo.dpiY;
+	newNode.data.rect = windowInfo.rect;
+	newNode.data.visibleOffset = windowInfo.visibleOffset;
+	newNode.data.visibleExtent = windowInfo.visibleExtent;
+	newNode.data.topLayout = Std::Move(windowInfo.widget);
 
 	implData.windows.emplace(implData.windows.begin(), Std::Move(newNode));
 }
@@ -769,11 +823,13 @@ void Context::PushPostEventJob_Inner(
 	int alignment,
 	PostEventJob_InvokeFnT invokeFn,
 	void const* callablePtr,
-	PostEventJob_InitCallableFnT initCallableFn)
+	PostEventJob_InitCallableFnT initCallableFn,
+	PostEventJob_DestroyFnT destroyFn)
 {
 	auto& implData = Internal_ImplData();
 	Impl::PostEventJob newJob = {};
 	newJob.invokeFn = invokeFn;
+	newJob.destroyFn = destroyFn;
 	newJob.ptr = implData.postEventAlloc.Alloc(size, alignment);
 	// Initialize the memory
 	initCallableFn(newJob.ptr, callablePtr);

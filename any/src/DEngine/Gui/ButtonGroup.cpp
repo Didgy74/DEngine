@@ -1,4 +1,5 @@
 #include <DEngine/Gui/ButtonGroup.hpp>
+#include <DEngine/Gui/Context.hpp>
 #include <DEngine/Gui/TextManager.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
 
@@ -119,7 +120,8 @@ struct Gui::ButtonGroup::Impl
 
 		Std::Vec<u32, RectCollection::AllocRefT> desiredBtnWidths;
 
-		// Only available
+		// Only available during rendering
+		FontFaceId fontFaceId;
 		u32 textHeight;
 		Std::Vec<u32, RectCollection::AllocRefT> totalTextWidths;
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
@@ -307,10 +309,14 @@ u32 ButtonGroup::GetActiveButtonIndex() const
 
 SizeHint ButtonGroup::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
 {
-	SizeHint returnVal = {};
-
+	auto const& ctx = params.ctx;
+	auto const& window = params.window;
 	auto& pusher = params.pusher;
 	auto& textManager = params.textManager;
+
+	auto textSize = ctx.fontScale * window.contentScale;
+
+	SizeHint returnVal = {};
 
 	auto entry = pusher.AddEntry(*this);
 
@@ -321,50 +327,56 @@ SizeHint ButtonGroup::GetSizeHint2(Widget::GetSizeHint2_Params const& params) co
 	for (auto const& item : buttons)
 		totalGlyphCount += item.title.size();
 
+	auto lineheight = textManager.GetLineheight(textSize, window.dpiX, window.dpiY);
+	auto actualMargin = (u32)Math::Round((f32)lineheight * 0.25f);
+
 	auto& customData = pusher.AttachCustomData(entry, Impl::CustomData{ pusher.Alloc() });
 	customData.desiredBtnWidths.Resize(btnCount);
-	if (pusher.IncludeRendering())
-	{
-		customData.textHeight = textManager.GetLineheight();
+	if (pusher.IncludeRendering()) {
+		customData.textHeight = lineheight;
 		customData.glyphRects.Resize(totalGlyphCount);
 		customData.totalTextWidths.Resize(btnCount);
 	}
 
-
 	// Tracks the offset where we will push each
 	// line of glyph rects into
 	int glyphRectsOffset = 0;
-
 	for (int i = 0; i < btnCount; i += 1)
 	{
 		auto const& btn = buttons[i];
 		DENGINE_IMPL_GUI_ASSERT(!btn.title.empty());
-
 		auto const textLength = btn.title.size();
 
 		// Load the outer extent of this button text
 		// And store the rects of each glyph
 		Extent textOuterExtent = {};
-		if (pusher.IncludeRendering())
-		{
+		if (pusher.IncludeRendering()) {
+			customData.fontFaceId = textManager.GetFontFaceId(textSize, window.dpiX, window.dpiY);
 			textOuterExtent = textManager.GetOuterExtent(
 				{ btn.title.data(), textLength },
-				{},
+				textSize,
+				window.dpiX,
+				window.dpiY,
 				customData.glyphRects.Data() + glyphRectsOffset);
-			glyphRectsOffset += (int)textLength;
 			customData.totalTextWidths[i] = textOuterExtent.width;
 		}
-		else
-			textOuterExtent = textManager.GetOuterExtent({ btn.title.data(), textLength });
+		else {
+			textOuterExtent = textManager.GetOuterExtent(
+				{ btn.title.data(), textLength },
+				textSize,
+				window.dpiX,
+				window.dpiY);
+		}
+		glyphRectsOffset += (int)textLength;
 
 		// Store the outer extent in our custom-data for later use.
-		auto const btnWidth = textOuterExtent.width + (margin * 2);
+		auto const btnWidth = textOuterExtent.width + (actualMargin * 2);
 		customData.desiredBtnWidths[i] = btnWidth;
 
 		returnVal.minimum.width += btnWidth;
 		returnVal.minimum.height = Math::Max(returnVal.minimum.height, textOuterExtent.height);
 	}
-	returnVal.minimum.height = margin * 2;
+	returnVal.minimum.height += actualMargin * 2;
 
 	pusher.SetSizeHint(entry, returnVal);
 	return returnVal;
@@ -411,7 +423,6 @@ void ButtonGroup::BuildChildRects(
 			btnRectPosOffsetX += btnExtent.width;
 			glyphRectIndexOffset += textLength;
 		}
-
 	}
 }
 
@@ -468,8 +479,10 @@ void ButtonGroup::Render2(
 		auto textLen = buttons[i].title.size();
 		Std::Span btnGlyphRects = { &customData.glyphRects[glyphRectIndexOffset], textLen };
 		drawInfo.PushText(
+			(u64)customData.fontFaceId,
 			{ btnText.data(), btnText.size() },
 			btnGlyphRects.Data(),
+			{},
 			{ 1.f, 1.f, 1.f, 1.f });
 
 		horiOffset += btnRect.extent.width;

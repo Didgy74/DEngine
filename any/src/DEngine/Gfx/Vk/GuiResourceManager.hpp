@@ -3,6 +3,8 @@
 #include "VulkanIncluder.hpp"
 #include "VMAIncluder.hpp"
 #include "ForwardDeclarations.hpp"
+#include "TransientAllocRef.hpp"
+#include "NativeWindowManager.hpp"
 
 #include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/AllocRef.hpp>
@@ -12,7 +14,10 @@
 #include <DEngine/Math/Matrix.hpp>
 #include <DEngine/Math/Vector.hpp>
 
+#include <DEngine/Gfx/Gfx.hpp>
+
 #include <unordered_map>
+#include <mutex>
 
 namespace DEngine::Gfx
 {
@@ -47,17 +52,46 @@ namespace DEngine::Gfx::Vk
 		vk::PipelineLayout filledMeshPipelineLayout{};
 
 
-		struct GlyphData
-		{
-			vk::Image img{};
-			vk::ImageView imgView{};
-			vk::DescriptorSet descrSet{};
+		std::mutex jobQueueLock;
+		struct NewFontFaceJob {
+			FontFaceId id;
 		};
-		std::unordered_map<u32, GlyphData> glyphDatas;
-		static constexpr uSize lowUtfGlyphDatasSize = 256;
-		Std::Array<GlyphData, lowUtfGlyphDatasSize> lowUtfGlyphDatas;
-		struct FontPushConstant
-		{
+		std::vector<NewFontFaceJob> newFontFaceJobs;
+		struct NewGlyphJob {
+			FontFaceId fontFaceId;
+			int dataOffset;
+			int dataLength;
+			int imgWidth;
+			int imgHeight;
+			u32 utfValue;
+		};
+		std::vector<NewGlyphJob> newGlyphJobs;
+		std::vector<char> queuedGlyphBitmapData;
+
+		struct GlyphData {
+			vk::Image img {};
+			VmaAllocation imgAlloc {};
+			vk::ImageView imgView {};
+			vk::DescriptorSet descrSet {};
+		};
+		struct FontFace {
+			std::unordered_map<u32, GlyphData> glyphDatas;
+			static constexpr uSize lowUtfGlyphDatasSize = 256;
+			Std::Array<GlyphData, lowUtfGlyphDatasSize> lowUtfGlyphDatas;
+
+			FontFace() = default;
+			FontFace(FontFace const&) = delete;
+			FontFace& operator=(FontFace const&) = delete;
+			FontFace(FontFace&&) = default;
+			FontFace& operator=(FontFace&&) = default;
+		};
+		struct FontFaceNode {
+			FontFaceId id = FontFaceId::Invalid;
+			FontFace face;
+		};
+		std::vector<FontFaceNode> fontFaceNodes;
+
+		struct FontPushConstant {
 			Math::Mat2 orientation;
 			Math::Vec2 rectOffset;
 			Math::Vec2 rectExtent;
@@ -89,20 +123,41 @@ namespace DEngine::Gfx::Vk
 			Std::AllocRef const& transientAlloc,
 			DebugUtilsDispatch const* debugUtils);
 
-		static void Update(
+		static void PreDraw(
 			GuiResourceManager& manager,
 			GlobUtils const& globUtils,
 			Std::Span<GuiVertex const> guiVertices,
 			Std::Span<u32 const> guiIndices,
+			vk::CommandBuffer cmdBuffer,
+			DeletionQueue& delQueue,
+			TransientAllocRef transientAlloc,
 			u8 inFlightIndex);
-		
+
+		static void NewFontFace(
+			GuiResourceManager& manager,
+			FontFaceId id);
+
 		static void NewFontTexture(
 			GuiResourceManager& manager,
-			GlobUtils const& globUtils,
+			FontFaceId fontFaceId,
 			u32 utfValue,
 			u32 width,
 			u32 height,
 			u32 pitch,
 			Std::Span<std::byte const> data);
+
+		static GlyphData GetGlyphData(
+			GuiResourceManager const& manager,
+			FontFaceId fontFaceId,
+			u32 utfValue);
+
+		static void RenderText(
+			GuiResourceManager const& manager,
+			DeviceDispatch const& device,
+			NativeWinMgr_WindowGuiData const& guiData,
+			vk::CommandBuffer cmdBuffer,
+			GuiDrawCmd::Text const& drawCmd,
+			Std::Span<u32 const> utfValuesAll,
+			Std::Span<GlyphRect const> glyphRectsAll);
 	};
 }

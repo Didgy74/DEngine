@@ -1,4 +1,5 @@
 #include <DEngine/Gui/Button.hpp>
+#include <DEngine/Gui/Context.hpp>
 #include <DEngine/Gui/TextManager.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
 
@@ -78,6 +79,7 @@ public:
 		explicit CustomData(RectCollection::AllocRefT const& alloc) : glyphRects{ alloc } {}
 
 		Extent titleTextOuterExtent = {};
+		FontFaceId fontFaceId;
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
@@ -260,35 +262,46 @@ bool Button::TouchPress2(
 SizeHint Button::GetSizeHint2(
 	GetSizeHint2_Params const& params) const
 {
-	auto& textManager = params.textManager;
+	auto const& ctx = params.ctx;
+	auto& textMgr = params.textManager;
 	auto& pusher = params.pusher;
+	auto const& window = params.window;
 
 	SizeHint returnValue = {};
 
 	auto pusherIt = pusher.AddEntry(*this);
 
-	if (pusher.IncludeRendering())
-	{
+	auto textScale = ctx.fontScale * window.contentScale;
+
+	if (pusher.IncludeRendering()) {
 		auto customData = Impl::CustomData{ pusher.Alloc() };
+		customData.fontFaceId = textMgr.GetFontFaceId(
+			textScale,
+			window.dpiX,
+			window.dpiY);
 
 		customData.glyphRects.Resize(text.size());
-		auto const textOuterExtent = textManager.GetOuterExtent(
+		auto const textOuterExtent = textMgr.GetOuterExtent(
 			{ text.data(), text.size() },
-			{},
+			textScale,
+			window.dpiX,
+			window.dpiY,
 			customData.glyphRects.Data());
-
 		customData.titleTextOuterExtent = textOuterExtent;
 		returnValue.minimum = textOuterExtent;
-
 		pusher.AttachCustomData(pusherIt, Std::Move(customData));
 	}
 	else
 	{
-		returnValue.minimum = textManager.GetOuterExtent({ text.data(), text.size() });
+		returnValue.minimum = textMgr.GetOuterExtent(
+			{ text.data(), text.size() },
+			textScale,
+			window.dpiX,
+			window.dpiY);
 	}
 
-	returnValue.minimum.width += textMargin * 2;
-	returnValue.minimum.height += textMargin * 2;
+	auto margin = (u32)Math::Round((f32)returnValue.minimum.height * 0.25f);
+	returnValue.minimum.AddPadding(margin);
 
 	pusher.SetSizeHint(pusherIt, returnValue);
 	return returnValue;
@@ -299,29 +312,6 @@ void Button::BuildChildRects(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
-	auto& pusher = params.pusher;
-
-	if (!pusher.IncludeRendering())
-		return;
-
-	auto* customDataPtr = pusher.GetCustomData2<Impl::CustomData>(*this);
-	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
-	auto& customData = customDataPtr;
-
-	auto const textExtent = customData->titleTextOuterExtent;
-
-	auto textPosOffset = impl::BuildTextOffset(widgetRect.extent, textExtent);
-
-	int const textLength = (int)text.size();
-	DENGINE_IMPL_GUI_ASSERT(textLength == customData->glyphRects.Size());
-	for (int i = 0; i < textLength; i += 1)
-	{
-		auto& rect = customData->glyphRects[i];
-		auto relativePos = rect.position;
-
-		rect.position += widgetRect.position;
-		rect.position += textPosOffset;
-	}
 }
 
 void Button::Render2(
@@ -390,13 +380,16 @@ void Button::Render2(
 	auto& customData = *customDataPtr;
 
 	Rect textRect = {};
-	textRect.position = widgetRect.position + impl::BuildTextOffset(widgetRect.extent, customData.titleTextOuterExtent);
+	textRect.position =
+		widgetRect.position + impl::BuildTextOffset(widgetRect.extent, customData.titleTextOuterExtent);
 	textRect.extent = customData.titleTextOuterExtent;
 
 	auto scissor = DrawInfo::ScopedScissor(drawInfo, textRect, widgetRect);
 
 	drawInfo.PushText(
+		(u64)customData.fontFaceId,
 		{ text.data(), text.size() },
 		customData.glyphRects.Data(),
+		textRect.position,
 		currTextColor);
 }

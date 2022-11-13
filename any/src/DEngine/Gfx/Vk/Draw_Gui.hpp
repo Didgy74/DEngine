@@ -19,6 +19,8 @@ namespace DEngine::Gfx::Vk
 		vk::CommandBuffer cmdBuffer;
 		vk::Framebuffer framebuffer;
 		Std::Span<GuiDrawCmd const> guiDrawCmds;
+		Std::Span<u32 const> utfValues;
+		Std::Span<GlyphRect const> glyphRects;
 		u8 inFlightIndex;
 	};
 	void RecordGuiCmds(

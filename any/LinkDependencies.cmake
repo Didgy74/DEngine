@@ -1,5 +1,16 @@
 function(DEngineAny_LinkDependencies TARGET ENABLE_CMAKE_LOGGING)
 
+	# Posix threads
+	find_package(Threads REQUIRED)
+	target_link_libraries(${TARGET}
+			PUBLIC
+			Threads::Threads)
+
+	# Dynamic lib loading
+	target_link_libraries(${TARGET}
+			PUBLIC
+			${CMAKE_DL_LIBS})
+
 	# FreeType
 	if (${ENABLE_CMAKE_LOGGING})
 		message(CHECK_START "DEngine: Searching for FreeType2 package.")

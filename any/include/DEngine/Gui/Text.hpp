@@ -16,6 +16,7 @@ namespace DEngine::Gui
 
 		std::string text;
 		Math::Vec4 color = Math::Vec4::One();
+		f32 relativeScale = 1.f;
 		u32 margin = 0;
 		bool expandX = true;
 		

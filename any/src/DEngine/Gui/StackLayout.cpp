@@ -315,10 +315,7 @@ namespace DEngine::Gui::impl
 		u32 padding) noexcept
 	{
 		Rect returnVal = widgetRect;
-		returnVal.position.x += padding;
-		returnVal.position.y += padding;
-		returnVal.extent.width -= padding * 2;
-		returnVal.extent.height -= padding * 2;
+		returnVal = returnVal.Reduce(padding);
 		return returnVal;
 	}
 }
@@ -617,13 +614,11 @@ void StackLayout::Render2(
 	auto& rectColl = params.rectCollection;
 
 	auto const innerRect = impl::BuildInnerRect(widgetRect, padding);
-
 	if (Rect::Intersection(innerRect, visibleRect).IsNothing())
 		return;
 
 	// Only draw the quad of the layout if the alpha of the color is high enough to be visible.
-	if (color.w > 0.01f)
-	{
+	if (color.w > 0.01f) {
 		params.drawInfo.PushFilledQuad(innerRect, color);
 	}
 

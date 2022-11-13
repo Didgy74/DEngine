@@ -1,10 +1,18 @@
 #pragma once
 
+// This file contains the structs that may be sent into
+// the GUI context.
+
 #include <DEngine/Gui/WindowID.hpp>
 #include <DEngine/Gui/Utility.hpp>
 
 namespace DEngine::Gui
 {
+	struct WindowContentScaleEvent {
+		WindowID windowId;
+		f32 scale;
+	};
+
 	struct WindowResizeEvent
 	{
 		WindowID windowId;

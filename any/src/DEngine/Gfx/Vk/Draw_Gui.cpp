@@ -122,57 +122,18 @@ void Gfx::Vk::RecordGuiCmds(
 				}
 					break;
 
-				case GuiDrawCmd::Type::TextGlyph:
-				{
-					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, params.guiResManager.font_pipeline);
-					GuiResourceManager::FontPushConstant pushConstant{};
-					pushConstant.color = drawCmd.textGlyph.color;
-					pushConstant.orientation = params.guiData.rotation;
-					pushConstant.rectExtent = drawCmd.rectExtent;
-					pushConstant.rectOffset = drawCmd.rectPosition;
-					device.cmdPushConstants(
+				case GuiDrawCmd::Type::Text: {
+					GuiResourceManager::RenderText(
+						params.guiResManager,
+						device,
+						params.guiData,
 						cmdBuffer,
-						params.guiResManager.font_pipelineLayout,
-						vk::ShaderStageFlagBits::eVertex,
-						0,
-						32,
-						&pushConstant);
-					device.cmdPushConstants(
-						cmdBuffer,
-						params.guiResManager.font_pipelineLayout,
-						vk::ShaderStageFlagBits::eFragment,
-						32,
-						sizeof(pushConstant.color),
-						&pushConstant.color);
-					GuiResourceManager::GlyphData glyphData{};
-					if (drawCmd.textGlyph.utfValue < GuiResourceManager::lowUtfGlyphDatasSize)
-					{
-						glyphData = params.guiResManager.lowUtfGlyphDatas[drawCmd.textGlyph.utfValue];
-					}
-					else
-					{
-						auto glyphDataIt = params.guiResManager.glyphDatas.find((u32)drawCmd.textGlyph.utfValue);
-						if (glyphDataIt == params.guiResManager.glyphDatas.end())
-							throw std::runtime_error("DEngine - Vulkan: Unable to find glyph.");
-						glyphData = glyphDataIt->second;
-					}
-
-
-					device.cmdBindDescriptorSets(
-						cmdBuffer,
-						vk::PipelineBindPoint::eGraphics,
-						params.guiResManager.font_pipelineLayout,
-						0,
-						glyphData.descrSet,
-						nullptr);
-					device.cmdDraw(
-						cmdBuffer,
-						6,
-						1,
-						0,
-						0);
-				}
+						drawCmd.text,
+						params.utfValues,
+						params.glyphRects);
 					break;
+				}
+
 
 				case GuiDrawCmd::Type::Viewport:
 				{

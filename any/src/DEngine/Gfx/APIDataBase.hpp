@@ -29,7 +29,11 @@ namespace DEngine::Gfx
 		virtual void DeleteViewport(ViewportID id) = 0;
 
 		// Needs to be thread-safe
+		virtual void NewFontFace(FontFaceId fontFaceId) = 0;
+
+		// Needs to be thread-safe
 		virtual void NewFontTexture(
+			FontFaceId fontFaceId,
 			u32 id,
 			u32 width,
 			u32 height,

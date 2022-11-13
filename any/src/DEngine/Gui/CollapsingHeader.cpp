@@ -1,4 +1,5 @@
 #include <DEngine/Gui/CollapsingHeader.hpp>
+#include <DEngine/Gui/Context.hpp>
 #include <DEngine/Gui/TextManager.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
 
@@ -11,6 +12,9 @@ using namespace DEngine::Gui;
 struct CollapsingHeader::Impl
 {
 public:
+	static constexpr f32 textScale = 1.25f;
+	static constexpr f32 marginFactor = 0.1f;
+
 	struct CustomData
 	{
 		explicit CustomData(RectCollection::AllocRefT alloc) :
@@ -18,19 +22,22 @@ public:
 
 		Extent titleTextOuterExtent = {};
 		// Only included when rendering.
+		FontFaceId fontFaceId;
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
 	[[nodiscard]] static Rect BuildHeaderRect(
+		CollapsingHeader const& widget,
 		Math::Vec2Int widgetPos,
 		u32 widgetWidth,
-		u32 textHeight,
-		u32 textMargin) noexcept
+		u32 textHeight) noexcept
 	{
 		Rect returnVal = {};
 		returnVal.position = widgetPos;
 		returnVal.extent.width = widgetWidth;
-		returnVal.extent.height = textHeight + (textMargin * 2);
+		returnVal.extent.height =
+			textHeight +
+			(u32)Math::Round(((f32)textHeight * Impl::marginFactor * 2));
 		return returnVal;
 	}
 
@@ -39,13 +46,25 @@ public:
 		u32 widgetHeight) noexcept
 	{
 		Rect returnVal = headerRect;
-		returnVal.position.y += returnVal.extent.height;
+		returnVal.position.y += (i32)returnVal.extent.height;
 
 		i32 temp = (i32)widgetHeight - (i32)headerRect.extent.height;
 		temp = Math::Max(temp, 0);
 
 		returnVal.extent.height = temp;
 		return returnVal;
+	}
+
+	[[nodiscard]] static Math::Vec2Int BuildTextOffset(Extent const& widgetExtent, Extent const& textExtent) noexcept {
+		Math::Vec2Int out = {};
+		for (int i = 0; i < 2; i++) {
+			auto temp = (i32)Math::Round((f32)widgetExtent[i] * 0.5f - (f32)textExtent[i] * 0.5f);
+			temp = Math::Max(0, temp);
+			out[i] = temp;
+		}
+		out.x =
+			(i32)Math::Round((f32)textExtent.height * Impl::marginFactor);
+		return out;
 	}
 
 	enum class PointerType : u8 { Primary, Secondary };
@@ -102,10 +121,10 @@ public:
 
 		// Check if we are inside the header.
 		auto const headerRect = BuildHeaderRect(
+			widget,
 			widgetRect.position,
 			widgetRect.extent.width,
-			textHeight,
-			widget.titleMargin);
+			textHeight);
 
 		auto const insideHeader =
 			visibleRect.PointIsInside(pointer.pos) &&
@@ -201,22 +220,20 @@ public:
 
 		// Check if we are inside the header.
 		auto const headerRect = BuildHeaderRect(
+			widget,
 			widgetRect.position,
 			widgetRect.extent.width,
-			textHeight,
-			widget.titleMargin);
+			textHeight);
 
 		auto const insideHeader =
 			visibleRect.PointIsInside(pointer.pos) &&
 			headerRect.PointIsInside(pointer.pos);
 
-		if (pointer.id == cursorPointerId)
-		{
+		if (pointer.id == cursorPointerId) {
 			widget.hoveredByCursor = insideHeader && !pointer.occluded;
 		}
 
-		if (widget.child && !widget.collapsed)
-		{
+		if (widget.child && !widget.collapsed) {
 			auto const occludedForChild = pointer.occluded || insideHeader;
 			auto const childRect = BuildChildRect(headerRect, widgetRect.extent.height);
 
@@ -240,32 +257,41 @@ CollapsingHeader::CollapsingHeader()
 SizeHint CollapsingHeader::GetSizeHint2(
 	Widget::GetSizeHint2_Params const& params) const
 {
+	auto const& ctx = params.ctx;
+	auto const& window = params.window;
 	auto& pusher = params.pusher;
 	auto& textManager = params.textManager;
 
-	SizeHint returnValue = {};
-
 	auto const& pusherIt = pusher.AddEntry(*this);
 
+	auto textSize = ctx.fontScale * window.contentScale * Impl::textScale;
+
 	auto customData = Impl::CustomData{ pusher.Alloc() };
-
-	if (pusher.IncludeRendering())
-	{
+	if (pusher.IncludeRendering()) {
+		customData.fontFaceId = textManager.GetFontFaceId(textSize, window.dpiX, window.dpiY);
 		customData.glyphRects.Resize(title.size());
-
 		customData.titleTextOuterExtent = textManager.GetOuterExtent(
 			{ title.data(), title.size() },
-			{},
+			textSize,
+			window.dpiX,
+			window.dpiY,
 			customData.glyphRects.Data());
 	}
-	else
-	{
-		customData.titleTextOuterExtent = textManager.GetOuterExtent({ title.data(), title.size() });
+	else {
+		customData.titleTextOuterExtent = textManager.GetOuterExtent(
+			{ title.data(), title.size() },
+			textSize,
+			window.dpiX,
+			window.dpiY);
 	}
 
+	SizeHint returnValue = {};
 	returnValue.minimum = customData.titleTextOuterExtent;
-	returnValue.minimum.width += titleMargin * 2;
-	returnValue.minimum.height += titleMargin * 2;
+
+	auto margin =
+		(u32)Math::Round((f32)customData.titleTextOuterExtent.height * Impl::marginFactor);
+	returnValue.minimum.width += margin * 2;
+	returnValue.minimum.height += margin * 2;
 
 	// Add the child if there is one
 	if (!collapsed && child)
@@ -298,21 +324,18 @@ void CollapsingHeader::BuildChildRects(
 
 	auto textHeight = customData.titleTextOuterExtent.height;
 
-	if (pusher.IncludeRendering())
-	{
-		for (auto& item : customData.glyphRects)
-		{
-			item.position += widgetRect.position;
-			item.position.x += titleMargin;
-			item.position.y += titleMargin;
-		}
-	}
-
 	auto const headerRect = Impl::BuildHeaderRect(
+		*this,
 		widgetRect.position,
 		widgetRect.extent.width,
-		textHeight,
-		titleMargin);
+		textHeight);
+
+	if (pusher.IncludeRendering())
+	{
+		auto posOffset = Impl::BuildTextOffset(headerRect.extent, customData.titleTextOuterExtent);
+		for (auto& item : customData.glyphRects)
+			item.position += widgetRect.position + posOffset;
+	}
 
 	if (!collapsed && child)
 	{
@@ -497,10 +520,10 @@ void CollapsingHeader::Render2(
 	auto const textHeight = customData.titleTextOuterExtent.height;
 
 	auto const headerRect = Impl::BuildHeaderRect(
+		*this,
 		widgetRect.position,
 		widgetRect.extent.width,
-		textHeight,
-		titleMargin);
+		textHeight);
 
 	auto const childRect = Impl::BuildChildRect(
 		headerRect,
@@ -508,7 +531,7 @@ void CollapsingHeader::Render2(
 	if (!collapsed && child && !childRect.IsNothing())
 	{
 		auto scissorGuard = DrawInfo::ScopedScissor(drawInfo, childRect);
-		drawInfo.PushFilledQuad(childRect, { 1.f, 1.f, 1.f, 0.3f });
+		drawInfo.PushFilledQuad(childRect, { 1.f, 1.f, 1.f, 0.1f });
 		child->Render2(
 			params,
 			childRect,
@@ -517,22 +540,18 @@ void CollapsingHeader::Render2(
 
 	Math::Vec4 headerBgColor;
 	Math::Vec4 textColor = { 1.f, 1.f, 1.f, 1.f };
-	if (headerPointerId.HasValue())
-	{
+	if (headerPointerId.HasValue()) {
 		headerBgColor = { 1.f, 1.f, 1.f, 1.f };
 		textColor = { 0.f, 0.f, 0.f, 1.f };
 	}
-	else
-	{
-		if (collapsed)
-		{
+	else {
+		if (collapsed) {
 			if (!hoveredByCursor)
 				headerBgColor = collapsedColor;
 			else
 				headerBgColor = { 0.4f, 0.4f, 0.4f, 1.f };
 		}
-		else
-		{
+		else {
 			if (!hoveredByCursor)
 				headerBgColor = expandedColor;
 			else
@@ -544,8 +563,10 @@ void CollapsingHeader::Render2(
 	auto drawScissor = DrawInfo::ScopedScissor(drawInfo, headerRect);
 
 	drawInfo.PushText(
+		(u64)customData.fontFaceId,
 		{ title.data(), title.size() },
 		customData.glyphRects.Data(),
+		{},
 		textColor);
 }
 

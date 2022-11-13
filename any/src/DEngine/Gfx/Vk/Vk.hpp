@@ -73,7 +73,11 @@ namespace DEngine::Gfx::Vk
 		virtual void DeleteViewport(ViewportID id) override;
 
 		// Thread safe
+		virtual void NewFontFace(FontFaceId fontFaceId) override;
+
+		// Thread safe
 		virtual void NewFontTexture(
+			FontFaceId fontFaceId,
 			u32 id,
 			u32 width,
 			u32 height,
@@ -110,15 +114,11 @@ namespace DEngine::Gfx::Vk
 		struct Thread
 		{
 			std::thread renderingThread;
-			enum class NextCmd
-			{
-				Draw,
-				Shutdown,
-				Invalid,
-			};
-			NextCmd nextCmd = NextCmd::Invalid;
+			bool shutdownThread = false;
+			bool nextJobReady = false;
+			using JobFnT = void(*)(APIData& apiData);
+			JobFnT nextJobFn = nullptr;
 			DrawParams drawParams;
-			bool drawParamsReady = false;
 			std::condition_variable drawParamsCondVarWorker;
 			std::condition_variable drawParamsCondVarProducer;
 		};

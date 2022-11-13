@@ -99,6 +99,8 @@ namespace DEngine::Editor
 		std::vector<Gfx::ViewportUpdate> viewportUpdates;
 		std::vector<Math::Vec3> lineVertices;
 		std::vector<Gfx::LineDrawCmd> lineDrawCmds;
+		std::vector<u32> utfValues;
+		std::vector<Gfx::GlyphRect> textGlyphRects;
 	};
 
 	class EditorImpl;
@@ -133,6 +135,9 @@ namespace DEngine::Editor
 			App::Extent windowExtent;
 			Math::Vec2UInt windowSafeAreaOffset;
 			App::Extent windowSafeAreaExtent;
+			f32 windowContentScale;
+			f32 windowDpiX;
+			f32 windowDpiY;
 		};
 		[[nodiscard]] static Context Create(
 			CreateInfo const& createInfo);

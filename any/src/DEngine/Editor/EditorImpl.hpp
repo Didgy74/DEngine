@@ -104,6 +104,8 @@ namespace DEngine::Editor
 		std::vector<u32> indices;
 		std::vector<Gfx::GuiDrawCmd> drawCmds;
 		std::vector<Gfx::NativeWindowUpdate> windowUpdates;
+		std::vector<u32> utfValues;
+		std::vector<Gfx::GlyphRect> textGlyphRects;
 
 		// App-specific stuff
 		void InvalidateRendering() { guiRenderingInvalidated = true; }

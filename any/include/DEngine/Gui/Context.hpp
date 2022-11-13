@@ -66,6 +66,8 @@ namespace DEngine::Gui
 			std::vector<u32>& indices;
 			std::vector<Gfx::GuiDrawCmd>& drawCmds;
 			std::vector<Gfx::NativeWindowUpdate>& windowUpdates;
+			std::vector<u32>& utfValues;
+			std::vector<Gfx::GlyphRect>& textGlyphRects;
 		};
 		void Render2(Render2_Params const& params) const;
 
@@ -75,6 +77,7 @@ namespace DEngine::Gui
 		void PushEvent(EndTextInputSessionEvent const&);
 		void PushEvent(TouchMoveEvent const&);
 		void PushEvent(TouchPressEvent const&);
+		void PushEvent(WindowContentScaleEvent const&);
 		void PushEvent(WindowCloseEvent const&);
 		void PushEvent(WindowCursorExitEvent const&);
 		void PushEvent(WindowFocusEvent const&);
@@ -86,13 +89,18 @@ namespace DEngine::Gui
 		template<class Callable>
 		void PushPostEventJob(Callable const& in);
 
-		void AdoptWindow(
-			WindowID id,
-			Math::Vec4 clearColor,
-			Rect windowRect,
-			Math::Vec2UInt visibleOffset,
-			Extent visibleExtent,
-			Std::Box<Widget>&& widget);
+		struct AdoptWindowInfo {
+			WindowID id;
+			Math::Vec4 clearColor;
+			Rect rect;
+			Math::Vec2UInt visibleOffset;
+			Extent visibleExtent;
+			f32 dpiX;
+			f32 dpiY;
+			f32 contentScale;
+			Std::Box<Widget> widget;
+		};
+		void AdoptWindow(AdoptWindowInfo&& windowInfo);
 
 		void DestroyWindow(
 			WindowID id);
@@ -111,6 +119,8 @@ namespace DEngine::Gui
 			WindowID windowId,
 			Std::Box<Layer>&& layer);
 
+		f32 fontScale = 1.f;
+
 	struct Impl;
 	friend Impl;
 	[[nodiscard]] Impl& Internal_ImplData();
@@ -121,12 +131,14 @@ namespace DEngine::Gui
 
 		using PostEventJob_InvokeFnT = void(*)(void const* ptr, Context& context);
 		using PostEventJob_InitCallableFnT = void(*)(void* dstPtr, void const* callablePtr);
+		using PostEventJob_DestroyFnT = void(*)(void* ptr);
 		void PushPostEventJob_Inner(
 			int size,
 			int alignment,
 			PostEventJob_InvokeFnT invokeFn,
 			void const* callablePtr,
-			PostEventJob_InitCallableFnT initCallableFn);
+			PostEventJob_InitCallableFnT initCallableFn,
+			PostEventJob_DestroyFnT destroyFn);
 
 		Impl* pImplData = nullptr;
 	};
@@ -142,10 +154,16 @@ void DEngine::Gui::Context::PushPostEventJob(Callable const& in)
 		auto const& temp = *reinterpret_cast<Callable const*>(callablePtr);
 		new(dstPtr, impl::CtxPlacementNewTag{}) Callable(temp);
 	};
+	PostEventJob_DestroyFnT const destroyFn = [](void* ptr){
+		auto const& temp = *reinterpret_cast<Callable*>(ptr);
+		temp.~Callable();
+	};
+
 	PushPostEventJob_Inner(
 		sizeof(Callable),
 		alignof(Callable),
 		invokeFn,
 		&in,
-		initFn);
+		initFn,
+		destroyFn);
 }

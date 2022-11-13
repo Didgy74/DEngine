@@ -3,6 +3,7 @@
 #include <DEngine/impl/Application.hpp>
 
 #include <android/asset_manager.h>
+#include <android/configuration.h>
 #include <android/input.h>
 #include <android/native_activity.h>
 #include <android/native_window.h>
@@ -14,6 +15,8 @@
 
 #include <thread>
 #include <vector>
+
+extern int dengine_impl_main(int argc, char** argv);
 
 namespace DEngine::Application::impl
 {
@@ -49,84 +52,26 @@ namespace DEngine::Application::impl
 		InputQueue,
 		CustomEvent,
 	};
-
-	struct CustomEvent
-	{
-		enum class Type
-		{
-			OnResume,
-			OnPause,
-			TextInput,
-			EndTextInputSession,
-			NativeWindowCreated,
-			NativeWindowResized,
-			NativeWindowDestroyed,
-			InputQueueCreated,
-			InputQueueDestroyed,
-			ContentRectChanged,
-			DeviceOrientation,
-		};
-		Type type;
-
-		template<Type>
-		struct Data {};
-		template<>
-		struct Data<Type::NativeWindowCreated> {
-			ANativeWindow* nativeWindow;
-		};
-		template<>
-		struct Data<Type::NativeWindowResized> {
-			ANativeWindow* nativeWindow;
-		};
-		template<>
-		struct Data<Type::NativeWindowDestroyed> {
-			ANativeWindow* nativeWindow;
-		};
-		template<>
-		struct Data<Type::InputQueueCreated> {
-			AInputQueue* inputQueue;
-		};
-		template<>
-		struct Data<Type::InputQueueDestroyed> {
-			AInputQueue* inputQueue;
-		};
-		template<>
-		struct Data<Type::ContentRectChanged> {
-			u32 offsetX;
-			u32 offsetY;
-			u32 width;
-			u32 height;
-		};
-		template<>
-		struct Data<Type::DeviceOrientation> {
-			Orientation newOrientation;
-		};
-		template<>
-		struct Data<Type::TextInput> {
-			u32 start;
-			uSize count;
-			uSize textInputStartIndex;
-			uSize textInputLength;
-		};
-
-		union Data_T
-		{
-			Data<Type::NativeWindowCreated> nativeWindowCreated;
-			Data<Type::NativeWindowResized> nativeWindowResized;
-			Data<Type::NativeWindowDestroyed> nativeWindowDestroyed;
-			Data<Type::InputQueueCreated> inputQueueCreated;
-			Data<Type::InputQueueDestroyed> inputQueueDestroyed;
-			Data<Type::ContentRectChanged> contentRectChanged;
-			Data<Type::DeviceOrientation> deviceOrientation;
-			Data<Type::TextInput> textInput;
-		};
-		Data_T data;
+	enum class CustomEventType {
+		OnResume,
+		OnPause,
+		ConfiguationChanged,
+		TextInput,
+		EndTextInputSession,
+		NativeWindowCreated,
+		NativeWindowResized,
+		NativeWindowDestroyed,
+		InputQueueCreated,
+		InputQueueDestroyed,
+		ContentRectChanged,
+		DeviceOrientation,
+		Unknown,
 	};
 
-	using CustomEvent_CallbackFnT = Std::FnRef<void(CustomEvent::Type)>;
+	using CustomEvent_CallbackFnT = Std::FnRef<void(CustomEventType)>;
 
 	struct CustomEvent2 {
-		CustomEvent::Type type;
+		CustomEventType type;
 		Std::FnRef<void(Context::Impl&, BackendData&)> fn;
 	};
 
@@ -161,25 +106,32 @@ namespace DEngine::Application::impl
 
 		std::thread gameThread;
 
-		Std::Opt<WindowID> currentWindow;
-		ALooper* gameThreadAndroidLooper = nullptr;
+		// This is the ID of our current window
+		Std::Opt<WindowID> currWindowId;
+		// This is the native handle to our current window
+		// associated with the currWindowId
 		ANativeWindow* nativeWindow = nullptr;
+		ALooper* gameThreadAndroidLooper = nullptr;
+
 		AInputQueue* inputQueue = nullptr;
 		Math::Vec2UInt visibleAreaOffset;
 		Extent visibleAreaExtent;
 		Orientation currentOrientation;
+		float fontScale = 1.f;
+
 
 		JavaVM* globalJavaVm = nullptr;
 		// This is initialized to be a global Java ref
 		jobject mainActivity = nullptr;
 		AAssetManager* assetManager = nullptr;
+		// This should generally never be nullptr?
+		AConfiguration* currAConfig = nullptr;
 		// JNI Envs are per-thread. This is for the game thread, it is created when attaching
 		// the thread to the JavaVM.
 		JNIEnv* gameThreadJniEnv = nullptr;
 		JniMethodIds jniMethodIds = {};
 
 		std::mutex customEventQueueLock;
-		std::vector<CustomEvent> customEventQueue;
 		std::vector<u32> customEvent_textInputs;
 		std::vector<CustomEvent2> customEventQueue2;
 		// ONLY USE WITH customEventQueue member!!!

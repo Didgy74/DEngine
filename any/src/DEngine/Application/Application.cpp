@@ -227,6 +227,9 @@ auto Context::NewWindow(
 	returnVal.position = newNode.windowData.position;
 	returnVal.visibleExtent = newNode.windowData.visibleExtent;
 	returnVal.visibleOffset = newNode.windowData.visibleOffset;
+	returnVal.dpiX = newNode.windowData.dpiX;
+	returnVal.dpiY = newNode.windowData.dpiY;
+	returnVal.contentScale = newNode.windowData.contentScale;
 
 	return returnVal;
 }
@@ -443,6 +446,24 @@ void BackendInterface::WindowReorientation(
 	windowNode.events.orientation = true;
 
 	//DENGINE_IMPL_APPLICATION_ASSERT(windowData.orientation != newOrientation);
+}
+
+void BackendInterface::WindowContentScale(
+	Context::Impl& implData,
+	WindowID id,
+	float scale)
+{
+	auto windowNodePtr = implData.GetWindowNode(id);
+	DENGINE_IMPL_APPLICATION_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+
+	windowNode.windowData.contentScale = scale;
+
+	EnqueueEvent2(
+		implData,
+		[=](Context& ctx, Context::Impl& implData, EventForwarder& forwarder) {
+			forwarder.WindowContentScale(ctx, id, scale);
+		});
 }
 
 void BackendInterface::PushWindowCloseSignal(Context::Impl& implData, WindowID id){

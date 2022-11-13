@@ -1,7 +1,10 @@
 #include <DEngine/Gui/DockArea.hpp>
+#include <DEngine/Gui/Context.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
 #include <DEngine/Gui/TextManager.hpp>
 #include <DEngine/Std/Utility.hpp>
+
+
 
 #include <DEngine/Std/Containers/Array.hpp>
 
@@ -23,8 +26,7 @@ void DockArea::AddWindow(
 	Math::Vec2Int spawnPos = {};
 	if (layers.size() >= 2)
 	{
-		if (layers.front().rect.position == spawnPos)
-		{
+		if (layers.front().rect.position == spawnPos) {
 			spawnPos.x += 150;
 			spawnPos.y += 150;
 		}
@@ -46,13 +48,17 @@ void DockArea::AddWindow(
 	newWindow.widget = static_cast<Std::Box<Widget>&&>(widget);
 }
 
-
 bool DockArea::CursorMove(
 	Widget::CursorMoveParams const& params,
 	Rect const& widgetRect,
 	Rect const& visibleRect,
 	bool occluded)
 {
+	TextSizeInfo tabTextSize = {
+		.scale = params.ctx.fontScale * params.window.contentScale,
+		.dpiX = params.window.dpiX,
+		.dpiY = params.window.dpiY, };
+
 	DA_PointerMove_Pointer pointer = {};
 	pointer.id = cursorPointerId;
 	pointer.pos = { (f32)params.event.position.x, (f32)params.event.position.y };
@@ -74,6 +80,7 @@ bool DockArea::CursorMove(
 		.dockArea = *this,
 		.rectCollection = params.rectCollection,
 		.textManager = params.textManager,
+		.tabTextSize = tabTextSize,
 		.transientAlloc = params.transientAlloc,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
@@ -91,6 +98,11 @@ bool DockArea::CursorPress2(
 	Rect const& visibleRect,
 	bool consumed)
 {
+	TextSizeInfo tabTextSize = {
+		.scale = params.ctx.fontScale * params.window.contentScale,
+		.dpiX = params.window.dpiX,
+		.dpiY = params.window.dpiY, };
+
 	DA_PointerPress_Pointer pointer = {};
 	pointer.id = cursorPointerId;
 	pointer.pos = { (f32)params.cursorPos.x, (f32)params.cursorPos.y };
@@ -113,6 +125,7 @@ bool DockArea::CursorPress2(
 		.dockArea = *this,
 		.transientAlloc = params.transientAlloc,
 		.rectCollection = params.rectCollection,
+		.tabTextSize = tabTextSize,
 		.textManager = params.textManager,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
@@ -127,6 +140,11 @@ bool DockArea::TouchMove2(
 	Rect const& visibleRect,
 	bool occluded)
 {
+	TextSizeInfo tabTextSize = {
+		.scale = params.ctx.fontScale * params.window.contentScale,
+		.dpiX = params.window.dpiX,
+		.dpiY = params.window.dpiY, };
+
 	DA_PointerMove_Pointer pointer = {};
 	pointer.id = params.event.id;
 	pointer.pos = params.event.position;
@@ -148,6 +166,7 @@ bool DockArea::TouchMove2(
 		.dockArea = *this,
 		.rectCollection = params.rectCollection,
 		.textManager = params.textManager,
+		.tabTextSize = tabTextSize,
 		.transientAlloc = params.transientAlloc,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
@@ -158,12 +177,18 @@ bool DockArea::TouchMove2(
 		occluded,
 		childDispatchFn);
 }
+
 bool DockArea::TouchPress2(
 	TouchPressParams const& params,
 	Rect const& widgetRect,
 	Rect const& visibleRect,
 	bool consumed)
 {
+	TextSizeInfo tabTextSize = {
+		.scale = params.ctx.fontScale * params.window.contentScale,
+		.dpiX = params.window.dpiX,
+		.dpiY = params.window.dpiY, };
+
 	DA_PointerPress_Pointer pointer = {};
 	pointer.id = params.event.id;
 	pointer.pos = params.event.position;
@@ -186,6 +211,7 @@ bool DockArea::TouchPress2(
 		.dockArea = *this,
 		.transientAlloc = params.transientAlloc,
 		.rectCollection = params.rectCollection,
+		.tabTextSize = tabTextSize,
 		.textManager = params.textManager,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
@@ -209,8 +235,7 @@ SizeHint DockArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
 
 			auto& node = static_cast<DA_WindowNode const&>(itResult.node);
 			auto const& activeTab = node.tabs[node.activeTabIndex];
-			if (activeTab.widget)
-			{
+			if (activeTab.widget) {
 				auto const& widget = *activeTab.widget;
 				widget.GetSizeHint2(params);
 			}
@@ -233,19 +258,23 @@ void DockArea::BuildChildRects(
 	Rect const& visibleRect) const
 {
 	auto& dockArea = *this;
+	auto const& ctx = params.ctx;
 	auto& textManager = params.textManager;
 	auto& transientAlloc = params.transientAlloc;
 	auto& pusher = params.pusher;
 
-	auto const totalLineheight = textManager.GetLineheight() + (dockArea.tabTextMargin * 2);
+	auto textSize = TextSizeInfo{
+		.scale = ctx.fontScale * params.window.contentScale,
+		.dpiX = params.window.dpiX,
+		.dpiY = params.window.dpiY, };
+	auto innerLineheight = textManager.GetLineheight(textSize);
+
+	auto const totalLineheight = innerLineheight + (dockArea.tabTextMargin * 2);
 
 	for (auto const& layerIt : DA_BuildLayerItPair(dockArea))
 	{
 		auto const& layerRect = layerIt.BuildLayerRect(widgetRect);
-		for (auto const& nodeIt : DA_BuildNodeItPair(
-			layerIt.node,
-			layerRect,
-			transientAlloc))
+		for (auto const& nodeIt : DA_BuildNodeItPair(layerIt.node, layerRect, transientAlloc))
 		{
 			if (nodeIt.node.GetNodeType() != NodeType::Window)
 				continue;
@@ -274,6 +303,8 @@ namespace DEngine::Gui::impl
 	// Renders the window node for this layer.
 	void DA_Layer_Render_WindowNodes(
 		DockArea const& dockArea,
+		TextSizeInfo const& tabTextSize,
+		u32 tabTextMargin,
 		Rect const& layerRect,
 		Rect const& visibleRect,
 		DA_Node const& rootNode,
@@ -291,12 +322,16 @@ namespace DEngine::Gui::impl
 
 			auto const& node = static_cast<DA_WindowNode const&>(nodeIt.node);
 			auto const& nodeRect = nodeIt.rect;
-			Render_WindowNode(
-				node,
-				dockArea,
-				nodeRect,
-				visibleRect,
-				params);
+			Render_WindowNode_Params renderWindowParams {
+				.windowNode = node,
+				.dockArea = dockArea,
+				.nodeRect = nodeRect,
+				.visibleRect = visibleRect,
+				.tabTextSize = tabTextSize,
+				.tabTextMargin = tabTextMargin,
+				.widgetRenderParams = params,
+			};
+			Render_WindowNode(renderWindowParams);
 		}
 	}
 
@@ -376,24 +411,30 @@ void DockArea::Render2(
 	Rect const& visibleRect) const
 {
 	auto& dockArea = *this;
+	auto& ctx = params.ctx;
 	auto& transientAlloc = params.transientAlloc;
 	auto& drawInfo = params.drawInfo;
+
+	TextSizeInfo tabTextSize = {
+		.scale = ctx.fontScale * params.window.contentScale,
+		.dpiX = params.window.dpiX,
+		.dpiY = params.window.dpiY, };
 
 	auto scopedScissor = DrawInfo::ScopedScissor(
 		drawInfo,
 		widgetRect,
 		visibleRect);
 
-	for (auto const layerIt : DA_BuildLayerItPair(dockArea).Reverse())
-	{
+	for (auto const layerIt : DA_BuildLayerItPair(dockArea).Reverse()) {
 		auto const& layerRect = layerIt.BuildLayerRect(widgetRect);
 		DA_Layer_Render_WindowNodes(
 			dockArea,
+			tabTextSize,
+			dockArea.tabTextMargin,
 			layerRect,
 			visibleRect,
 			layerIt.node,
 			params);
-
 
 		// Then render all the split node handles for this layer on top
 		DA_Layer_Render_SplitNodeHandles(
