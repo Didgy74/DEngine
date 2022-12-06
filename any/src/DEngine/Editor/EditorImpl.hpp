@@ -12,6 +12,7 @@
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/FnRef.hpp>
 #include <DEngine/Std/Containers/Variant.hpp>
+#include <DEngine/Std/Containers/FnScratchList.hpp>
 
 #include <DEngine/Application.hpp>
 #include <DEngine/Gfx/Gfx.hpp>
@@ -81,16 +82,11 @@ namespace DEngine::Editor
 			Math::Vec2UInt visibleOffset,
 			App::Extent visibleExtent) override;
 
-		std::vector<Std::FnRef<void(EditorImpl&, Gui::Context&)>> queuedGuiEvents;
-		Std::FrameAlloc queuedGuiEvents_InnerBuffer = Std::FrameAlloc::PreAllocate(1024).Get();
 		std::vector<u32> guiQueuedTextInputData;
+		Std::FnScratchList<EditorImpl&, Gui::Context&> queuedGuiEvents;
 		template<class Callable>
-		void PushQueuedGuiEvent(Callable const& in) {
-			auto* temp = (Callable*)queuedGuiEvents_InnerBuffer.Alloc(
-				sizeof(Callable),
-				alignof(Callable));
-			new(temp) Callable(in);
-			queuedGuiEvents.push_back({ *temp });
+		void PushQueuedGuiEvent(Callable&& in) requires (!Std::Trait::isRef<Callable>) {
+			queuedGuiEvents.Push(Std::Move(in));
 		}
 
 

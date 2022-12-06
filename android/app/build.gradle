@@ -1,14 +1,15 @@
 apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
 
+
 android {
     compileSdk 33
     ndkVersion '25.1.8937393'
-    buildToolsVersion '33.0.0'
+    buildToolsVersion '33.0.1'
     namespace 'didgy.dengine.editor'
     defaultConfig {
         applicationId  "didgy.dengine.editor"
-        minSdkVersion 27
+        minSdkVersion 31
         targetSdkVersion 33
         versionCode  1
         versionName  "0.1"
@@ -31,8 +32,8 @@ android {
 
     externalNativeBuild {
         cmake {
+            version "3.22.1"
             path 'CMakeLists.txt'
-
         }
     }
 
@@ -101,10 +102,6 @@ android {
                 }
             }
         }
-    }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
     }
 }
 

@@ -17,6 +17,7 @@
 
 #include <thread>
 #include <mutex>
+#include <jni.h>
 
 void DENGINE_APP_MAIN_ENTRYPOINT(int argc, char** argv);
 

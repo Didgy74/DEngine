@@ -12,9 +12,11 @@
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/FnRef.hpp>
 #include <DEngine/Std/BumpAllocator.hpp>
+#include <DEngine/Std/Containers/FnScratchList.hpp>
 
 #include <thread>
 #include <vector>
+#include <functional>
 
 extern int dengine_impl_main(int argc, char** argv);
 
@@ -42,7 +44,7 @@ namespace DEngine::Application::impl
 	[[nodiscard]] inline BackendData const& GetBackendData(ANativeActivity const* activity) noexcept {
 		return *(BackendData const*)activity->instance;
 	}
-	[[nodiscard]] inline BackendData& GetBackendData(jdouble in) noexcept {
+	[[nodiscard]] inline BackendData& GetBackendData(long long in) noexcept {
 		BackendData* ptr = nullptr;
 		memcpy(&ptr, &in, sizeof(ptr));
 		return *ptr;
@@ -70,9 +72,9 @@ namespace DEngine::Application::impl
 
 	using CustomEvent_CallbackFnT = Std::FnRef<void(CustomEventType)>;
 
-	struct CustomEvent2 {
+	struct CustomEvent {
 		CustomEventType type;
-		Std::FnRef<void(Context::Impl&, BackendData&)> fn;
+		std::function<void(Context::Impl&, BackendData&)> fn;
 	};
 
 	struct PollSource {
@@ -86,8 +88,7 @@ namespace DEngine::Application::impl
 		jmethodID hideSoftInput = nullptr;
 	};
 
-	struct BackendData
-	{
+	struct BackendData {
 		// Decided against using this because the function is one-per-vkinstance
 		//PFN_vkCreateAndroidSurfaceKHR vkCreateAndroidSurface = nullptr;
 		// Cached to improve speed during the CreateVkSurface function.
@@ -131,13 +132,11 @@ namespace DEngine::Application::impl
 		JNIEnv* gameThreadJniEnv = nullptr;
 		JniMethodIds jniMethodIds = {};
 
-		std::mutex customEventQueueLock;
 		std::vector<u32> customEvent_textInputs;
-		std::vector<CustomEvent2> customEventQueue2;
-		// ONLY USE WITH customEventQueue member!!!
-		Std::FrameAlloc queuedEvents_InnerBuffer = Std::FrameAlloc::PreAllocate(1024).Get();
-
+		std::mutex customEventQueueLock;
+		std::vector<CustomEvent> customEventQueue;
 	};
 
-	extern BackendData* pBackendData;
+	// This should only be used for init.
+	extern BackendData* pBackendDataInit;
 }

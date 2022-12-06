@@ -8,6 +8,7 @@
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Vec.hpp>
+#include <DEngine/Std/Containers/FnScratchList.hpp>
 
 #include <chrono>
 #include <vector>
@@ -104,9 +105,10 @@ struct DEngine::Application::Context::Impl
 	std::vector<EventForwarder*> eventForwarders;
 
 
-	std::vector<Std::FnRef<void(Context&, Context::Impl&, EventForwarder&)>> queuedEventCallbacks;
+	//std::vector<Std::FnRef<void(Context&, Context::Impl&, EventForwarder&)>> queuedEventCallbacks;
+	Std::FnScratchList<Context&, Context::Impl&> queuedEventCallbacks;
 	// USE ONLY WITH THE queuedEventCallbacks vector!!!!
-	Std::FrameAlloc queuedEvents_InnerBuffer = Std::FrameAlloc::PreAllocate(1024).Get();
+	//Std::FrameAlloc queuedEvents_InnerBuffer = Std::FrameAlloc::PreAllocate(1024).Get();
 
 
 	bool textInputSessionActive = false;

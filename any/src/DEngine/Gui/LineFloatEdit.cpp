@@ -91,7 +91,7 @@ struct LineFloatEdit::Impl
 	{
 		ctx.TakeInputConnection(
 			widget,
-			Gui::SoftInputFilter::NoFilter,
+			Gui::SoftInputFilter::SignedFloat,
 			{ widget.text.data(), widget.text.length() });
 		widget.inputConnectionCtx = &ctx;
 	}

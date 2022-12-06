@@ -17,7 +17,11 @@
 #include <vector>
 #include <string>
 
-#include <Tracy.hpp>
+#ifdef DENGINE_TRACY_LINKED
+	#include <tracy/Tracy.hpp>
+	#include <tracy/TracyC.h>
+#endif
+
 
 void DEngine::Move::Update(
 	App::Context& appCtx,
@@ -377,6 +381,10 @@ int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	while (true)
 	{
+#ifdef DENGINE_TRACY_LINKED
+		TracyCZoneNS(tracy_frameBeforeRendering, "Tick before rendering", 20, true);
+#endif
+
 		Time::TickStart();
 
 		App::impl::ProcessEvents(appCtx, false, 0, false);
@@ -403,6 +411,9 @@ int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 			impl::RunPhysicsStep(scene);
 		}
 
+#ifdef DENGINE_TRACY_LINKED
+		TracyCZoneEnd(tracy_frameBeforeRendering);
+#endif
 
 		impl::SubmitRendering(
 			gfxCtx,
@@ -410,7 +421,9 @@ int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 			editorCtx, 
 			*renderedScene);
 
-		FrameMark
+		#ifdef DENGINE_TRACY_LINKED
+			FrameMark;
+		#endif
 	}
 
 	return 0;

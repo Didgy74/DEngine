@@ -20,7 +20,7 @@
 using namespace DEngine;
 using namespace DEngine::Application;
 
-Application::impl::BackendData* Application::impl::pBackendData = nullptr;
+Application::impl::BackendData* Application::impl::pBackendDataInit = nullptr;
 
 namespace DEngine::Application::impl
 {
@@ -72,10 +72,18 @@ namespace DEngine::Application::impl
 		// These polling functions have parameters we never use, made some quick lambdas
 		// to wrap them.
 		auto pollOnceWrapper = [&](int timeout) {
-			return ALooper_pollOnce(timeout,nullptr,nullptr,nullptr);
+			return ALooper_pollOnce(
+				timeout,
+				nullptr,
+				nullptr,
+				nullptr);
 		};
 		auto pollAllWrapper = [&](int timeout) {
-			return ALooper_pollAll(timeout,nullptr,nullptr,nullptr);
+			return ALooper_pollAll(
+				timeout,
+				nullptr,
+				nullptr,
+				nullptr);
 		};
 
 		if (waitForEvents && timeoutNs == 0) {
@@ -129,10 +137,9 @@ namespace DEngine::Application::impl
 	{
 		bool nativeWindowSet = false;
 		bool visibleAreaSet = false;
-		while (!nativeWindowSet || !visibleAreaSet)
-		{
-			auto callback =
-				[&](CustomEventType type) {
+		while (!nativeWindowSet || !visibleAreaSet) {
+
+			CustomEvent_CallbackFnT fnRef = [&](CustomEventType type) {
 				switch (type) {
 					case CustomEventType::NativeWindowCreated:
 						nativeWindowSet = true;
@@ -144,8 +151,6 @@ namespace DEngine::Application::impl
 						break;
 				}
 			};
-
-			CustomEvent_CallbackFnT fnRef = callback;
 
 			RunEventPolling(
 				implData,
@@ -163,11 +168,11 @@ namespace DEngine::Application::impl
 
 		returnValue.openSoftInput = jniEnv->GetMethodID(
 				classObject,
-				"nativeEvent_openSoftInput",
+				"NativeEvent_OpenSoftInput",
 				"(Ljava/lang/String;I)V");
 		returnValue.hideSoftInput = jniEnv->GetMethodID(
 				classObject,
-				"nativeEvent_hideSoftInput",
+				"NativeEvent_HideSoftInput",
 				"()V");
 
 		return returnValue;
@@ -178,13 +183,14 @@ void* Application::impl::Backend::Initialize(
 	Context& ctx,
 	Context::Impl& implData)
 {
-	auto& backendData = *pBackendData;
+	auto& backendData = *pBackendDataInit;
+	//pBackendDataInit = nullptr;
 
 	// First we attach this thread to the JVM,
 	// this gives us the JniEnv handle for this thread and
 	// allows this thread to do Java/JNI stuff.
 	JNIEnv* jniEnv = nullptr;
-	jint attachThreadResult = backendData.nativeActivity->vm->AttachCurrentThread(
+	jint attachThreadResult = backendData.globalJavaVm->AttachCurrentThread(
 		&jniEnv,
 		nullptr);
 	if (attachThreadResult != JNI_OK)
@@ -215,7 +221,7 @@ void* Application::impl::Backend::Initialize(
 	// before we can really do anything. Probably not an ideal solution.
 	WaitForInitialRequiredEvents(implData, backendData);
 
-	return pBackendData;
+	return &backendData;
 }
 
 void Application::impl::Backend::ProcessEvents(

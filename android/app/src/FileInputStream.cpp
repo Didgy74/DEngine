@@ -131,7 +131,7 @@ bool Application::FileInputStream::Open(char const* path)
 
 	impl::Backend_FileInputStreamData implData{};
 	std::memcpy(&implData, &m_buffer[0], sizeof(implData));
-	auto const& backendData = *impl::pBackendData;
+	auto const& backendData = *impl::pBackendDataInit;
 	implData.file = AAssetManager_open(backendData.assetManager, path, AASSET_MODE_RANDOM);
 	std::memcpy(&m_buffer[0], &implData, sizeof(implData));
 	return implData.file != nullptr;

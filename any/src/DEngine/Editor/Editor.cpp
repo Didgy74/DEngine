@@ -378,12 +378,9 @@ namespace DEngine::Editor
 		playButton->type = Gui::Button::Type::Toggle;
 		playButton->activateFn = [&editorImpl](Gui::Button& btn)
 		{
-			if (btn.GetToggled())
-			{
+			if (btn.GetToggled()) {
 				editorImpl.BeginSimulating();
-			}
-			else
-			{
+			} else {
 				editorImpl.StopSimulating();
 			}
 		};
@@ -474,8 +471,7 @@ void Editor::Context::ProcessEvents()
 
 	implData.FlushQueuedEventsToGui();
 
-	for (auto viewportPtr : implData.viewportWidgetPtrs)
-	{
+	for (auto viewportPtr : implData.viewportWidgetPtrs) {
 		viewportPtr->Tick(Time::Delta());
 	}
 	if (implData.appCtx->TickCount() % 60 == 0)
@@ -499,7 +495,8 @@ void Editor::Context::ProcessEvents()
 		}
 	}
 
-	if (implData.RenderIsInvalidated())
+	//if (implData.RenderIsInvalidated())
+	if (true)
 	{
 		implData.guiRenderingInvalidated = false;
 

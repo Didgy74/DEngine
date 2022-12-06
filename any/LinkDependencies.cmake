@@ -91,9 +91,11 @@ function(DEngineAny_LinkDependencies TARGET ENABLE_CMAKE_LOGGING)
 	FetchContent_Declare(
 		tracy
 		GIT_REPOSITORY https://www.github.com/wolfpld/tracy.git
-		GIT_TAG f493d4aa8ba8141d9680473fad007d8a6348628e
+		GIT_TAG 5a1f5371b792c12aea324213e1dc738b2923ae21
 		#FIND_PACKAGE_ARGS NAMES TracyClient
 	)
 	FetchContent_MakeAvailable(tracy)
 	target_link_libraries(${TARGET} PUBLIC TracyClient)
+	#target_compile_definitions(${TARGET} PUBLIC DENGINE_TRACY_LINKED)
+
 endfunction()

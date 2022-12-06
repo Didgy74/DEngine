@@ -47,12 +47,7 @@ static void Application::impl::FlushQueuedEventCallbacks(Context& ctx)
 {
 	auto& implData = ctx.GetImplData();
 
-	for(auto const& job : implData.queuedEventCallbacks) {
-		for (auto* eventForwarder : implData.eventForwarders)
-			job(ctx, implData, *eventForwarder);
-	}
-	implData.queuedEventCallbacks.clear();
-	implData.queuedEvents_InnerBuffer.Reset(false);
+	implData.queuedEventCallbacks.Consume(ctx, implData);
 }
 
 void Application::impl::DestroyWindow(
@@ -400,17 +395,17 @@ WindowID Application::Context::Impl::GetWindowId(void* platformHandle) const
 
 	return element.id;
 }
-
 namespace DEngine::Application::impl
 {
-	template<class Callable>
+	template<class Callable> requires (!Std::Trait::isRef<Callable>)
 	void EnqueueEvent2(Context::Impl& implData, Callable&& in) {
-
-		auto* tempPtr = (Callable*)implData.queuedEvents_InnerBuffer.Alloc(sizeof(Callable), alignof(Callable));
-		DENGINE_IMPL_APPLICATION_ASSERT(tempPtr != nullptr);
-		new(tempPtr) Callable(Std::Move(in));
-
-		implData.queuedEventCallbacks.emplace_back(*tempPtr);
+		auto temp = in;
+		implData.queuedEventCallbacks.Push(
+			[=](Context& ctx, Context::Impl& implData) {
+				for (auto const& forwarder : implData.eventForwarders) {
+					temp(ctx, implData, *forwarder);
+				}
+			});
 	}
 }
 
@@ -583,12 +578,19 @@ namespace DEngine::Application::impl::BackendInterface
 
 		EnqueueEvent2(
 			implData,
-			[=](Context& ctx, Context::Impl& implData, EventForwarder& forwarder) {
+			[
+				windowId = windowNode.id,
+			    newRelativePos,
+			    positionDelta = cursorData.positionDelta] (
+				Context& ctx,
+				Context::Impl& implData,
+				EventForwarder& forwarder)
+			{
 				forwarder.CursorMove(
 					ctx,
-					windowNode.id,
+					windowId,
 					newRelativePos,
-					cursorData.positionDelta);
+					positionDelta);
 			});
 	}
 

@@ -35,7 +35,7 @@ public:
 			{
 				auto& block = in.ptr[i];
 				DENGINE_IMPL_CONTAINERS_ASSERT(block.data);
-				if (safetyOn)
+				if (!noSafetyOverride && safetyOn)
 					DENGINE_IMPL_CONTAINERS_ASSERT(block.allocCount == 0);
 
 				free(block.data);
@@ -49,8 +49,7 @@ public:
 	{
 		FreeBlockListElements(in, safetyOn);
 
-		if (in.ptr)
-		{
+		if (in.ptr) {
 			free(in.ptr);
 			in = {};
 		}
@@ -123,6 +122,8 @@ namespace DEngine::Std
 
 void* Std::BumpAllocator::Alloc(uSize size, uSize alignment) noexcept
 {
+	//return malloc(size);
+
 	bool allocActiveBlock = false;
 	uSize allocActiveBlockSize = 0;
 
@@ -220,6 +221,8 @@ void* Std::BumpAllocator::Alloc(uSize size, uSize alignment) noexcept
 
 bool Std::BumpAllocator::Resize(void* ptr, uSize newSize) noexcept
 {
+	//return false;
+
 	DENGINE_IMPL_CONTAINERS_ASSERT(activeBlock.data);
 	DENGINE_IMPL_CONTAINERS_ASSERT(activeBlock.allocCount > 0);
 
@@ -239,7 +242,10 @@ bool Std::BumpAllocator::Resize(void* ptr, uSize newSize) noexcept
 
 void Std::BumpAllocator::Free(void* in) noexcept
 {
-	if constexpr (!checkForAllocFoundOnFree)
+	//free(in);
+	//return;
+
+	if constexpr (noSafetyOverride)
 		return;
 
 	// Ideally we shouldn't have to confirm this on a release
@@ -302,14 +308,13 @@ void Std::BumpAllocator::Reset([[maybe_unused]] bool safetyOn) noexcept
 {
 	Impl::FreeBlockListElements(blockList, safetyOn);
 
-	DENGINE_IMPL_CONTAINERS_ASSERT(!safetyOn || activeBlock.allocCount == 0);
+	DENGINE_IMPL_CONTAINERS_ASSERT(noSafetyOverride || (!safetyOn || activeBlock.allocCount == 0));
 	activeBlock.allocCount = 0;
 	activeBlock.offset = 0;
 	prevAllocOffset = Std::nullOpt;
 
 	// For testing purposes
-	if constexpr (clearUnusedMemory)
-	{
+	if constexpr (clearUnusedMemory) {
 		for (uSize i = 0; i < activeBlock.size; i += 1)
 			activeBlock.data[i] = 0;
 	}
@@ -319,7 +324,7 @@ void Std::BumpAllocator::ReleaseAllMemory()
 {
 	if (activeBlock.data)
 	{
-		DENGINE_IMPL_CONTAINERS_ASSERT(activeBlock.allocCount == 0);
+		DENGINE_IMPL_CONTAINERS_ASSERT(noSafetyOverride || activeBlock.allocCount == 0);
 		free(activeBlock.data);
 		activeBlock = {};
 	}

@@ -3,15 +3,12 @@
 using namespace DEngine;
 using namespace DEngine::Editor;
 
-
-
 void Editor::EditorImpl::ButtonEvent(
 	App::WindowID windowId,
 	App::Button button,
 	bool state)
 {
-	if (button == App::Button::LeftMouse || button == App::Button::RightMouse)
-	{
+	if (button == App::Button::LeftMouse || button == App::Button::RightMouse) {
 		PushQueuedGuiEvent(
 			[=](EditorImpl& implData, Gui::Context& guiCtx) {
 				Gui::CursorPressEvent event = {};
@@ -235,13 +232,13 @@ void Editor::EditorImpl::OpenSoftInput(
 	appCtx->StartTextInputSession(toFilter(inputFilter), text);
 }
 
+#include <tracy/Tracy.hpp>
 void Editor::EditorImpl::FlushQueuedEventsToGui()
 {
-	for (auto const& event : queuedGuiEvents) {
-		event.Invoke(*this, *guiCtx);
+	if (!queuedGuiEvents.IsEmpty()) {
+		ZoneScopedN("Any GUI event");
+		queuedGuiEvents.Consume(*this, *guiCtx);
+		guiQueuedTextInputData.clear();
 		InvalidateRendering();
 	}
-	queuedGuiEvents.clear();
-	queuedGuiEvents_InnerBuffer.Reset(false);
-	guiQueuedTextInputData.clear();
 }

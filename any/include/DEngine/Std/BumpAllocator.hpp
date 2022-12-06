@@ -12,7 +12,7 @@ namespace DEngine::Std
 		static constexpr bool stateless = false;
 
 		static constexpr bool clearUnusedMemory = false;
-		static constexpr bool checkForAllocFoundOnFree = true;
+		static constexpr bool noSafetyOverride = false;
 
 		BumpAllocator() noexcept = default;
 		BumpAllocator(BumpAllocator const&) = delete;
