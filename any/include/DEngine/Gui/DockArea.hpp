@@ -26,10 +26,6 @@ namespace DEngine::Gui
 	class DockArea : public Widget
 	{
 	public:
-		u32 gizmoSize = 75;
-		u32 resizeHandleThickness = 50;
-		u32 resizeHandleLength = 75;
-		u32 tabTextMargin = 0;
 		struct Colors
 		{
 			Math::Vec4 resizeHandle = { 1.f, 1.f, 1.f, 0.5f };

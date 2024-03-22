@@ -9,12 +9,14 @@
 #include <DEngine/Application.hpp>
 #include <DEngine/Scene.hpp>
 
+#include <DEngine/Gui/TextManager.hpp>
+
 namespace DEngine::Editor
 {
-	namespace Settings
-	{
-		enum class Color
-		{
+    enum class GizmoType : u8 { Translate, Rotate, Scale, COUNT };
+
+	namespace Settings {
+		enum class Color {
 			Background,
 
 			Button_Normal,
@@ -29,6 +31,7 @@ namespace DEngine::Editor
 
 			COUNT,
 		};
+
 		[[nodiscard]] constexpr Math::Vec4 FromHexadecimal(i32 hex) noexcept
 		{
 			Math::Vec3 out = {};
@@ -54,8 +57,7 @@ namespace DEngine::Editor
 
 			// Just to make for less typing.
 			auto Ref = [&returnVal](Color in) -> Math::Vec4& { return returnVal[(int)in]; };
-			auto Clamp = [](Math::Vec4 const& in) -> Math::Vec4
-				{
+			auto Clamp = [](Math::Vec4 const& in) -> Math::Vec4 {
 					Math::Vec4 returnVal = {};
 					for (auto i = 0; i < 4; i++)
 						returnVal[i] = Math::Clamp(in[i], 0.f, 1.f);
@@ -69,7 +71,7 @@ namespace DEngine::Editor
 				(Ref(Color::Button_Normal).AsVec3() + Math::Vec3{ 0.25f, 0.25f, 0.25f })
 				.AsVec4(1.f));
 
-			Ref(Color::Scrollbar_Normal) = FromHexadecimal(0x595959);
+			Ref(Color::Scrollbar_Normal) = { 1, 1, 1, 0.1 };
 
 			Ref(Color::Window_Viewport) = FromHexadecimal(0x8C2C23);
 			Ref(Color::Window_DefaultViewportBackground) = FromHexadecimal(0x211E1E);
@@ -81,8 +83,7 @@ namespace DEngine::Editor
 
 		extern Std::Array<Math::Vec4, (int)Color::COUNT> colorArray;
 
-		[[nodiscard]] inline Math::Vec4 GetColor(Color in) noexcept
-		{
+		[[nodiscard]] inline Math::Vec4 GetColor(Color in) noexcept {
 			return colorArray[(int)in];
 		}
 
@@ -105,7 +106,7 @@ namespace DEngine::Editor
 
 	class EditorImpl;
 
-	class Context
+	class Context : public Platform::EventForwarder
 	{
 	public:
 		Context(Context const&) = delete;
@@ -117,16 +118,24 @@ namespace DEngine::Editor
 		[[nodiscard]] constexpr EditorImpl const& GetImplData() const noexcept { return *m_implData; }
 		[[nodiscard]] constexpr EditorImpl& GetImplData() noexcept { return *m_implData; }
 
-		void ProcessEvents();
+		void ProcessEvents(float deltaTime);
+
+		Gui::TextManager& GetTextManager();
 
 		[[nodiscard]] DrawInfo GetDrawInfo() const;
 
 		[[nodiscard]] bool IsSimulating() const;
 		[[nodiscard]] Scene& GetActiveScene();
 
+        void BeginSimulatingScene();
+        void StopSimulatingScene();
 
-		struct CreateInfo
-		{
+        [[nodiscard]] Std::Opt<Entity> const& GetSelectedEntity() const;
+        void SelectEntity(Entity id);
+        void UnselectEntity();
+        [[nodiscard]] GizmoType GetCurrentGizmoType() const;
+
+		struct CreateInfo {
 			App::Context& appCtx;
 			Gfx::Context& gfxCtx;
 			Scene& scene;
@@ -142,11 +151,63 @@ namespace DEngine::Editor
 		[[nodiscard]] static Context Create(
 			CreateInfo const& createInfo);
 
+		/*
+		 * Gui events start
+		 */
+		virtual void ButtonEvent(
+			App::WindowID windowId,
+			App::Button button,
+			bool state) override;
+		virtual void CursorMove(
+			App::Context& appCtx,
+			App::WindowID windowId,
+			Math::Vec2Int position,
+			Math::Vec2Int positionDelta) override;
+
+		virtual void TextInputEvent(
+			App::Context& ctx,
+			App::WindowID windowId,
+			uSize oldIndex,
+			uSize oldCount,
+			Std::Span<u32 const> newString) override;
+		virtual void EndTextInputSessionEvent(
+			App::Context& ctx,
+			App::WindowID windowId) override;
+		virtual void TouchEvent(
+			App::WindowID windowId,
+			u8 id,
+			App::TouchEventType type,
+			Math::Vec2 position) override;
+		virtual bool WindowCloseSignal(
+			App::Context& appCtx,
+			App::WindowID window) override;
+		virtual void WindowCursorEnter(
+			App::WindowID window,
+			bool entered) override;
+		virtual void WindowMinimize(
+			App::WindowID window,
+			bool wasMinimized) override;
+		virtual void WindowMove(
+			App::WindowID window,
+			Math::Vec2Int position) override;
+		virtual void WindowResize(
+			App::Context& appCtx,
+			App::WindowID window,
+			App::Extent extent,
+			Math::Vec2UInt visibleOffset,
+			App::Extent visibleExtent) override;
+		/*
+		 * Gui events end
+		 */
+
 
 	protected:
 		Context() = default;
 
 		EditorImpl* m_implData = nullptr;
+
+		// Returns true if any events happened
+        bool FlushQueuedEventsToGui();
 	};
 
 	[[nodiscard]] std::vector<Math::Vec3> BuildGizmoArrowMesh3D();

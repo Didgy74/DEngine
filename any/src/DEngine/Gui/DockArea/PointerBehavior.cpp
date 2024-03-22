@@ -67,7 +67,7 @@ namespace DEngine::Gui::impl
 		void Clear() {
 			if (actualFn) {
 				destroyFn(actualFn);
-				allocRef.Free(actualFn);
+				allocRef.Free(actualFn, allocSize);
 			}
 			Nullify();
 		}
@@ -93,12 +93,12 @@ namespace DEngine::Gui::impl
 		using FnDestroyT = void(*)(void*);
 		FnDestroyT destroyFn = nullptr;
 		void* actualFn = nullptr;
+		uSize allocSize = 0;
 		AllocRef allocRef;
 	};
 
 	// Returns true if event was consumed
-	struct DA_PointerPress_Result
-	{
+	struct DA_PointerPress_Result {
 		bool eventConsumed = false;
 		Std::Opt<DockingJob> dockingJobOpt;
 		Std::Opt<DockArea::Impl::StateDataT> newStateJob;
@@ -107,28 +107,28 @@ namespace DEngine::Gui::impl
 	};
 
 	DA_PointerPress_Result DA_PointerPress_StateNormal(
-		DA_PointerPress_Params2 const& params,
+		DA_PointerPress_Params const& params,
+		int tabTotalHeight,
 		bool eventConsumed)
 	{
 		auto& dockArea = params.dockArea;
-		auto const& tabTextSize = params.tabTextSize;
 		auto& textManager = params.textManager;
-		auto const& rectCollection = params.rectCollection;
 		auto const& widgetRect = params.widgetRect;
 		auto const& visibleRect = params.visibleRect;
 		auto& transientAlloc = params.transientAlloc;
 		auto const& pointer = params.pointer;
+		auto& customData = params.customData;
+		auto fontSizeId = customData.fontSizeId;
+		auto resizeHandleThickness = customData.resizeHandleThickness;
+		auto resizeHandleLength = customData.resizeHandleLength;
+		auto tabTextMarginHori = customData.tabMargin;
 
-		auto const textheight = textManager.GetLineheight(tabTextSize);
-		auto const totalTabHeight = textheight + dockArea.tabTextMargin * 2;
-
-		bool pointerInWidget = PointIsInAll(pointer.pos, { widgetRect, visibleRect });
+		auto pointerInWidget = widgetRect.GetIntersect(visibleRect).PointIsInside(pointer.pos);
 
 		DA_PointerPress_Result returnValue = { .job = transientAlloc };
 		returnValue.eventConsumed = eventConsumed;
 
-		for (auto const layerIt : DA_BuildLayerItPair(dockArea))
-		{
+		for (auto const layerIt : DA_BuildLayerItPair(dockArea)) {
 			auto const& layerRect = layerIt.BuildLayerRect(widgetRect);
 			auto const& pointerInLayer =
 				layerRect.PointIsInside(pointer.pos) &&
@@ -147,17 +147,16 @@ namespace DEngine::Gui::impl
 				returnValue.pushLayerToFrontJob = layerIt.layerIndex;
 
 			// First we check if we hit a resize handle.
-			if (pointer.pressed && pointerInLayer && !returnValue.eventConsumed)
-			{
+			if (pointer.pressed && pointerInLayer && !returnValue.eventConsumed) {
 				// Pointer to the node of the resize handle that we hit.
 				auto resizeHandleHitNodePtr = DA_Layer_CheckHitResizeHandle(
-					dockArea,
+					resizeHandleThickness,
+					resizeHandleLength,
 					layerIt.node,
 					layerRect,
 					transientAlloc,
 					pointer.pos);
-				if (resizeHandleHitNodePtr)
-				{
+				if (resizeHandleHitNodePtr) {
 					returnValue.eventConsumed = true;
 					DA_State_ResizingSplit newStateJob = {};
 					newStateJob.splitNode = resizeHandleHitNodePtr;
@@ -178,9 +177,8 @@ namespace DEngine::Gui::impl
 				if (nodeIt.node.GetNodeType() != NodeType::Window)
 					continue;
 				auto& windowNode = static_cast<DA_WindowNode&>(nodeIt.node);
-				auto [titlebarRect, contentRect] = DA_WindowNode_BuildPrimaryRects(
-					nodeIt.rect,
-					totalTabHeight);
+				auto [titlebarRect, contentRect] =
+					DA_WindowNode_BuildPrimaryRects(nodeIt.rect, tabTotalHeight);
 				auto const pointerInsideTitlebar =
 					titlebarRect.PointIsInside(pointer.pos) &&
 					pointerInLayer;
@@ -203,13 +201,12 @@ namespace DEngine::Gui::impl
 					pointerInsideTitlebar &&
 					pointer.pressed &&
 					temp;
-				if (checkForHitTab)
-				{
+				if (checkForHitTab) {
 					auto tabRects = DA_WindowNode_BuildTabRects(
 						titlebarRect,
 						{ windowNode.tabs.data(), windowNode.tabs.size() },
-						tabTextSize,
-						dockArea.tabTextMargin,
+						fontSizeId,
+						tabTextMarginHori,
 						textManager,
 						transientAlloc);
 					auto hitTabOpt = PointIsInside(pointer.pos, tabRects.ToSpan());
@@ -256,7 +253,7 @@ namespace DEngine::Gui::impl
 	}
 
 	DA_PointerPress_Result DA_PointerPress_StateMoving(
-		DA_PointerPress_Params2 const& params,
+		DA_PointerPress_Params const& params,
 		bool eventConsumed)
 	{
 		auto& dockArea = params.dockArea;
@@ -264,6 +261,8 @@ namespace DEngine::Gui::impl
 		auto const& visibleRect = params.visibleRect;
 		auto& transientAlloc = params.transientAlloc;
 		auto const& pointer = params.pointer;
+		auto& customData = params.customData;
+		auto gizmoExtent = customData.gizmoExtent;
 
 		bool pointerInsideWidget =
 			widgetRect.PointIsInside(pointer.pos) &&
@@ -279,7 +278,7 @@ namespace DEngine::Gui::impl
 
 		// Check if we hit the outer docking gizmo
 		auto hitOuterGizmo =
-			DA_CheckHitOuterLayoutGizmo(widgetRect, dockArea.gizmoSize, pointer.pos);
+			DA_CheckHitOuterLayoutGizmo(widgetRect, gizmoExtent, pointer.pos);
 		bool dockIntoOuterGizmo =
 			!returnValue.dockingJobOpt.HasValue() &&
 			stateData.heldPointerId == pointer.id &&
@@ -295,7 +294,7 @@ namespace DEngine::Gui::impl
 
 		// Check if we hit delete gizmo
 		auto hitDeleteGizmo =
-			DA_CheckHitDeleteGizmo(widgetRect, dockArea.gizmoSize, pointer.pos);
+			DA_CheckHitDeleteGizmo(widgetRect, gizmoExtent, pointer.pos);
 		bool deleteFrontLayer =
 			!returnValue.dockingJobOpt.HasValue() &&
 			stateData.heldPointerId == pointer.id &&
@@ -312,10 +311,7 @@ namespace DEngine::Gui::impl
 			};
 		}
 
-
-
-		for (auto const& layerIt : DA_BuildLayerItPair(dockArea))
-		{
+		for (auto const& layerIt : DA_BuildLayerItPair(dockArea)) {
 			auto layerRect = layerIt.BuildLayerRect(widgetRect);
 			auto const pointerInsideLayer =
 				layerRect.PointIsInside(pointer.pos) &&
@@ -339,11 +335,10 @@ namespace DEngine::Gui::impl
 				auto hitResult = DA_Layer_CheckHitInnerDockingGizmo(
 					layerIt.node,
 					layerRect,
-					dockArea.gizmoSize,
+					gizmoExtent,
 					pointer.pos,
 					transientAlloc);
-				if (hitResult.node)
-				{
+				if (hitResult.node != nullptr) {
 					// We hit something
 					DockingJob dockingJob = {};
 					dockingJob.innerGizmo = hitResult.gizmo;
@@ -361,12 +356,10 @@ namespace DEngine::Gui::impl
 	}
 
 	DA_PointerPress_Result DA_PointerPress_StateResizingSplit(
-		DA_PointerPress_Params2 const& params,
+		DA_PointerPress_Params const& params,
 		bool eventConsumed)
 	{
 		auto& dockArea = params.dockArea;
-		auto& widgetRect = params.widgetRect;
-		auto& visibleRect = params.visibleRect;
 		auto& transientAlloc = params.transientAlloc;
 		auto& pointer = params.pointer;
 
@@ -375,8 +368,7 @@ namespace DEngine::Gui::impl
 		DA_PointerPress_Result returnValue = { .job = transientAlloc };
 		returnValue.eventConsumed = eventConsumed;
 
-		if (!pointer.pressed && pointer.id == stateData.pointerId)
-		{
+		if (!pointer.pressed && pointer.id == stateData.pointerId) {
 			DA_State_Normal newStateData = {};
 			returnValue.newStateJob = newStateData;
 		}
@@ -385,7 +377,7 @@ namespace DEngine::Gui::impl
 	}
 
 	DA_PointerPress_Result DA_PointerPress_State_HoldingTab(
-		DA_PointerPress_Params2 const& params,
+		DA_PointerPress_Params const& params,
 		bool eventConsumed)
 	{
 		auto& dockArea = params.dockArea;
@@ -408,7 +400,8 @@ namespace DEngine::Gui::impl
 	}
 
 	bool DA_PointerPress_DispatchChild(
-		DA_PointerPress_Params2 const& params,
+		DA_PointerPress_Params const& params,
+		int tabTotalHeight,
 		bool eventConsumed)
 	{
 		auto& dockArea = params.dockArea;
@@ -418,12 +411,13 @@ namespace DEngine::Gui::impl
 		auto& textManager = params.textManager;
 		auto& transientAlloc = params.transientAlloc;
 		auto& childDispatchFn = params.childDispatchFn;
-
-		u32 textHeight = textManager.GetLineheight(params.tabTextSize);
-		u32 totalLineHeight = textHeight + dockArea.tabTextMargin * 2;
+		auto& customData = params.customData;
+		auto fontSizeId = customData.fontSizeId;
+		auto resizeHandleThickness = customData.resizeHandleThickness;
+		auto resizeHandleLength = customData.resizeHandleLength;
 
 		bool newEventConsumed = eventConsumed;
-		for (auto const layerIt : DA_BuildLayerItPair(dockArea))
+		for (auto const& layerIt : DA_BuildLayerItPair(dockArea))
 		{
 			auto const layerRect = layerIt.BuildLayerRect(widgetRect);
 			auto const pointerInsideLayer =
@@ -434,7 +428,7 @@ namespace DEngine::Gui::impl
 			newEventConsumed =
 				newEventConsumed ||
 				(DA_Layer_CheckHitResizeHandle(
-					dockArea,
+					resizeHandleThickness, resizeHandleLength,
 					layerIt.node,
 					layerRect,
 					transientAlloc,
@@ -449,7 +443,7 @@ namespace DEngine::Gui::impl
 					continue;
 				auto& windowNode = static_cast<DA_WindowNode&>(nodeIt.node);
 				auto [titlebarRect, contentRect] =
-					DA_WindowNode_BuildPrimaryRects(nodeIt.rect, totalLineHeight);
+					DA_WindowNode_BuildPrimaryRects(nodeIt.rect, tabTotalHeight);
 				bool titlebarConsumes =
 					titlebarRect.PointIsInside(pointer.pos) &&
 					pointerInsideLayer &&
@@ -457,8 +451,7 @@ namespace DEngine::Gui::impl
 				newEventConsumed = newEventConsumed || titlebarConsumes;
 
 				auto& widget = windowNode.tabs[windowNode.activeTabIndex].widget;
-				if (widget)
-				{
+				if (widget) {
 					childDispatchFn(
 						*widget,
 						contentRect,
@@ -475,19 +468,24 @@ namespace DEngine::Gui::impl
 }
 
 bool Gui::impl::DA_PointerPress(
-	DA_PointerPress_Params2 const& params,
+	DA_PointerPress_Params const& params,
 	bool eventConsumed)
 {
 	auto& dockArea = params.dockArea;
 	auto& stateData = DA_GetStateData(dockArea);
 	auto& transientAlloc = params.transientAlloc;
+	auto& customData = params.customData;
+	auto tabTotalHeight = customData.tabTotalHeight;
 
 	auto newConsumed = eventConsumed;
 
 	DA_PointerPress_Result temp = { .job = transientAlloc, };
-	if (stateData.IsA<DA_State_Normal>())
-		temp = DA_PointerPress_StateNormal(params, newConsumed);
-	else if (stateData.IsA<DA_State_Moving>())
+	if (stateData.IsA<DA_State_Normal>()) {
+		temp = DA_PointerPress_StateNormal(
+			params,
+			tabTotalHeight,
+			newConsumed);
+	} else if (stateData.IsA<DA_State_Moving>())
 		temp = DA_PointerPress_StateMoving(params, newConsumed);
 	else if (stateData.IsA<DA_State_ResizingSplit>())
 		temp = DA_PointerPress_StateResizingSplit(params, newConsumed);
@@ -496,7 +494,7 @@ bool Gui::impl::DA_PointerPress(
 	else
 		DENGINE_IMPL_GUI_UNREACHABLE();
 
-	DA_PointerPress_DispatchChild(params, newConsumed);
+	DA_PointerPress_DispatchChild(params, tabTotalHeight, newConsumed);
 
 	newConsumed = temp.eventConsumed;
 
@@ -539,7 +537,8 @@ namespace DEngine::Gui::impl
 	};
 
 	DA_PointerMove_Return DA_PointerMove_StateNormal(
-		DA_PointerMove_Params2 const& params,
+		DA_PointerMove_Params const& params,
+		int totalTabHeight,
 		bool pointerOccluded)
 	{
 		auto& dockArea = params.dockArea;
@@ -548,13 +547,11 @@ namespace DEngine::Gui::impl
 		auto& textManager = params.textManager;
 		auto& transientAlloc = params.transientAlloc;
 		auto const& pointer = params.pointer;
+		auto const& customData = params.customData;
+		auto fontSizeId = customData.fontSizeId;
 
 		DA_PointerMove_Return returnValue = { .job = transientAlloc, };
 		returnValue.pointerOccluded = pointerOccluded;
-
-		auto const totalTabHeight =
-			textManager.GetLineheight(params.tabTextSize) +
-			dockArea.tabTextMargin * 2;
 
 		for (auto const layerIt : DA_BuildLayerItPair(dockArea)) {
 			auto const layerRect = layerIt.BuildLayerRect(widgetRect);
@@ -566,7 +563,6 @@ namespace DEngine::Gui::impl
 			{
 				if (nodeIt.node.GetNodeType() != NodeType::Window)
 					continue;
-
 				auto& node = static_cast<DA_WindowNode&>(nodeIt.node);
 				auto& activeTab = node.tabs[node.activeTabIndex];
 				auto& nodeRect = nodeIt.rect;
@@ -598,7 +594,7 @@ namespace DEngine::Gui::impl
 	}
 
 	DA_PointerMove_Return DA_PointerMove_StateMoving(
-		DA_PointerMove_Params2 const& params,
+		DA_PointerMove_Params const& params,
 		bool pointerOccluded)
 	{
 		auto& dockArea = params.dockArea;
@@ -607,6 +603,8 @@ namespace DEngine::Gui::impl
 		auto const& widgetRect = params.widgetRect;
 		auto const& visibleRect = params.visibleRect;
 		auto const& pointer = params.pointer;
+		auto const& customData = params.customData;
+		auto gizmoExtent = customData.gizmoExtent;
 
 		auto const pointerInWidget =
 			PointIsInAll(pointer.pos, { widgetRect, visibleRect });
@@ -626,7 +624,7 @@ namespace DEngine::Gui::impl
 		if (pointerInWidget) {
 			auto hitOuterGizmoOpt = DA_CheckHitOuterLayoutGizmo(
 				widgetRect,
-				dockArea.gizmoSize,
+				gizmoExtent,
 				pointer.pos);
 			if (hitOuterGizmoOpt.HasValue()) {
 				DA_State_Moving::HoveredWindow newHoveredGizmo = {};
@@ -690,7 +688,7 @@ namespace DEngine::Gui::impl
 					auto hitGizmoOpt =
 						DA_CheckHitInnerDockingGizmo(
 							nodeRect,
-							dockArea.gizmoSize,
+							gizmoExtent,
 							pointer.pos);
 					if (hitGizmoOpt.HasValue())
 						newHoveredWindow.gizmo = (int)hitGizmoOpt.Value();
@@ -710,7 +708,7 @@ namespace DEngine::Gui::impl
 	}
 
 	DA_PointerMove_Return DA_PointerMove_StateResizingSplit(
-		DA_PointerMove_Params2 const& params,
+		DA_PointerMove_Params const& params,
 		bool pointerOccluded)
 	{
 		auto& dockArea = params.dockArea;
@@ -767,8 +765,7 @@ namespace DEngine::Gui::impl
 		DA_WindowNode* srcWindowNode,
 		AllocRef transientAlloc)
 	{
-		for (auto const layerIt : DA_BuildLayerItPair(dockArea))
-		{
+		for (auto const layerIt : DA_BuildLayerItPair(dockArea)) {
 			for (auto const nodeIt : DA_BuildNodeItPair(
 				layerIt.ppParentPtrToNode,
 				transientAlloc))
@@ -833,7 +830,8 @@ namespace DEngine::Gui::impl
 	}
 
 	DA_PointerMove_Return DA_PointerMove_State_HoldingTab(
-		DA_PointerMove_Params2 const& params,
+		DA_PointerMove_Params const& params,
+		int tabTotalHeight,
 		bool pointerOccluded)
 	{
 		auto& dockArea = params.dockArea;
@@ -841,6 +839,8 @@ namespace DEngine::Gui::impl
 		auto const& pointer = params.pointer;
 		auto& textManager = params.textManager;
 		auto& transientAlloc = params.transientAlloc;
+		auto const& customData = params.customData;
+		auto fontSizeId = customData.fontSizeId;
 
 		DENGINE_IMPL_GUI_ASSERT(DA_GetStateData(dockArea).IsA<DA_State_HoldingTab>());
 		auto& stateData = DA_GetStateData(dockArea).Get<DA_State_HoldingTab>();
@@ -867,15 +867,12 @@ namespace DEngine::Gui::impl
 			&windowNode,
 			transientAlloc);
 
-		auto textHeight = textManager.GetLineheight(params.tabTextSize);
-		auto totalLineheight = textHeight + dockArea.tabTextMargin * 2;
-
-		auto [titlebarRect, contentRect] = DA_WindowNode_BuildPrimaryRects(windowNodeRect, totalLineheight);
+		auto [titlebarRect, contentRect] = DA_WindowNode_BuildPrimaryRects(windowNodeRect, tabTotalHeight);
 		auto tabRects = DA_WindowNode_BuildTabRects(
 			titlebarRect,
 			{ windowNode.tabs.data(), windowNode.tabs.size() },
-			params.tabTextSize,
-			dockArea.tabTextMargin,
+			fontSizeId,
+			tabTotalHeight,
 			textManager,
 			transientAlloc);
 
@@ -911,7 +908,8 @@ namespace DEngine::Gui::impl
 	}
 
 	void DA_PointerMove_DispatchChild(
-		DA_PointerMove_Params2 const& params,
+		DA_PointerMove_Params const& params,
+		int totalTabHeight,
 		bool pointerOccluded,
 		DA_ChildDispatchFnT const& childDispatchFn)
 	{
@@ -921,19 +919,19 @@ namespace DEngine::Gui::impl
 		auto const& pointer = params.pointer;
 		auto& transientAlloc = params.transientAlloc;
 		auto& textManager = params.textManager;
-
-		auto totalTabHeight = textManager.GetLineheight(params.tabTextSize)
-			+ dockArea.tabTextMargin * 2;
+		auto& customData = params.customData;
+		auto fontSizeId = customData.fontSizeId;
 
 		bool newPointerOccluded = pointerOccluded;
 		for (auto const& layerIt : DA_BuildLayerItPair(dockArea))
 		{
 			auto const& layerRect = layerIt.BuildLayerRect(widgetRect);
-			bool const pointerInsideLayer =
-				layerRect.PointIsInside(pointer.pos) &&
-				visibleRect.PointIsInside(pointer.pos);
+			auto pointerInsideLayer = layerRect.GetIntersect(visibleRect).PointIsInside(pointer.pos);
 
-			for (auto const& nodeIt : DA_BuildNodeItPair(layerIt.ppParentPtrToNode, layerRect, transientAlloc))
+			for (auto const& nodeIt : DA_BuildNodeItPair(
+                    layerIt.ppParentPtrToNode,
+                    layerRect,
+                    transientAlloc))
 			{
 				if (nodeIt.node.GetNodeType() != NodeType::Window)
 					continue;
@@ -962,7 +960,7 @@ namespace DEngine::Gui::impl
 }
 
 bool Gui::impl::DA_PointerMove(
-	DA_PointerMove_Params2 const& params,
+	DA_PointerMove_Params const& params,
 	bool pointerOccluded,
 	DA_ChildDispatchFnT const& childDispatchFn)
 {
@@ -970,20 +968,29 @@ bool Gui::impl::DA_PointerMove(
 	auto const& widgetRect = params.widgetRect;
 	auto& transientAlloc = params.transientAlloc;
 	auto& stateData = DA_GetStateData(dockArea);
+	auto& customData = params.customData;
+	auto totalTabHeight = customData.tabTotalHeight;
 
-	DA_PointerMove_DispatchChild(params, pointerOccluded, childDispatchFn);
+	DA_PointerMove_DispatchChild(
+		params,
+		totalTabHeight,
+		pointerOccluded,
+		childDispatchFn);
 
 	DA_PointerMove_Return temp = { .job = transientAlloc, };
 
-	if (stateData.IsA<DA_State_Normal>())
-		temp = DA_PointerMove_StateNormal(params, pointerOccluded);
-	else if (stateData.IsA<DA_State_Moving>())
+	if (stateData.IsA<DA_State_Normal>()) {
+		temp = DA_PointerMove_StateNormal(
+			params,
+			totalTabHeight,
+			pointerOccluded);
+	} else if (stateData.IsA<DA_State_Moving>())
 		temp = DA_PointerMove_StateMoving(params, pointerOccluded);
 	else if (stateData.IsA<DA_State_ResizingSplit>())
 		temp = DA_PointerMove_StateResizingSplit(params, pointerOccluded);
-	else if (stateData.IsA<DA_State_HoldingTab>())
-		temp = DA_PointerMove_State_HoldingTab(params, pointerOccluded);
-	else
+	else if (stateData.IsA<DA_State_HoldingTab>()) {
+		temp = DA_PointerMove_State_HoldingTab(params, totalTabHeight, pointerOccluded);
+	} else
 		DENGINE_IMPL_GUI_UNREACHABLE();
 
 	if (temp.job.IsValid()) {

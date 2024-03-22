@@ -84,6 +84,7 @@ namespace DEngine::Application::impl
 	};
 
 	struct JniMethodIds {
+		jmethodID updateAccessibility = nullptr;
 		jmethodID openSoftInput = nullptr;
 		jmethodID hideSoftInput = nullptr;
 	};
@@ -122,6 +123,11 @@ namespace DEngine::Application::impl
 
 
 		JavaVM* globalJavaVm = nullptr;
+		// This is our main DEngineApp
+		jobject appHandle = nullptr;
+		// This is our main DEngineApp class object
+		jclass appClass = nullptr;
+
 		// This is initialized to be a global Java ref
 		jobject mainActivity = nullptr;
 		AAssetManager* assetManager = nullptr;

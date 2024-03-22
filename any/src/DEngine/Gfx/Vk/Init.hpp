@@ -10,8 +10,7 @@
 
 namespace DEngine::Gfx::Vk::Init
 {
-	struct CreateVkInstance_Return
-	{
+	struct CreateVkInstance_Return {
 		vk::Instance instanceHandle{};
 		bool debugUtilsEnabled = false;
 	};
@@ -46,6 +45,16 @@ namespace DEngine::Gfx::Vk::Init
 	[[nodiscard]] Std::StackVec<vk::Fence, Constants::maxInFlightCount> CreateMainFences(
 		DevDispatch const& device,
 		u8 resourceSetCount,
+		DebugUtilsDispatch const* debugUtils);
+
+	struct CreateMainCmdBuffers_ReturnT {
+		Std::StackVec<vk::CommandPool, Const::maxInFlightCount> cmdPools;
+		Std::StackVec<vk::CommandBuffer, Const::maxInFlightCount> cmdBuffers;
+	};
+	[[nodiscard]] CreateMainCmdBuffers_ReturnT CreateMainCmdBuffers(
+		DeviceDispatch const& device,
+		int queueFamilyIndex,
+		int inFlightCount,
 		DebugUtilsDispatch const* debugUtils);
 
 	[[nodiscard]] vk::RenderPass BuildMainGfxRenderPass(

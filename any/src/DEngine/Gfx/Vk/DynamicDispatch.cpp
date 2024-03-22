@@ -451,12 +451,14 @@ bool InstanceDispatch::getPhysicalDeviceSurfaceSupportKHR(
 void DeviceDispatch::BuildInPlace(
 	DeviceDispatch& dispatcher,
 	vk::Device device,
+	vk::PhysicalDeviceLimits physDeviceLimits,
 	PFN_vkGetDeviceProcAddr getProcAddr)
 {
 	dispatcher.handle = device;
 
 	dispatcher.raw = DeviceDispatchRaw::Build(device, getProcAddr);
 	dispatcher.swapchainRaw = KHR_SwapchainDispatchRaw::Build(device, getProcAddr);
+	dispatcher.physDeviceLimits = physDeviceLimits;
 }
 
 vk::Result DeviceDispatch::allocateCommandBuffers(
@@ -469,14 +471,14 @@ vk::Result DeviceDispatch::allocateCommandBuffers(
 		reinterpret_cast<VkCommandBuffer*>(pCommandBuffers)));
 }
 
-vk::Result DeviceDispatch::allocateDescriptorSets(
+vk::Result DeviceDispatch::AllocateDescriptorSets(
 	vk::DescriptorSetAllocateInfo const& allocInfo,
 	vk::DescriptorSet* pDescriptorSets) const noexcept
 {
-	return static_cast<vk::Result>(raw.vkAllocateDescriptorSets(
+	return (vk::Result)raw.vkAllocateDescriptorSets(
 		static_cast<VkDevice>(handle),
 		reinterpret_cast<VkDescriptorSetAllocateInfo const*>(&allocInfo),
-		reinterpret_cast<VkDescriptorSet*>(pDescriptorSets)));
+		reinterpret_cast<VkDescriptorSet*>(pDescriptorSets));
 }
 
 vk::DeviceMemory DeviceDispatch::allocateMemory(
@@ -721,44 +723,44 @@ void DeviceDispatch::cmdSetViewport(
 		reinterpret_cast<VkViewport const*>(viewports.data()));
 }
 
-vk::ResultValue<vk::CommandPool> DeviceDispatch::createCommandPool(
+vk::ResultValue<vk::CommandPool> DeviceDispatch::CreateCommandPool(
 	vk::CommandPoolCreateInfo const& createInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const noexcept
 {
-	vk::CommandPool temp;
-	vk::Result result = static_cast<vk::Result>(raw.vkCreateCommandPool(
+	vk::CommandPool temp = {};
+	auto result = (vk::Result)raw.vkCreateCommandPool(
 		static_cast<VkDevice>(handle),
 		reinterpret_cast<VkCommandPoolCreateInfo const*>(&createInfo),
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator)),
-		reinterpret_cast<VkCommandPool*>(&temp)));
+		reinterpret_cast<VkCommandPool*>(&temp));
 	return { result, temp };
 }
 
-vk::DescriptorPool DeviceDispatch::createDescriptorPool(
+vk::DescriptorPool DeviceDispatch::CreateDescriptorPool(
 	vk::DescriptorPoolCreateInfo const& createInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
-	vk::DescriptorPool temp;
-	vk::Result result = static_cast<vk::Result>(raw.vkCreateDescriptorPool(
+	vk::DescriptorPool temp = {};
+	auto result = (vk::Result)raw.vkCreateDescriptorPool(
 		static_cast<VkDevice>(handle),
 		reinterpret_cast<VkDescriptorPoolCreateInfo const*>(&createInfo),
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator)),
-		reinterpret_cast<VkDescriptorPool*>(&temp)));
+		reinterpret_cast<VkDescriptorPool*>(&temp));
 	if (result != vk::Result::eSuccess)
 		throw std::runtime_error("DEngine - Vulkan: Unable to create Vulkan descriptor pool.");
 	return temp;
 }
 
-vk::DescriptorSetLayout DeviceDispatch::createDescriptorSetLayout(
+vk::DescriptorSetLayout DeviceDispatch::CreateDescriptorSetLayout(
 	vk::DescriptorSetLayoutCreateInfo const& createInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
 	vk::DescriptorSetLayout temp;
-	vk::Result result = static_cast<vk::Result>(raw.vkCreateDescriptorSetLayout(
+	auto result = (vk::Result)raw.vkCreateDescriptorSetLayout(
 		static_cast<VkDevice>(handle),
 		reinterpret_cast<VkDescriptorSetLayoutCreateInfo const*>(&createInfo),
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator)),
-		reinterpret_cast<VkDescriptorSetLayout*>(&temp)));
+		reinterpret_cast<VkDescriptorSetLayout*>(&temp));
 	if (result != vk::Result::eSuccess)
 		throw std::runtime_error("DEngine - Vulkan: Unable to create Vulkan descriptorset layout.");
 	return temp;
@@ -824,16 +826,16 @@ vk::ImageView DeviceDispatch::createImageView(
 	return temp;
 }
 
-vk::PipelineLayout DeviceDispatch::createPipelineLayout(
+vk::PipelineLayout DeviceDispatch::CreatePipelineLayout(
 	vk::PipelineLayoutCreateInfo const& createInfo, 
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
-	vk::PipelineLayout outPipelineLayout;
-	vk::Result result = static_cast<vk::Result>(raw.vkCreatePipelineLayout(
+	vk::PipelineLayout outPipelineLayout = {};
+	auto result = (vk::Result)raw.vkCreatePipelineLayout(
 		static_cast<VkDevice>(handle),
 		reinterpret_cast<VkPipelineLayoutCreateInfo const*>(&createInfo),
 		reinterpret_cast<VkAllocationCallbacks const*>(static_cast<vk::AllocationCallbacks const*>(allocator)),
-		reinterpret_cast<VkPipelineLayout*>(&outPipelineLayout)));
+		reinterpret_cast<VkPipelineLayout*>(&outPipelineLayout));
 	if (result != vk::Result::eSuccess)
 		throw std::runtime_error("DEngine - Vulkan: Unable to create Vulkan pipeline layout.");
 	return outPipelineLayout;
@@ -854,16 +856,16 @@ vk::RenderPass DeviceDispatch::createRenderPass(
 	return outRenderPass;
 }
 
-vk::Sampler DeviceDispatch::createSampler(
+vk::Sampler DeviceDispatch::CreateSampler(
 	vk::SamplerCreateInfo const& createInfo,
 	vk::Optional<vk::AllocationCallbacks> allocator) const
 {
-	vk::Sampler temp;
-	vk::Result result = static_cast<vk::Result>(raw.vkCreateSampler(
+	vk::Sampler temp = {};
+	auto result = (vk::Result)raw.vkCreateSampler(
 		static_cast<VkDevice>(handle),
 		reinterpret_cast<VkSamplerCreateInfo const*>(&createInfo),
 		reinterpret_cast<VkAllocationCallbacks const*>(static_cast<vk::AllocationCallbacks const*>(allocator)),
-		reinterpret_cast<VkSampler*>(&temp)));
+		reinterpret_cast<VkSampler*>(&temp));
 	if (result != vk::Result::eSuccess)
 		throw std::runtime_error("DEngine - Vulkan: Unable to create Vulkan sampler.");
 	return temp;
@@ -897,19 +899,19 @@ vk::ShaderModule DeviceDispatch::createShaderModule(
 	return outShaderModule;
 }
 
-vk::Result DeviceDispatch::createGraphicsPipelines(
-	vk::PipelineCache pipelineCache,
-	vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> createInfos,
+vk::Result DeviceDispatch::CreateGraphicsPipelines(
+	vk::PipelineCache cache,
+	vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> infos,
 	vk::Optional<vk::AllocationCallbacks> allocator,
 	vk::Pipeline* pPipelines) const
 {
-	return static_cast<vk::Result>(raw.vkCreateGraphicsPipelines(
+	return (vk::Result)raw.vkCreateGraphicsPipelines(
 		static_cast<VkDevice>(handle),
-		static_cast<VkPipelineCache>(pipelineCache),
-		createInfos.size(),
-		reinterpret_cast<VkGraphicsPipelineCreateInfo const*>(createInfos.data()),
+		static_cast<VkPipelineCache>(cache),
+		infos.size(),
+		reinterpret_cast<VkGraphicsPipelineCreateInfo const*>(infos.data()),
 		reinterpret_cast<VkAllocationCallbacks*>(static_cast<vk::AllocationCallbacks*>(allocator)),
-		reinterpret_cast<VkPipeline*>(pPipelines)));
+		reinterpret_cast<VkPipeline*>(pPipelines));
 }
 
 void DeviceDispatch::Destroy() const
@@ -992,7 +994,14 @@ void DeviceDispatch::endCommandBuffer(vk::CommandBuffer cmdBuffer) const
 	raw.vkEndCommandBuffer(static_cast<VkCommandBuffer>(cmdBuffer));
 }
 
-void DeviceDispatch::freeCommandBuffers(
+vk::Result DeviceDispatch::FlushMappedMemoryRanges(vk::ArrayProxy<vk::MappedMemoryRange const> const& ranges) const {
+	return (vk::Result)this->raw.vkFlushMappedMemoryRanges(
+		static_cast<VkDevice>(handle),
+		ranges.size(),
+		reinterpret_cast<VkMappedMemoryRange const*>(ranges.data()));
+}
+
+void DeviceDispatch::FreeCommandBuffers(
 	vk::CommandPool cmdPool, 
 	vk::ArrayProxy<vk::CommandBuffer const> cmdBuffers) const
 {
@@ -1001,6 +1010,17 @@ void DeviceDispatch::freeCommandBuffers(
 		static_cast<VkCommandPool>(cmdPool),
 		cmdBuffers.size(),
 		reinterpret_cast<VkCommandBuffer const*>(cmdBuffers.data()));
+}
+
+void DeviceDispatch::FreeDescriptorSets(
+	vk::DescriptorPool pool,
+	vk::ArrayProxy<vk::DescriptorSet const> descrSets) const
+{
+	raw.vkFreeDescriptorSets(
+		static_cast<VkDevice>(handle),
+		static_cast<VkDescriptorPool>(pool),
+		descrSets.size(),
+		reinterpret_cast<VkDescriptorSet const*>(descrSets.data()));
 }
 
 void DeviceDispatch::freeMemory(

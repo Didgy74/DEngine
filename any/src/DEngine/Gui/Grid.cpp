@@ -401,8 +401,7 @@ void Grid::BuildChildRects(
 
 			auto const linearIndex = Impl::CalcLinearIndex(currCol, currRow, width);
 			auto& child = children[linearIndex];
-			if (child)
-			{
+			if (child) {
 				pusher.SetRectPair(childrenEntries[linearIndex], { childRect, visibleRect });
 				child->BuildChildRects(
 					params,

@@ -1,9 +1,15 @@
 #pragma once
 
 #include <DEngine/Gui/Utility.hpp>
+#include <DEngine/Gui/TextManager.hpp>
+#include <DEngine/Std/Containers/FnRef.hpp>
+
+#include <DEngine/Math/Vector.hpp>
 
 #include <DEngine/Gfx/Gfx.hpp>
 #include <vector>
+
+
 
 // All the code in this document is mostly temporary and to be redesigned.
 
@@ -89,6 +95,9 @@ namespace DEngine::Gui
 			Math::Vec2Int posOffset,
 			Math::Vec4 color)
 		{
+			DENGINE_IMPL_GUI_ASSERT(fontFaceId != 0);
+			DENGINE_IMPL_GUI_ASSERT(fontFaceId != -1);
+
 			auto const fbExtent = GetFramebufferExtent();
 
 			int const length = (int)text.Size();
@@ -126,18 +135,22 @@ namespace DEngine::Gui
 
 		void PushScissor(Rect rect)
 		{
-			Rect rectToUse{};
+			Rect rectToUse = {};
 			if (!scissors.empty())
 				rectToUse = Rect::Intersection(rect, scissors.back());
 			else
 				rectToUse = Rect::Intersection(rect, Rect{ {}, framebufferExtent });
 			scissors.push_back(rectToUse);
+
 			Gfx::GuiDrawCmd cmd{};
 			cmd.type = Gfx::GuiDrawCmd::Type::Scissor;
-			cmd.rectPosition.x = (f32)rectToUse.position.x / framebufferExtent.width;
-			cmd.rectPosition.y = (f32)rectToUse.position.y / framebufferExtent.height;
-			cmd.rectExtent.x = (f32)rectToUse.extent.width / framebufferExtent.width;
-			cmd.rectExtent.y = (f32)rectToUse.extent.height / framebufferExtent.height;
+			cmd.rectPosition.x = (f32)rectToUse.position.x / (f32)framebufferExtent.width;
+			cmd.rectPosition.y = (f32)rectToUse.position.y / (f32)framebufferExtent.height;
+			cmd.rectExtent.x = (f32)rectToUse.extent.width / (f32)framebufferExtent.width;
+			cmd.rectExtent.y = (f32)rectToUse.extent.height / (f32)framebufferExtent.height;
+			DENGINE_IMPL_GUI_ASSERT(cmd.rectPosition.x + cmd.rectExtent.x <= 1);
+			DENGINE_IMPL_GUI_ASSERT(cmd.rectPosition.y + cmd.rectExtent.y <= 1);
+
 			drawCmds->push_back(cmd);
 		}
 
@@ -147,46 +160,60 @@ namespace DEngine::Gui
 			scissors.pop_back();
 			Gfx::GuiDrawCmd cmd = {};
 			cmd.type = Gfx::GuiDrawCmd::Type::Scissor;
-			if (!scissors.empty())
-			{
+			if (!scissors.empty()) {
 				Rect rect = scissors.back();
-				cmd.rectPosition.x = (f32)rect.position.x / framebufferExtent.width;
-				cmd.rectPosition.y = (f32)rect.position.y / framebufferExtent.height;
-				cmd.rectExtent.x = (f32)rect.extent.width / framebufferExtent.width;
-				cmd.rectExtent.y = (f32)rect.extent.height / framebufferExtent.height;
+				cmd.rectPosition.x = (f32)rect.position.x / (f32)framebufferExtent.width;
+				cmd.rectPosition.y = (f32)rect.position.y / (f32)framebufferExtent.height;
+				cmd.rectExtent.x = (f32)rect.extent.width / (f32)framebufferExtent.width;
+				cmd.rectExtent.y = (f32)rect.extent.height / (f32)framebufferExtent.height;
 			}
-			else
-			{
+			else {
 				cmd.rectPosition = {};
 				cmd.rectExtent = { 1.f, 1.f };
 			}
 			drawCmds->push_back(cmd);
 		}
 
-		void PushFilledQuad(Rect rect, Math::Vec4 color)
-		{
+		void PushFilledQuad(Rect rect, Math::Vec4 color, Math::Vec4Int radius) {
 			Gfx::GuiDrawCmd cmd{};
-			cmd.type = Gfx::GuiDrawCmd::Type::FilledMesh;
-			cmd.filledMesh.color = color;
-			cmd.filledMesh.mesh = GetQuadMesh();
-			cmd.rectPosition.x = f32(rect.position.x) / framebufferExtent.width;
-			cmd.rectPosition.y = f32(rect.position.y) / framebufferExtent.height;
-			cmd.rectExtent.x = f32(rect.extent.width) / framebufferExtent.width;
-			cmd.rectExtent.y = f32(rect.extent.height) / framebufferExtent.height;
+			cmd.type = Gfx::GuiDrawCmd::Type::Rectangle;
+			cmd.rectangle = Gfx::GuiDrawCmd::Rectangle{};
+			cmd.rectangle.color = color;
+			cmd.rectangle.pos.x = (f32)rect.position.x / (f32)framebufferExtent.width;
+			cmd.rectangle.pos.y = (f32)rect.position.y / (f32)framebufferExtent.height;
+			cmd.rectangle.extent.x = (f32)rect.extent.width / (f32)framebufferExtent.width;
+			cmd.rectangle.extent.y = (f32)rect.extent.height / (f32)framebufferExtent.height;
+			for (int i = 0; i < 4; i++) {
+				cmd.rectangle.radius[i] = (f32)radius[i] / (f32)framebufferExtent.height;
+			}
+
+			cmd.rectPosition.x = (f32)rect.position.x / (f32)framebufferExtent.width;
+			cmd.rectPosition.y = (f32)rect.position.y / (f32)framebufferExtent.height;
+			cmd.rectExtent.x = (f32)rect.extent.width / (f32)framebufferExtent.width;
+			cmd.rectExtent.y = (f32)rect.extent.height / (f32)framebufferExtent.height;
 			drawCmds->push_back(cmd);
+		}
+
+		void PushFilledQuad(Rect rect, Math::Vec4 color, int radius) {
+			PushFilledQuad(rect, color, { radius, radius, radius, radius });
+		}
+
+		void PushFilledQuad(Rect rect, Math::Vec4 color) {
+			PushFilledQuad(rect, color, {});
 		}
 
 		class ScopedScissor
 		{
 		public:
+			// Only activates if the target rect cannot fit within the visible rect.
 			ScopedScissor(
 				DrawInfo& drawInfoIn,
-				Rect const& widgetRect,
+				Rect const& targetRect,
 				Rect const& visibleRect)
 			{
-				if (!widgetRect.FitsInside(visibleRect)) {
+				if (!targetRect.FitsInside(visibleRect)) {
 					drawInfo = &drawInfoIn;
-					drawInfo->PushScissor(Intersection(widgetRect, visibleRect));
+					drawInfo->PushScissor(Intersection(targetRect, visibleRect));
 				}
 			}
 			ScopedScissor(DrawInfo& drawInfo, Rect const& scissor) : drawInfo{ &drawInfo }

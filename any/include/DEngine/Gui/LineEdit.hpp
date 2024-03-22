@@ -48,6 +48,14 @@ namespace DEngine::Gui
 			Context& ctx,
 			AllocRef const& transientAlloc,
 			TextInputEvent const& event) override;
+		void TextSelection(
+			Context& ctx,
+			AllocRef const& transientAlloc,
+			TextSelectionEvent const& event) override;
+		void TextDelete(
+			Context& ctx,
+			AllocRef const& transientAlloc,
+			WindowID windowId) override;
 		void EndTextInputSession(
 			Context& ctx,
 			AllocRef const& transientAlloc,

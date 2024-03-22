@@ -16,13 +16,12 @@
 #include <DEngine/Std/Utility.hpp>
 #include <DEngine/Math/Vector.hpp>
 
-#include "GfxGuiEventForwarder.hpp"
 
 #include <iostream>
 #include <vector>
 #include <string>
 
-namespace DEngine::impl
+namespace DEngine::GuiPlayground
 {
 	[[nodiscard]] std::vector<Math::Vec3> BuildGizmoTranslateArrowMesh2D();
 	[[nodiscard]] std::vector<Math::Vec3> BuildGizmoTorusMesh2D();
@@ -67,7 +66,7 @@ namespace DEngine::impl
 		{
 			CreateVkSurface_ReturnT returnValue = {};
 
-			auto test = appCtx->CreateVkSurface((App::WindowID)windowId, vkInstance, allocCallbacks);
+			auto test = appCtx->CreateVkSurface_ThreadSafe((App::WindowID)windowId, vkInstance, allocCallbacks);
 
 			returnValue.vkResult = test.vkResult;
 			returnValue.vkSurface = test.vkSurface;
@@ -102,22 +101,24 @@ namespace DEngine::impl
 
 	struct TempWindowHandler : public Gui::WindowHandler
 	{
-		App::Context* appCtx = nullptr;
+		Platform::Context* appCtx = nullptr;
 
 		virtual void CloseWindow(Gui::WindowID) override {
 		}
 
-		virtual void SetCursorType(Gui::WindowID, Gui::CursorType) override {
+		void SetCursorType(Gui::WindowID, Gui::CursorType) override {
 
 		}
 
-		virtual void HideSoftInput() override {
+		void HideSoftInput() override {
 			appCtx->StopTextInputSession();
 		}
 
-		virtual void OpenSoftInput(
+		void OpenSoftInput(
+			Gui::WindowID windowId,
 			Std::Span<char const> inputText,
-			Gui::SoftInputFilter inputFilter) override {
+			Gui::SoftInputFilter inputFilter) override
+		{
 			auto convert = [=]() {
 				switch (inputFilter) {
 					case Gui::SoftInputFilter::NoFilter:
@@ -128,7 +129,123 @@ namespace DEngine::impl
 						return App::SoftInputFilter{};
 				}
 			};
-			appCtx->StartTextInputSession(convert(), inputText);
+			appCtx->StartTextInputSession(
+				(Platform::WindowID)windowId,
+				convert(),
+				inputText);
+		}
+
+		void UpdateTextInputConnection(
+			u64 selIndex,
+			u64 selCount,
+			Std::Span<u32 const> inputText) override
+		{
+			appCtx->UpdateTextInputConnection(selIndex, selCount, inputText);
+		}
+
+		void UpdateTextInputConnectionSelection(u64 selIndex, u64 selCount) override {
+			appCtx->UpdateTextInputConnectionSelection(selIndex, selCount);
+		}
+	};
+
+	struct PlatformToGuiEventForwarder : Platform::EventForwarder {
+		Std::FnScratchList<Gui::Context&> fnList;
+
+		void WindowResize(
+			Platform::Context& appCtx,
+			Platform::WindowID window,
+			Platform::Extent extent,
+			Math::Vec2UInt visibleOffset,
+			Platform::Extent visibleExtent) override
+		{
+			fnList.Push([=](Gui::Context& guiCtx) {
+				Gui::WindowResizeEvent event = {};
+				event.windowId = (Gui::WindowID)window;
+				event.extent = { extent.width, extent.height };
+				event.safeAreaOffset = { visibleOffset.x, visibleOffset.y };
+				event.safeAreaExtent = { visibleExtent.width, visibleExtent.height };
+				guiCtx.PushEvent(event);
+			});
+		}
+
+		void CursorMove(
+			Platform::Context& appCtx,
+			Platform::WindowID window,
+			Math::Vec2Int position,
+			Math::Vec2Int positionDelta) override
+		{
+			fnList.Push([=](Gui::Context& guiCtx) {
+				Gui::CursorMoveEvent event = {};
+				event.windowId = (Gui::WindowID)window;
+				event.position = { position.x, position.y };
+				event.positionDelta = { positionDelta.x, positionDelta.y };
+				guiCtx.PushEvent(event, {});
+			});
+		}
+
+		void ButtonEvent(
+			Platform::WindowID window,
+			Platform::Button button,
+			bool state) override
+		{
+			if (button == Platform::Button::LeftMouse) {
+				fnList.Push([=](Gui::Context& guiCtx) {
+					Gui::CursorPressEvent event = {};
+					event.windowId = (Gui::WindowID)window;
+					event.button = Gui::CursorButton::Primary;
+					event.pressed = state;
+					guiCtx.PushEvent(event, {});
+				});
+			}
+		}
+
+		void TextInputEvent(
+			Platform::Context& ctx,
+			Platform::WindowID windowId,
+			u64 start,
+			u64 count,
+			Std::Span<u32 const> newString) override
+		{
+			std::vector<u32> inputText;
+			inputText.resize(newString.Size());
+			for (int i = 0; i < newString.Size(); i++) {
+				inputText[i] = newString[i];
+			}
+
+			fnList.Push([=, text = Std::Move(inputText)](Gui::Context& guiCtx) {
+				Gui::TextInputEvent event = {};
+				event.windowId = (Gui::WindowID)windowId;
+				event.start = start;
+				event.count = count;
+				event.newText = { text.data(), text.size() };
+				guiCtx.PushEvent(event);
+			});
+		}
+
+		void TextSelectionEvent(
+			Platform::Context& ctx,
+			Platform::WindowID windowId,
+			u64 start,
+			u64 count) override
+		{
+			fnList.Push([=](Gui::Context& guiCtx) {
+				Gui::TextSelectionEvent event = {};
+				event.windowId = (Gui::WindowID)windowId;
+				event.start = start;
+				event.count = count;
+				guiCtx.PushEvent(event);
+			});
+		}
+
+		void TextDeleteEvent(
+			Platform::Context& ctx,
+			Platform::WindowID windowId) override
+		{
+			fnList.Push([=](Gui::Context& guiCtx) {
+				Gui::TextDeleteEvent event = {};
+				event.windowId = (Gui::WindowID)windowId;
+				guiCtx.PushEvent(event);
+			});
 		}
 	};
 
@@ -140,7 +257,13 @@ namespace DEngine::impl
 
 		auto* layout = new StackLayout;
 		layout->direction = StackLayout::Dir::Vertical;
-		layout->spacing = 5;
+
+		{
+			auto* lineEdit = new LineEdit;
+			//lineEdit->text = "Edit me";
+			layout->AddWidget(Std::Box{ lineEdit });
+		}
+
 
 		{
 			auto* guiText = new Text;
@@ -156,14 +279,14 @@ namespace DEngine::impl
 
 			auto* plusButton = new Button;
 			plusButton->text = "Plus";
-			plusButton->activateFn = [&guiCtx](Button& btn) {
+			plusButton->activateFn = [&guiCtx](Button& btn, auto) {
 				guiCtx.fontScale += 0.25f;
 			};
 			innerLayout->AddWidget(Std::Box{ plusButton });
 
 			auto* minusButton = new Button;
 			minusButton->text = "Minus";
-			minusButton->activateFn = [&guiCtx](Button& btn) {
+			minusButton->activateFn = [&guiCtx](Button& btn, auto) {
 				guiCtx.fontScale -= 0.25f;
 			};
 			innerLayout->AddWidget(Std::Box{ minusButton });
@@ -192,13 +315,10 @@ namespace DEngine::impl
 			layout->AddWidget(Std::Box{ header });
 			header->title = "Collapse me!";
 			auto* innerLayout = new StackLayout(StackLayout::Dir::Vertical);
-			innerLayout->spacing = 10;
-			innerLayout->padding = 10;
 			header->child = Std::Box{ innerLayout };
 			for (int i = 0; i < 3; i++) {
 				auto* lineEdit = new LineEdit;
 				lineEdit->text = "Edit me";
-				lineEdit->margin = 10;
 				innerLayout->AddWidget(Std::Box{ lineEdit});
 			}
 		}
@@ -229,10 +349,36 @@ namespace DEngine::impl
 		guiCtx.AdoptWindow(Std::Move(adoptWindowInfo));
 	}
 
-	void SetupWindowB(App::Context& appCtx, Gui::Context& guiCtx, Gfx::Context& gfxCtx)
+	void SetupWindowB(Platform::Context& platformCtx, Gui::Context& guiCtx, Gfx::Context& gfxCtx)
 	{
+		auto windowInfo = platformCtx.NewWindow(Std::CStrToSpan("Second Window"), { 800, 600 });
 
+		using namespace Gui;
 
+		auto* layout = new StackLayout;
+		layout->direction = StackLayout::Dir::Vertical;
+
+		{
+			auto* lineEdit = new LineEdit;
+			lineEdit->text = "Edit me";
+			layout->AddWidget(Std::Box{ lineEdit });
+		}
+
+		Gui::Context::AdoptWindowInfo adoptWindowInfo {};
+		adoptWindowInfo.id = (Gui::WindowID)windowInfo.windowId;
+		adoptWindowInfo.rect = {
+			{ windowInfo.position.x, windowInfo.position.y },
+			{ windowInfo.extent.width, windowInfo.extent.height } };
+		adoptWindowInfo.visibleOffset = windowInfo.visibleOffset;
+		adoptWindowInfo.visibleExtent = { windowInfo.visibleExtent.width, windowInfo.visibleExtent.height };
+		adoptWindowInfo.clearColor = { 0.1f, 0.1f, 0.1f, 1.f };
+		adoptWindowInfo.dpiX = windowInfo.dpiX;
+		adoptWindowInfo.dpiY = windowInfo.dpiY;
+		adoptWindowInfo.contentScale = windowInfo.contentScale;
+		adoptWindowInfo.widget = Std::Box{ layout };
+		guiCtx.AdoptWindow(Std::Move(adoptWindowInfo));
+
+		gfxCtx.AdoptNativeWindow((Gfx::NativeWindowID)windowInfo.windowId);
 	}
 }
 
@@ -242,50 +388,47 @@ int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	Std::NameThisThread(Std::CStrToSpan("MainThread"));
 
-	auto appCtx = App::impl::Initialize();
+	auto platformCtx = Platform::impl::Initialize();
 
-	auto mainWindowInfo = appCtx.NewWindow(
+	auto mainWindowInfo = platformCtx.NewWindow(
 		Std::CStrToSpan("Main window"),
 		{ 900, 900 });
 
 	// Initialize the renderer
-	auto gfxWsiConnection = impl::MyGfxWsiInterfacer{};
-	gfxWsiConnection.appCtx = &appCtx;
+	auto gfxWsiConnection = GuiPlayground::MyGfxWsiInterfacer{};
+	gfxWsiConnection.appCtx = &platformCtx;
 	auto requiredInstanceExtensions = App::GetRequiredVkInstanceExtensions();
-	impl::GfxLogger gfxLogger = {};
-	gfxLogger.appCtx = &appCtx;
-	impl::GfxTexAssetInterfacer gfxTexAssetInterfacer{};
-	Gfx::Context gfxCtx = impl::CreateGfxContext(
+	GuiPlayground::GfxLogger gfxLogger = {};
+	gfxLogger.appCtx = &platformCtx;
+	GuiPlayground::GfxTexAssetInterfacer gfxTexAssetInterfacer{};
+	Gfx::Context gfxCtx = GuiPlayground::CreateGfxContext(
 		(Gfx::NativeWindowID)mainWindowInfo.windowId,
 		gfxWsiConnection,
 		gfxTexAssetInterfacer,
 		gfxLogger,
 		requiredInstanceExtensions);
 
-	impl::TempWindowHandler tempWindowHandler = {};
-	tempWindowHandler.appCtx = &appCtx;
+	GuiPlayground::TempWindowHandler tempWindowHandler = {};
+	tempWindowHandler.appCtx = &platformCtx;
 
-	auto guiCtx = Gui::Context::Create(tempWindowHandler, &appCtx, &gfxCtx);
+	auto guiCtx = Gui::Context::Create(tempWindowHandler, &platformCtx, &gfxCtx);
 
-	impl::SetupWindowA(guiCtx, mainWindowInfo);
-	//impl::SetupWindowB(appCtx, guiCtx, gfxCtx);
+	GuiPlayground::SetupWindowA(guiCtx, mainWindowInfo);
+	//GuiPlayground::SetupWindowB(platformCtx, guiCtx, gfxCtx);
 
-	GfxGuiEventForwarder gfxGuiEventForwarder;
-	gfxGuiEventForwarder.guiCtx = &guiCtx;
-	gfxGuiEventForwarder.gfxCtx = &gfxCtx;
-	appCtx.InsertEventForwarder(gfxGuiEventForwarder);
+
 
 	Gui::RectCollection sizeHintCollection;
 	Std::BumpAllocator transientAlloc;
 
 	while (true)
 	{
-		// This will in turn call the appropriate callbacks into the
-		// GfxGuiEventForwarder object.
-		App::impl::ProcessEvents(appCtx, true, 0, true);
-		if (appCtx.GetWindowCount() == 0)
+		GuiPlayground::PlatformToGuiEventForwarder eventForwarder = {};
+		Platform::impl::ProcessEvents(platformCtx, true, 0, true, &eventForwarder);
+		if (platformCtx.GetWindowCount() == 0)
 			break;
 
+		eventForwarder.fnList.Consume(guiCtx);
 
 		// Temporary stuff
 		std::vector<Gfx::GuiVertex> vertices;
@@ -294,7 +437,6 @@ int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 		std::vector<Gfx::NativeWindowUpdate> windowUpdates;
 		std::vector<u32> utfValues;
 		std::vector<Gfx::GlyphRect> textGlyphRects;
-
 		Gui::Context::Render2_Params renderParams {
 			.rectCollection = sizeHintCollection,
 			.transientAlloc = transientAlloc,
@@ -304,8 +446,14 @@ int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 			.windowUpdates = windowUpdates,
 			.utfValues = utfValues,
 			.textGlyphRects = textGlyphRects };
-		guiCtx.Render2(renderParams);
+		guiCtx.Render2(renderParams, {});
 		if (!windowUpdates.empty()) {
+			{
+				// Submit all queued bitmap upload jobs
+				auto& textManager = guiCtx.GetTextManager();
+				textManager.FlushQueuedJobs(gfxCtx);
+			}
+
 			Gfx::DrawParams drawParams = {};
 			drawParams.guiDrawCmds = drawCmds;
 			drawParams.guiIndices = indices;
@@ -316,10 +464,10 @@ int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 
 			for (auto& windowUpdate : drawParams.nativeWindowUpdates)
 			{
-				auto const windowEvents = appCtx.GetWindowEvents((App::WindowID)windowUpdate.id);
-				if (windowEvents.resize)
+				auto windowEventFlags = platformCtx.GetWindowEventFlags((App::WindowID)windowUpdate.id);
+				if (Platform::Contains(windowEventFlags, Platform::WindowEventFlag::Resize))
 					windowUpdate.event = Gfx::NativeWindowEvent::Resize;
-				if (windowEvents.restore)
+				if (Platform::Contains(windowEventFlags, Platform::WindowEventFlag::Restore))
 					windowUpdate.event = Gfx::NativeWindowEvent::Restore;
 			}
 			gfxCtx.Draw(drawParams);
@@ -329,7 +477,7 @@ int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 	return 0;
 }
 
-std::vector<DEngine::Math::Vec3> DEngine::impl::BuildGizmoTranslateArrowMesh2D()
+std::vector<DEngine::Math::Vec3> DEngine::GuiPlayground::BuildGizmoTranslateArrowMesh2D()
 {
 	std::vector<Math::Vec3> vertices;
 
@@ -340,7 +488,7 @@ std::vector<DEngine::Math::Vec3> DEngine::impl::BuildGizmoTranslateArrowMesh2D()
 	return vertices;
 }
 
-std::vector<DEngine::Math::Vec3> DEngine::impl::BuildGizmoTorusMesh2D()
+std::vector<DEngine::Math::Vec3> DEngine::GuiPlayground::BuildGizmoTorusMesh2D()
 {
 	std::vector<Math::Vec3> vertices;
 
@@ -351,7 +499,7 @@ std::vector<DEngine::Math::Vec3> DEngine::impl::BuildGizmoTorusMesh2D()
 	return vertices;
 }
 
-std::vector<DEngine::Math::Vec3> DEngine::impl::BuildGizmoScaleArrowMesh2D()
+std::vector<DEngine::Math::Vec3> DEngine::GuiPlayground::BuildGizmoScaleArrowMesh2D()
 {
 	std::vector<Math::Vec3> vertices;
 

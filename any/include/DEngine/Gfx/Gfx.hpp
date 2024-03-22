@@ -31,6 +31,15 @@ namespace DEngine::Gfx
 	enum class NativeWindowEvent : u32;
 	enum class FontFaceId : u64 { Invalid = u64(-1) };
 
+	struct FontBitmapUploadJob {
+		FontFaceId fontFaceId;
+		u32 utfValue;
+		u32 width;
+		u32 height;
+		u32 pitch;
+		Std::Span<std::byte const> data;
+	};
+
 	class Context
 	{
 	public:
@@ -46,13 +55,8 @@ namespace DEngine::Gfx
 		void NewFontFace(FontFaceId fontFaceId);
 
 		// Thread safe
-		void NewFontTexture(
-			FontFaceId fontFaceId,
-			u32 utfValue,
-			u32 width,
-			u32 height,
-			u32 pitch,
-			Std::Span<std::byte const> data);
+		// Guaranteed to copy the byte-data.
+		void NewFontTextures(Std::Span<FontBitmapUploadJob const> const& jobs);
 
 		// Thread safe
 		ViewportRef NewViewport();
@@ -103,15 +107,14 @@ namespace DEngine::Gfx
 		Std::Opt<Gizmo> gizmoOpt;
 	};
 
-	struct GuiVertex
-	{
+	struct GuiVertex {
 		Math::Vec2 position;
 		Math::Vec2 uv;
 	};
 
-	struct GuiDrawCmd
-	{
+	struct GuiDrawCmd {
 		enum class Type {
+			Rectangle,
 			FilledMesh,
 			Text,
 			Viewport,
@@ -137,10 +140,17 @@ namespace DEngine::Gfx
 		struct Viewport {
 			ViewportID id;
 		};
+		struct Rectangle {
+			Math::Vec2 pos;
+			Math::Vec2 extent;
+			Math::Vec4 radius; // Relative to Y resolution
+			Math::Vec4 color;
+		};
 		union {
 			FilledMesh filledMesh;
 			Text text;
 			Viewport viewport;
+			Rectangle rectangle;
 		};
 		// In the range of 0-1
 		Math::Vec2 rectPosition;
@@ -163,11 +173,11 @@ namespace DEngine::Gfx
 
 	struct GlyphRect {
 		Math::Vec2 pos;
+		// This MUST be set to zero if the associated glyph does not have any corresponding bitmap.
 		Math::Vec2 extent;
 	};
 
-	struct DrawParams
-	{
+	struct DrawParams {
 		// Scene specific stuff, this is WIP
 		std::vector<TextureID> textureIDs;
 		std::vector<Math::Mat4> transforms;
@@ -186,8 +196,7 @@ namespace DEngine::Gfx
 		std::vector<NativeWindowUpdate> nativeWindowUpdates;
 	};
 
-	struct InitInfo
-	{
+	struct InitInfo {
 		NativeWindowID initialWindow = {};
 		WsiInterface* wsiConnection = nullptr;
 
@@ -201,26 +210,22 @@ namespace DEngine::Gfx
 		std::vector<Math::Vec3> gizmoArrowScaleMesh2d;
 	};
 
-	class LogInterface
-	{
+	class LogInterface {
 	public:
 		virtual ~LogInterface() {};
 
-		enum class Level
-		{
+		enum class Level {
 			Info,
 			Fatal
 		};
 		virtual void Log(Level level, Std::Span<char const> msg) = 0;
 	};
 
-	class WsiInterface
-	{
+	class WsiInterface {
 	public:
 		virtual ~WsiInterface() = default;
 
-		struct CreateVkSurface_ReturnT
-		{
+		struct CreateVkSurface_ReturnT {
 			u32 vkResult;
 			u64 vkSurface;
 		};
@@ -230,8 +235,7 @@ namespace DEngine::Gfx
 			void const* allocCallbacks) noexcept = 0;
 	};
 
-	class ViewportRef
-	{
+	class ViewportRef {
 	public:
 		ViewportRef() = default;
 
@@ -240,11 +244,18 @@ namespace DEngine::Gfx
 
 	private:
 		Gfx::ViewportID viewportID = Gfx::ViewportID::Invalid;
-
 		friend class Context;
 	};
 	
 	Std::Opt<Context> Initialize(InitInfo const& initInfo);
+
+	// Rotation happens clock-wise.
+	enum class WindowRotation {
+		e0,
+		e90,
+		e180,
+		e270,
+	};
 }
 
 enum class DEngine::Gfx::NativeWindowEvent : DEngine::u32

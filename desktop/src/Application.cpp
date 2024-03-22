@@ -272,6 +272,15 @@ void Application::impl::Backend::StopTextInputSession(
 	implData.textInputSessionActive = false;
 }
 
+void Application::impl::Backend::UpdateAccessibility(
+	Context::Impl& implData,
+	void* backendData,
+	WindowID windowId,
+	Std::RangeFnRef<AccessibilityUpdateElement> const& range,
+	Std::ConstByteSpan textData)
+{
+
+}
 void Application::impl::Backend_GLFW_WindowCursorEnterCallback(
 	GLFWwindow* window,
 	int entered)

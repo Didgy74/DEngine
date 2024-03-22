@@ -68,8 +68,7 @@ namespace DEngine::Gui
 			CursorMoveParams const& params,
 			bool occluded) { return false; }
 
-		struct CursorPressParams
-		{
+		struct CursorPressParams {
 			Context& ctx;
 			TextManager& textManager;
 			EventWindowInfo const& window;

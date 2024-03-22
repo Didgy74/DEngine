@@ -386,12 +386,14 @@ namespace DEngine::Gui::impl
 		NodePtrT<T> rootNode;
 		Rect rootRect = {};
 		AllocRef transientAlloc;
+
 		[[nodiscard]] auto begin() const noexcept {
 			return DA_NodeIt_Inner2<T, includeRect>{
 				rootNode,
 				rootRect,
 				transientAlloc };
 		}
+        
 		[[nodiscard]] auto end() const noexcept {
 			return DA_Node_EndIt{};
 		}

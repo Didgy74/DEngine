@@ -5,6 +5,7 @@
 #include <DEngine/Scene.hpp>
 #include <DEngine/Time.hpp>
 
+#include <DEngine/Gui/Context.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/Fn.hpp>
@@ -16,6 +17,8 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <filesystem>
+#include <cstdlib>
 
 #ifdef DENGINE_TRACY_LINKED
 	#include <tracy/Tracy.hpp>
@@ -31,8 +34,7 @@ void DEngine::Move::Update(
 {
 	auto const rbPtr = scene.GetComponent<Physics::Rigidbody2D>(entity);
 	b2Body* physBodyPtr = nullptr;
-	if (rbPtr != nullptr)
-	{
+	if (rbPtr != nullptr) {
 		DENGINE_IMPL_ASSERT(rbPtr->b2BodyPtr);
 		physBodyPtr = (b2Body*)rbPtr->b2BodyPtr;
 	}
@@ -45,8 +47,7 @@ void DEngine::Move::Update(
 		return;
 
 	auto const& gamepadState = gamepadOpt.Value();
-	if (gamepadState.GetKeyEvent(App::GamepadKey::A) == App::KeyEventType::Pressed)
-	{
+	if (gamepadState.GetKeyEvent(App::GamepadKey::A) == App::KeyEventType::Pressed) {
 		physBody.ApplyLinearImpulseToCenter({ 0.f, 5.f }, true);
 	}
 
@@ -106,7 +107,7 @@ namespace DEngine::impl
 			uSize vkInstance,
 			void const* allocCallbacks) noexcept override
 		{
-			auto const result = appCtx->CreateVkSurface(
+			auto const result = appCtx->CreateVkSurface_ThreadSafe(
 				(App::WindowID)windowId,
 				vkInstance,
 				allocCallbacks);
@@ -293,13 +294,44 @@ namespace DEngine::impl
 }
 */
 
+
+
 int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 {
+	if (argc == 3) {
+		if (strcmp(argv[1], "-ra") == 0) {
+			auto path = argv[2];
+			auto programNameA = std::filesystem::path("refresh_assets");
+			auto programNameB = std::filesystem::path("refresh_assets.exe");
+			std::filesystem::path* pathToUse = nullptr;
+			if (std::filesystem::exists(programNameA) && std::filesystem::is_regular_file(programNameA)) {
+				pathToUse = &programNameA;
+			} else if (std::filesystem::exists(programNameB) && std::filesystem::is_regular_file(programNameB)) {
+				pathToUse = &programNameB;
+			}
+			if (pathToUse == nullptr) {
+				std::cout << "Error. Unable to find 'refresh_assets' executable file." << std::endl;
+				std::exit(1);
+			}
+
+			std::string command = pathToUse->string() + std::string(" ") + path;
+			std::cout.flush();
+			int result = system(command.c_str());
+			std::cout.flush();
+			if (result != 0) {
+				std::cout << "Error. refresh_assets program did not execute successfully." << std::endl;
+				std::exit(result);
+			}
+		}
+	}
+
 	using namespace DEngine;
 
 	Std::NameThisThread(Std::CStrToSpan("MainThread"));
 
 	Time::Initialize();
+
+
 
 	auto appCtx = App::impl::Initialize();
 
@@ -309,13 +341,12 @@ int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 
 	impl::GfxWsiConnection gfxWsiConnection = {};
 	gfxWsiConnection.appCtx = &appCtx;
-
 	// Initialize the renderer
 	auto requiredInstanceExtensions = App::GetRequiredVkInstanceExtensions();
 	impl::GfxLogger gfxLogger = {};
 	gfxLogger.appCtx = &appCtx;
 	impl::GfxTexAssetInterfacer gfxTexAssetInterfacer{};
-	Gfx::Context gfxCtx = impl::CreateGfxContext(
+	auto gfxCtx = impl::CreateGfxContext(
 		gfxWsiConnection,
 		gfxTexAssetInterfacer,
 		gfxLogger,
@@ -377,26 +408,32 @@ int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 	editorCreateInfo.windowContentScale = mainWindowCreateResult.contentScale;
 	editorCreateInfo.windowDpiX = mainWindowCreateResult.dpiX;
 	editorCreateInfo.windowDpiY = mainWindowCreateResult.dpiY;
-	Editor::Context editorCtx = Editor::Context::Create(editorCreateInfo);
+	auto editorCtx = Editor::Context::Create(editorCreateInfo);
+	editorCtx.SelectEntity((Entity)0);
 
-	while (true)
-	{
+	while (true) {
 #ifdef DENGINE_TRACY_LINKED
-		TracyCZoneNS(tracy_frameBeforeRendering, "Tick before rendering", 20, true);
+		TracyCZoneNS(tracy_mainTick, "Main tick", 20, true);
 #endif
 
 		Time::TickStart();
+		{
+			Platform::impl::ProcessEvents(
+				appCtx,
+				false, // wait for events
+				0, // wait timeout
+				false,
+				&editorCtx);
+		}
 
-		App::impl::ProcessEvents(appCtx, false, 0, false);
 		if (appCtx.GetWindowCount() == 0)
 			break;
 
-		editorCtx.ProcessEvents();
+		editorCtx.ProcessEvents(Time::Delta());
 
 		Scene* renderedScene = &myScene;
 
-		if (editorCtx.IsSimulating())
-		{
+		if (editorCtx.IsSimulating()) {
 			Scene& scene = editorCtx.GetActiveScene();
 			renderedScene = &scene;
 
@@ -411,15 +448,17 @@ int DENGINE_MAIN_ENTRYPOINT(int argc, char** argv)
 			impl::RunPhysicsStep(scene);
 		}
 
-#ifdef DENGINE_TRACY_LINKED
-		TracyCZoneEnd(tracy_frameBeforeRendering);
-#endif
+
 
 		impl::SubmitRendering(
 			gfxCtx,
 			appCtx,
 			editorCtx, 
 			*renderedScene);
+
+		#ifdef DENGINE_TRACY_LINKED
+			TracyCZoneEnd(tracy_mainTick);
+		#endif
 
 		#ifdef DENGINE_TRACY_LINKED
 			FrameMark;
@@ -472,6 +511,14 @@ void DEngine::impl::SubmitRendering(
 	Editor::Context& editorCtx,
 	Scene const& scene)
 {
+
+	{
+		// Submit all queued bitmap upload jobs
+		auto& textManager = editorCtx.GetTextManager();
+		textManager.FlushQueuedJobs(gfxData);
+	}
+
+
 	Gfx::DrawParams params = {};
 
 	for (auto const& item : scene.GetAllComponents<Gfx::TextureID>())
@@ -502,13 +549,15 @@ void DEngine::impl::SubmitRendering(
 	params.lineDrawCmds = editorDrawData.lineDrawCmds;
 	params.guiUtfValues = editorDrawData.utfValues;
 	params.guiTextGlyphRects = editorDrawData.textGlyphRects;
-	for (auto& windowUpdate : params.nativeWindowUpdates)
-	{
-		auto const windowEvents = appCtx.GetWindowEvents((App::WindowID)windowUpdate.id);
-		if (windowEvents.restore)
-			windowUpdate.event = Gfx::NativeWindowEvent::Restore;
-		if (windowEvents.resize)
-			windowUpdate.event = Gfx::NativeWindowEvent::Resize;
+	for (auto& windowUpdate : params.nativeWindowUpdates) {
+		auto windowEventFlags = appCtx.GetWindowEventFlags((App::WindowID)windowUpdate.id);
+		if ((u64)windowEventFlags > 0) { // Some event did happen.
+			if (Platform::Contains(windowEventFlags, Platform::WindowEventFlag::Restore)) {
+				windowUpdate.event = Gfx::NativeWindowEvent::Restore;
+			} else if (Platform::Contains(windowEventFlags, Platform::WindowEventFlag::Resize)) {
+				windowUpdate.event = Gfx::NativeWindowEvent::Resize;
+			}
+		}
 	}
 
 

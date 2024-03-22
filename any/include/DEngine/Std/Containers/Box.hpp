@@ -60,6 +60,7 @@ namespace DEngine::Std
 		[[nodiscard]] T const& operator*() const noexcept;
 
 		[[nodiscard]] explicit operator bool() const noexcept;
+		[[nodiscard]] bool Has() const noexcept { return this->data != nullptr; }
 
 		[[nodiscard]] bool operator==(Box const&) const noexcept;
 		[[nodiscard]] bool operator==(T const*) const noexcept;

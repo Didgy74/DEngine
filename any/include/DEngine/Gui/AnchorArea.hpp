@@ -15,25 +15,21 @@ namespace DEngine::Gui
 	public:
 		AnchorArea();
 
-		enum class AnchorX 
-		{
+		enum class AnchorX {
 			Left,
 			Center,
 			Right
 		};
 
-		enum class AnchorY
-		{
+		enum class AnchorY {
 			Top,
 			Center,
 			Bottom
 		};
 
-		struct Node
-		{
+		struct Node {
 			AnchorX anchorX;
 			AnchorY anchorY;
-			Extent extent;
 			Std::Box<Widget> widget;
 		};
 

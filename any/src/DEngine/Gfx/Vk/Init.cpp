@@ -19,11 +19,14 @@ namespace DEngine::Gfx::Vk
 		VkDebugUtilsMessengerCallbackDataEXT const* pCallbackDataIn,
 		void* pUserData)
 	{
-		auto messageSeverity = static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>(messageSeverityIn);
-		auto messageType = static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypeIn);
+		auto messageSeverity = (vk::DebugUtilsMessageSeverityFlagBitsEXT)messageSeverityIn;
+		auto messageType = (vk::DebugUtilsMessageTypeFlagsEXT)messageTypeIn;
 		auto* pCallbackData = reinterpret_cast<vk::DebugUtilsMessengerCallbackDataEXT const*>(pCallbackDataIn);
 
 		auto* logger = static_cast<LogInterface*>(pUserData);
+
+
+
 
 		if (logger != nullptr)
 		{
@@ -60,6 +63,7 @@ namespace DEngine::Gfx::Vk
 
 using namespace DEngine;
 using namespace DEngine::Gfx;
+using namespace DEngine::Gfx::Vk;
 
 Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	Std::Span<char const*> requiredExtensionsIn,
@@ -102,6 +106,9 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	auto availableExtensions = Std::NewVec<vk::ExtensionProperties>(transientAlloc);
 	availableExtensions.Resize(instanceExtensionCount);
 	vkResult = baseDispatch.EnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, availableExtensions.Data());
+	if (vkResult != vk::Result::eSuccess) {
+		throw std::runtime_error("Vulkan: Unable to enumerate available instance extension properties.");
+	}
 	for (const char* required : extensionsToUse)
 	{
 		bool requiredExtensionIsAvailable = false;
@@ -120,14 +127,11 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	Std::StackVec<const char*, 5> layersToUse = {};
 	if constexpr (Constants::enableDebugUtils)
 	{
-		if (enableLayers)
-		{
+		if (enableLayers) {
 			// Check if debug utils is available through global list.
 			bool debugUtilsIsAvailable = false;
-			for (const auto& ext : availableExtensions)
-			{
-				if (std::strcmp(ext.extensionName, Constants::debugUtilsExtensionName) == 0)
-				{
+			for (const auto& ext : availableExtensions) {
+				if (std::strcmp(ext.extensionName, Constants::debugUtilsExtensionName) == 0) {
 					debugUtilsIsAvailable = true;
 					break;
 				}
@@ -137,9 +141,13 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 			vkResult = baseDispatch.EnumerateInstanceLayerProperties(&availableLayerCount, nullptr);
 			if (vkResult != vk::Result::eSuccess && vkResult != vk::Result::eIncomplete)
 				throw std::runtime_error("Failed to enumerate instance layer properties during Vulkan instance creation.");
-			std::vector<vk::LayerProperties> availableLayers;
-			availableLayers.resize(availableLayerCount);
-			vkResult = baseDispatch.EnumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data());
+
+			auto availableLayers = Std::NewVec<vk::LayerProperties>(transientAlloc);
+			availableLayers.Resize(availableLayerCount);
+			vkResult = baseDispatch.EnumerateInstanceLayerProperties(&availableLayerCount, availableLayers.Data());
+			if (vkResult != vk::Result::eSuccess) {
+				throw std::runtime_error("Failed to enumerate instance layer properties during Vulkan instance creation.");
+			}
 
 			if (!debugUtilsIsAvailable)
 			{
@@ -183,14 +191,17 @@ Vk::Init::CreateVkInstance_Return Vk::Init::CreateVkInstance(
 	instanceInfo.enabledLayerCount = (u32)layersToUse.Size();
 	instanceInfo.ppEnabledLayerNames = layersToUse.Data();
 
+	auto test = baseDispatch.EnumerateInstanceVersion();
+	auto major = VK_VERSION_MAJOR(test);
+	auto minor = VK_VERSION_MINOR(test);
+
 	vk::ApplicationInfo appInfo{};
-	appInfo.apiVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.apiVersion = VK_MAKE_VERSION(1, 3, 0);
 	appInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
 	appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
 	appInfo.pApplicationName = "DidgyImguiVulkanTest";
 	appInfo.pEngineName = "Nothing special";
 	instanceInfo.pApplicationInfo = &appInfo;
-	instanceInfo.pApplicationInfo = nullptr;
 
 	vk::DebugUtilsMessengerCreateInfoEXT messengerCreateInfo{};
 	if constexpr (Constants::enableDebugUtils)
@@ -595,8 +606,7 @@ vk::RenderPass Vk::Init::BuildMainGfxRenderPass(
 	rpInfo.pDependencies = dependencies;
 
 	vk::RenderPass renderPass = device.createRenderPass(rpInfo);
-	if (debugUtils)
-	{
+	if (debugUtils) {
 		debugUtils->Helper_SetObjectName(
 			device.handle,
 			renderPass,
@@ -663,8 +673,7 @@ vk::RenderPass Vk::Init::CreateGuiRenderPass(
 	createInfo.pDependencies = dependencies;
 
 	vk::RenderPass renderPass = device.createRenderPass(createInfo);
-	if (debugUtils != nullptr)
-	{
+	if (debugUtils != nullptr) {
 		debugUtils->Helper_SetObjectName(
 			device.handle,
 			renderPass,
@@ -672,4 +681,47 @@ vk::RenderPass Vk::Init::CreateGuiRenderPass(
 	}
 
 	return renderPass;
+}
+
+auto Init::CreateMainCmdBuffers(
+	DeviceDispatch const& device,
+	int queueFamilyIndex,
+	int inFlightCount,
+	DebugUtilsDispatch const* debugUtils)
+	-> CreateMainCmdBuffers_ReturnT
+{
+	CreateMainCmdBuffers_ReturnT returnVal = {};
+
+	returnVal.cmdPools.Resize(inFlightCount);
+	returnVal.cmdBuffers.Resize(inFlightCount);
+
+	for (uSize i = 0; i < inFlightCount; i += 1) {
+		vk::CommandPoolCreateInfo cmdPoolInfo = {};
+		//cmdPoolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+		cmdPoolInfo.queueFamilyIndex = queueFamilyIndex;
+		auto cmdPool = device.Create(cmdPoolInfo);
+		if (cmdPool.result != vk::Result::eSuccess)
+			throw std::runtime_error("Unable to make command pool");
+		returnVal.cmdPools[i] = cmdPool.value;
+		if (debugUtils) {
+			std::string name = "Main CmdPool #";
+			name += std::to_string(i);
+			debugUtils->Helper_SetObjectName(
+				device.handle,
+				returnVal.cmdPools[i],
+				name.c_str());
+		}
+
+		vk::CommandBufferAllocateInfo cmdBufferAllocInfo = {};
+		cmdBufferAllocInfo.commandBufferCount = 1;
+		cmdBufferAllocInfo.commandPool = returnVal.cmdPools[i];
+		cmdBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
+		auto vkResult = device.allocateCommandBuffers(cmdBufferAllocInfo, &returnVal.cmdBuffers[i]);
+		if (vkResult != vk::Result::eSuccess)
+			throw std::runtime_error("DEngine - Vulkan: Failed to initialize main commandbuffers.");
+		// We don't give the command buffers debug names here,
+		// because we need to rename them everytime we re-record anyways.
+	}
+
+	return returnVal;
 }

@@ -79,23 +79,11 @@ void Gfx::Context::NewFontFace(FontFaceId fontFaceId)
 	return apiData.NewFontFace(fontFaceId);
 }
 
-void Gfx::Context::NewFontTexture(
-	FontFaceId fontFaceId,
-	u32 id,
-	u32 width,
-	u32 height,
-	u32 pitch,
-	Std::Span<std::byte const> data)
+void Gfx::Context::NewFontTextures(Std::Span<FontBitmapUploadJob const> const& jobs)
 {
 	auto& apiData = *static_cast<APIDataBase*>(apiDataBase);
 
-	return apiData.NewFontTexture(
-		fontFaceId,
-		id,
-		width,
-		height,
-		pitch,
-		data);
+	return apiData.NewFontTextures(jobs);
 }
 
 void Gfx::Context::AdoptNativeWindow(Gfx::NativeWindowID in)

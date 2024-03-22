@@ -32,13 +32,7 @@ namespace DEngine::Gfx
 		virtual void NewFontFace(FontFaceId fontFaceId) = 0;
 
 		// Needs to be thread-safe
-		virtual void NewFontTexture(
-			FontFaceId fontFaceId,
-			u32 id,
-			u32 width,
-			u32 height,
-			u32 pitch,
-			Std::Span<std::byte const> data) = 0;
+		virtual void NewFontTextures(Std::Span<FontBitmapUploadJob const> const&) = 0;
 	};
 
 	inline APIDataBase::~APIDataBase() {}

@@ -3,6 +3,8 @@
 #include <DEngine/Gui/TextManager.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
 
+#include <DEngine/Gui/ButtonSizeBehavior.hpp>
+
 #include <DEngine/Std/Containers/Vec.hpp>
 #include <DEngine/Std/Containers/FnRef.hpp>
 
@@ -13,7 +15,6 @@ struct CollapsingHeader::Impl
 {
 public:
 	static constexpr f32 textScale = 1.25f;
-	static constexpr f32 marginFactor = 0.1f;
 
 	struct CustomData
 	{
@@ -21,23 +22,22 @@ public:
 			glyphRects{ alloc } {}
 
 		Extent titleTextOuterExtent = {};
+		int marginAmount = {};
+		FontFaceSizeId fontSizeId = FontFaceSizeId::Invalid;
 		// Only included when rendering.
-		FontFaceId fontFaceId;
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
 	[[nodiscard]] static Rect BuildHeaderRect(
-		CollapsingHeader const& widget,
 		Math::Vec2Int widgetPos,
-		u32 widgetWidth,
-		u32 textHeight) noexcept
+		int widgetWidth,
+		int textHeight,
+		int marginAmount) noexcept
 	{
 		Rect returnVal = {};
 		returnVal.position = widgetPos;
 		returnVal.extent.width = widgetWidth;
-		returnVal.extent.height =
-			textHeight +
-			(u32)Math::Round(((f32)textHeight * Impl::marginFactor * 2));
+		returnVal.extent.height = textHeight + 2 * marginAmount;
 		return returnVal;
 	}
 
@@ -53,18 +53,6 @@ public:
 
 		returnVal.extent.height = temp;
 		return returnVal;
-	}
-
-	[[nodiscard]] static Math::Vec2Int BuildTextOffset(Extent const& widgetExtent, Extent const& textExtent) noexcept {
-		Math::Vec2Int out = {};
-		for (int i = 0; i < 2; i++) {
-			auto temp = (i32)Math::Round((f32)widgetExtent[i] * 0.5f - (f32)textExtent[i] * 0.5f);
-			temp = Math::Max(0, temp);
-			out[i] = temp;
-		}
-		out.x =
-			(i32)Math::Round((f32)textExtent.height * Impl::marginFactor);
-		return out;
 	}
 
 	enum class PointerType : u8 { Primary, Secondary };
@@ -114,6 +102,7 @@ public:
 		auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(widget);
 		DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 		auto& customData = *customDataPtr;
+		auto marginAmount = customData.marginAmount;
 
 		bool newEventConsumed = pointer.consumed;
 
@@ -121,10 +110,10 @@ public:
 
 		// Check if we are inside the header.
 		auto const headerRect = BuildHeaderRect(
-			widget,
 			widgetRect.position,
 			widgetRect.extent.width,
-			textHeight);
+			textHeight,
+			marginAmount);
 
 		auto const insideHeader =
 			visibleRect.PointIsInside(pointer.pos) &&
@@ -215,15 +204,16 @@ public:
 		auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(widget);
 		DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 		auto& customData = *customDataPtr;
+		auto marginAmount = customData.marginAmount;
 
 		auto const textHeight = customData.titleTextOuterExtent.height;
 
 		// Check if we are inside the header.
 		auto const headerRect = BuildHeaderRect(
-			widget,
 			widgetRect.position,
 			widgetRect.extent.width,
-			textHeight);
+			textHeight,
+			marginAmount);
 
 		auto const insideHeader =
 			visibleRect.PointIsInside(pointer.pos) &&
@@ -260,54 +250,73 @@ SizeHint CollapsingHeader::GetSizeHint2(
 	auto const& ctx = params.ctx;
 	auto const& window = params.window;
 	auto& pusher = params.pusher;
-	auto& textManager = params.textManager;
+	auto& textMgr = params.textManager;
 
 	auto const& pusherIt = pusher.AddEntry(*this);
 
-	auto textSize = ctx.fontScale * window.contentScale * Impl::textScale;
-
-	auto customData = Impl::CustomData{ pusher.Alloc() };
+	auto& customData = pusher.AttachCustomData(pusherIt,Impl::CustomData{ pusher.Alloc() });
 	if (pusher.IncludeRendering()) {
-		customData.fontFaceId = textManager.GetFontFaceId(textSize, window.dpiX, window.dpiY);
 		customData.glyphRects.Resize(title.size());
-		customData.titleTextOuterExtent = textManager.GetOuterExtent(
-			{ title.data(), title.size() },
-			textSize,
-			window.dpiX,
-			window.dpiY,
-			customData.glyphRects.Data());
-	}
-	else {
-		customData.titleTextOuterExtent = textManager.GetOuterExtent(
-			{ title.data(), title.size() },
-			textSize,
-			window.dpiX,
-			window.dpiY);
 	}
 
-	SizeHint returnValue = {};
-	returnValue.minimum = customData.titleTextOuterExtent;
+	auto normalTextScale = ctx.fontScale * window.contentScale;
+	auto fontSizeId = FontFaceSizeId::Invalid;
+	auto marginAmount = 0;
+	{
+		auto normalHeight = textMgr.GetLineheight(normalTextScale, window.dpiX, window.dpiY);
+		auto normalHeightMargin = (u32)Math::Round((f32)normalHeight * ctx.defaultMarginFactor);
+		normalHeight += 2 * normalHeightMargin;
 
-	auto margin =
-		(u32)Math::Round((f32)customData.titleTextOuterExtent.height * Impl::marginFactor);
-	returnValue.minimum.width += margin * 2;
-	returnValue.minimum.height += margin * 2;
+		auto minHeight = CmToPixels(ctx.minimumHeightCm, window.dpiY);
+
+		if (normalHeight > minHeight) {
+			fontSizeId = textMgr.GetFontFaceSizeId(normalTextScale, window.dpiX, window.dpiY);
+			marginAmount = (i32)normalHeightMargin;
+		} else {
+			// We can't just do minHeight * defaultMarginFactor for this one, because defaultMarginFactor applies to
+			// content, not the outer size. So we set up an equation `height = 2 * marginFactor * content + content`
+			// and we solve for content.
+			auto contentSizeCm = ctx.minimumHeightCm / ((2 * ctx.defaultMarginFactor) + 1.f);
+			auto contentSize = CmToPixels(contentSizeCm, window.dpiY);
+			fontSizeId = textMgr.FontFaceSizeIdForLinePixelHeight(
+				contentSize,
+				TextHeightType::Alphas);
+			marginAmount = CmToPixels((f32)contentSizeCm * ctx.defaultMarginFactor, window.dpiY);
+		}
+	}
+	customData.fontSizeId = fontSizeId;
+	customData.marginAmount = marginAmount;
+
+	auto textOuterExtent = textMgr.GetOuterExtent(
+		{ title.data(), title.size() },
+		fontSizeId,
+		TextHeightType::Alphas,
+		customData.glyphRects.ToSpan());
+	customData.titleTextOuterExtent = textOuterExtent;
+
+	SizeHint returnVal = {};
+	returnVal.minimum = customData.titleTextOuterExtent;
+	returnVal.minimum.AddPadding(marginAmount);
+	returnVal.minimum.width = Math::Max(
+		returnVal.minimum.width,
+		(u32)CmToPixels(ctx.minimumHeightCm, window.dpiX));
+	returnVal.minimum.height = Math::Max(
+		returnVal.minimum.height,
+		(u32)CmToPixels(ctx.minimumHeightCm, window.dpiY));
 
 	// Add the child if there is one
-	if (!collapsed && child)
-	{
+	if (!collapsed && child) {
 		auto const childHint = child->GetSizeHint2(params);
-		returnValue.minimum.width = Math::Max(
-			returnValue.minimum.width,
+		returnVal.minimum.width = Math::Max(
+			returnVal.minimum.width,
 			childHint.minimum.width);
 
-		returnValue.minimum.height += childHint.minimum.height;
+		returnVal.minimum.height += childHint.minimum.height;
 	}
 
-	pusher.AttachCustomData(pusherIt, Std::Move(customData));
-	pusher.SetSizeHint(pusherIt, returnValue);
+	pusher.SetSizeHint(pusherIt, returnVal);
 
-	return returnValue;
+	return returnVal;
 }
 
 void CollapsingHeader::BuildChildRects(
@@ -321,24 +330,16 @@ void CollapsingHeader::BuildChildRects(
 	auto* customDataPtr = pusher.GetCustomData2<Impl::CustomData>(*this);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
+	auto marginAmount = customData.marginAmount;
 
 	auto textHeight = customData.titleTextOuterExtent.height;
-
 	auto const headerRect = Impl::BuildHeaderRect(
-		*this,
 		widgetRect.position,
 		widgetRect.extent.width,
-		textHeight);
+		textHeight,
+		marginAmount);
 
-	if (pusher.IncludeRendering())
-	{
-		auto posOffset = Impl::BuildTextOffset(headerRect.extent, customData.titleTextOuterExtent);
-		for (auto& item : customData.glyphRects)
-			item.position += widgetRect.position + posOffset;
-	}
-
-	if (!collapsed && child)
-	{
+	if (!collapsed && child) {
 		auto& childWidget = *child;
 
 		auto const childRect = Impl::BuildChildRect(
@@ -506,7 +507,6 @@ void CollapsingHeader::Render2(
 {
 	auto& rectCollection = params.rectCollection;
 	auto& drawInfo = params.drawInfo;
-	auto& framebufferExtent = params.framebufferExtent;
 
 	if (Rect::Intersection(widgetRect, visibleRect).IsNothing())
 		return;
@@ -514,28 +514,30 @@ void CollapsingHeader::Render2(
 	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
-
 	DENGINE_IMPL_GUI_ASSERT(customData.glyphRects.Size() == title.size());
+	auto fontSizeId = customData.fontSizeId;
+	auto textOuterExtent = customData.titleTextOuterExtent;
+	auto marginAmount = customData.marginAmount;
 
 	auto const textHeight = customData.titleTextOuterExtent.height;
 
 	auto const headerRect = Impl::BuildHeaderRect(
-		*this,
 		widgetRect.position,
-		widgetRect.extent.width,
-		textHeight);
+		(int)widgetRect.extent.width,
+		(int)textHeight,
+		marginAmount);
 
-	auto const childRect = Impl::BuildChildRect(
+	// Draw the child and its background.
+	auto childRect = Impl::BuildChildRect(
 		headerRect,
 		widgetRect.extent.height);
-	if (!collapsed && child && !childRect.IsNothing())
-	{
+	if (!collapsed && child && !childRect.GetIntersect(visibleRect).IsNothing()) {
 		auto scissorGuard = DrawInfo::ScopedScissor(drawInfo, childRect);
 		drawInfo.PushFilledQuad(childRect, { 1.f, 1.f, 1.f, 0.1f });
 		child->Render2(
 			params,
 			childRect,
-			visibleRect);
+			childRect.GetIntersect(visibleRect));
 	}
 
 	Math::Vec4 headerBgColor;
@@ -550,23 +552,29 @@ void CollapsingHeader::Render2(
 				headerBgColor = collapsedColor;
 			else
 				headerBgColor = { 0.4f, 0.4f, 0.4f, 1.f };
-		}
-		else {
+		} else {
 			if (!hoveredByCursor)
 				headerBgColor = expandedColor;
 			else
 				headerBgColor = { 0.7f, 0.7f, 0.7f, 1.f };
 		}
 	}
-	drawInfo.PushFilledQuad(headerRect, headerBgColor);
+
+	auto minDimension = Math::Min(headerRect.extent.width, headerRect.extent.height);
+	auto radius = (int)Math::Floor((f32)minDimension * 0.25f);
+	drawInfo.PushFilledQuad(headerRect, headerBgColor, { radius, 0, 0, radius });
 
 	auto drawScissor = DrawInfo::ScopedScissor(drawInfo, headerRect);
 
+	auto textRect = Rect{ headerRect.position, textOuterExtent };
+	textRect.position.x += marginAmount;
+	textRect.position.y += CenterRangeOffset((int)headerRect.extent.height, (int)textOuterExtent.height);
+
 	drawInfo.PushText(
-		(u64)customData.fontFaceId,
+		(u64)fontSizeId,
 		{ title.data(), title.size() },
 		customData.glyphRects.Data(),
-		{},
+		textRect.position,
 		textColor);
 }
 

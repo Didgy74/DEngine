@@ -59,23 +59,29 @@ namespace DEngine::Math
 		}
 	}
 
-	constexpr f32 Vector<4, f32>::Dot(Vector<4, f32> const& lhs, Vector<4, f32> const& rhs) noexcept
-	{
+	constexpr f32 Vector<4, f32>::Dot(Vector<4, f32> const& lhs, Vector<4, f32> const& rhs) noexcept {
 		return (lhs.x * rhs.x) + (lhs.y * rhs.y) + (lhs.z * rhs.z) + (lhs.w * rhs.w);
 	}
 
-	constexpr f32* Vector<4, f32>::Data() noexcept
-	{
-		return &x;
-	}
-	constexpr f32 const* Vector<4, f32>::Data() const noexcept
-	{
-		return &x;
-	}
+	constexpr f32* Vector<4, f32>::Data() noexcept { return &x; }
+	constexpr f32 const* Vector<4, f32>::Data() const noexcept { return &x; }
 
 	constexpr f32 Vector<4, f32>::MagnitudeSqrd() const noexcept
 	{
 		return (x * x) + (y * y) + (z * z) + (w * w);
+	}
+
+	inline Vector<4, f32> Vector<4, f32>::ClampAll(f32 min, f32 max) const noexcept {
+		auto returnVal = *this;
+		for (auto& item : returnVal) {
+			if (item < min) {
+				item = min;
+			}
+			if (item > max) {
+				item = max;
+			}
+		}
+		return returnVal;
 	}
 
 	[[nodiscard]] constexpr f32* Vector<4, f32>::begin() noexcept

@@ -46,47 +46,60 @@ namespace DEngine::Gui
 
 
 
-		virtual SizeHint GetSizeHint2(
+		SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
-		virtual void BuildChildRects(
+		void BuildChildRects(
 			BuildChildRects_Params const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect) const override;
-		virtual void Render2(
+		void Render2(
 			Render_Params const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect) const override;
-		virtual void CursorExit(
+		void CursorExit(
 			Context& ctx) override;
-		virtual bool CursorMove(
+		bool CursorMove(
 			CursorMoveParams const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect,
 			bool occluded) override;
-		virtual bool CursorPress2(
+		bool CursorPress2(
 			CursorPressParams const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect,
 			bool consumed) override;
-		virtual void TextInput(
+		void TextInput(
 			Context& ctx,
 			AllocRef const& transientAlloc,
 			TextInputEvent const& event) override;
-		virtual void EndTextInputSession(
+		void TextDelete(
+			Context& ctx,
+			AllocRef const& transientAlloc,
+			WindowID windowId) override;
+		virtual void TextSelection(
+			Context& ctx,
+			AllocRef const& transientAlloc,
+			TextSelectionEvent const& event) override;
+		void EndTextInputSession(
 			Context& ctx,
 			AllocRef const& transientAlloc,
 			EndTextInputSessionEvent const& event) override;
 
-		virtual bool TouchMove2(
+		bool TouchMove2(
 			TouchMoveParams const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect,
 			bool occluded) override;
-		virtual bool TouchPress2(
+		bool TouchPress2(
 			TouchPressParams const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect,
 			bool consumed) override;
+
+		void AccessibilityTest(
+			AccessibilityTest_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
 
 	protected:
 		std::vector<Std::Box<Widget>> children;

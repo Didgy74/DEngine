@@ -9,6 +9,7 @@
 #include "QueueData.hpp"
 #include "VulkanIncluder.hpp"
 #include "VMAIncluder.hpp"
+#include "StagingBufferAlloc.hpp"
 
 #include <unordered_map>
 
@@ -46,6 +47,8 @@ namespace DEngine::Gfx::Vk
 			TextureManager& manager,
 			GlobUtils const& globUtils,
 			DelQueue& delQueue,
+			StagingBufferAlloc& stagingBufferAlloc,
+			vk::CommandBuffer cmdBuffer,
 			DrawParams const& drawParams,
 			Gfx::TextureAssetInterface const& texAssetInterface,
 			Std::AllocRef const& transientAlloc);

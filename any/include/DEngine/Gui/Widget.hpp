@@ -6,10 +6,10 @@
 #include <DEngine/Gui/AllocRef.hpp>
 #include <DEngine/Gui/Utility.hpp>
 
+#include <DEngine/Std/Containers/AnyRef.hpp>
 #include <DEngine/Std/BumpAllocator.hpp>
 
-namespace DEngine::Gui
-{
+namespace DEngine::Gui {
 	class DrawInfo;
 	class Context;
 	class TextManager;
@@ -20,8 +20,7 @@ namespace DEngine::Gui
 		f32 dpiY = 0;
 	};
 
-	class Widget
-	{
+	class Widget {
 	public:
 		Widget() = default;
 		Widget(Widget const&) = delete;
@@ -35,6 +34,7 @@ namespace DEngine::Gui
 			Context const& ctx;
 			EventWindowInfo const& window;
 			TextManager& textManager;
+			Std::ConstAnyRef appData;
 			AllocRef const& transientAlloc;
 			RectCollection::SizeHintPusher& pusher;
 		};
@@ -45,8 +45,7 @@ namespace DEngine::Gui
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const = 0;
 
-		struct BuildChildRects_Params
-		{
+		struct BuildChildRects_Params {
 			Context const& ctx;
 			EventWindowInfo const& window;
 			TextManager& textManager;
@@ -84,6 +83,7 @@ namespace DEngine::Gui
 			AllocRef const& transientAlloc;
 			//WindowID windowId;
 			CursorMoveEvent const& event;
+			Std::AnyRef customData;
 		};
 		/*
 			Returns true if the widget occludes the move event cursor point.
@@ -120,9 +120,10 @@ namespace DEngine::Gui
 			RectCollection const& rectCollection;
 			TextManager& textManager;
 			AllocRef const& transientAlloc;
-			WindowID windowId;
-			Math::Vec2Int cursorPos;
-			CursorPressEvent event;
+			WindowID windowId = {};
+			Math::Vec2Int cursorPos = {};
+			CursorPressEvent event = {};
+            Std::AnyRef customData;
 		};
 		/*
 			Return true if event has been consumed.
@@ -148,6 +149,7 @@ namespace DEngine::Gui
 			TextManager& textManager;
 			AllocRef const& transientAlloc;
 			WindowID windowId;
+			Std::AnyRef customData;
 			TouchPressEvent const& event;
 		};
 		virtual bool TouchPress2(
@@ -165,6 +167,7 @@ namespace DEngine::Gui
 			TextManager& textManager;
 			AllocRef const& transientAlloc;
 			WindowID windowId;
+			Std::AnyRef customData;
 			TouchMoveEvent const& event;
 		};
 		virtual bool TouchMove2(
@@ -180,6 +183,14 @@ namespace DEngine::Gui
 			Context& ctx,
 			AllocRef const& transientAlloc,
 			TextInputEvent const& event) {}
+		virtual void TextSelection(
+			Context& ctx,
+			AllocRef const& transientAlloc,
+			TextSelectionEvent const& event) {}
+		virtual void TextDelete(
+			Context& ctx,
+			AllocRef const& transientAlloc,
+			WindowID windowId) {}
 		virtual void EndTextInputSession(
 			Context& ctx,
 			AllocRef const& transientAlloc,
@@ -243,6 +254,27 @@ namespace DEngine::Gui
 			Rect widgetRect,
 			Rect visibleRect,
 			TouchPressEvent event) { return false; }
+
+		struct AccessibilityInfoElement {
+			Rect rect;
+			int textStart;
+			int textCount;
+			bool isClickable;
+		};
+		struct AccessibilityInfoPusher {
+			// Returns the offset that your text ended up at.
+			virtual int PushText(Std::Span<char const>) = 0;
+			virtual void PushElement(AccessibilityInfoElement const&) = 0;
+		};
+		struct AccessibilityTest_Params {
+			Context const& ctx;
+			RectCollection const& rectColl;
+			AccessibilityInfoPusher& pusher;
+		};
+		virtual void AccessibilityTest(
+			AccessibilityTest_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const {}
 	};
 
 	inline Widget::~Widget() {}

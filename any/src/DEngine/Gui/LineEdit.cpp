@@ -15,7 +15,7 @@ struct LineEdit::Impl
 		explicit CustomData(RectCollection::AllocRefT const& alloc) :
 			glyphRects{ alloc } {}
 
-		FontFaceId fontFaceId;
+		FontFaceSizeId fontFaceId;
 		Extent textOuterExtent = {};
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
@@ -43,9 +43,9 @@ struct LineEdit::Impl
 		bool consumed;
 	};
 
-	struct PointerPress_Params
-	{
+	struct PointerPress_Params {
 		Context& ctx;
+		WindowID windowId = WindowID::Invalid;
 		RectCollection const& rectCollection;
 		LineEdit& widget;
 		Rect const& widgetRect;
@@ -55,9 +55,10 @@ struct LineEdit::Impl
 
 
 
-	static void BeginInputSession(LineEdit& widget, Context& ctx)
+	static void BeginInputSession(WindowID windowId, LineEdit& widget, Context& ctx)
 	{
 		ctx.TakeInputConnection(
+			windowId,
 			widget,
 			Gui::SoftInputFilter::NoFilter,
 			{ widget.text.data(), widget.text.length() });
@@ -96,7 +97,7 @@ struct LineEdit::Impl
 				!pointer.pressed &&
 				pointer.type == PointerType::Primary;
 			if (beginInputSession) {
-				BeginInputSession(widget, ctx);
+				BeginInputSession(in.windowId, widget, ctx);
 				eventConsumed = true;
 			}
 		}
@@ -153,7 +154,7 @@ void LineEdit::ClearInputConnection()
 }
 
 SizeHint LineEdit::GetSizeHint2(
-	Widget::GetSizeHint2_Params const& params) const
+	GetSizeHint2_Params const& params) const
 {
 	auto const& ctx = params.ctx;
 	auto const& window = params.window;
@@ -170,14 +171,14 @@ SizeHint LineEdit::GetSizeHint2(
 		auto customData = Impl::CustomData{ pusher.Alloc() };
 		customData.glyphRects.Resize(text.size());
 
-		customData.fontFaceId = textManager.GetFontFaceId(textScale, window.dpiX, window.dpiY);
+		customData.fontFaceId = textManager.GetFontFaceSizeId(textScale, window.dpiX, window.dpiY);
 
 		customData.textOuterExtent = textManager.GetOuterExtent(
 			{ text.data(), text.size() },
 			textScale,
 			window.dpiX,
 			window.dpiY,
-			customData.glyphRects.Data());
+			customData.glyphRects.ToSpan());
 		returnValue.minimum = customData.textOuterExtent;
 
 		pusher.AttachCustomData(pusherIt, Std::Move(customData));
@@ -201,7 +202,7 @@ SizeHint LineEdit::GetSizeHint2(
 }
 
 void LineEdit::BuildChildRects(
-	Widget::BuildChildRects_Params const& params,
+	BuildChildRects_Params const& params,
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
@@ -223,7 +224,7 @@ void LineEdit::BuildChildRects(
 }
 
 void LineEdit::Render2(
-	Widget::Render_Params const& params,
+	Render_Params const& params,
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
@@ -249,11 +250,15 @@ void LineEdit::Render2(
 
 	auto drawScissor = DrawInfo::ScopedScissor(drawInfo, intersection);
 
+	auto glyphPosOffset = widgetRect.position;
+	glyphPosOffset.x += (i32)this->margin;
+	glyphPosOffset.x += (i32)this->margin;
+
 	drawInfo.PushText(
 		(u64)customData.fontFaceId,
 		{ text.data(), text.size() },
 		customData.glyphRects.Data(),
-		{},
+		glyphPosOffset,
 		{ 1.f, 1.f, 1.f, 1.f });
 }
 
@@ -272,6 +277,7 @@ bool LineEdit::CursorPress2(
 
 	Impl::PointerPress_Params temp = {
 		.ctx = params.ctx,
+		.windowId = params.windowId,
 		.rectCollection = params.rectCollection,
 		.widget = *this,
 		.widgetRect = widgetRect,
@@ -296,6 +302,7 @@ bool LineEdit::TouchPress2(
 
 	Impl::PointerPress_Params temp = {
 		.ctx = params.ctx,
+		.windowId = params.windowId,
 		.rectCollection = params.rectCollection,
 		.widget = *this,
 		.widgetRect = widgetRect,
@@ -305,41 +312,110 @@ bool LineEdit::TouchPress2(
 	return Impl::PointerPress(temp);
 }
 
+template<class GetTextPtrFnT, class ResizeStringFnT>
+void ReplaceText(
+	i64 currStringSize,
+	GetTextPtrFnT const& getTextPtrFn,
+	ResizeStringFnT const& resizeStringFn,
+	i64 selIndex,
+	i64 selCount,
+	Std::RangeFnRef<Std::Trait::RemoveCVRef<decltype(*getTextPtrFn())>> const& newTextRange)
+{
+	if (selIndex > currStringSize)
+		DENGINE_IMPL_UNREACHABLE();
+
+	auto oldStringSize = currStringSize;
+	auto sizeDiff = newTextRange.Size() - selCount;
+
+	// First check if we need to expand our storage.
+	if (sizeDiff > 0) {
+		// We need to move all content behind the old substring
+		// To the right.
+		resizeStringFn(oldStringSize + sizeDiff);
+		auto* textPtr = getTextPtrFn();
+		for (i64 i = oldStringSize - 1; i >= selIndex + selCount; i--)
+			textPtr[i + sizeDiff] = textPtr[i];
+	} else if (sizeDiff < 0) {
+		// We need to move all content behind the old substring
+		// To the left.
+		auto* textPtr = getTextPtrFn();
+		for (auto i = selIndex + selCount; i < oldStringSize; i += 1)
+			textPtr[i + sizeDiff] = textPtr[i];
+		resizeStringFn(currStringSize + sizeDiff);
+	}
+
+	auto* textPtr = getTextPtrFn();
+	for (auto i = 0; i < newTextRange.Size(); i += 1)
+		textPtr[i + selIndex] = newTextRange.Invoke(i);
+}
+
 void LineEdit::TextInput(
 	Context& ctx,
 	AllocRef const& transientAlloc,
 	TextInputEvent const& event)
 {
+	if (this->HasInputSession()) {
+
+		ReplaceText(
+			(int)this->text.size(),
+			[&]() { return this->text.data(); },
+			[&](auto newSize) { this->text.resize(newSize); },
+			(i64)event.start,
+			(i64)event.count,
+			{ (int)event.newText.Size(), [&](int i) { return (char)event.newText[i]; } });
+
+		ctx.GetWindowHandler().UpdateTextInputConnection(
+			event.start,
+			event.count,
+			event.newText);
+
+
+		// TODO: Might need to handle the case where the insertion was not successful for whatever reason.
+	}
+}
+
+void LineEdit::TextSelection(
+	Context& ctx,
+	AllocRef const& transientAlloc,
+	TextSelectionEvent const& event)
+{
+	if (this->HasInputSession()) {
+		if (event.start != this->text.size() || event.count != 0) {
+			DENGINE_IMPL_UNREACHABLE();
+		}
+
+		ctx.GetWindowHandler().UpdateTextInputConnectionSelection(event.start, event.count);
+
+		// TODO: do something with the selection.
+	}
+}
+
+void LineEdit::TextDelete(
+	Context& ctx,
+	AllocRef const& transientAlloc,
+	WindowID windowId)
+{
 	if (HasInputSession())
 	{
-		DENGINE_IMPL_GUI_ASSERT(event.oldIndex + event.oldCount <= text.size());
-
-		auto sizeDifference = (int)event.newTextSize - (int)event.oldCount;
-
-		// First check if we need to expand our storage.
-		if (sizeDifference > 0)
-		{
-			// We need to move all content behind the old substring
-			// To the right.
-			auto oldSize = (int)text.size();
-			text.resize(text.size() + sizeDifference);
-			int end = (int)event.oldIndex + (int)event.oldCount - 1;
-			for (int i = oldSize - 1; i > end; i -= 1)
-				text[i + sizeDifference] = text[i];
-		}
-		else if (sizeDifference < 0)
-		{
-			// We need to move all content behind the old substring
-			// To the left.
-			auto oldSize = (int)text.size();
-			int begin = (int)event.oldIndex + (int)event.oldCount;
-			for (int i = begin; i < oldSize; i += 1)
-				text[i + sizeDifference] = text[i];
-			text.resize(text.size() + sizeDifference);
+		u64 selIndex = text.size();
+		u64 selCount = 0;
+		if (selIndex > 0) {
+			selIndex -= 1;
+			selCount = 1;
 		}
 
-		for (int i = 0; i < event.newTextSize; i += 1)
-			text[i + event.oldIndex] = (char)event.newTextData[i];
+		ReplaceText(
+			(int)text.size(),
+			[&]() { return text.data(); },
+			[&](auto newSize) { text.resize(newSize); },
+			(i64)selIndex,
+			(i64)selCount,
+			{});
+
+		ctx.UpdateInputConnection(
+			(int)selIndex,
+			selCount,
+			{});
 	}
 }
 
@@ -354,3 +430,5 @@ void LineEdit::EndTextInputSession(
 		inputConnectionCtx = nullptr;
 	}
 }
+
+

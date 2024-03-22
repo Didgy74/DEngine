@@ -11,7 +11,6 @@ namespace DEngine::Gfx::Vk
 
 	class NativeWinMgr;
 	class NativeWinMgr_WindowData;
-	class NativeWinMgr_WindowGuiData;
 
 	class GuiResourceManager;
 

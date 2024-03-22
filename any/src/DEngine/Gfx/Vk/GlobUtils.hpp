@@ -29,7 +29,7 @@ namespace DEngine::Gfx::Vk
 		DebugUtilsDispatch debugUtils{};
 		vk::DebugUtilsMessengerEXT debugMessenger{};
 		bool UsingDebugUtils() const { return debugUtils.raw.vkCreateDebugUtilsMessengerEXT != nullptr; }
-		DebugUtilsDispatch const* DebugUtilsPtr() const { return UsingDebugUtils() ? &debugUtils : nullptr; }
+		auto const* DebugUtilsPtr() const { return UsingDebugUtils() ? &debugUtils : nullptr; }
 
 		PhysDeviceInfo physDevice{};
 		DeviceDispatch device{};
@@ -39,7 +39,7 @@ namespace DEngine::Gfx::Vk
 		VmaAllocator vma{};
 
 		u8 inFlightCount = 0;
-
+		[[nodiscard]] int MainFencesCount() const { return inFlightCount - 1; }
 		SurfaceInfo surfaceInfo{};
 
 		bool editorMode = false;

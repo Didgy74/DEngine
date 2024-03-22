@@ -3,21 +3,14 @@
 #include <DEngine/Std/Containers/impl/Assert.hpp>
 #include <DEngine/Std/Trait.hpp>
 
-namespace DEngine::Std::impl { struct OptPlacementNewTag {}; }
-template<class T>
-constexpr void* operator new(decltype(sizeof(int)) size, T* data, DEngine::Std::impl::OptPlacementNewTag) noexcept { return data; }
-// Having this delete operator silences a compiler warning.
-[[maybe_unused]] constexpr void operator delete(void* data, DEngine::Std::impl::OptPlacementNewTag) noexcept {}
+#include <new>
 
-
-namespace DEngine::Std
-{
+namespace DEngine::Std {
 	enum class NullOpt_T : char;
 	constexpr NullOpt_T nullOpt = {};
 
 	template<typename T>
-	class Opt
-	{
+	class Opt {
 	public:
 		using ValueType = T;
 
@@ -27,55 +20,47 @@ namespace DEngine::Std
 			hasValue{ other.hasValue }
 		{
 			if (other.hasValue)
-				new(&value, impl::OptPlacementNewTag{}) T(other.value);
+				new(&value) T(other.value);
 		}
 
 		Opt(Opt&& other) noexcept requires (Std::Trait::isMoveConstructible<T>) :
 			hasValue{ other.hasValue }
 		{
-			if (other.hasValue)
-			{
-				new(&value, impl::OptPlacementNewTag{}) T(static_cast<T&&>(other.value));
+			if (other.hasValue) {
+				new(&value) T(static_cast<T&&>(other.value));
 				other.Clear();
 			}
 		}
 
-		Opt(T const& other) noexcept requires (Std::Trait::isCopyConstructible<T>) :
-			hasValue{ true }
-		{
-			new(&value, impl::OptPlacementNewTag{}) T(other);
+		Opt(T const& other) noexcept requires (Std::Trait::isCopyConstructible<T>) : hasValue{ true } {
+			new(&value) T(other);
 		}
 
-		Opt(Trait::RemoveCVRef<T>&& other) noexcept requires (Std::Trait::isMoveConstructible<T>) :
-			hasValue{ true }
-		{
-			new(&value, impl::OptPlacementNewTag{}) T(static_cast<T&&>(other));
+		Opt(Trait::RemoveCVRef<T>&& other) noexcept requires (Std::Trait::isMoveConstructible<T>) : hasValue{ true } {
+			new(&value) T(static_cast<T&&>(other));
 		}
 
 		~Opt() noexcept;
 
 		template<class... Ts>
-		void Emplace(Ts&&... in) noexcept
-		{
+		void Emplace(Ts&&... in) noexcept {
 			if (hasValue)
 				Clear();
 
-			new(&value, impl::OptPlacementNewTag{}) T(in...);
+			new(&value) T(in...);
 			hasValue = true;
 		}
 
 
-		Opt& operator=(Opt const& other) noexcept requires (Std::Trait::isCopyAssignable<T>)
-		{
+		Opt& operator=(Opt const& other) noexcept requires (Std::Trait::isCopyAssignable<T>) {
 			if (this == &other)
 				return *this;
 
-			if (other.hasValue)
-			{
+			if (other.hasValue) {
 				if (hasValue)
 					value = other.value;
 				else
-					new(&value, impl::OptPlacementNewTag{}) T(other.value);
+					new(&value) T(other.value);
 			}
 			else
 				Clear();
@@ -95,7 +80,7 @@ namespace DEngine::Std
 				if (hasValue)
 					value = static_cast<T&&>(other.value);
 				else
-					new(&value, impl::OptPlacementNewTag{}) T(static_cast<T&&>(other.value));
+					new(&value) T(static_cast<T&&>(other.value));
 			}
 			else
 				Clear();
@@ -113,7 +98,7 @@ namespace DEngine::Std
 				value = other;
 			else
 			{
-				new(&value, impl::OptPlacementNewTag{}) T(other);
+				new(&value) T(other);
 				hasValue = true;
 			}
 			return *this;
@@ -125,7 +110,7 @@ namespace DEngine::Std
 				value = static_cast<T&&>(other);
 			else
 			{
-				new(&value, impl::OptPlacementNewTag{}) T(static_cast<T&&>(other));
+				new(&value) T(static_cast<T&&>(other));
 				hasValue = true;
 			}
 			return *this;

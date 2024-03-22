@@ -842,12 +842,17 @@ namespace DEngine::Editor::impl
 		Gui::Rect const& widgetRect;
 		Gui::Rect const& visibleRect;
 		PointerMove_Pointer const& pointer;
+        Std::AnyRef customData;
 	};
 	[[nodiscard]] static bool PointerMove(PointerMove_Params const& params) {
 		auto& widget = params.widget;
 		auto const& widgetRect = params.widgetRect;
 		auto const& visibleRect = params.visibleRect;
 		auto const& pointer = params.pointer;
+
+        auto* appDataPtr = params.customData.Get<Editor::Context>();
+        DENGINE_IMPL_ASSERT(appDataPtr != nullptr);
+        auto& appData = *appDataPtr;
 
 		bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
 
@@ -857,19 +862,18 @@ namespace DEngine::Editor::impl
 			Entity entity = {};
 			Transform* transformPtr = nullptr;
 			auto const& gizmoHoldingData = widget.holdingGizmoData.Value();
-			if (gizmoHoldingData.pointerId == pointer.id && widget.editorImpl->GetSelectedEntity().HasValue())
+			if (gizmoHoldingData.pointerId == pointer.id && appData.GetSelectedEntity().HasValue())
 			{
-				entity = widget.editorImpl->GetSelectedEntity().Value();
+				entity = appData.GetSelectedEntity().Value();
 				// First check if we have a transform
-				Scene& scene = widget.editorImpl->GetActiveScene();
+				Scene& scene = appData.GetActiveScene();
 				transformPtr = scene.GetComponent<Transform>(entity);
 			}
 			if (transformPtr != nullptr)
 			{
 				auto& transform = *transformPtr;
 				auto const currGizmo = gizmoHoldingData.gizmoType;
-				if (currGizmo == GizmoType::Translate)
-				{
+				if (currGizmo == GizmoType::Translate) {
 					impl::Gizmo_HandleTranslation(
 						widget,
 						widgetRect,
@@ -928,6 +932,7 @@ namespace DEngine::Editor::impl {
 		Gui::Rect const& widgetRect;
 		Gui::Rect const& visibleRect;
 		PointerPress_Pointer const& pointer;
+        Std::AnyRef customData;
 		bool eventConsumed;
 	};
 	[[nodiscard]] static bool PointerPress(PointerPress_Params const& params) {
@@ -937,8 +942,9 @@ namespace DEngine::Editor::impl {
 		auto const& pointer = params.pointer;
 		auto const& oldEventConsumed = params.eventConsumed;
 
-		DENGINE_IMPL_ASSERT(widget.editorImpl);
-		auto& editorImpl = *widget.editorImpl;
+        auto* appDataPtr = params.customData.Get<Editor::Context>();
+        DENGINE_IMPL_ASSERT(appDataPtr != nullptr);
+        auto& appData = *appDataPtr;
 
 		bool pointerInside = widgetRect.PointIsInside(pointer.pos) && visibleRect.PointIsInside(pointer.pos);
 		if (!pointerInside && pointer.pressed)
@@ -961,7 +967,7 @@ namespace DEngine::Editor::impl {
 			pointer.type == PointerType::Secondary)
 		{
 			widget.state = ViewportWidget::BehaviorState::FreeLooking;
-			editorImpl.appCtx->LockCursor(true);
+			widget.editorImpl->appCtx->LockCursor(true);
 			return true;
 		}
 
@@ -971,12 +977,12 @@ namespace DEngine::Editor::impl {
 			pointer.type == PointerType::Secondary)
 		{
 			widget.state = ViewportWidget::BehaviorState::Normal;
-			editorImpl.appCtx->LockCursor(false);
+            widget.editorImpl->appCtx->LockCursor(true);
 			return false;
 		}
 
 
-		Scene const& scene = editorImpl.GetActiveScene();
+		Scene const& scene = appData.GetActiveScene();
 
 		// We don't want to do gizmo stuff if it was the secondary cursor button
 		bool doGizmoStuff =
@@ -992,15 +998,14 @@ namespace DEngine::Editor::impl {
 			// We want to see if we hit it's gizmo.
 			Entity ent = Entity::Invalid;
 			Transform const* transformPtr = nullptr;
-			if (widget.editorImpl->GetSelectedEntity().HasValue())
-			{
-				ent = widget.editorImpl->GetSelectedEntity().Value();
+			if (appData.GetSelectedEntity().HasValue()) {
+				ent = appData.GetSelectedEntity().Value();
 				transformPtr = scene.GetComponent<Transform>(ent);
 			}
 			if (transformPtr)
 			{
 				Transform const& transform = *transformPtr;
-				auto const currGizmoType = editorImpl.GetCurrentGizmoType();
+				auto const currGizmoType = appData.GetCurrentGizmoType();
 				auto const& hitTestOpt = impl::GizmoHitTest(
 					widget,
 					widgetRect,
@@ -1037,7 +1042,7 @@ namespace DEngine::Editor::impl {
 				// Iterate over all physics components that also have a transform component
 				for (auto const& [entity, rb] : scene.GetAllComponents<Physics::Rigidbody2D>())
 				{
-					Transform const* transform = widget.editorImpl->scene->GetComponent<Transform>(entity);
+					Transform const* transform = appData.GetActiveScene().GetComponent<Transform>(entity);
 					if (transform)
 					{
 						Math::Vec2 vertices[4] = {
@@ -1061,9 +1066,8 @@ namespace DEngine::Editor::impl {
 						}
 					}
 				}
-				if (hitEntity.HasValue())
-				{
-					widget.editorImpl->SelectEntity(hitEntity.Value().b);
+				if (hitEntity.HasValue()) {
+					appData.SelectEntity(hitEntity.Value().b);
 					return pointerInside;
 				}
 			}
@@ -1090,7 +1094,7 @@ InternalViewportWidget::InternalViewportWidget(
 	EditorImpl& implData) :
 	editorImpl(&implData)
 {
-	auto newViewportRef = editorImpl->gfxCtx->NewViewport();
+	auto newViewportRef = implData.gfxCtx->NewViewport();
 	viewportId = newViewportRef.ViewportID();
 }
 
@@ -1344,6 +1348,7 @@ bool InternalViewportWidget::CursorPress2(
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
 		.pointer = pointer,
+		.customData = params.customData,
 		.eventConsumed = consumed, };
 
 	return impl::PointerPress(temp);
@@ -1366,7 +1371,8 @@ bool InternalViewportWidget::CursorMove(
 		.ctx = params.ctx,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
-		.pointer = pointer, };
+		.pointer = pointer,
+		.customData = params.customData };
 	return impl::PointerMove(temp);
 }
 
@@ -1387,7 +1393,8 @@ bool InternalViewportWidget::TouchMove2(
 		.ctx = params.ctx,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
-		.pointer = pointer, };
+		.pointer = pointer,
+		.customData = params.customData, };
 	return impl::PointerMove(temp);
 }
 
@@ -1409,6 +1416,7 @@ bool InternalViewportWidget::TouchPress2(
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
 		.pointer = pointer,
+		.customData = params.customData,
 		.eventConsumed = consumed, };
 	return impl::PointerPress(temp);
 }
@@ -1420,19 +1428,17 @@ ViewportWidget::ViewportWidget(EditorImpl& implData) :
 
 	implData.viewportWidgetPtrs.push_back(this);
 
-	leftJoystick = new Joystick;
+	this->leftJoystick = new Joystick;
 	Gui::AnchorArea::Node leftJoystickNode = {};
 	leftJoystickNode.anchorX = Gui::AnchorArea::AnchorX::Left;
 	leftJoystickNode.anchorY = Gui::AnchorArea::AnchorY::Bottom;
-	leftJoystickNode.extent = { 200, 200 };
 	leftJoystickNode.widget = Std::Box{ leftJoystick };
 	anchorArea->nodes.push_back(Std::Move(leftJoystickNode));
 
-	rightJoystick = new Joystick;
+	this->rightJoystick = new Joystick;
 	Gui::AnchorArea::Node rightJoystickNode = {};
 	rightJoystickNode.anchorX = Gui::AnchorArea::AnchorX::Right;
 	rightJoystickNode.anchorY = Gui::AnchorArea::AnchorY::Bottom;
-	rightJoystickNode.extent = { 200, 200 };
 	rightJoystickNode.widget = Std::Box{ rightJoystick };
 	anchorArea->nodes.push_back(Std::Move(rightJoystickNode));
 

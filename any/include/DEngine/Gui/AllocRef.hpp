@@ -19,8 +19,8 @@ namespace DEngine::Gui
 			return frameAlloc->Resize(ptr, newSize);
 		}
 		// Passing in a pointer value that was not returned by Alloc is UB.
-		void Free(void* in) const noexcept {
-			frameAlloc->Free(in);
+		void Free(void* in, uSize size) const noexcept {
+			frameAlloc->Free(in, size);
 		}
 
 	private:

@@ -2,13 +2,14 @@ package didgy.dengine;
 
 import android.content.res.AssetManager;
 import android.view.InputQueue;
-import android.view.MotionEvent;
 import android.view.Surface;
 
 public class NativeInterface {
 
     // Return type is the pointer to the backend-data
     static native long init(
+        DEngineApp app,
+        Class<DEngineApp> appClass,
         DEngineActivity activity,
         AssetManager assetMgr,
         float fontScale);
@@ -56,7 +57,7 @@ public class NativeInterface {
 
     static native void onInputQueuCreated(
         long backendPtr,
-        InputQueue surface);
+        InputQueue queue);
 
     static native void onTouch(
         long backendPtr,
@@ -64,4 +65,8 @@ public class NativeInterface {
         float x,
         float y,
         int action);
+
+    static void NativeEvent_AccessibilityUpdate(int windowId, int[] dataArray, byte[] textArray) {
+
+    }
 }

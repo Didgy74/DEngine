@@ -424,7 +424,7 @@ SizeHint StackLayout::GetSizeHint2(GetSizeHint2_Params const& params) const
 {
 	auto& pusher = params.pusher;
 
-	int const childCount = children.size();
+	auto const childCount = (int)children.size();
 
 	SizeHint returnVal = {};
 
@@ -623,8 +623,7 @@ void StackLayout::Render2(
 	}
 
 	auto const childCount = children.size();
-	for (uSize childIndex = 0; childIndex < childCount; childIndex += 1)
-	{
+	for (uSize childIndex = 0; childIndex < childCount; childIndex += 1) {
 		auto const indexOpt = Impl::GetModifiedWidgetIndex(
 			{ insertionJobs.data(), insertionJobs.size() },
 			childIndex);
@@ -656,6 +655,31 @@ void StackLayout::TextInput(
 	}
 }
 
+void StackLayout::TextDelete(Context& ctx, AllocRef const& transientAlloc, WindowID windowId)
+{
+	for (auto const& iter : Impl::BuildItPair(*this)) {
+		auto& child = iter.child;
+		child.TextDelete(
+			ctx,
+			transientAlloc,
+			windowId);
+	}
+}
+
+void StackLayout::TextSelection(
+	Context& ctx,
+	AllocRef const& transientAlloc,
+	TextSelectionEvent const& event)
+{
+	for (auto const& iter : Impl::BuildItPair(*this)) {
+		auto& child = iter.child;
+		child.TextSelection(
+			ctx,
+			transientAlloc,
+			event);
+	}
+}
+
 void StackLayout::EndTextInputSession(
 	Context& ctx,
 	AllocRef const& transientAlloc,
@@ -667,5 +691,23 @@ void StackLayout::EndTextInputSession(
 			ctx,
 			transientAlloc,
 			event);
+	}
+}
+
+void StackLayout::AccessibilityTest(
+	AccessibilityTest_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	auto& rectColl = params.rectColl;
+	for (auto const& childBox : this->children) {
+		auto& child = *childBox;
+		auto* childRectsPtr = rectColl.GetRect(child);
+		DENGINE_IMPL_GUI_ASSERT(childRectsPtr != nullptr);
+		auto const& childRects = *childRectsPtr;
+		child.AccessibilityTest(
+			params,
+			childRects.widgetRect,
+			childRects.visibleRect);
 	}
 }

@@ -1,15 +1,17 @@
-function(DEngineAny_LinkDependencies TARGET ENABLE_CMAKE_LOGGING)
+macro(DEngineAny_LinkDependencies TARGET ENABLE_CMAKE_LOGGING)
+
+	include(FetchContent)
 
 	# Posix threads
 	find_package(Threads REQUIRED)
 	target_link_libraries(${TARGET}
-			PUBLIC
-			Threads::Threads)
+		PUBLIC
+		Threads::Threads)
 
 	# Dynamic lib loading
 	target_link_libraries(${TARGET}
-			PUBLIC
-			${CMAKE_DL_LIBS})
+		PUBLIC
+		${CMAKE_DL_LIBS})
 
 	# FreeType
 	if (${ENABLE_CMAKE_LOGGING})
@@ -52,14 +54,17 @@ function(DEngineAny_LinkDependencies TARGET ENABLE_CMAKE_LOGGING)
 
 
 	# Texas
-	if (NOT TARGET Texas)
-		add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/external/Texas")
-	endif()
+	set(TEXAS_BUILD_TESTS OFF)
+	FetchContent_Declare(
+		texas
+		GIT_REPOSITORY https://github.com/Didgy74/Texas.git
+		GIT_TAG        development
+	)
+	FetchContent_MakeAvailable(texas)
 	if (NOT TARGET Texas)
 		message(FATAL_ERROR "DEngine: CMake target 'Texas' was not found.")
 	endif()
 	target_link_libraries(${TARGET} PUBLIC Texas)
-
 
 
 	# Box2D
@@ -87,15 +92,27 @@ function(DEngineAny_LinkDependencies TARGET ENABLE_CMAKE_LOGGING)
 
 
 	#add_compile_definitions(${TARGET} PUBLIC TRACY_ENABLE=1)
+
 	include(FetchContent)
 	FetchContent_Declare(
 		tracy
 		GIT_REPOSITORY https://www.github.com/wolfpld/tracy.git
-		GIT_TAG 5a1f5371b792c12aea324213e1dc738b2923ae21
-		#FIND_PACKAGE_ARGS NAMES TracyClient
+		GIT_TAG v0.9.1
+		FIND_PACKAGE_ARGS NAMES TracyClient
 	)
+	set(TRACY_CALLSTACK ON)
 	FetchContent_MakeAvailable(tracy)
 	target_link_libraries(${TARGET} PUBLIC TracyClient)
-	#target_compile_definitions(${TARGET} PUBLIC DENGINE_TRACY_LINKED)
+	target_compile_definitions(${TARGET} PUBLIC DENGINE_TRACY_LINKED)
 
-endfunction()
+	# Fetch fmt library from GitHub
+	FetchContent_Declare(
+		fmtlib
+		GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+		GIT_TAG        7.1.3
+	)
+	# Make the fetched content available
+	FetchContent_MakeAvailable(fmtlib)
+	target_link_libraries(${TARGET} PUBLIC fmt::fmt)
+
+endmacro()

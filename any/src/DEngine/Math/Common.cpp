@@ -12,6 +12,7 @@ f64 Math::Ceil(f64 input) { return ceil(input); }
 f32 Math::Floor(f32 input) { return floorf(input); }
 f64 Math::Floor(f64 input) { return floor(input); }
 f32 Math::Round(f32 input) { return roundf(input); }
+f64 Math::Round(f64 input) { return round(input); }
 
 f32 Math::Sqrt(f32 input) { return sqrtf(input); }
 f64 Math::Sqrt(f64 input) { return sqrt(input); }

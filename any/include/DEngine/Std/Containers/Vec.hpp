@@ -5,14 +5,7 @@
 #include <DEngine/Std/Trait.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 
-namespace DEngine::Std::impl { struct VecPlacementNewTag {}; }
-constexpr void* operator new(
-	decltype(sizeof(int)) size,
-	void* data,
-	[[maybe_unused]] DEngine::Std::impl::VecPlacementNewTag) noexcept
-{
-	return data;
-}
+#include <new>
 
 namespace DEngine::Std
 {
@@ -53,46 +46,60 @@ namespace DEngine::Std
 			capacity = other.capacity;
 			alloc = other.alloc;
 			other.Nullify();
+			return *this;
 		}
 
 		[[nodiscard]] Alloc Allocator() const noexcept { return alloc; }
 
 		[[nodiscard]] bool Empty() const noexcept { return count == 0; }
-		void Clear() noexcept
-		{
+		void Clear() noexcept {
 			if (data) {
 				if constexpr (!Trait::isTriviallyDestructible<T>) {
 					for (auto i = 0; i < count; i += 1)
 						data[i].~T();
 				}
-				alloc.Free(data);
+				alloc.Free(data, capacity * sizeof(T));
 				Nullify();
 			}
 		}
 
-		void PushBack(T const& in) noexcept requires (Trait::isCopyConstructible<T>)
-		{
+		void PushBack(Std::Span<T const> const& input) requires (Trait::isCopyConstructible<T>) {
+			DENGINE_IMPL_CONTAINERS_ASSERT(count <= capacity);
+			auto inputSize = (int)input.Size();
+			if (inputSize == 0)
+				return;
+
+			// First check if we have enough room left
+			if (count + inputSize >= capacity) {
+				auto const newCapacity = count + inputSize;
+				Grow(newCapacity);
+			}
+			for (int i = 0; i < inputSize; i++) {
+				new(data + count + i) T(input[i]);
+			}
+
+			count += inputSize;
+		}
+
+		void PushBack(T const& in) noexcept requires (Trait::isCopyConstructible<T>) {
 			DENGINE_IMPL_CONTAINERS_ASSERT(count <= capacity);
 			// First check if we have any room left
-			if (count == capacity)
-			{
+			if (count == capacity) {
 				auto const newCapacity = count + 1;
 				Grow(newCapacity);
 			}
-			new(data + count, impl::VecPlacementNewTag{}) T(static_cast<T const&>(in));
+			new(data + count) T(static_cast<T const&>(in));
 			count += 1;
 		}
 
-		void PushBack(T&& in) noexcept
-		{
+		void PushBack(T&& in) noexcept {
 			DENGINE_IMPL_CONTAINERS_ASSERT(count <= capacity);
 			// First check if we have any room left
-			if (count == capacity)
-			{
+			if (count == capacity) {
 				auto const newCapacity = count + 1;
 				Grow(newCapacity);
 			}
-			new(data + count, impl::VecPlacementNewTag{}) T(static_cast<T&&>(in));
+			new(data + count) T(static_cast<T&&>(in));
 			count += 1;
 		}
 
@@ -102,31 +109,42 @@ namespace DEngine::Std
 			return true;
 		}
 
-		void Resize(uSize newSize) noexcept requires (Trait::isDefaultConstructible<T>)
-		{
-			if (newSize > capacity)
-			{
+		void Resize(uSize newSize) noexcept requires (Trait::isDefaultConstructible<T>) {
+			if (newSize > capacity) {
 				auto newCapacity = newSize;
 				Grow(newCapacity);
 			}
 
-			if (newSize > count)
-			{
-				if constexpr (!Trait::isTriviallyDefaultConstructible<T>)
-				{
+			if (newSize > count) {
+				if constexpr (!Trait::isTriviallyDefaultConstructible<T>) {
 					for (uSize i = count; i < newSize; i += 1)
-						new(data + i, impl::VecPlacementNewTag{}) T;
+						new(data + i) T;
 				}
 			}
-			else if (newSize < count)
-			{
-				if constexpr (!Trait::isTriviallyDestructible<T>)
-				{
+			else if (newSize < count) {
+				if constexpr (!Trait::isTriviallyDestructible<T>) {
 					for (uSize i = newSize; i < count; i += 1)
 						data[i].~T();
 				}
 			}
 
+			count = newSize;
+		}
+
+		void Resize(uSize newSize, T const& newValue) noexcept requires (Trait::isCopyConstructible<T>) {
+			if (newSize > capacity) {
+				Grow(newSize);
+			}
+			if (newSize > count) {
+				for (uSize i = count; i < newSize; i += 1)
+					new(data + i) T(newValue);
+			}
+			else if (newSize < count) {
+				if constexpr (!Trait::isTriviallyDestructible<T>) {
+					for (uSize i = newSize; i < count; i += 1)
+						data[i].~T();
+				}
+			}
 			count = newSize;
 		}
 
@@ -198,11 +216,11 @@ namespace DEngine::Std
 			capacity = 0;
 		}
 
-		bool Grow(uSize newCapacity) noexcept
-		{
-			DENGINE_IMPL_CONTAINERS_ASSERT(newCapacity > capacity);
+		bool Grow(uSize newCapacity) noexcept {
+			auto oldCapacity = capacity;
+			DENGINE_IMPL_CONTAINERS_ASSERT(newCapacity > oldCapacity);
 
-			bool needNewAlloc;
+			bool needNewAlloc = false;
 			if (data)
 				needNewAlloc = !alloc.Resize(data, newCapacity * sizeof(T));
 			else
@@ -212,13 +230,15 @@ namespace DEngine::Std
 				auto oldData = data;
 				data = static_cast<T*>(alloc.Alloc(newCapacity * sizeof(T), alignof(T)));
 
+				// Move the old elements into the new buffer, delete the elements and then delete the
+				// old buffer.
 				if (oldData) {
 					for (uSize i = 0; i < count; i++) {
-						new(data + i, impl::VecPlacementNewTag{}) T(static_cast<T&&>(oldData[i]));
+						new(data + i) T(static_cast<T&&>(oldData[i]));
 						if constexpr (!Trait::isTriviallyDestructible<T>)
 							oldData[i].~T();
 					}
-					alloc.Free(oldData);
+					alloc.Free(oldData, newCapacity * sizeof(T));
 				}
 			}
 
@@ -230,9 +250,15 @@ namespace DEngine::Std
 
 	template<class T, class AllocRefT>
 	inline auto NewVec(AllocRefT const& alloc) { return Std::Vec<T, AllocRefT>{ alloc }; }
+	template<class T, class AllocRefT>
+	inline auto NewVec_Fill(AllocRefT const& alloc, uSize count, T const& value) {
+		auto temp = Std::Vec<T, AllocRefT>{ alloc };
+		temp.Resize(count, value);
+		return temp;
+	}
 
 	template<class T, class AllocRefT>
-	inline auto NewVec_WithCapacity(AllocRefT const& alloc, uSize size) {
+	inline auto NewVec_Reserve(AllocRefT const& alloc, int size) {
 		auto temp = Std::Vec<T, AllocRefT>{ alloc };
 		temp.Reserve(size);
 		return temp;

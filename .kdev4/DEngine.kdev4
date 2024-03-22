@@ -1,0 +1,16 @@
+[CMake]
+Build Directory Count=1
+Current Build Directory Index-Host System=0
+
+[CMake][CMake Build Directory 0]
+Build Directory Path=C:/Users/np_sk/Nextcloud/Documents/Projects/DEngine/build
+Build Type=Debug
+CMake Binary=C:/Program Files/CMake/bin/cmake.exe
+CMake Executable=C:/Program Files/CMake/bin/cmake.exe
+Environment Profile=
+Extra Arguments=
+Install Directory=
+Runtime=Host System
+
+[Project]
+VersionControlSupport=kdevgit

@@ -9,6 +9,7 @@
 
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
+#include <DEngine/Math/Common.hpp>
 
 namespace DEngine::Gui
 {
@@ -20,10 +21,18 @@ namespace DEngine::Gui
 		else return value;
 	}
 
-	struct Extent
-	{
-		u32 width;
-		u32 height;
+	struct SelectionRange {
+		u64 startIndex;
+		u64 count;
+
+		[[nodiscard]] auto End() const noexcept { return startIndex + count; }
+	};
+
+
+	struct Extent {
+
+		u32 width = {};
+		u32 height = {};
 
 		[[nodiscard]] constexpr bool IsNothing() const noexcept;
 		[[nodiscard]] constexpr f32 Aspect() const noexcept;
@@ -40,11 +49,24 @@ namespace DEngine::Gui
 		// Gets the minimum of both directions
 		[[nodiscard]] constexpr static Extent Min(Extent const& a, Extent const& b) noexcept;
 
-		[[nodiscard]] static Extent StackVertically(Std::Span<Extent const> const& elements) noexcept {
+		[[nodiscard]] static auto StackVertically(Std::Span<Extent const> const& elements) noexcept {
 			Extent out = {};
 			for (auto const& item : elements) {
 				out.width = Max(out.width, item.width);
 				out.height += item.height;
+			}
+			return out;
+		}
+
+		[[nodiscard]] static auto CenteringOffsetVert(int outer, int inner) noexcept {
+			return (i32)Math::Round((f64)outer * 0.5 - (f64)inner * 0.5);
+		}
+
+		[[nodiscard]] static auto CenteringOffset(Extent const& outer, Extent const& inner) noexcept {
+			Math::Vec2Int out = {};
+			for (int i = 0; i < 2; i++) {
+				auto temp = (i32)Math::Round((f64)outer[i] * 0.5 - (f64)inner[i] * 0.5);
+				out[i] = temp;
 			}
 			return out;
 		}
@@ -97,6 +119,7 @@ namespace DEngine::Gui
 
 		[[nodiscard]] constexpr bool PointIsInside(Math::Vec2Int point) const noexcept;
 		[[nodiscard]] constexpr bool PointIsInside(Math::Vec2 point) const noexcept;
+		// Takes a point and clamps it to be within the Rect.
 		[[nodiscard]] Math::Vec2Int ClampPoint(Math::Vec2Int point) const noexcept {
 			return {
 				Clamp(point.x, Left(), Right()),
@@ -106,7 +129,9 @@ namespace DEngine::Gui
 		// Returns a Rect that is shrunk towards it's center by the margin 'amount'
 		[[nodiscard]] constexpr Rect Reduce(u32 amount) const noexcept;
 
-		[[nodiscard]] constexpr static Rect Intersection(Rect const&, Rect const&) noexcept;
+		[[nodiscard]] Rect GetIntersect(Rect const& b) const noexcept { return Intersection(*this, b); }
+		[[nodiscard]] inline static Rect Intersection(Std::Span<Rect const> const&) noexcept;
+		[[nodiscard]] inline static Rect Intersection(Rect const&, Rect const&) noexcept;
 
 
 
@@ -114,7 +139,7 @@ namespace DEngine::Gui
 		[[nodiscard]] constexpr bool operator!=(Rect const&) const noexcept;
 	};
 
-	[[nodiscard]] constexpr Rect Intersection(Rect const& a, Rect const& b) noexcept {
+	[[nodiscard]] inline Rect Intersection(Rect const& a, Rect const& b) noexcept {
 		return Rect::Intersection(a, b);
 	}
 
@@ -123,6 +148,35 @@ namespace DEngine::Gui
 	[[nodiscard]] inline bool PointIsInAll(Math::Vec2 point, Rect const (&in)[N]);
 	template<int N>
 	[[nodiscard]] inline bool PointIsInAll(Math::Vec2Int point, Rect const (&in)[N]);
+
+	[[nodiscard]] inline i32 CmToPixels(f32 cm, f32 dpi) {
+		auto dotsPerCm = dpi / 2.54;
+		// Convert millimeters to pixels
+		return (i32)Math::Round(cm * dotsPerCm);
+	}
+
+	// Given two lengths, gives the offset needed to center the inner within the outer.
+	[[nodiscard]] inline int CenterRangeOffset(int outer, int inner) noexcept {
+		return (i32)Math::Round((f64)outer * 0.5 - (f64)inner * 0.5);
+	}
+
+	enum class AlignmentOffset_Setting { Start, Center, End };
+	[[nodiscard]] inline auto AlignmentOffset(
+		Extent const& inner,
+		Extent const& outer,
+		AlignmentOffset_Setting alignX = AlignmentOffset_Setting::Center,
+		AlignmentOffset_Setting alignY = AlignmentOffset_Setting::Center) noexcept
+	{
+		AlignmentOffset_Setting aligns[] = { alignX, alignY };
+		Math::Vec2Int out = {};
+		for (int i = 0; i < 2; i++) {
+			auto align = aligns[i];
+			auto temp = (i32)Math::Round((f32)outer[i] * 0.5f - (f32)inner[i] * 0.5f);
+			temp = Math::Max(0, temp);
+			out[i] = temp;
+		}
+		return out;
+	}
 }
 
 constexpr bool DEngine::Gui::Extent::IsNothing() const noexcept { return width == 0 || height == 0; }
@@ -190,21 +244,44 @@ constexpr DEngine::Gui::Rect DEngine::Gui::Rect::Reduce(u32 amount) const noexce
 	return returnValue;
 }
 
-constexpr DEngine::Gui::Rect DEngine::Gui::Rect::Intersection(Rect const& a, Rect const& b) noexcept
+inline DEngine::Gui::Rect DEngine::Gui::Rect::Intersection(Std::Span<Rect const> const& rects) noexcept
 {
-	constexpr auto max = [](i32 a, i32 b) { return a > b ? a : b; };
-	constexpr auto min = [](i32 a, i32 b) { return a < b ? a : b; };
+	if (rects.Size() == 0) {
+		return {};
+	} else if (rects.Size() == 1) {
+		return rects[0];
+	} else {
+		auto returnVal = rects[0];
+		// For loop to handle X and Y directions
+		bool isFirst = true;
+		for (auto const& rect : rects) {
+			if (isFirst) {
+				isFirst = false;
+				continue;
+			}
+			for (uSize i = 0; i < 2; i += 1) {
+				constexpr auto max = [](auto a, auto b) { return a > b ? a : b; };
+				constexpr auto min = [](auto a, auto b) { return a < b ? a : b; };
 
-	Rect returnVal = {};
-	// For loop to handle X and Y directions
-	for (uSize i = 0; i < 2; i += 1)
-	{
-		i32 minPoint = max(a.position[i], b.position[i]);
-		returnVal.position[i] = minPoint;
-		i32 maxPoint = min(a.position[i] + (i32)a.extent[i], b.position[i] + (i32)b.extent[i]);
-		returnVal.extent[i] = (u32)max(0, maxPoint - returnVal.position[i]);
+				i32 minPoint = max(
+					returnVal.position[i],
+					rect.position[i]);
+				i32 maxPoint = min(
+					returnVal.position[i] + (i32)returnVal.extent[i],
+					rect.position[i] + (i32)rect.extent[i]);
+				i32 tempExtent = max(0, maxPoint - minPoint);
+				returnVal.position[i] = minPoint;
+				returnVal.extent[i] = (u32)tempExtent;
+			}
+		}
+		return returnVal;
 	}
-	return returnVal;
+}
+
+inline DEngine::Gui::Rect DEngine::Gui::Rect::Intersection(Rect const& a, Rect const& b) noexcept
+{
+	Rect temp[] = { a, b };
+	return Intersection({ temp, 2 });
 }
 
 constexpr bool DEngine::Gui::Rect::operator==(Rect const& other) const noexcept

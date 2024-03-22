@@ -4,6 +4,7 @@
 #include <DEngine/Math/Trigonometric.hpp>
 
 #include <DEngine/Gui/DrawInfo.hpp>
+#include <DEngine/Gui/Context.hpp>
 
 namespace DEngine::Editor::impl
 {
@@ -116,10 +117,13 @@ using namespace DEngine::Editor;
 
 Gui::SizeHint Joystick::GetSizeHint2(Gui::Widget::GetSizeHint2_Params const& params) const
 {
+	auto const& ctx = params.ctx;
+	auto const& window = params.window;
+
+	u32 sizeInPixels = Gui::CmToPixels(ctx.minimumHeightCm, window.dpiX);
+
 	Gui::SizeHint returnVal = {};
-	returnVal.expandX = false;
-	returnVal.expandY = false;
-	returnVal.minimum = { 150, 150 };
+	returnVal.minimum = { 2 * sizeInPixels, 2 * sizeInPixels };
 
 	auto& pusher = params.pusher;
 
@@ -133,6 +137,30 @@ void Joystick::Render2(
 	Gui::Rect const& widgetRect,
 	Gui::Rect const& visibleRect) const
 {
+	auto& drawInfo = params.drawInfo;
+
+	auto outerDiameter = Math::Min(widgetRect.extent.width, widgetRect.extent.height);
+	auto outerRadius = (int)Math::Floor((f32)outerDiameter * 0.5f);
+	drawInfo.PushFilledQuad(
+		{ widgetRect.position, { outerDiameter, outerDiameter }},
+		{ 0.f, 0.f, 0.f, 0.25f },
+		outerRadius);
+
+	auto innerDiameter = (int)Math::Round((f32)outerDiameter * 0.5f);
+	auto innerRadius = (int)Math::Floor((f32)innerDiameter * 0.5f);
+	auto innerPos = widgetRect.position;
+	innerPos.x += innerRadius;
+	innerPos.y += innerRadius;
+	auto joystickPos = GetVector() * (f32)outerRadius;
+	innerPos.x += (int)Math::Round(joystickPos.x);
+	innerPos.y += (int)Math::Round(joystickPos.y);
+
+	drawInfo.PushFilledQuad(
+		{ innerPos, { (u32)innerDiameter, (u32)innerDiameter }},
+		{ 1.f, 1.f, 1.f, 0.75f },
+		innerRadius);
+
+	/*
 	// Draw a circle, start from the top, move clockwise
 	Gfx::GuiDrawCmd::MeshSpan circleMeshSpan = {};
 
@@ -201,6 +229,7 @@ void Joystick::Render2(
 	cmd.rectExtent.x = (f32)outerDiameter * 0.5f / params.framebufferExtent.width;
 	cmd.rectExtent.y = (f32)outerDiameter * 0.5f / params.framebufferExtent.height;
 	params.drawInfo.drawCmds->push_back(cmd);
+	 */
 }
 
 bool Joystick::CursorPress2(

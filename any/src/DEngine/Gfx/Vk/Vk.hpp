@@ -11,6 +11,7 @@
 #include "NativeWindowManager.hpp"
 #include "ObjectDataManager.hpp"
 #include "QueueData.hpp"
+#include "StagingBufferAlloc.hpp"
 #include "TextureManager.hpp"
 #include "ViewportManager.hpp"
 #include "VMAIncluder.hpp"
@@ -46,8 +47,7 @@ namespace DEngine::Gfx::Vk
 		vk::PhysicalDevice physDeviceHandle{};
 	};
 
-	struct VMA_MemoryTrackingData
-	{
+	struct VMA_MemoryTrackingData {
 		DebugUtilsDispatch const* debugUtils = nullptr;
 		vk::Device deviceHandle{};
 		std::mutex vma_idTracker_lock{};
@@ -60,7 +60,7 @@ namespace DEngine::Gfx::Vk
 		APIData();
 		virtual ~APIData() override;
 		virtual void Draw(DrawParams const& drawParams) override;
-		void InternalDraw(DrawParams const& drawParams);
+		static void InternalDraw(APIData& apiData, DrawParams const& drawParams);
 
 		// Thread safe
 		virtual void NewNativeWindow(NativeWindowID windowId) override;
@@ -76,17 +76,22 @@ namespace DEngine::Gfx::Vk
 		virtual void NewFontFace(FontFaceId fontFaceId) override;
 
 		// Thread safe
-		virtual void NewFontTexture(
-			FontFaceId fontFaceId,
-			u32 id,
-			u32 width,
-			u32 height,
-			u32 pitch,
-			Std::Span<std::byte const> data) override;
+		virtual void NewFontTextures(Std::Span<FontBitmapUploadJob const> const&) override;
 
 		Gfx::TextureAssetInterface const* test_textureAssetInterface = nullptr;
 
+		u64 tickCount = 0;
+		int inFlightCount = 0;
 		u8 currInFlightIndex = 0;
+		[[nodiscard]] int InFlightIndex() const { return currInFlightIndex; }
+		void IncrementInFlightIndex() {
+			currInFlightIndex = (currInFlightIndex + 1) % inFlightCount;
+		}
+		u8 currFenceIndex = 0;
+		void IncrementMainFenceIndex() {
+			currFenceIndex = (currFenceIndex + 1) % (inFlightCount - 1);
+		}
+		[[nodiscard]] int MainFenceIndex() const { return currFenceIndex; }
 
 		// Do not touch this.
 		VMA_MemoryTrackingData vma_trackingData{};
@@ -94,6 +99,7 @@ namespace DEngine::Gfx::Vk
 		Std::StackVec<vk::Fence, Const::maxInFlightCount> mainFences;
 		Std::StackVec<vk::CommandPool, Const::maxInFlightCount> mainCmdPools;
 		Std::StackVec<vk::CommandBuffer, Const::maxInFlightCount> mainCmdBuffers;
+		Std::StackVec<StagingBufferAlloc, Const::maxInFlightCount> mainStagingBufferAllocs;
 
 		GlobUtils globUtils = {};
 
@@ -111,8 +117,7 @@ namespace DEngine::Gfx::Vk
 		vk::Pipeline testPipeline{};
 
 		std::mutex threadLock;
-		struct Thread
-		{
+		struct Thread {
 			std::thread renderingThread;
 			bool shutdownThread = false;
 			bool nextJobReady = false;

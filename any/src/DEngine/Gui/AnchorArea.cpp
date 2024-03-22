@@ -8,11 +8,12 @@ namespace DEngine::Gui::impl
 {
     [[nodiscard]] static Rect BuildNodeRect(
         AnchorArea::Node const& node,
+		SizeHint const& sizeHint,
         Rect const& widgetRect) noexcept
     {
         Rect nodeRect = {};
 
-		nodeRect.extent = node.extent;
+		nodeRect.extent = sizeHint.minimum;
 		nodeRect.position = widgetRect.position;
 		switch (node.anchorX)
 		{
@@ -158,7 +159,6 @@ namespace DEngine::Gui::impl
             }
             else if constexpr (Std::Trait::isSame<Type, TouchPressEvent>)
             {
-                
                 eventConsumed = node.widget->TouchPressEvent(
                     ctx,
                     windowId,
@@ -166,9 +166,6 @@ namespace DEngine::Gui::impl
                     visibleRect,
                     event);
             }
-
-            if (eventConsumed && pointer.pressed)
-                break;
         }
 
         return pointerInside;
@@ -199,12 +196,13 @@ namespace DEngine::Gui::impl
 
 		[[nodiscard]] Rect BuildNodeItRect(
 			AnchorArea const& anchorArea,
+			SizeHint const& sizeHint,
 			Rect const& widgetRect) const
 		{
 			if (index == childCount)
 				return widgetRect;
 			else
-				return impl::BuildNodeRect(anchorArea.nodes[index], widgetRect);
+				return impl::BuildNodeRect(anchorArea.nodes[index], sizeHint, widgetRect);
 		}
 
 		[[nodiscard]] Rect GetNodeItRect(
@@ -352,9 +350,11 @@ void AnchorArea::BuildChildRects(
 	for (auto const& node : impl::BuildNodeItPair(*this))
 	{
 		auto const& child = node.child;
-		auto const childRect = node.BuildNodeItRect(*this, widgetRect);
-
 		auto childEntry = pusher.GetEntry(child);
+		auto childSizeHint = pusher.GetSizeHint(childEntry);
+
+		auto const childRect = node.BuildNodeItRect(*this, childSizeHint, widgetRect);
+
 		pusher.SetRectPair(childEntry, { childRect, visibleRect });
 		child.BuildChildRects(
 			params,

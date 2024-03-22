@@ -10,6 +10,9 @@
 using namespace DEngine;
 using namespace DEngine::Gui;
 
+
+constexpr float gizmoOffsetFactor = 0.25f;
+
 void Gui::impl::DA_PushLayerToFront(DockArea& dockArea, uSize indexToPush)
 {
 	auto& layers = DockArea::Impl::GetLayers(dockArea);
@@ -31,8 +34,7 @@ int Gui::impl::FindLayerIndex(
 	DA_Node const* targetWindow,
 	AllocRef transientAlloc)
 {
-	for (auto const& layerIt : DA_BuildLayerItPair(dockArea))
-	{
+	for (auto const& layerIt : DA_BuildLayerItPair(dockArea)) {
 		for (auto const& nodeIt : DA_BuildNodeItPair(layerIt.node, transientAlloc))
 		{
 			if (targetWindow == &nodeIt.node)
@@ -60,26 +62,32 @@ auto Gui::impl::DA_ToInnerLayoutGizmo(DA_OuterLayoutGizmo in) noexcept -> DA_Inn
 Rect Gui::impl::DA_BuildOuterLayoutGizmoRect(
 	Rect layerRect,
 	DA_OuterLayoutGizmo in,
-	u32 gizmoSize) noexcept
+	Extent const& gizmoSize) noexcept
 {
 	Rect returnVal = {};
 	returnVal.position = layerRect.position;
-	returnVal.extent = { gizmoSize, gizmoSize };
-	switch (in)
-	{
+	returnVal.extent = gizmoSize;
+	auto offsetX = (int)Math::Floor((f32)gizmoSize.width * gizmoOffsetFactor);
+	auto offsetY = (int)Math::Floor((f32)gizmoSize.height * gizmoOffsetFactor);
+
+	switch (in) {
 		case DA_OuterLayoutGizmo::Top:
-			returnVal.position.x += layerRect.extent.width / 2 - gizmoSize / 2;
+			returnVal.position.x += (int)layerRect.extent.width / 2 - (int)gizmoSize.width / 2;
+			returnVal.position.y += offsetY;
 			break;
 		case DA_OuterLayoutGizmo::Bottom:
-			returnVal.position.x += layerRect.extent.width / 2 - gizmoSize / 2;
-			returnVal.position.y += layerRect.extent.height - gizmoSize;
+			returnVal.position.x += (int)layerRect.extent.width / 2 - (int)gizmoSize.width / 2;
+			returnVal.position.y += (int)layerRect.extent.height - (int)gizmoSize.height;
+			returnVal.position.y -= offsetY;
 			break;
 		case DA_OuterLayoutGizmo::Left:
-			returnVal.position.y += layerRect.extent.height / 2 - gizmoSize / 2;
+			returnVal.position.x += offsetX;
+			returnVal.position.y += (int)layerRect.extent.height / 2 - (int)gizmoSize.height / 2;
 			break;
 		case DA_OuterLayoutGizmo::Right:
-			returnVal.position.x += layerRect.extent.width - gizmoSize;
-			returnVal.position.y += layerRect.extent.height / 2 - gizmoSize / 2;
+			returnVal.position.x += (int)layerRect.extent.width - (int)gizmoSize.width;
+			returnVal.position.x -= offsetX;
+			returnVal.position.y += (int)layerRect.extent.height / 2 - (int)gizmoSize.height / 2;
 			break;
 		default:
 			DENGINE_IMPL_UNREACHABLE();
@@ -122,16 +130,14 @@ Std::Array<Rect, 2> Gui::impl::DA_SplitNode::BuildChildRects(Rect const& nodeRec
 
 auto Gui::impl::DA_CheckHitOuterLayoutGizmo(
 	Rect const& nodeRect,
-	u32 gizmoSize,
+	Extent const& gizmoSize,
 	Math::Vec2 point) noexcept -> Std::Opt<DA_OuterLayoutGizmo>
 {
 	Std::Opt<DA_OuterLayoutGizmo> gizmoHit;
-	for (int i = 0; i < (int)DA_OuterLayoutGizmo::COUNT; i += 1)
-	{
+	for (int i = 0; i < (int)DA_OuterLayoutGizmo::COUNT; i += 1) {
 		auto gizmo = (DA_OuterLayoutGizmo)i;
 		Rect gizmoRect = DA_BuildOuterLayoutGizmoRect(nodeRect, gizmo, gizmoSize);
-		if (gizmoRect.PointIsInside(point))
-		{
+		if (gizmoRect.PointIsInside(point)) {
 			gizmoHit = gizmo;
 			break;
 		}
@@ -141,18 +147,19 @@ auto Gui::impl::DA_CheckHitOuterLayoutGizmo(
 
 Rect Gui::impl::DA_BuildDeleteGizmoRect(
 	Rect widgetRect,
-	u32 gizmoSize)
+	Extent const& gizmoSize)
 {
 	Rect returnVal = widgetRect;
-	returnVal.extent = { gizmoSize, gizmoSize };
-	returnVal.position.x += widgetRect.extent.width / 2 - gizmoSize / 2;
-	returnVal.position.y += widgetRect.extent.height - gizmoSize * 2;
+	returnVal.extent = gizmoSize;
+	returnVal.position.x += (i32)widgetRect.extent.width / 2 - (i32)returnVal.extent.width / 2;
+	returnVal.position.y += (i32)widgetRect.extent.height - (i32)returnVal.extent.height * 2;
+	returnVal.position.y -= (int)Math::Floor((f32)gizmoSize.height * gizmoOffsetFactor) * 2;
 	return returnVal;
 }
 
 bool Gui::impl::DA_CheckHitDeleteGizmo(
 	Rect widgetRect,
-	u32 gizmoSize,
+	Extent const& gizmoSize,
 	Math::Vec2 point) noexcept
 {
 	return DA_BuildDeleteGizmoRect(widgetRect, gizmoSize).PointIsInside(point);
@@ -161,30 +168,38 @@ bool Gui::impl::DA_CheckHitDeleteGizmo(
 Rect Gui::impl::DA_BuildInnerDockingGizmoRect(
 	Rect const& nodeRect,
 	DA_InnerDockingGizmo in,
-	u32 gizmoSize) noexcept
+	Extent const& gizmoSize) noexcept
 {
 	// We initialize it with the top-left corner of the center gizmo
 	Rect returnVal = {};
+	returnVal.extent = gizmoSize;
 	returnVal.position = nodeRect.position;
-	returnVal.position.x += nodeRect.extent.width / 2 - gizmoSize / 2;
-	returnVal.position.y += nodeRect.extent.height / 2 - gizmoSize / 2;
-	returnVal.extent = { gizmoSize, gizmoSize };
+	returnVal.position.x += (i32)nodeRect.extent.width / 2 - (i32)returnVal.extent.width / 2;
+	returnVal.position.y += (i32)nodeRect.extent.height / 2 - (i32)returnVal.extent.height / 2;
+
+	auto offsetX = (int)Math::Floor((f32)gizmoSize.width * gizmoOffsetFactor);
+	auto offsetY = (int)Math::Floor((f32)gizmoSize.height * gizmoOffsetFactor);
+
 	switch (in)
 	{
 		case DA_InnerDockingGizmo::Center:
 			// Do nothing
 			break;
 		case DA_InnerDockingGizmo::Top:
-			returnVal.position.y -= gizmoSize;
+			returnVal.position.y -= (i32)returnVal.extent.height;
+			returnVal.position.y -= offsetY;
 			break;
 		case DA_InnerDockingGizmo::Bottom:
-			returnVal.position.y += gizmoSize;
+			returnVal.position.y += (i32)returnVal.extent.height;
+			returnVal.position.y += offsetY;
 			break;
 		case DA_InnerDockingGizmo::Left:
-			returnVal.position.x -= gizmoSize;
+			returnVal.position.x -= (i32)returnVal.extent.width;
+			returnVal.position.x -= offsetX;
 			break;
 		case DA_InnerDockingGizmo::Right:
-			returnVal.position.x += gizmoSize;
+			returnVal.position.x += (i32)returnVal.extent.width;
+			returnVal.position.x += offsetX;
 			break;
 		default:
 			DENGINE_IMPL_UNREACHABLE();
@@ -195,17 +210,15 @@ Rect Gui::impl::DA_BuildInnerDockingGizmoRect(
 
 auto Gui::impl::DA_CheckHitInnerDockingGizmo(
 	Rect const& nodeRect,
-	u32 gizmoSize,
+	Extent const& gizmoSize,
 	Math::Vec2 const& point) noexcept
 		-> Std::Opt<DA_InnerDockingGizmo>
 {
 	Std::Opt<DA_InnerDockingGizmo> gizmoHit;
-	for (int i = {}; i < (int)DA_InnerDockingGizmo::COUNT; i += 1)
-	{
+	for (int i = {}; i < (int)DA_InnerDockingGizmo::COUNT; i += 1) {
 		auto gizmo = (DA_InnerDockingGizmo)i;
 		Rect gizmoRect = DA_BuildInnerDockingGizmoRect(nodeRect, gizmo, gizmoSize);
-		if (gizmoRect.PointIsInside(point))
-		{
+		if (gizmoRect.PointIsInside(point)) {
 			gizmoHit = gizmo;
 			break;
 		}
@@ -216,7 +229,7 @@ auto Gui::impl::DA_CheckHitInnerDockingGizmo(
 auto Gui::impl::DA_Layer_CheckHitInnerDockingGizmo(
 	DA_Node& rootNode,
 	Rect const& layerRect,
-	u32 gizmoSize,
+	Extent const& gizmoSize,
 	Math::Vec2 point,
 	AllocRef transientAlloc)
 		-> DA_Layer_CheckHitInnerDockingGizmo_ReturnT
@@ -227,13 +240,9 @@ auto Gui::impl::DA_Layer_CheckHitInnerDockingGizmo(
 			continue;
 		auto& node = static_cast<DA_WindowNode&>(nodeIt.node);
 
-		auto const& nodeRect = nodeIt.rect;
-		auto const hitInnerGizmoOpt = DA_CheckHitInnerDockingGizmo(
-			nodeRect,
-			gizmoSize,
-			point);
-		if (hitInnerGizmoOpt.HasValue())
-		{
+		auto& nodeRect = nodeIt.rect;
+		auto hitInnerGizmoOpt = DA_CheckHitInnerDockingGizmo(nodeRect, gizmoSize, point);
+		if (hitInnerGizmoOpt.HasValue()) {
 			DA_Layer_CheckHitInnerDockingGizmo_ReturnT returnValue = {};
 			returnValue.node = &node;
 			returnValue.gizmo = hitInnerGizmoOpt.Value();
@@ -248,8 +257,7 @@ Rect Gui::impl::DA_BuildDockingHighlightRect(
 	DA_InnerDockingGizmo gizmo)
 {
 	Rect returnVal = nodeRect;
-	switch (gizmo)
-	{
+	switch (gizmo) {
 		case DA_InnerDockingGizmo::Top:
 			returnVal.extent.height = nodeRect.extent.height / 2;
 			break;
@@ -258,11 +266,11 @@ Rect Gui::impl::DA_BuildDockingHighlightRect(
 			break;
 		case DA_InnerDockingGizmo::Bottom:
 			returnVal.extent.height = nodeRect.extent.height / 2;
-			returnVal.position.y += nodeRect.extent.height / 2;
+			returnVal.position.y += (i32)nodeRect.extent.height / 2;
 			break;
 		case DA_InnerDockingGizmo::Right:
 			returnVal.extent.width = nodeRect.extent.width / 2;
-			returnVal.position.x += nodeRect.extent.width / 2;
+			returnVal.position.x += (i32)nodeRect.extent.width / 2;
 			break;
 		case DA_InnerDockingGizmo::Center:
 			break;
@@ -295,19 +303,16 @@ Rect Gui::impl::DA_BuildSplitNodeResizeHandleRect(
 	returnVal.extent.width = isHoriz ? thickness : length;
 	returnVal.extent.height = isHoriz ? length : thickness;
 
-	if (isHoriz)
-	{
-		returnVal.position.x += u32(nodeRect.extent.width * splitOffset);
-		returnVal.position.x -= returnVal.extent.width / 2;
-		returnVal.position.y += nodeRect.extent.height / 2;
-		returnVal.position.y -= returnVal.extent.height / 2;
-	}
-	else
-	{
-		returnVal.position.x += nodeRect.extent.width / 2;
-		returnVal.position.x -= returnVal.extent.width / 2;
-		returnVal.position.y += u32(nodeRect.extent.height * splitOffset);
-		returnVal.position.y -= returnVal.extent.height / 2;
+	if (isHoriz) {
+		returnVal.position.x += (i32)Math::Round((f32)nodeRect.extent.width * splitOffset);
+		returnVal.position.x -= (i32)returnVal.extent.width / 2;
+		returnVal.position.y += (i32)nodeRect.extent.height / 2;
+		returnVal.position.y -= (i32)returnVal.extent.height / 2;
+	} else {
+		returnVal.position.x += (i32)nodeRect.extent.width / 2;
+		returnVal.position.x -= (i32)returnVal.extent.width / 2;
+		returnVal.position.y += (i32)Math::Round((f32)nodeRect.extent.height * splitOffset);
+		returnVal.position.y -= (i32)returnVal.extent.height / 2;
 	}
 
 	return returnVal;
@@ -512,7 +517,6 @@ auto Gui::impl::DA_WindowNode_BuildPrimaryRects(
 	u32 totalTabHeight) -> DA_WindowNodePrimaryRects
 {
 	DA_WindowNodePrimaryRects returnValue = {};
-
 	returnValue.titlebarRect = nodeRect;
 	returnValue.titlebarRect.extent.height = totalTabHeight;
 
@@ -596,8 +600,8 @@ auto Gui::impl::CheckHitWindowNode(
 Std::Vec<Rect, AllocRef> Gui::impl::DA_WindowNode_BuildTabRects(
 	Rect const& titlebarRect,
 	Std::Span<DA_WindowTab const> tabs,
-	TextSizeInfo const& tabTextSize,
-	u32 tabTextMargin,
+	FontFaceSizeId fontSizeId,
+	int horiMarginAmount,
 	TextManager& textManager,
 	AllocRef transientAlloc)
 {
@@ -606,21 +610,20 @@ Std::Vec<Rect, AllocRef> Gui::impl::DA_WindowNode_BuildTabRects(
 	// First gather all the desired widths.
 	auto desiredWidths = Std::NewVec<int>(transientAlloc);
 	desiredWidths.Resize(tabCount);
-	for (int i = 0 ; i < tabCount ; i += 1)
-	{
+	for (int i = 0 ; i < tabCount ; i += 1) {
 		auto const& text = tabs[i].title;
 		auto& desiredWidth = desiredWidths[i];
+
 		auto outerExtent = textManager.GetOuterExtent(
 			{ text.data(), text.size() },
-			tabTextSize);
-		desiredWidth = (int)outerExtent.width;
-		desiredWidth += (int)tabTextMargin * 2;
+			fontSizeId);
+		desiredWidth = (int)outerExtent.width + 2 * horiMarginAmount;
 	}
 
 	// Then figure out the sum of the desired widths.
 	int sumDesired = 0;
 	for (int i = 0 ; i < tabCount ; i += 1)
-		sumDesired += (int) desiredWidths[i];
+		sumDesired += (int)desiredWidths[i];
 
 	auto const sizeRatio = (f32) titlebarRect.extent.width / (f32) sumDesired;
 
@@ -628,14 +631,13 @@ Std::Vec<Rect, AllocRef> Gui::impl::DA_WindowNode_BuildTabRects(
 	rects.Resize(tabCount);
 	int remainingWidth = (int)titlebarRect.extent.width;
 	int horizontalPosOffset = 0;
-	for (int i = 0 ; i < tabCount ; i += 1)
-	{
+	for (int i = 0 ; i < tabCount ; i += 1) {
 		// Set the width
 		int width = 0;
-		if (sizeRatio >= 1.0f)
+		if (sizeRatio >= 1.0f) {
 			width = (int)desiredWidths[i];
-		else
-		{
+		}
+		else {
 			if (i == (tabCount - 1))
 				width = remainingWidth;
 			else
@@ -658,8 +660,8 @@ Std::Vec<Rect, AllocRef> Gui::impl::DA_WindowNode_BuildTabRects(
 Std::Opt<uSize> Gui::impl::DA_CheckHitTab(
 	Rect const& titlebarRect,
 	Std::Span<DA_WindowTab const> tabs,
-	TextSizeInfo const& tabTextSize,
-	u32 tabTextMargin,
+	FontFaceSizeId fontSizeId,
+	int horiMarginAmount,
 	TextManager& textManager,
 	Math::Vec2 point,
 	AllocRef const& transientAlloc)
@@ -667,8 +669,8 @@ Std::Opt<uSize> Gui::impl::DA_CheckHitTab(
 	auto tabRects = DA_WindowNode_BuildTabRects(
 		titlebarRect,
 		tabs,
-		tabTextSize,
-		tabTextMargin,
+		fontSizeId,
+		horiMarginAmount,
 		textManager,
 		transientAlloc);
 	// Then check if we hit any of these rects.
@@ -680,6 +682,47 @@ Std::Opt<uSize> Gui::impl::DA_CheckHitTab(
 	return Std::nullOpt;
 }
 
+namespace DEngine::Gui::impl {
+	void Render_WindowNode_Child(
+		DA_WindowTab const& tab,
+		Rect const& contentRect,
+		Rect const& visibleRect,
+		Widget::Render_Params const& renderParams)
+	{
+		auto& drawInfo = renderParams.drawInfo;
+
+		auto const visibleIntersection = Intersection(contentRect, visibleRect);
+		if (!visibleIntersection.IsNothing()) {
+			f32 contentBackgroundDarkenFactor = 0.5f;
+			auto contentBackgroundColor = tab.color;
+			contentBackgroundColor *= contentBackgroundDarkenFactor;
+			contentBackgroundColor.w = 1.f;
+			drawInfo.PushFilledQuad(contentRect, contentBackgroundColor);
+
+			if (tab.widget) {
+				auto scissor = DrawInfo::ScopedScissor(drawInfo, visibleIntersection);
+				auto const& child = *tab.widget;
+				child.Render2(
+					renderParams,
+					contentRect,
+					visibleIntersection);
+			}
+		}
+	}
+
+	void Render_WindowNode_TitlebarBackground(
+		Math::Vec4 titlebarColor,
+		Rect const& titlebarRect,
+		int radius,
+		DrawInfo& drawInfo)
+	{
+		f32 titlebarDarkenFactor = 1.f;
+		titlebarColor *= titlebarDarkenFactor;
+		titlebarColor.w = 1.f;
+		drawInfo.PushFilledQuad(titlebarRect, titlebarColor, { radius, 0, 0, radius });
+	}
+}
+
 void Gui::impl::Render_WindowNode(Render_WindowNode_Params const& params)
 {
 	auto& textManager = params.widgetRenderParams.textManager;
@@ -687,96 +730,71 @@ void Gui::impl::Render_WindowNode(Render_WindowNode_Params const& params)
 	auto& drawInfo = params.widgetRenderParams.drawInfo;
 	auto const& tabs = params.windowNode.tabs;
 	auto const& activeTabIndex = params.windowNode.activeTabIndex;
-	auto const& tabTextSize = params.tabTextSize;
-	auto const& tabTextMargin = params.dockArea.tabTextMargin;
 	auto const& nodeRect = params.nodeRect;
 	auto const& visibleRect = params.visibleRect;
+	auto tabTotalHeight = params.tabTotalHeight;
+	auto fontSizeId = params.fontSizeId;
+	auto tabMarginAmount = params.textMarginAmount;
+	auto isBackLayer = params.isBackLayer;
 
-	auto const textheight = textManager.GetLineheight(tabTextSize);
-	auto const totalTabHeight = textheight + tabTextMargin * 2;
-
-	auto const [titlebarRect, contentRect] = impl::DA_WindowNode_BuildPrimaryRects(nodeRect, totalTabHeight);
+	auto [titlebarRect, contentRect] =
+		impl::DA_WindowNode_BuildPrimaryRects(nodeRect, tabTotalHeight);
 
 	DENGINE_IMPL_GUI_ASSERT(!tabs.empty());
 	auto& activeTab = tabs[activeTabIndex];
 
-	auto const visibleIntersection = Intersection(contentRect, visibleRect);
-	if (!visibleIntersection.IsNothing())
-	{
-		f32 contentBackgroundDarkenFactor = 0.5f;
-		auto contentBackgroundColor = activeTab.color;
-		contentBackgroundColor *= contentBackgroundDarkenFactor;
-		contentBackgroundColor.w = 1.f;
-		drawInfo.PushFilledQuad(contentRect, contentBackgroundColor);
-
-		if (activeTab.widget)
-		{
-			auto const& child = *activeTab.widget;
-			child.Render2(
-				params.widgetRenderParams,
-				contentRect,
-				visibleIntersection);
-		}
-	}
+	Render_WindowNode_Child(activeTab, contentRect, visibleRect, params.widgetRenderParams);
 
 	// Render the titlebar background
-	auto titlebarColor = activeTab.color;
-	f32 titlebarDarkenFactor = 1.f;
-	titlebarColor *= titlebarDarkenFactor;
-	titlebarColor.w = 1.f;
-	drawInfo.PushFilledQuad(titlebarRect, titlebarColor);
+	// Calculate radius
+	auto minDimension = Math::Min(titlebarRect.extent.width, titlebarRect.extent.height);
+	auto radius = (int)Math::Floor((f32)minDimension * 0.25f);
+	auto titlebarRadius = isBackLayer ? 0 : radius;
+	Render_WindowNode_TitlebarBackground(activeTab.color, titlebarRect, titlebarRadius, drawInfo);
 
 	// Now we start rendering the tabs of the titlebar.
 	auto tabRects = DA_WindowNode_BuildTabRects(
 		titlebarRect,
 		{ tabs.data(), tabs.size() },
-		tabTextSize,
-		tabTextMargin,
+		fontSizeId,
+		tabMarginAmount,
 		textManager,
 		transientAlloc);
-
-	auto fontFaceId = textManager.GetFontFaceId(tabTextSize);
 
 	// Render each tab
 	for (int i = 0; i < (int)tabs.size(); i += 1) {
 		auto const& tab = tabs[i];
 		auto color = tab.color;
-		auto rect = tabRects[i];
+		auto tabRect = tabRects[i];
 		Math::Vec4 textColor = { 1.f, 1.f, 1.f, 1.f };
 		if (i != activeTabIndex) {
 			textColor *= 0.7f;
 			textColor.w = 1.f;
 			color.w = 0.8f;
+		} else if (i == activeTabIndex) {
+			color = { 1, 1, 1, 0.1f };
 		}
-		drawInfo.PushFilledQuad(rect, color);
+		// Render the background of this tab.
+		drawInfo.PushFilledQuad(tabRect, color, { radius, 0, 0, radius });
 
 		auto glyphRects = Std::NewVec<Rect>(transientAlloc);
 		glyphRects.Resize(tab.title.size());
 		auto textExtent = textManager.GetOuterExtent(
 			{ tab.title.data(), tab.title.size() },
-			tabTextSize,
-			glyphRects.Data());
-		// Now center these glyphs to the tab rect.
-		Math::Vec2Int centeringOffset = {
-			(i32)Math::Round((f32)rect.extent.width * 0.5f - (f32)textExtent.width * 0.5f),
-			(i32)Math::Round((f32)rect.extent.height * 0.5f - (f32)textExtent.height * 0.5f) };
-		for (auto& item : glyphRects)
-		{
-			auto oldPos = item.position;
-			item.position += rect.position + centeringOffset;
-			item.position.x = Math::Max(item.position.x, rect.position.x + oldPos.x + (i32)tabTextMargin);
-			item.position.y = Math::Max(item.position.y, rect.position.y + oldPos.y);
-		}
+			fontSizeId,
+			TextHeightType::Alphas,
+			glyphRects.ToSpan());
+		Rect textRect = {};
+		textRect.position = tabRect.position + Extent::CenteringOffset(tabRect.extent, textExtent);
+		textRect.extent = textExtent;
 
-		Std::Opt<DrawInfo::ScopedScissor> optionalScissor;
-		if (textExtent.width > rect.extent.width || textExtent.height > rect.extent.height)
-			optionalScissor = DrawInfo::ScopedScissor(drawInfo, rect);
+		auto scissor = DrawInfo::ScopedScissor(drawInfo, textRect, tabRect);
 
 		drawInfo.PushText(
-			(u64)fontFaceId,
+			(u64)fontSizeId,
 			{ tab.title.data(), tab.title.size() },
 			glyphRects.Data(),
-			{},
+			textRect.position,
 			textColor);
 	}
 }
@@ -802,7 +820,8 @@ Std::Opt<Rect> Gui::impl::FindSplitNodeRect(
 }
 
 auto Gui::impl::DA_Layer_CheckHitResizeHandle(
-	DockArea& dockArea,
+	u32 resizeHandleThickness,
+	u32 resizeHandleLength,
 	DA_Node& rootNode,
 	Rect const& layerRect,
 	AllocRef transientAlloc,
@@ -820,8 +839,8 @@ auto Gui::impl::DA_Layer_CheckHitResizeHandle(
 		auto& splitNode = static_cast<DA_SplitNode&>(nodeIt.node);
 		auto const resizeHandle = DA_BuildSplitNodeResizeHandleRect(
 			nodeIt.rect,
-			dockArea.resizeHandleThickness,
-			dockArea.resizeHandleLength,
+			resizeHandleThickness,
+			resizeHandleLength,
 			splitNode.split,
 			splitNode.dir);
 		auto const pointerInsideHandle = resizeHandle.PointIsInside(pos);

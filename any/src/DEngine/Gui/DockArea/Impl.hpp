@@ -39,6 +39,15 @@ namespace DEngine::Gui::impl
 	using DA_State_ResizingSplit = DockArea::Impl::State_ResizingSplit;
 	using DA_State_HoldingTab = DockArea::Impl::State_HoldingTab;
 
+	struct DA_CustomData {
+		FontFaceSizeId fontSizeId = FontFaceSizeId::Invalid;
+		int tabTotalHeight = 0;
+		int tabMargin = 0;
+		Extent gizmoExtent = {};
+		int resizeHandleThickness = 0;
+		int resizeHandleLength = 0;
+	};
+
 	static constexpr auto cursorPointerId = static_cast<u8>(-1);
 
 	enum class NodeType : u8 { Window, Split };
@@ -94,8 +103,8 @@ namespace DEngine::Gui::impl
 	Std::Vec<Rect, AllocRef> DA_WindowNode_BuildTabRects(
 		Rect const& titlebarRect,
 		Std::Span<DA_WindowTab const> tabs,
-		TextSizeInfo const& tabTextSize,
-		u32 tabTextMargin,
+		FontFaceSizeId fontSizeId,
+		int horiMarginAmount,
 		TextManager& textManager,
 		AllocRef transientAlloc);
 	// Checks if a point overlaps with any tabs
@@ -103,24 +112,25 @@ namespace DEngine::Gui::impl
 	[[nodiscard]] Std::Opt<uSize> DA_CheckHitTab(
 		Rect const& titlebarRect,
 		Std::Span<DA_WindowTab const> tabs,
-		TextSizeInfo const& tabTextSize,
-		u32 tabTextMargin,
+		FontFaceSizeId fontSizeId,
+		int horiMarginAmount,
 		TextManager& textManager,
 		Math::Vec2 point,
 		AllocRef const& transientAlloc);
 	struct Render_WindowNode_Params {
 		DA_WindowNode const& windowNode;
 		DockArea const& dockArea;
+		FontFaceSizeId const& fontSizeId;
+		int tabTotalHeight = 0;
+		int textMarginAmount = 0;
+		bool isBackLayer = {};
 		Rect const& nodeRect;
 		Rect const& visibleRect;
-		TextSizeInfo const& tabTextSize;
-		u32 tabTextMargin;
 		Widget::Render_Params const& widgetRenderParams;
 	};
 	void Render_WindowNode(Render_WindowNode_Params const& params);
 
-	struct DA_WindowNodePrimaryRects
-	{
+	struct DA_WindowNodePrimaryRects {
 		Rect titlebarRect;
 		Rect contentRect;
 	};
@@ -152,7 +162,8 @@ namespace DEngine::Gui::impl
 	// Returns the pointer to the node of the resize handle that we hit
 	// Returns nullptr if no handle was hit
 	[[nodiscard]] DA_SplitNode* DA_Layer_CheckHitResizeHandle(
-		DockArea& dockArea,
+		u32 resizeHandleThickness,
+		u32 resizeHandleLength,
 		DA_Node& rootNode,
 		Rect const& layerRect,
 		AllocRef transientAlloc,
@@ -197,32 +208,31 @@ namespace DEngine::Gui::impl
 	[[nodiscard]] Rect DA_BuildOuterLayoutGizmoRect(
 		Rect layerRect,
 		DA_OuterLayoutGizmo in,
-		u32 gizmoSize) noexcept;
+		Extent const& gizmoSize) noexcept;
 	[[nodiscard]] Std::Opt<DA_OuterLayoutGizmo> DA_CheckHitOuterLayoutGizmo(
 		Rect const& nodeRect,
-		u32 gizmoSize,
+		Extent const& gizmoSize,
 		Math::Vec2 point) noexcept;
 
 	[[nodiscard]] Rect DA_BuildDeleteGizmoRect(
 		Rect widgetRect,
-		u32 gizmoSize);
+		Extent const& gizmoSize);
 
 	[[nodiscard]] bool DA_CheckHitDeleteGizmo(
 		Rect widgetRect,
-		u32 gizmoSize,
+		Extent const& gizmoSize,
 		Math::Vec2 point) noexcept;
 
 	[[nodiscard]] Rect DA_BuildInnerDockingGizmoRect(
 		Rect const& nodeRect,
 		DA_InnerDockingGizmo in,
-		u32 gizmoSize) noexcept;
+		Extent const& gizmoSize) noexcept;
 	[[nodiscard]] Std::Opt<DA_InnerDockingGizmo> DA_CheckHitInnerDockingGizmo(
 		Rect const& nodeRect,
-		u32 gizmoSize,
+		Extent const& gizmoSize,
 		Math::Vec2 const& point) noexcept;
 
-	struct DA_Layer_CheckHitInnerDockingGizmo_ReturnT
-	{
+	struct DA_Layer_CheckHitInnerDockingGizmo_ReturnT {
 		DA_WindowNode* node;
 		DA_InnerDockingGizmo gizmo;
 	};
@@ -230,7 +240,7 @@ namespace DEngine::Gui::impl
 	[[nodiscard]] DA_Layer_CheckHitInnerDockingGizmo_ReturnT DA_Layer_CheckHitInnerDockingGizmo(
 		DA_Node& rootNode,
 		Rect const& layerRect,
-		u32 gizmoSize,
+		Extent const& gizmoSize,
 		Math::Vec2 point,
 		AllocRef transientAlloc);
 
@@ -243,8 +253,7 @@ namespace DEngine::Gui::impl
 
 	// We want to dock the entire front layer into this target
 	// node.
-	struct DockingJob
-	{
+	struct DockingJob {
 		DA_OuterLayoutGizmo outerGizmo;
 		bool dockIntoOuter;
 		DA_InnerDockingGizmo innerGizmo;
@@ -264,39 +273,33 @@ namespace DEngine::Gui::impl
 
 
 	using DA_ChildDispatchFnT = Std::FnRef<bool(Widget&, Rect const&, Rect const&, bool)>;
-	struct DA_PointerMove_Pointer
-	{
+	struct DA_PointerMove_Pointer {
 		u8 id;
 		Math::Vec2 pos;
 	};
-	struct DA_PointerMove_Params2
-	{
+	struct DA_PointerMove_Params {
 		DockArea& dockArea;
-		RectCollection const& rectCollection;
 		TextManager& textManager;
-		TextSizeInfo const& tabTextSize;
 		AllocRef transientAlloc;
+		DA_CustomData const& customData;
 		Rect const& widgetRect;
 		Rect const& visibleRect;
 		DA_PointerMove_Pointer const& pointer;
 	};
 	[[nodiscard]] bool DA_PointerMove(
-		DA_PointerMove_Params2 const& params,
+		DA_PointerMove_Params const& params,
 		bool pointerOccluded,
 		DA_ChildDispatchFnT const& childDispatchFn);
 
-	struct DA_PointerPress_Pointer
-	{
+	struct DA_PointerPress_Pointer {
 		u8 id;
 		Math::Vec2 pos;
 		bool pressed;
 	};
-	struct DA_PointerPress_Params2
-	{
+	struct DA_PointerPress_Params {
 		DockArea& dockArea;
 		AllocRef const& transientAlloc;
-		RectCollection const& rectCollection;
-		TextSizeInfo const& tabTextSize;
+		DA_CustomData const& customData;
 		TextManager& textManager;
 		Rect const& widgetRect;
 		Rect const& visibleRect;
@@ -304,7 +307,7 @@ namespace DEngine::Gui::impl
 		DA_ChildDispatchFnT const& childDispatchFn;
 	};
 	[[nodiscard]] bool DA_PointerPress(
-		DA_PointerPress_Params2 const& params,
+		DA_PointerPress_Params const& params,
 		bool eventConsumed);
 }
 

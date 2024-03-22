@@ -7,52 +7,108 @@
 
 #include <cstdlib>
 #include <cstdint>
+#include <new>
 
 using namespace DEngine;
 
 struct DEngine::Std::BumpAllocator::Impl
 {
 public:
+	static constexpr uSize minAllocAlignment = 8;
+
 	struct RAIIPtr
 	{
 		void* ptr = nullptr;
 		~RAIIPtr() noexcept
 		{
-			if (ptr)
-			{
+			if (ptr) {
 				free(ptr);
 				ptr = nullptr;
 			}
 		}
 	};
 
-	static void FreeBlockListElements(BlockList& in, bool safetyOn) noexcept
-	{
-		if (in.ptr)
-		{
-			DENGINE_IMPL_CONTAINERS_ASSERT(in.capacity != 0);
-			for (uSize i = 0; i < in.count; i++)
-			{
-				auto& block = in.ptr[i];
-				DENGINE_IMPL_CONTAINERS_ASSERT(block.data);
-				if (!noSafetyOverride && safetyOn)
-					DENGINE_IMPL_CONTAINERS_ASSERT(block.allocCount == 0);
+	static void FreeBlockListElements(BlockList& in, bool safetyOn) noexcept {
+		if (in.ptrElements == nullptr || in.count == 0)
+			return;
 
-				free(block.data);
-				block = {};
+		DENGINE_IMPL_CONTAINERS_ASSERT(in.capacity != 0);
+		for (uSize i = 0; i < in.count; i++) {
+			auto& block = in.ptrElements[i];
+			DENGINE_IMPL_CONTAINERS_ASSERT(block.data);
+			if (!noSafetyOverride && safetyOn) {
+				DENGINE_IMPL_CONTAINERS_ASSERT(block.allocCount == 0);
 			}
-			in.count = 0;
+
+			free(block.data);
+			block.data = nullptr;
+			block = {};
+		}
+		in.count = 0;
+	}
+
+	static void FreeBlockList(BlockList& in, bool safetyOn) noexcept {
+		FreeBlockListElements(in, safetyOn);
+
+		if (in.ptrElements) {
+			free(in.ptrElements);
+			in = {};
 		}
 	}
 
-	static void FreeBlockList(BlockList& in, bool safetyOn) noexcept
-	{
-		FreeBlockListElements(in, safetyOn);
+	static BlockList AllocateNewBlockList(uSize newCapacity = BlockList::minCapacity) {
+		BlockList blockList = {};
+		blockList.ptrElements = (Block*)malloc(sizeof(Block) * newCapacity);
+		// TODO: Error handling for failed allocation.
+		blockList.capacity = newCapacity;
+		return blockList;
+	}
 
-		if (in.ptr) {
-			free(in.ptr);
-			in = {};
+	static void PushToBlockList(BlockList& list, Block block) {
+		DENGINE_IMPL_ASSERT(list.count <= list.capacity);
+		DENGINE_IMPL_ASSERT(block.data != nullptr);
+
+		if (list.ptrElements == nullptr || list.capacity == 0) {
+			list = AllocateNewBlockList();
 		}
+
+		if (list.count == list.capacity) {
+			auto oldList = list;
+
+			// We need to allocate a new block-list and destroy the old one.
+			auto const newCapacity = oldList.capacity * 2;
+			auto ptr = (Block*)malloc(sizeof(Block) * newCapacity);
+			// Copy over the blocks to the new memory.
+			for (int i = 0; i < oldList.count; i++) {
+				auto& oldElement = oldList.ptrElements[i];
+
+				auto* newElement = ptr + i;
+				new(newElement) Block(oldElement);
+
+				oldElement.data = nullptr;
+			}
+
+			list.count = oldList.count;
+			list.capacity = newCapacity;
+			list.ptrElements = ptr;
+
+			free(oldList.ptrElements);
+		}
+
+		// We have guaranteed space
+		new(list.ptrElements + list.count) Block(block);
+		list.count += 1;
+	}
+
+	static Block AllocateBlock(uSize newSize) {
+		Block returnVal = {};
+		// Allocate new block with specified size.
+		auto* newMem = malloc(newSize);
+		returnVal.data = (Block::DataPtrT*)newMem;
+		returnVal.size = newSize;
+		returnVal.allocCount = 0;
+		returnVal.offset = 0;
+		return returnVal;
 	}
 };
 
@@ -87,6 +143,7 @@ Std::BumpAllocator& Std::BumpAllocator::operator=(Std::BumpAllocator&& other) no
 Std::Opt<Std::BumpAllocator> Std::BumpAllocator::PreAllocate(uSize size) noexcept
 {
 	BumpAllocator returnVal;
+	return returnVal;
 
 	auto ptr = malloc(size);
 	if (!ptr)
@@ -110,8 +167,7 @@ Std::Opt<Std::BumpAllocator> Std::BumpAllocator::PreAllocate(uSize size) noexcep
 
 namespace DEngine::Std
 {
-	static auto GetAlignedOffset(void const* ptr, uSize offset, uSize alignment)
-	{
+	static auto CalcAlignedOffset(void const* ptr, uSize offset, uSize alignment) {
 		u64 const asInt = (uintptr_t)ptr + offset;
 		auto const alignedAsInt = Math::CeilToMultiple(asInt, (u64)alignment);
 		DENGINE_IMPL_CONTAINERS_ASSERT((alignedAsInt % alignment) == 0);
@@ -120,103 +176,48 @@ namespace DEngine::Std
 	}
 }
 
-void* Std::BumpAllocator::Alloc(uSize size, uSize alignment) noexcept
+void* Std::BumpAllocator::Alloc(uSize allocSize, uSize allocAlignment) noexcept
 {
+	DENGINE_IMPL_CONTAINERS_ASSERT(allocSize != 0);
+	DENGINE_IMPL_CONTAINERS_ASSERT(allocAlignment > 0);
+
 	//return malloc(size);
+	if (activeBlock.data == nullptr) {
+		activeBlock = Impl::AllocateBlock(allocSize);
+	}
 
-	bool allocActiveBlock = false;
-	uSize allocActiveBlockSize = 0;
-
-	if (activeBlock.data)
 	{
+		// Check if we need to resize block.
 		DENGINE_IMPL_CONTAINERS_ASSERT(activeBlock.size != 0);
+		auto const alignedOffset = CalcAlignedOffset(
+			activeBlock.data,
+			activeBlock.offset,
+			Math::Max(allocAlignment, Impl::minAllocAlignment));
 
-		auto& block = activeBlock;
-
-		auto const alignedOffset = GetAlignedOffset(activeBlock.data, activeBlock.offset, alignment);
 		// Check if there is enough remaining space in the block
-		if (alignedOffset + size <= block.size)
-		{
-			// There is enough remaining space. Allocate here.
-			activeBlock.allocCount += 1;
-			prevAllocOffset = activeBlock.offset;
-			activeBlock.offset = alignedOffset + size;
-			return block.data + alignedOffset;
-		}
-		else
-		{
-			allocActiveBlock = true;
-			allocActiveBlockSize = Math::Max(size, activeBlock.size * 2);
+		if (alignedOffset + allocSize > activeBlock.size) {
+			Impl::PushToBlockList(blockList, activeBlock);
 
-			// First move the active block onto the prev-block-array
-			if (blockList.ptr)
-			{
-				// Check if we can fit the current block onto our block-list.
-				if (blockList.capacity == blockList.count)
-				{
-					// We need to fit more space for the block.
-					// Allocate new space and move the data over.
-					auto const newCapacity = sizeof(Block) * blockList.capacity * 2;
-
-					Impl::RAIIPtr newArray = {};
-					newArray.ptr = malloc(newCapacity);
-					if (!newArray.ptr)
-						return nullptr;
-
-					for (int i = 0; i < blockList.count; i++)
-						static_cast<Block*>(newArray.ptr)[i] = blockList.ptr[i];
-
-					// Delete our old one and assign our new one.
-					free(blockList.ptr);
-					blockList.ptr = static_cast<Block*>(newArray.ptr);
-					newArray.ptr = nullptr;
-					blockList.capacity = newCapacity;
-				}
-
-				// We can fit the current active block. Push it to the end.
-				blockList.ptr[blockList.count] = activeBlock;
-				activeBlock = {};
-				blockList.count += 1;
-			}
-			else
-			{
-				// Allocate space for the previous block-structs.
-				uSize blockListCapacity = BlockList::minCapacity;
-				blockList.ptr = static_cast<Block*>(malloc(sizeof(Block) * blockListCapacity));
-				if (!blockList.ptr)
-					return nullptr;
-				blockList.capacity = blockListCapacity;
-
-				blockList.ptr[0] = activeBlock;
-				activeBlock = {};
-				blockList.count += 1;
-			}
+			// Alloc new block with larger capacity.
+			auto newSize = Math::Max(allocSize, activeBlock.size * 2);
+			activeBlock = Impl::AllocateBlock(newSize);
 		}
 	}
-	else
-	{
-		allocActiveBlock = true;
-		allocActiveBlockSize = size;
-	}
 
-	if (allocActiveBlock)
-	{
-		// Allocate data on the active block
 
-		auto* newMem = malloc(allocActiveBlockSize);
-		if (!newMem)
-			return nullptr;
 
-		activeBlock.data = static_cast<Block::DataPtrT*>(newMem);
-		activeBlock.size = allocActiveBlockSize;
+	// It's now guaranteed that we can fit the memory.
+	DENGINE_IMPL_ASSERT(activeBlock.data != nullptr);
+	auto const alignedOffset = CalcAlignedOffset(
+		activeBlock.data,
+		activeBlock.offset,
+		Math::Max(allocAlignment, Impl::minAllocAlignment));
+	DENGINE_IMPL_ASSERT(alignedOffset + allocSize <= activeBlock.size);
+	auto returnVal = activeBlock.data + alignedOffset;
+	activeBlock.allocCount += 1;
+	activeBlock.offset = alignedOffset + allocSize;
 
-		activeBlock.allocCount = 1;
-		activeBlock.offset = size;
-		prevAllocOffset = 0;
-		return activeBlock.data;
-	}
-
-	return nullptr;
+	return returnVal;
 }
 
 bool Std::BumpAllocator::Resize(void* ptr, uSize newSize) noexcept
@@ -240,7 +241,7 @@ bool Std::BumpAllocator::Resize(void* ptr, uSize newSize) noexcept
 	return false;
 }
 
-void Std::BumpAllocator::Free(void* in) noexcept
+void Std::BumpAllocator::Free(void* in, uSize size) noexcept
 {
 	//free(in);
 	//return;
@@ -250,9 +251,7 @@ void Std::BumpAllocator::Free(void* in) noexcept
 
 	// Ideally we shouldn't have to confirm this on a release
 	// build. In a release build, all of this could be skipped.
-
 	[[maybe_unused]] bool allocFound = false;
-
 	{
 		// Check the active block first.
 		DENGINE_IMPL_CONTAINERS_ASSERT(activeBlock.data);
@@ -262,34 +261,29 @@ void Std::BumpAllocator::Free(void* in) noexcept
 		{
 			allocFound = true;
 			activeBlock.allocCount -= 1;
-			if (activeBlock.allocCount == 0)
-			{
+			if (activeBlock.allocCount == 0) {
 				activeBlock.offset = 0;
 				prevAllocOffset = Std::nullOpt;
 			}
 		}
 	}
 
-	if (prevAllocOffset.HasValue())
-	{
+	if (prevAllocOffset.HasValue()) {
 		auto const lastAllocOffsetValue = prevAllocOffset.Value();
 		// If the freed pointer was the previously allocated
 		// memory, then we pop the allocation so we can reuse it
 		// immediately
-		if (in == activeBlock.data + lastAllocOffsetValue)
-		{
+		if (in == activeBlock.data + lastAllocOffsetValue) {
 			activeBlock.offset = lastAllocOffsetValue;
 			prevAllocOffset = Std::nullOpt;
 		}
 	}
 
 
-	if (!allocFound && blockList.ptr)
-	{
+	if (!allocFound && blockList.ptrElements) {
 		// Then check the other pools
-		for (uSize i = 0; i < blockList.count; i += 1)
-		{
-			auto& block = blockList.ptr[i];
+		for (uSize i = 0; i < blockList.count; i += 1) {
+			auto& block = blockList.ptrElements[i];
 			// Check if the pointer is within range of our allocated data
 			auto const ptrOffset = (intptr_t)in - (intptr_t)block.data;
 			if (ptrOffset >= 0 && ptrOffset < block.offset)
@@ -312,7 +306,6 @@ void Std::BumpAllocator::Reset([[maybe_unused]] bool safetyOn) noexcept
 	activeBlock.allocCount = 0;
 	activeBlock.offset = 0;
 	prevAllocOffset = Std::nullOpt;
-
 	// For testing purposes
 	if constexpr (clearUnusedMemory) {
 		for (uSize i = 0; i < activeBlock.size; i += 1)
@@ -322,12 +315,11 @@ void Std::BumpAllocator::Reset([[maybe_unused]] bool safetyOn) noexcept
 
 void Std::BumpAllocator::ReleaseAllMemory()
 {
-	if (activeBlock.data)
-	{
+	Impl::FreeBlockList(blockList, false);
+
+	if (activeBlock.data) {
 		DENGINE_IMPL_CONTAINERS_ASSERT(noSafetyOverride || activeBlock.allocCount == 0);
 		free(activeBlock.data);
 		activeBlock = {};
 	}
-
-	Impl::FreeBlockList(blockList, false);
 }

@@ -1,4 +1,4 @@
-#pragma once
+ #pragma once
 
 #include "VulkanIncluder.hpp"
 
@@ -10,6 +10,8 @@ namespace DEngine::Gfx::Vk::Constants
 {
 	constexpr u32 maxInFlightCount = 4;
 	constexpr u32 preferredInFlightCount = 2;
+	// We need at least two, because one always needs to be available for writing.
+	static_assert(preferredInFlightCount >= 2);
 
 	constexpr vk::PresentModeKHR preferredPresentMode = vk::PresentModeKHR::eFifo;
 	constexpr u32 maxSwapchainLength = 4;
@@ -18,18 +20,16 @@ namespace DEngine::Gfx::Vk::Constants
 	constexpr char const* khronosLayerName { "VK_LAYER_KHRONOS_validation" };
 	constexpr char const* armMaliPerfLayerName { "VK_LAYER_ARM_mali_perf_doc" };
 
-	constexpr std::array preferredLayerNames
-	{
+	constexpr std::array preferredLayerNames {
 		khronosLayerName,
 		//armMaliPerfLayerName
 	};
 
-	constexpr std::array<const char*, 1> requiredInstanceExtensions
-	{
+	constexpr std::array<const char*, 1> requiredInstanceExtensions {
 		"VK_KHR_surface"
 	};
 
-	constexpr bool enableDebugUtils = false;
+	constexpr bool enableDebugUtils = true;
 	constexpr char const* debugUtilsExtensionName{ "VK_EXT_debug_utils" };
 
 	constexpr std::array<const char*, 1> requiredDeviceExtensions

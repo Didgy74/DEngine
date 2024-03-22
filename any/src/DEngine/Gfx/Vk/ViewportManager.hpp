@@ -18,39 +18,34 @@
 
 namespace DEngine::Gfx::Vk
 {
-	struct ViewportMgr_GfxRenderTarget
-	{
+	struct ViewportMgr_GfxRenderTarget {
 		vk::Extent2D extent = {};
 		VmaAllocation vmaAllocation = {};
 		vk::Image img = {};
 		vk::ImageView imgView = {};
 		vk::Framebuffer framebuffer = {};
+
+		[[nodiscard]] bool IsInitialized() const { return img != vk::Image{}; }
 	};
 
-	struct ViewportMgr_ViewportData
-	{
+	struct ViewportMgr_ViewportData {
 		ViewportMgr_GfxRenderTarget renderTarget = {};
+		vk::DescriptorPool cameraDescrPool = {};
+		Std::StackVec<vk::DescriptorSet, Constants::maxInFlightCount> camDataDescrSets = {};
+		VmaAllocation camVmaAllocation = {};
+		vk::Buffer camDataBuffer = {};
+		Std::ByteSpan camDataMappedMem = {};
 
-		vk::DescriptorPool cameraDescrPool{};
-		Std::StackVec<vk::DescriptorSet, Constants::maxInFlightCount> camDataDescrSets{};
-		VmaAllocation camVmaAllocation{};
-		vk::Buffer camDataBuffer{};
-		Std::Span<u8> camDataMappedMem;
-
-		// This is temporary and shit
-		// But it works. This is controlled by the GuiResourceManager
-		vk::DescriptorSet descrSet{};
+		// idk if I like this
+		vk::DescriptorPool imgDescrPool = {};
+		vk::DescriptorSet imgDescrSet = {};
 	};
 
 	// This variable should basically not be accessed anywhere except from APIData.
-	struct ViewportManager
-	{
+	struct ViewportManager {
 		// Create queue resources start
 		std::mutex createQueue_Lock;
-		struct CreateJob
-		{
-			ViewportID id = ViewportID::Invalid;
-		};
+		struct CreateJob { ViewportID id = ViewportID::Invalid; };
 		uSize viewportIDTracker = 0;
 		std::vector<CreateJob> createQueue{};
 		// Create queue resources end
@@ -62,8 +57,7 @@ namespace DEngine::Gfx::Vk
 
 		// Main mutable resources start
 		// This doesn't need a mutex because it's only ever accessed by the rendering thread.
-		struct Node
-		{
+		struct Node {
 			ViewportID id;
 			ViewportMgr_ViewportData viewport;
 
@@ -73,11 +67,14 @@ namespace DEngine::Gfx::Vk
 		std::vector<Node> viewportNodes{};
 		// Main mutable resources end
 
+		[[nodiscard]] ViewportMgr_ViewportData const& GetViewportData(ViewportID id) const;
+
 		static constexpr uSize minimumCamDataCapacity = 8;
-		// Thread safe to access
 		vk::DescriptorSetLayout cameraDescrLayout{};
-		// Thread safe to access
 		uSize camElementSize = 0;
+		vk::Sampler imgSampler = {};
+		vk::DescriptorSetLayout imgDescrSetLayout = {};
+
 
 		[[nodiscard]] static bool Init(
 			ViewportManager& manager,
@@ -91,19 +88,21 @@ namespace DEngine::Gfx::Vk
 		static void DeleteViewport(
 			ViewportManager& viewportManager, 
 			ViewportID id);
-		[[nodiscard]] static Node const* FindNode(
-			ViewportManager const& viewportManager,
-			ViewportID id);
 
+		struct ProcessEvents_Params {
+			GlobUtils const& globUtils;
+			vk::CommandBuffer cmdBuffer;
+			DelQueue& delQueue;
+			Std::AllocRef transientAlloc;
+			Std::Span<ViewportUpdate const> viewportUpdates;
+			int inFlightIndex;
+			DebugUtilsDispatch const* debugUtils;
+		};
 		// Making it static made it more explicit.
 		// Easier to identify in the main loop
 		static void ProcessEvents(
 			ViewportManager& manager,
-			GlobUtils const& globUtils,
-			DelQueue& delQueue,
-			Std::AllocRef const& transientAlloc,
-			Std::Span<ViewportUpdate const> viewportUpdates,
-			GuiResourceManager const& guiResourceManager);
+			ProcessEvents_Params const& params);
 
 		static void UpdateCameras(
 			ViewportManager& viewportManager,

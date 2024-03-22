@@ -15,10 +15,8 @@ using namespace DEngine::Gui;
 namespace DEngine::Gui::impl
 {
 	enum class PointerType : u8 { Primary, Secondary };
-	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept
-	{
-		switch (in)
-		{
+	[[nodiscard]] static PointerType ToPointerType(CursorButton in) noexcept {
+		switch (in) {
 			case CursorButton::Primary: return PointerType::Primary;
 			case CursorButton::Secondary: return PointerType::Secondary;
 			default:
@@ -32,29 +30,26 @@ namespace DEngine::Gui::impl
 
 	[[nodiscard]] static Extent DropdownLayer_BuildOuterExtent(
 		Std::Span<std::string const> widgetItems,
-		u32 textMargin,
-		TextSizeInfo const& textSize,
+		FontFaceSizeId fontSizeId,
+		int totalLineHeight,
+		int marginAmount,
 		TextManager& textManager,
 		Rect const& safeAreaRect)
 	{
-		auto const textHeight = textManager.GetLineheight(textSize);
-		auto const lineHeight = textHeight + (textMargin * 2);
-
 		Extent returnValue = {};
-		returnValue.height = lineHeight * widgetItems.Size();
+		returnValue.height = totalLineHeight * widgetItems.Size();
 
-		for (auto const& line : widgetItems)
-		{
+		for (auto const& line : widgetItems) {
 			auto const textExtent = textManager.GetOuterExtent(
 				{ line.data(), line.size() },
-				textSize);
+				fontSizeId);
 
 			returnValue.width = Math::Max(
 				returnValue.width,
 				textExtent.width);
 		}
 		// Add margin to extent.
-		returnValue.width += textMargin * 2;
+		returnValue.width += marginAmount * 2;
 
 		return returnValue;
 	}
@@ -81,8 +76,7 @@ namespace DEngine::Gui::impl
 		return lineHit;
 	}
 
-	struct PointerPress_Pointer
-	{
+	struct PointerPress_Pointer {
 		u8 id;
 		PointerType type;
 		Math::Vec2 pos;
@@ -90,8 +84,7 @@ namespace DEngine::Gui::impl
 	};
 
 
-	struct PointerMove_Pointer
-	{
+	struct PointerMove_Pointer {
 		u8 id;
 		Math::Vec2 pos;
 		bool occluded;
@@ -124,14 +117,16 @@ struct Dropdown::Impl
 	// This data is only available when rendering.
 	struct [[maybe_unused]] CustomData
 	{
-		explicit CustomData(RectCollection::AllocRefT const& alloc) : glyphRects{ alloc } {}
+		explicit CustomData(RectCollection::AllocRefT const& alloc) :
+			glyphRects{ alloc }
+		{}
 
 		Extent titleTextOuterExtent = {};
+		FontFaceSizeId fontSizeId = FontFaceSizeId::Invalid;
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
-	struct Dropdown_PointerPress_Params
-	{
+	struct Dropdown_PointerPress_Params {
 		Dropdown& widget;
 		Context& ctx;
 		WindowID windowId;
@@ -153,8 +148,7 @@ struct Dropdown::Impl
 
 		Math::Vec2Int pos = {};
 		u32 dropdownWidgetWidth = 0;
-		struct PressedLine
-		{
+		struct PressedLine {
 			u8 pointerId;
 			uSize index;
 		};
@@ -189,14 +183,14 @@ struct Dropdown::Impl
 			lineGlyphRects{ alloc },
 			lineGlyphRectOffsets{ alloc} {}
 
-		int textheight = 0;
+		int totalLineHeight = 0;
+		FontFaceSizeId fontSizeId = FontFaceSizeId::Invalid;
 		// Only available when rendering.
 		Std::Vec<Rect, RectCollection::AllocRefT> lineGlyphRects;
 		Std::Vec<uSize, RectCollection::AllocRefT> lineGlyphRectOffsets;
 	};
 
-	struct DropdownLayer_PointerMove_Params
-	{
+	struct DropdownLayer_PointerMove_Params {
 		DropdownLayer& layer;
 		Context& ctx;
 		RectCollection const& rectCollection;
@@ -208,8 +202,7 @@ struct Dropdown::Impl
 		DropdownLayer_PointerMove_Params const& params);
 
 
-	struct DropdownLayer_PointerPress_Params
-	{
+	struct DropdownLayer_PointerPress_Params {
 		DropdownLayer& layer;
 		Context& ctx;
 		RectCollection const& rectCollection;
@@ -266,23 +259,18 @@ bool Dropdown::Impl::Dropdown_PointerPress(
 		return newEventConsumed;
 
 	// We can now trust pointer.type == Primary
-	if (widget.heldPointerId.HasValue())
-	{
+	if (widget.heldPointerId.HasValue()) {
 		auto const heldPointerId = widget.heldPointerId.Value();
 		if (!pointer.pressed)
 			widget.heldPointerId = Std::nullOpt;
 
-		if (heldPointerId == pointer.id && pointerInside && !pointer.pressed)
-		{
+		if (heldPointerId == pointer.id && pointerInside && !pointer.pressed) {
 			// Now we open the dropdown menu
 			impl::CreateDropdownLayer(widget, ctx, windowId, widgetRect);
 			newEventConsumed = true;
 		}
-	}
-	else
-	{
-		if (!oldEventConsumed && pointerInside && pointer.pressed)
-		{
+	} else {
+		if (!oldEventConsumed && pointerInside && pointer.pressed) {
 			widget.heldPointerId = pointer.id;
 			newEventConsumed = true;
 		}
@@ -298,26 +286,52 @@ void Dropdown::Impl::DropdownLayer::BuildSizeHints(
 	auto& ctx = params.ctx;
 	auto& pusher = params.pusher;
 	auto& window = params.window;
-	auto& textManager = params.textManager;
+	auto& textMgr = params.textManager;
 
 	auto const& widget = GetDropdownWidget();
 	int lineCount = (int)widget.items.size();
 
-	TextSizeInfo textSize = {
-		.scale = window.contentScale * ctx.fontScale,
-		.dpiX = window.dpiX,
-		.dpiY = window.dpiY, };
-	auto lineheight = textManager.GetLineheight(textSize);
-
 	auto pusherIt = pusher.AddEntry(*this);
 
 	DropdownLayer_CustomData customDataTemp { pusher.Alloc() };
-	auto& customData = pusher.AttachCustomData(pusherIt, Std::Move(customDataTemp));
+	auto& customData =
+		pusher.AttachCustomData(pusherIt, DropdownLayer_CustomData{ pusher.Alloc() });
 
-	customData.textheight = (int)lineheight;
+	auto normalTextScale = ctx.fontScale * window.contentScale;
+	auto fontSizeId = FontFaceSizeId::Invalid;
+	auto marginAmount = 0;
+	auto totalHeight = 0;
+	{
+		auto normalFontSizeId = textMgr.GetFontFaceSizeId(normalTextScale, window.dpiX, window.dpiY);
+		auto normalHeight = textMgr.GetLineheight(normalFontSizeId, TextHeightType::Alphas);
+		auto normalHeightMargin = (u32)Math::Round((f32)normalHeight * ctx.defaultMarginFactor);
+		auto totalNormalHeight = normalHeight + 2 * normalHeightMargin;
+
+		auto minHeight = CmToPixels(ctx.minimumHeightCm, window.dpiY);
+
+		if (totalNormalHeight > minHeight) {
+			fontSizeId = normalFontSizeId;
+			marginAmount = (i32)normalHeightMargin;
+			totalHeight = (int)totalNormalHeight;
+		} else {
+			// We can't just do minHeight * defaultMarginFactor for this one, because defaultMarginFactor applies to
+			// content, not the outer size. So we set up an equation `height = 2 * marginFactor * content + content`
+			// and we solve for content.
+			auto contentSizeCm = ctx.minimumHeightCm / ((2 * ctx.defaultMarginFactor) + 1.f);
+			auto contentSize = CmToPixels(contentSizeCm, window.dpiY);
+			fontSizeId = textMgr.FontFaceSizeIdForLinePixelHeight(
+					contentSize,
+					TextHeightType::Alphas);
+			marginAmount = CmToPixels((f32)contentSizeCm * ctx.defaultMarginFactor, window.dpiY);
+			totalHeight = minHeight;
+		}
+	}
+
+	customData.totalLineHeight = totalHeight;
+	customData.fontSizeId = fontSizeId;
 
 	SizeHint returnValue = {};
-	returnValue.minimum.height = (lineheight + widget.textMargin * 2) * lineCount;
+	returnValue.minimum.height = totalHeight * lineCount;
 	returnValue.minimum.width = dropdownWidgetWidth;
 	returnValue.expandX = false;
 	returnValue.expandY = false;
@@ -338,19 +352,18 @@ void Dropdown::Impl::DropdownLayer::BuildRects(BuildRects_Params const& params) 
 	auto& mainWidget = GetDropdownWidget();
 
 	auto pusherIt = pusher.GetEntry(*this);
-
 	auto* customDataPtr = pusher.GetCustomData2<Impl::DropdownLayer_CustomData>(pusherIt);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
+	auto fontSizeId = customData.fontSizeId;
 
-	int textheight = customData.textheight;
-	int lineheight = textheight + mainWidget.textMargin * 2;
+	int totalLineHeight = customData.totalLineHeight;
 	int linecount = (int)mainWidget.items.size();
 
 	// Figure out the rect of the list of items.
 	Rect outerBoxRect = {};
 	outerBoxRect.extent.width = dropdownWidgetWidth;
-	outerBoxRect.extent.height = lineheight * linecount;
+	outerBoxRect.extent.height = totalLineHeight * linecount;
 	// Position it and clamp it to the usable area.
 	outerBoxRect.position = pos;
 	outerBoxRect.position.x = Math::Min(
@@ -368,55 +381,34 @@ void Dropdown::Impl::DropdownLayer::BuildRects(BuildRects_Params const& params) 
 
 	pusher.SetRectPair(pusherIt, { outerBoxRect, usableRect });
 
-	TextSizeInfo textSize = {
-		.scale = window.contentScale * ctx.fontScale,
-		.dpiX = window.dpiX,
-		.dpiY = window.dpiY, };
-
 	// Position our line glyphs correctly
-	if (pusher.IncludeRendering())
-	{
+	if (pusher.IncludeRendering()) {
 		// First we calculate total amount of glyphs of all the lines, and
 		// the index for each line
 		customData.lineGlyphRectOffsets.Resize(linecount);
 		int currentOffset = 0;
-		for (int i = 0; i < linecount; i++)
-		{
+		for (int i = 0; i < linecount; i++) {
 			customData.lineGlyphRectOffsets[i] = currentOffset;
-			currentOffset += mainWidget.items[i].size();
+			currentOffset += (int)mainWidget.items[i].size();
 		}
 
 		// Then populate our list with the rects
 		auto const totalStrLength = currentOffset;
 		customData.lineGlyphRects.Resize(totalStrLength);
-		i32 linePosOffsetY = {};
-		for (int i = 0; i < linecount; i++)
-		{
+		int linePosOffsetY = {};
+		for (int i = 0; i < linecount; i++) {
 			// We can't know the outer extent of the text until we have gathered the rects.
 			// We need to know the outer extent to center it.
 			// We gather the rects first then offset them accordingly.
 			auto const& line = mainWidget.items[i];
 			auto const linelength = line.size();
 			auto const& offset = customData.lineGlyphRectOffsets[i];
-
-			auto textExtent = textManager.GetOuterExtent(
+			auto const glyphRects = customData.lineGlyphRects.ToSpan().Subspan(offset, line.size());
+			textManager.GetOuterExtent(
 				{ line.data(), linelength },
-				textSize,
-				&customData.lineGlyphRects[offset]);
-
-			Rect lineRect = outerBoxRect;
-			lineRect.extent.height = lineheight;
-			lineRect.position.y += (i32)lineRect.extent.height * i;
-
-			Math::Vec2Int textPos = lineRect.position;
-			textPos.x += (i32)(lineRect.extent.width / 2 - textExtent.width / 2);
-			textPos.y += (i32)(lineRect.extent.height / 2 - textExtent.height / 2);
-			auto lineGlyphs = Std::Span{ &customData.lineGlyphRects[offset], linelength };
-			for (auto& glyph : lineGlyphs)
-				glyph.position += textPos;
-
-			linePosOffsetY += textheight;
-			linePosOffsetY += (i32)mainWidget.textMargin * 2;
+				fontSizeId,
+				TextHeightType::Alphas,
+				glyphRects);
 		}
 	}
 }
@@ -430,6 +422,7 @@ void Dropdown::Impl::DropdownLayer::Render(Render_Params const& params) const
 	auto& drawInfo = params.drawInfo;
 	auto const& windowRect = params.windowRect;
 	auto const& safeAreaRect = params.safeAreaRect;
+	auto& textMgr = params.textManager;
 
 	auto const& mainWidget = GetDropdownWidget();
 
@@ -444,8 +437,8 @@ void Dropdown::Impl::DropdownLayer::Render(Render_Params const& params) const
 	auto const* customDataPtr = rectColl.GetCustomData2<Impl::DropdownLayer_CustomData>(rectCollEntry);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
-
-	auto lineheight = customData.textheight;
+	auto fontSizeId = customData.fontSizeId;
+	auto totalLineHeight = customData.totalLineHeight;
 
 	// First we want to draw the background rect
 	auto const& rectPair = rectColl.GetRect(rectCollEntry);
@@ -454,43 +447,40 @@ void Dropdown::Impl::DropdownLayer::Render(Render_Params const& params) const
 	auto scissorGuard = DrawInfo::ScopedScissor{ drawInfo, rectPair.widgetRect };
 
 	// Then we display the hovered item if there is one.
-	if (hoveredByCursorIndex.HasValue())
-	{
+	if (hoveredByCursorIndex.HasValue()) {
 		auto const& hoveredIndex = hoveredByCursorIndex.Value();
 		auto lineRect = rectPair.widgetRect;
-		lineRect.extent.height = lineheight + mainWidget.textMargin * 2;
+		lineRect.extent.height = totalLineHeight;
 		lineRect.position.y += (i32)lineRect.extent.height * (i32)hoveredIndex;
 		drawInfo.PushFilledQuad(lineRect, { 1.f, 1.f, 1.f, 0.5f });
 	}
 
-	// Append all text into a single list.
-	int allTextCount = 0;
-	for (auto const& item : mainWidget.items)
-		allTextCount += (int)item.length();
-	auto allText = Std::NewVec<char>(transientAlloc);
-	allText.Resize(allTextCount);
-	int offset = 0;
-	for (auto const& item : mainWidget.items)
 	{
-		int strLength = (int)item.length();
-		for (int i = 0; i < strLength; i += 1)
-			allText[i + offset] = item[i];
-		offset += strLength;
+		// Render the text on all lines.
+		for (int i = 0; i < (int)mainWidget.items.size(); i++) {
+			auto& text = mainWidget.items[i];
+
+			auto lineRect = rectPair.widgetRect;
+			lineRect.extent.height = totalLineHeight;
+			lineRect.position.y += (i32)lineRect.extent.height * i;
+
+			auto rects = Std::NewVec<Rect>(transientAlloc);
+			rects.Resize(text.size());
+			auto textExtent = textMgr.GetOuterExtent(
+				{ text.data(), text.size() },
+				fontSizeId,
+				TextHeightType::Alphas,
+				rects.ToSpan());
+			auto textOffset = lineRect.position + Extent::CenteringOffset(lineRect.extent, textExtent);
+
+			drawInfo.PushText(
+				(i64)fontSizeId,
+				{ text.data(), text.size() },
+				rects.Data(),
+				textOffset,
+				{ 1, 1, 1, 1 });
+		}
 	}
-
-	TextSizeInfo textSize = {
-		.scale = window.contentScale * ctx.fontScale,
-		.dpiX = window.dpiX,
-		.dpiY = window.dpiY, };
-	auto fontFaceId = params.textManager.GetFontFaceId(textSize);
-
-	// Next draw each line
-	drawInfo.PushText(
-		(u64)fontFaceId,
-		{ allText.Data(), allText.Size() },
-		customData.lineGlyphRects.Data(),
-		{},
-		{ 1.f, 1.f, 1.f, 1.f });
 }
 
 bool Dropdown::Impl::DropdownLayer::CursorMove(
@@ -594,25 +584,22 @@ bool Dropdown::Impl::DropdownLayer_PointerMove(
 	auto const* customDataPtr = rectColl.GetCustomData2<DropdownLayer_CustomData>(rectCollEntry);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto const& customData = *customDataPtr;
+	auto totalLineHeight = customData.totalLineHeight;
 
 	auto const outerRect = rectColl.GetRect(rectCollEntry);
 
 	bool newOccluded = pointer.occluded;
 
-	if (pointer.id == impl::cursorPointerId)
-	{
+	if (pointer.id == impl::cursorPointerId) {
 		if (pointer.occluded)
 			layer.hoveredByCursorIndex = Std::nullOpt;
-		else
-		{
-			auto const lineHeight = customData.textheight;
-
+		else {
 			// Figure out if we hit a line
 			auto lineHit = impl::DropdownLayer_CheckLineHit(
 				outerRect.widgetRect.position,
 				outerRect.widgetRect.extent.width,
 				mainWidget.items.size(),
-				lineHeight + mainWidget.textMargin * 2,
+				totalLineHeight,
 				pointer.pos);
 
 			layer.hoveredByCursorIndex = lineHit;
@@ -639,9 +626,7 @@ Layer::Press_Return Dropdown::Impl::DropdownLayer_PointerPress(
 	auto const* customDataPtr = rectColl.GetCustomData2<Impl::DropdownLayer_CustomData>(rectCollEntry);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto const& customData = *customDataPtr;
-
-	auto const textheight = customData.textheight;
-	auto const lineheight = textheight + mainWidget.textMargin * 2;
+	auto totalLineHeight = customData.totalLineHeight;
 
 	auto const& outerRectPair = rectColl.GetRect(rectCollEntry);
 	auto const outerRect = Rect::Intersection(outerRectPair.widgetRect, outerRectPair.visibleRect);
@@ -655,16 +640,13 @@ Layer::Press_Return Dropdown::Impl::DropdownLayer_PointerPress(
 	// and we missed the rect.
 	returnVal.destroyLayer = !eventConsumed && !pointerInsideOuter;
 
-	if (pointer.type != impl::PointerType::Primary)
-	{
+	if (pointer.type != impl::PointerType::Primary) {
 		return returnVal;
 	}
-	if (!pointerInsideOuter)
-	{
+	if (!pointerInsideOuter) {
 		return returnVal;
 	}
-	if (eventConsumed)
-	{
+	if (eventConsumed) {
 		return returnVal;
 	}
 
@@ -673,11 +655,10 @@ Layer::Press_Return Dropdown::Impl::DropdownLayer_PointerPress(
 		outerRect.position,
 		outerRect.extent.width,
 		mainWidget.items.size(),
-		lineheight,
+		totalLineHeight,
 		pointer.pos);
 
-	if (layer.pressedLine.HasValue())
-	{
+	if (layer.pressedLine.HasValue()) {
 		auto const pressedLine = layer.pressedLine.Value();
 		if (pressedLine.pointerId == pointer.id)
 		{
@@ -715,12 +696,58 @@ Layer::Press_Return Dropdown::Impl::DropdownLayer_PointerPress(
 SizeHint Dropdown::GetSizeHint2(
 	Widget::GetSizeHint2_Params const& params) const
 {
-	auto& textManager = params.textManager;
+	auto& ctx = params.ctx;
+	auto& window = params.window;
+	auto& textMgr = params.textManager;
 	auto& pusher = params.pusher;
 
-	SizeHint returnValue = {};
 
 	auto pusherIt = pusher.AddEntry(*this);
+	auto& customData = pusher.AttachCustomData(pusherIt, Impl::CustomData{ pusher.Alloc() });
+
+	auto normalTextScale = ctx.fontScale * window.contentScale;
+	auto fontSizeId = FontFaceSizeId::Invalid;
+	auto marginAmount = 0;
+	auto totalHeight = 0;
+	{
+		auto normalFontSizeId = textMgr.GetFontFaceSizeId(normalTextScale, window.dpiX, window.dpiY);
+		auto normalHeight = textMgr.GetLineheight(normalFontSizeId, TextHeightType::Alphas);
+		auto normalHeightMargin = (u32)Math::Round((f32)normalHeight * ctx.defaultMarginFactor);
+		auto totalNormalHeight = normalHeight + 2 * normalHeightMargin;
+
+		auto minHeight = CmToPixels(ctx.minimumHeightCm, window.dpiY);
+
+		if (totalNormalHeight > minHeight) {
+			fontSizeId = normalFontSizeId;
+			marginAmount = (i32)normalHeightMargin;
+			totalHeight = (int)totalNormalHeight;
+		} else {
+			// We can't just do minHeight * defaultMarginFactor for this one, because defaultMarginFactor applies to
+			// content, not the outer size. So we set up an equation `height = 2 * marginFactor * content + content`
+			// and we solve for content.
+			auto contentSizeCm = ctx.minimumHeightCm / ((2 * ctx.defaultMarginFactor) + 1.f);
+			auto contentSize = CmToPixels(contentSizeCm, window.dpiY);
+			fontSizeId = textMgr.FontFaceSizeIdForLinePixelHeight(
+					contentSize,
+					TextHeightType::Alphas);
+			marginAmount = CmToPixels((f32)contentSizeCm * ctx.defaultMarginFactor, window.dpiY);
+			totalHeight = minHeight;
+		}
+	}
+	customData.fontSizeId = fontSizeId;
+
+	{
+		// Load the outer extent of the text currently being displayed.
+		auto& currText = this->items[this->selectedItem];
+		auto& glyphRects = customData.glyphRects;
+		glyphRects.Resize(currText.size());
+		auto outerExtent = textMgr.GetOuterExtent(
+			{ currText.data(), currText.size() },
+			fontSizeId,
+			TextHeightType::Alphas,
+			glyphRects.ToSpan());
+		customData.titleTextOuterExtent = outerExtent;
+	}
 
 	// We want to find the size of the biggest text in the dropdown entries
 	// We could measure each lines outer rect, but I'm boring so I'm gonna
@@ -736,20 +763,18 @@ SizeHint Dropdown::GetSizeHint2(
 
 	// We do not store the glyphs of this text, because it's not the
 	// line we want to render later. This is just the longest line.
-	TextSizeInfo textSize = {
-		.scale = params.ctx.fontScale * params.window.contentScale,
-		.dpiX = params.window.dpiX,
-		.dpiY = params.window.dpiY };
-	auto const textOuterExtent = textManager.GetOuterExtent(
+	auto const widestTextOuterExtent = textMgr.GetOuterExtent(
 		{ text.data(), text.size() },
-		textSize);
-	returnValue.minimum = textOuterExtent;
+		fontSizeId,
+		TextHeightType::Alphas);
 
-	returnValue.minimum.width += textMargin * 2;
-	returnValue.minimum.height += textMargin * 2;
+	SizeHint returnVal = {};
+	returnVal.minimum.width = widestTextOuterExtent.width;
+	returnVal.minimum.width += marginAmount * 2;
+	returnVal.minimum.height = totalHeight;
 
-	pusher.SetSizeHint(pusherIt, returnValue);
-	return returnValue;
+	pusher.SetSizeHint(pusherIt, returnVal);
+	return returnVal;
 }
 
 void Dropdown::BuildChildRects(
@@ -763,33 +788,7 @@ void Dropdown::BuildChildRects(
 	if (!pusher.IncludeRendering())
 		return;
 
-	auto customData = Impl::CustomData{ pusher.Alloc() };
-
-	TextSizeInfo textSize = {
-		.scale = params.ctx.fontScale * params.window.contentScale,
-		.dpiX = params.window.dpiX,
-		.dpiY = params.window.dpiY };
-
-	auto& text = items[selectedItem];
-	auto const textLength = (int)text.size();
-	customData.glyphRects.Resize(text.size());
-	auto const textExtent = textMan.GetOuterExtent(
-		{ text.data(), (uSize)textLength },
-		textSize,
-		customData.glyphRects.Data());
-
-	Math::Vec2Int const centerOffset = {
-		(i32)(widgetRect.extent.width / 2 - textExtent.width / 2),
-		(i32)(widgetRect.extent.height / 2 - textExtent.height / 2) };
-	for (int i = 0; i < textLength; i += 1)
-	{
-		auto& rect = customData.glyphRects[i];
-		rect.position += widgetRect.position;
-		rect.position += centerOffset;
-	}
-
 	auto rectCollEntry = pusher.GetEntry(*this);
-	pusher.AttachCustomData(rectCollEntry, Std::Move(customData));
 }
 
 void Dropdown::Render2(
@@ -797,41 +796,36 @@ void Dropdown::Render2(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
-	auto& rectCollection = params.rectCollection;
+	auto& rectColl = params.rectCollection;
 	auto& drawInfo = params.drawInfo;
+	auto& transAlloc = params.transientAlloc;
+	auto& textMgr = params.textManager;
 
 	auto const intersection = Rect::Intersection(widgetRect, visibleRect);
 	if (intersection.IsNothing())
 		return;
-
 	drawInfo.PushFilledQuad(
 		widgetRect,
 		boxColor);
 
-	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
+	auto* customDataPtr = rectColl.GetCustomData2<Impl::CustomData>(*this);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
+	auto fontSizeId = customData.fontSizeId;
+	auto textOuterExtent = customData.titleTextOuterExtent;
 
-	auto const textIsBiggerThanExtent =
-		customData.titleTextOuterExtent.width > widgetRect.extent.width ||
-		customData.titleTextOuterExtent.height > widgetRect.extent.height;
+	auto textRect = widgetRect;
+	textRect.extent = textOuterExtent;
+	textRect.position += Extent::CenteringOffset(widgetRect.extent, textOuterExtent);
 
-	Std::Opt<DrawInfo::ScopedScissor> scissor;
-	if (textIsBiggerThanExtent)
-		scissor = DrawInfo::ScopedScissor(drawInfo, intersection);
-
-	TextSizeInfo textSize = {
-		.scale = params.ctx.fontScale * params.window.contentScale,
-		.dpiX = params.window.dpiX,
-		.dpiY = params.window.dpiY };
-	auto fontFaceId = params.textManager.GetFontFaceId(textSize);
+	auto scissor = DrawInfo::ScopedScissor(drawInfo, textRect, widgetRect);
 
 	auto& text = items[selectedItem];
 	drawInfo.PushText(
-		(u64)fontFaceId,
+		(u64)fontSizeId,
 		{ text.data(), text.size() },
 		customData.glyphRects.Data(),
-		{},
+		textRect.position,
 		{ 1.f, 1.f, 1.f, 1.f });
 }
 

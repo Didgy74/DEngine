@@ -4,18 +4,21 @@
 
 #include <DEngine/Std/Containers/Vec.hpp>
 
+#include <DEngine/Gui/ButtonSizeBehavior.hpp>
+
 using namespace DEngine;
 using namespace DEngine::Gui;
 
 namespace DEngine::Gui::impl
 {
-	[[nodiscard]] static uSize LineList_GetFirstVisibleLine(
+	[[nodiscard]] static int LineList_GetFirstVisibleLine(
 		u32 lineHeight,
 		i32 widgetPosY,
 		i32 visiblePosY,
 		uSize linecount) noexcept
 	{
 		auto temp = visiblePosY - widgetPosY;
+		temp = Math::Max(temp, 0);
 		auto b = (uSize)Math::Floor((f32)temp / (f32)lineHeight);
 		DENGINE_IMPL_ASSERT(b >= 0);
 		b = Math::Min(linecount, b);
@@ -29,20 +32,19 @@ namespace DEngine::Gui::impl
 		return (uSize)Math::Ceil((f32)visibleHeight / (f32)lineHeight);
 	}
 
-	[[nodiscard]] static uSize LineList_GetLastVisibleLine(
+	[[nodiscard]] static int LineList_GetLastVisibleLine(
 		u32 lineHeight,
 		i32 widgetPosY,
 		i32 visiblePosY,
 		u32 visibleHeight,
 		uSize linecount) noexcept
 	{
-		uSize const visibleBegin = impl::LineList_GetFirstVisibleLine(
+		auto const visibleBegin = impl::LineList_GetFirstVisibleLine(
 			lineHeight,
 			widgetPosY,
 			visiblePosY,
 			linecount);
 		auto temp = visibleBegin + impl::LineList_GetVisibleLineCount(lineHeight, visibleHeight);
-		temp = Math::Min(linecount, temp);
 		return temp;
 	}
 
@@ -72,21 +74,17 @@ namespace DEngine::Gui::impl
 	}
 }
 
-void LineList::RemoveLine(uSize index)
-{
+void LineList::RemoveLine(uSize index) {
 	DENGINE_IMPL_GUI_ASSERT(index < lines.size());
 
 	lines.erase(lines.begin() + index);
-	if (selectedLine.HasValue())
-	{
-		if (selectedLine.Value() == index)
-		{
+	if (selectedLine.HasValue()) {
+		if (selectedLine.Value() == index) {
 			selectedLine = Std::nullOpt;
 			if (selectedLineChangedFn)
 				selectedLineChangedFn(*this, nullptr);
 		}
-		else if (selectedLine.Value() < index)
-		{
+		else if (selectedLine.Value() < index) {
 			selectedLine.Value() -= 1;
 			if (selectedLineChangedFn)
 				selectedLineChangedFn(*this, nullptr);
@@ -106,10 +104,11 @@ struct LineList::Impl
 		}
 
 		// Does NOT include any margins.
-		u32 lineHeight = {};
+		int totalLineHeight = 0;
+		int marginAmount = 0;
+		FontFaceSizeId fontSizeId = FontFaceSizeId::Invalid;
 
 		// Only included when we are rendering
-		FontFaceId fontFaceId;
 		Std::Vec<Rect, RectCollection::AllocRefT> lineGlyphRects;
 		Std::Vec<uSize, RectCollection::AllocRefT> lineGlyphRectOffsets;
 	};
@@ -118,8 +117,7 @@ struct LineList::Impl
 	static constexpr u8 cursorPointerId = (u8)-1;
 
 	enum class PointerType : u8 { Primary, Secondary };
-	[[nodiscard]] static constexpr PointerType ToPointerType(Gui::CursorButton in) noexcept
-	{
+	[[nodiscard]] static constexpr PointerType ToPointerType(Gui::CursorButton in) noexcept {
 		switch (in)
 		{
 			case Gui::CursorButton::Primary: return PointerType::Primary;
@@ -130,16 +128,14 @@ struct LineList::Impl
 		return {};
 	}
 
-	struct PointerPress_Pointer
-	{
+	struct PointerPress_Pointer {
 		u8 id;
 		PointerType type;
 		Math::Vec2 pos;
 		bool pressed;
 	};
 
-	struct PointerPress_Params
-	{
+	struct PointerPress_Params {
 		Context& ctx;
 		LineList& widget;
 		RectCollection const& rectCollection;
@@ -150,13 +146,11 @@ struct LineList::Impl
 		bool eventConsumed;
 	};
 
-	struct PointerMove_Pointer
-	{
+	struct PointerMove_Pointer {
 		u8 id;
 		Math::Vec2 pos;
 	};
-	struct PointerMove_Params
-	{
+	struct PointerMove_Params {
 		LineList& widget;
 		RectCollection const& rectCollection;
 		TextManager& textManager;
@@ -171,6 +165,14 @@ struct LineList::Impl
 
 	[[nodiscard]] static bool PointerMove(
 		PointerMove_Params const& params);
+
+
+	static void RenderBackgroundLines(
+		LineList const& lineList,
+		Rect const& widgetRect,
+		Rect const& visibleRect,
+		int totalLineHeight,
+		DrawInfo& drawInfo);
 };
 
 SizeHint LineList::GetSizeHint2(
@@ -180,27 +182,59 @@ SizeHint LineList::GetSizeHint2(
 	auto const& window = params.window;
 	auto& pusher = params.pusher;
 	auto& transientAlloc = params.transientAlloc;
-	auto& textManager = params.textManager;
+	auto& textMgr = params.textManager;
 
-	auto textSize = ctx.fontScale * window.contentScale;
+	auto normalTextScale = ctx.fontScale * window.contentScale;
+	auto fontSizeId = FontFaceSizeId::Invalid;
+	auto totalLineHeight = 0;
+	auto marginAmount = 0;
+	{
+		auto normalFontSizeId = textMgr.GetFontFaceSizeId(normalTextScale, window.dpiX, window.dpiY);
+		auto normalHeight = textMgr.GetLineheight(normalFontSizeId, TextHeightType::Normal);
+		auto normalHeightMargin = (int)Math::Round((f32)normalHeight * ctx.defaultMarginFactor);
+		auto totalNormalHeight = normalHeight + 2 * normalHeightMargin;
 
-	auto const& pusherIt = pusher.AddEntry(*this);
+		auto minHeight = CmToPixels(ctx.minimumHeightCm, window.dpiY);
 
-	auto customData = Impl::CustomData{ pusher.Alloc() };
-	customData.lineHeight = textManager.GetLineheight(textSize, window.dpiX, window.dpiY);
-	if (pusher.IncludeRendering()) {
-		customData.fontFaceId = textManager.GetFontFaceId(textSize, window.dpiX, window.dpiY);
+		if (totalNormalHeight > minHeight) {
+			fontSizeId = normalFontSizeId;
+			totalLineHeight = (int)totalNormalHeight;
+			marginAmount = normalHeightMargin;
+
+		} else {
+			// We can't just do minHeight * defaultMarginFactor for this one, because defaultMarginFactor applies to
+			// content, not the outer size. So we set up an equation `height = 2 * marginFactor * content + content`
+			// and we solve for content.
+			auto contentSizeCm = ctx.minimumHeightCm / ((2 * ctx.defaultMarginFactor) + 1.f);
+			auto contentSize = CmToPixels(contentSizeCm, window.dpiY);
+			fontSizeId = textMgr.FontFaceSizeIdForLinePixelHeight(
+				contentSize,
+				TextHeightType::Alphas);
+			totalLineHeight = minHeight;
+			marginAmount = CmToPixels(contentSizeCm * ctx.defaultMarginFactor, window.dpiY);
+		}
 	}
 
-	SizeHint returnValue = {};
-	returnValue.minimum.width = 100;
-	returnValue.minimum.height = customData.lineHeight * lines.size();
-	returnValue.minimum.height += textMargin * 2 * lines.size();
+	auto const& pusherIt = pusher.AddEntry(*this);
+	auto& customData = pusher.AttachCustomData(pusherIt, Impl::CustomData{ pusher.Alloc() });
+	customData.fontSizeId = fontSizeId;
+	customData.totalLineHeight = totalLineHeight;
+	customData.marginAmount = marginAmount;
 
-	pusher.AttachCustomData(pusherIt, Std::Move(customData));
-	pusher.SetSizeHint(pusherIt, returnValue);
 
-	return returnValue;
+	SizeHint returnVal = {};
+	returnVal.minimum.height = totalLineHeight * lines.size();
+
+	returnVal.minimum.width = Math::Max(
+		returnVal.minimum.width,
+		(u32)CmToPixels(ctx.minimumHeightCm, window.dpiX));
+	returnVal.minimum.height = Math::Max(
+		returnVal.minimum.height,
+		(u32)lines.size() * (u32)CmToPixels(ctx.minimumHeightCm, window.dpiY));
+
+	pusher.SetSizeHint(pusherIt, returnVal);
+
+	return returnVal;
 }
 
 void LineList::BuildChildRects(
@@ -213,15 +247,12 @@ void LineList::BuildChildRects(
 	auto& pusher = params.pusher;
 	auto& textManager = params.textManager;
 
-	auto textSize = ctx.fontScale * window.contentScale;
-
-	if (pusher.IncludeRendering())
-	{
+	if (pusher.IncludeRendering()) {
 		auto* customDataPtr = pusher.GetCustomData2<Impl::CustomData>(*this);
 		DENGINE_IMPL_ASSERT(customDataPtr);
 		auto& customData = *customDataPtr;
 
-		auto const totalLineHeight = customData.lineHeight + textMargin * 2;
+		auto const totalLineHeight = customData.totalLineHeight;
 		auto const linecount = (int)lines.size();
 
 		auto visibleBegin = (int)impl::LineList_GetFirstVisibleLine(
@@ -235,6 +266,7 @@ void LineList::BuildChildRects(
 			visibleRect.position.y,
 			visibleRect.extent.height,
 			linecount);
+		visibleEnd = Math::Min(linecount, visibleEnd);
 
 		// First count up the total amount of Rects we need
 		auto const visibleLineCount = visibleEnd - visibleBegin;
@@ -249,30 +281,57 @@ void LineList::BuildChildRects(
 
 		// Then allocate the space we need for these rects, and load into them.
 		customData.lineGlyphRects.Resize(rectCount);
-		for (int i = 0; i < visibleLineCount; i += 1)
-		{
+		for (int i = 0; i < visibleLineCount; i += 1) {
 			auto const lineIndex = i + visibleBegin;
-
-			auto posOffset = widgetRect.position;
-			posOffset.y += (i32)totalLineHeight * lineIndex;
-			posOffset.x += (i32)textMargin;
-			posOffset.y += (i32)textMargin;
 
 			auto const& line = lines[lineIndex];
 			auto const lineGlyphRectOffset = customData.lineGlyphRectOffsets[i];
-			Std::Span lineGlyphRects {
-				&customData.lineGlyphRects[lineGlyphRectOffset],
-				line.size() };
-
 			textManager.GetOuterExtent(
 				{ line.data(), line.size() },
-				textSize,
-				window.dpiX,
-				window.dpiY,
-				lineGlyphRects.Data());
-			// Then apply the pos offset to the rects
-			for (auto& item : lineGlyphRects)
-				item.position += posOffset;
+				customData.fontSizeId,
+				TextHeightType::Normal,
+				customData.lineGlyphRects.ToSpan().Subspan(lineGlyphRectOffset, line.size()));
+		}
+	}
+}
+
+void LineList::Impl::RenderBackgroundLines(
+	LineList const& lineList,
+	Rect const& widgetRect,
+	Rect const& visibleRect,
+	int totalLineHeight,
+	DrawInfo& drawInfo)
+{
+	auto linecount = lineList.lines.size();
+	auto const& selectedLine = lineList.selectedLine;
+	auto const& lineCursorHover = lineList.lineCursorHover;
+
+	auto visibleBegin = impl::LineList_GetFirstVisibleLine(
+		totalLineHeight,
+		widgetRect.position.y,
+		visibleRect.position.y,
+		linecount);
+	auto visibleEnd = impl::LineList_GetLastVisibleLine(
+		totalLineHeight,
+		widgetRect.position.y,
+		visibleRect.position.y,
+		visibleRect.extent.height,
+		linecount);
+
+	auto const visibleLineCount = visibleEnd - visibleBegin;
+	for (uSize i = visibleBegin; i < visibleEnd; i += 1) {
+		auto const lineRect = impl::GetLineRect(
+			widgetRect.position,
+			widgetRect.extent.width,
+			totalLineHeight,
+			i);
+
+		if (selectedLine.HasValue() && selectedLine.Value() == i) {
+			drawInfo.PushFilledQuad(lineRect, highlightOverlayColor);
+		} else if (lineCursorHover.HasValue() && lineCursorHover.Value() == i) {
+			drawInfo.PushFilledQuad(lineRect, hoverOverlayColor);
+		} else if (i % 2 == 0) {
+			drawInfo.PushFilledQuad(lineRect, alternatingLineOverlayColor);
 		}
 	}
 }
@@ -282,68 +341,65 @@ void LineList::Render2(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
-	if (Rect::Intersection(widgetRect, visibleRect).IsNothing())
+	if (Intersection(widgetRect, visibleRect).IsNothing())
 		return;
 
 	auto& rectCollection = params.rectCollection;
 	auto& drawInfo = params.drawInfo;
+	auto& textMgr = params.textManager;
 
 	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
 	DENGINE_IMPL_ASSERT(customDataPtr);
 	auto const& customData = *customDataPtr;
+	auto totalLineHeight = customData.totalLineHeight;
+	auto fontSizeId = customData.fontSizeId;
+	auto textMargin = customData.marginAmount;
+	auto linecount = (int)this->lines.size();
 
-	auto const totalLineHeight = customData.lineHeight + textMargin * 2;
+	Impl::RenderBackgroundLines(
+		*this,
+		widgetRect,
+		visibleRect,
+		totalLineHeight,
+		drawInfo);
 
-	auto const linecount = lines.size();
-
-	auto const visibleBegin = impl::LineList_GetFirstVisibleLine(
+	auto visibleBegin = impl::LineList_GetFirstVisibleLine(
 		totalLineHeight,
 		widgetRect.position.y,
 		visibleRect.position.y,
 		linecount);
-	auto const visibleEnd = impl::LineList_GetLastVisibleLine(
+	auto visibleEnd = impl::LineList_GetLastVisibleLine(
 		totalLineHeight,
 		widgetRect.position.y,
 		visibleRect.position.y,
 		visibleRect.extent.height,
 		linecount);
+	visibleEnd = Math::Min(linecount, visibleEnd);
+	auto visibleLineCount = visibleEnd - visibleBegin;
 
-	auto const visibleLineCount = visibleEnd - visibleBegin;
+	auto textHeight = textMgr.GetLineheight(fontSizeId, TextHeightType::Normal);
 
-	for (uSize i = visibleBegin; i < visibleEnd; i += 1)
-	{
-		auto const lineRect = impl::GetLineRect(
+	for (int i = 0; i < visibleLineCount; i++) {
+		auto const lineIndex = i + visibleBegin;
+		auto& line = lines[lineIndex];
+		auto const& lineRectOffset = customData.lineGlyphRectOffsets[i];
+		auto const* lineRects = &customData.lineGlyphRects[lineRectOffset];
+
+		auto lineRect = impl::GetLineRect(
 			widgetRect.position,
 			widgetRect.extent.width,
 			totalLineHeight,
 			i);
-
-		if (selectedLine.HasValue() && selectedLine.Value() == i)
-		{
-			drawInfo.PushFilledQuad(lineRect, highlightOverlayColor);
-		}
-		else if (lineCursorHover.HasValue() && lineCursorHover.Value() == i)
-		{
-			drawInfo.PushFilledQuad(lineRect, hoverOverlayColor);
-		}
-		else if (i % 2 == 0)
-		{
-			drawInfo.PushFilledQuad(lineRect, alternatingLineOverlayColor);
-		}
-	}
-
-	for (uSize i = 0; i < visibleLineCount; i++)
-	{
-		auto const lineIndex = i + visibleBegin;
-		auto& line = lines[lineIndex];
-		auto const lineRectOffset = customData.lineGlyphRectOffsets[i];
-		auto const* lineRects = &customData.lineGlyphRects[lineRectOffset];
-
+		// Offset to center
+		auto textRect = lineRect;
+		textRect.extent.height = textHeight;
+		textRect.position.x += textMargin;
+		textRect.position.y += CenterRangeOffset((int)lineRect.extent.height, (int)textHeight);
 		drawInfo.PushText(
-			(u64)customData.fontFaceId,
+			(u64)fontSizeId,
 			{ line.data(), line.size() },
 			lineRects,
-			{},
+			textRect.position,
 			{ 1.f, 1.f, 1.f, 1.f });
 	}
 }
@@ -372,38 +428,33 @@ bool LineList::Impl::PointerPress(
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto const& customData = *customDataPtr;
 
-	auto const totalLineHeight = customData.lineHeight + widget.textMargin * 2;
+	auto const totalLineHeight = customData.totalLineHeight;
 
 	auto const hoveredIndex = impl::GetHoveredIndex(
 		(i32)pointer.pos.y,
 		widgetRect.position.y,
 		totalLineHeight);
 
-	if (widget.currPressedLine.HasValue())
-	{
+	if (widget.currPressedLine.HasValue()) {
 		auto const pressedLine = widget.currPressedLine.Value();
-		if (!pointer.pressed && pressedLine.pointerId == pointer.id)
-		{
-			widget.currPressedLine = Std::nullOpt;
+
+		if (!pointer.pressed && pressedLine.pointerId == pointer.id) {
+		 	widget.currPressedLine = Std::nullOpt;
 
 			bool selectedLineChanged = false;
-			if (pressedLine.lineIndex.HasValue())
-			{
+			if (pressedLine.lineIndex.HasValue()) {
 				// We are currently holding an existing line.
 				// Check if we unpressed that same line
 				auto const lineIndex = pressedLine.lineIndex.Value();
-				if (lineIndex == hoveredIndex)
-				{
+				if (lineIndex == hoveredIndex) {
 					widget.selectedLine = lineIndex;
 					selectedLineChanged = true;
 				}
-			}
-			else
+			} else
 			{
 				// We were currently not holding a line
 				// Check if we unpressed outside any lines
-				if (hoveredIndex >= widget.lines.size())
-				{
+				if (hoveredIndex >= widget.lines.size()) {
 					widget.selectedLine = Std::nullOpt;
 					selectedLineChanged = true;
 				}
@@ -417,15 +468,13 @@ bool LineList::Impl::PointerPress(
 	{
 		// We are not currently pressing a line, check if we hit a new line
 		// on the event if it was not already consumed
-		if (pointer.pressed && pointerInside && !params.eventConsumed)
-		{
+		if (pointer.pressed && pointerInside && !params.eventConsumed) {
 			// We don't want to go into pressed state if we
 			// pressed a line that is already selected.
 			auto const hoveringSelectingLine =
 				widget.selectedLine.HasValue() &&
 				widget.selectedLine.Value() == hoveredIndex;
-			if (!hoveringSelectingLine)
-			{
+			if (!hoveringSelectingLine) {
 				// We did not press a line that is already selected.
 				LineList::PressedLine_T newPressedLine = {};
 				newPressedLine.pointerId = pointer.id;
@@ -460,14 +509,13 @@ bool LineList::Impl::PointerMove(
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto const& customData = *customDataPtr;
 
-	auto const totalLineHeight = customData.lineHeight + widget.textMargin * 2;
+	auto const totalLineHeight = customData.totalLineHeight;
 
-	if (pointer.id == cursorPointerId)
-	{
-		if (!pointerInside || params.pointerOccluded)
+	if (pointer.id == cursorPointerId) {
+		if (!pointerInside || params.pointerOccluded) {
 			widget.lineCursorHover = Std::nullOpt;
-		else
-		{
+		}
+		else {
 			auto const hoveredIndex = impl::GetHoveredIndex(
 				(i32)pointer.pos.y,
 				widgetRect.position.y,

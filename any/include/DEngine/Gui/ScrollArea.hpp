@@ -18,8 +18,7 @@ namespace DEngine::Gui
 		static constexpr bool defaultExpandChild = true;
 		bool expandChild = defaultExpandChild;
 
-		static constexpr Math::Vec3 scrollbarHoverHighlight = { 0.1f, 0.1f, 0.1f };
-		Math::Vec4 scrollbarInactiveColor = { 0.4f, 0.4f, 0.4f, 1.f };
+		Math::Vec4 scrollbarInactiveColor = { 1, 1, 1, 0.25f };
 
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
@@ -71,10 +70,8 @@ namespace DEngine::Gui
 		friend impl::SA_Impl;
 
 		u32 currScrollbarPos = 0;
-		u32 scrollbarThickness = 50;
 
-		struct Scrollbar_Pressed_T
-		{
+		struct Scrollbar_Pressed_T {
 			u8 pointerId;
 			f32 pointerRelativePosY;
 		};

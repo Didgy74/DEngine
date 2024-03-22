@@ -56,7 +56,22 @@ namespace DEngine::Std
 		}
 		~StackVec();
 
-		StackVec<T, capacity>& operator=(StackVec<T, capacity> const&);
+		auto& operator=(StackVec const& other) requires (Trait::isCopyAssignable<T>) {
+			if (this == &other)
+				return *this;
+
+			int i = 0;
+			for (; i < (size < other.size ? size : other.size); i++)
+				values[i] = other[i];
+			for (; i < size; i++)
+				values[i].~T();
+			for (; i < other.size; i++)
+				new(values + i) T(other[i]);
+
+			size = other.size;
+
+			return *this;
+		}
 		StackVec<T, capacity>& operator=(StackVec<T, capacity>&&) noexcept;
 
 		[[nodiscard]] constexpr Span<T> ToSpan() noexcept;
@@ -104,25 +119,6 @@ namespace DEngine::Std
 	template<class T, unsigned int capacity>
 	StackVec<T, capacity>::~StackVec() {
 		Clear();
-	}
-
-	template<class T, unsigned int capacity>
-	StackVec<T, capacity>& StackVec<T, capacity>::operator=(StackVec<T, capacity> const& other)
-	{
-		if (this == &other)
-			return *this;
-
-		int i = 0;
-		for (; i < (size < other.size ? size : other.size); i++)
-			values[i] = other[i];
-		for (; i < size; i++)
-			values[i].~T();
-		for (; i < other.size; i++)
-			new(values + i) T(other[i]);
-
-		size = other.size;
-
-		return *this;
 	}
 
 	template<class T, unsigned int capacity>

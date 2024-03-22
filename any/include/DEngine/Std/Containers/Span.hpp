@@ -7,8 +7,7 @@
 
 namespace DEngine::Std
 {
-	namespace impl
-	{
+	namespace impl {
 		template<class T>
 		struct Span_IsConst { static constexpr bool value = false; };
 		template<class T>
@@ -19,6 +18,10 @@ namespace DEngine::Std
 		struct Span_RemoveConst_Struct<Type const> { using T = Type; };
 		template<class T>
 		using Span_RemoveConst = typename Span_RemoveConst_Struct<T>::T;
+		template<class T>
+		struct Span_isChar { static constexpr bool value = false; };
+		template<>
+		struct Span_isChar<char> { static constexpr bool value = true; };
 	}
 
 	template<class T>
@@ -27,6 +30,7 @@ namespace DEngine::Std
 	public:
 		using ValueType = impl::Span_RemoveConst<T>;
 		static constexpr bool typeIsConst = impl::Span_IsConst<T>::value;
+		static constexpr bool isByteSpan = impl::Span_isChar<ValueType>::value;
 
 		constexpr Span() noexcept = default;
 		constexpr Span(T* data, uSize size) noexcept;
@@ -35,6 +39,7 @@ namespace DEngine::Std
 		// Testing some stuff
 		//template<int N>
 		//constexpr Span(T (&arr)[N]) noexcept;
+		constexpr Span(T& value) noexcept : m_data{ &value }, m_size{ 1 } {}
 
 		[[nodiscard]] constexpr Span<T const> ConstSpan() const noexcept;
 		constexpr operator Span<T const>() const noexcept;
@@ -49,6 +54,14 @@ namespace DEngine::Std
 			return { m_data + offset, count };
 		}
 
+		template<class U>
+		[[nodiscard]] Std::Span<U> Cast() const requires (isByteSpan) {
+			DENGINE_IMPL_CONTAINERS_ASSERT((uSize)m_data % alignof(U) == 0);
+			DENGINE_IMPL_CONTAINERS_ASSERT(m_size % sizeof(U) == 0);
+			return {
+				reinterpret_cast<U*>(m_data),
+				m_size / sizeof(U) };
+		}
 		[[nodiscard]] T* Data() const noexcept;
 		[[nodiscard]] uSize Size() const noexcept;
 		[[nodiscard]] bool Empty() const noexcept;
@@ -64,6 +77,10 @@ namespace DEngine::Std
 		uSize m_size = 0;
 	};
 
+	using ByteSpan = Std::Span<char>;
+	using ConstByteSpan = Std::Span<char const>;
+
+	/*
 	class ByteSpan
 	{
 	public:
@@ -71,6 +88,7 @@ namespace DEngine::Std
 		ByteSpan(void* ptr, uSize size) : m_data{ ptr }, m_size{ size } {}
 
 		[[nodiscard]] char* Data() const noexcept { return static_cast<char*>(m_data); }
+		[[nodiscard]] uSize Size() const noexcept { return m_size; }
 
 		[[nodiscard]] ByteSpan Offset(uSize offset) const noexcept;
 
@@ -80,6 +98,7 @@ namespace DEngine::Std
 		void* m_data = nullptr;
 		uSize m_size = 0;
 	};
+	 */
 
 	template<class T>
 	constexpr Span<T>::Span(T* data, uSize size) noexcept :
@@ -138,7 +157,7 @@ namespace DEngine::Std
 
 	template<class T>
 	T* Span<T>::end() const noexcept { return m_data + m_size; }
-
+	/*
 	template<class T>
 	[[nodiscard]] Span<T> ByteSpan::Cast() const noexcept
 	{
@@ -148,13 +167,9 @@ namespace DEngine::Std
 			static_cast<T*>(m_data),
 			m_size / sizeof(T) };
 	}
+	 */
 
 	// Pass in string literals
 	template<unsigned N>
-	[[nodiscard]] constexpr Span<char const> CStrToSpan(char const (&in)[N]) noexcept {
-		return {
-			in,
-			N - 1
-		};
-	}
+	[[nodiscard]] consteval Span<char const> CStrToSpan(char const (&in)[N]) noexcept { return { in, N - 1 }; }
 }

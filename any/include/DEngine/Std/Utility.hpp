@@ -69,6 +69,19 @@ namespace DEngine::Std
 	constexpr Iterator FindIf(
 		Range<Iterator> range,
 		BoolCallable callable);
+
+	template<class Iterator>
+	constexpr bool Contains(
+		Iterator begin,
+		Iterator const& end,
+		decltype(*begin) const& value)
+	{
+		for (; begin != end; begin++) {
+			if (*begin == value)
+				return true;
+		}
+		return false;
+	}
 }
 
 template<typename T>
@@ -78,8 +91,7 @@ constexpr DEngine::Std::Trait::RemoveRef<T>&& DEngine::Std::Move(T&& in) noexcep
 }
 
 template<typename T>
-constexpr void DEngine::Std::Swap(T& a, T& b) noexcept
-{
+constexpr void DEngine::Std::Swap(T& a, T& b) noexcept {
 	T temp = Move(a);
 	a = Move(b);
 	b = Move(temp);
@@ -91,8 +103,7 @@ bool DEngine::Std::AllOf(
 	Iterator end,
 	BoolCallable callable)
 {
-	for (;begin != end; begin++)
-	{
+	for (;begin != end; begin++) {
 		if (!callable(*begin))
 			return false;
 	}
@@ -113,8 +124,7 @@ bool DEngine::Std::AnyOf(
 	Iterator end,
 	BoolCallable callable)
 {
-	for (; begin != end; begin++)
-	{
+	for (; begin != end; begin++) {
 		if (callable(*begin))
 			return true;
 	}
@@ -135,8 +145,7 @@ constexpr Iterator DEngine::Std::FindIf(
 	Iterator end,
 	BoolFunc callable)
 {
-	for (; begin != end; begin++)
-	{
+	for (; begin != end; begin++) {
 		if (callable(*begin))
 			return begin;
 	}

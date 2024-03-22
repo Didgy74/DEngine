@@ -7,6 +7,8 @@
 
 #include <DEngine/Math/Common.hpp>
 
+#include <DEngine/Gui/ButtonSizeBehavior.hpp>
+
 namespace DEngine::Gui::impl
 {
 	enum class PointerType : u8 { Primary, Secondary };
@@ -54,17 +56,8 @@ namespace DEngine::Gui::impl
 		Rect const& widgetRect;
 		Rect const& visibleRect;
 		PointerPress_Pointer const& pointer;
+        Std::AnyRef customData;
 	};
-
-	[[nodiscard]] static Math::Vec2Int BuildTextOffset(Extent const& widgetExtent, Extent const& textExtent) noexcept {
-		Math::Vec2Int out = {};
-		for (int i = 0; i < 2; i++) {
-			auto temp = (i32)Math::Round((f32)widgetExtent[i] * 0.5f - (f32)textExtent[i] * 0.5f);
-			temp = Math::Max(0, temp);
-			out[i] = temp;
-		}
-		return out;
-	}
 }
 
 using namespace DEngine;
@@ -78,8 +71,8 @@ public:
 	{
 		explicit CustomData(RectCollection::AllocRefT const& alloc) : glyphRects{ alloc } {}
 
-		Extent titleTextOuterExtent = {};
-		FontFaceId fontFaceId;
+		FontFaceSizeId fontSizeId = FontFaceSizeId::Invalid;
+		Extent textOuterExtent = {};
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
@@ -107,19 +100,16 @@ bool Gui::Button::Impl::PointerPress(impl::PointerPress_Params const& params)
 	if (pointer.type != impl::PointerType::Primary)
 		return returnVal;
 
-	if (widget.heldPointerId.HasValue())
-	{
+	if (widget.heldPointerId.HasValue()) {
 		auto const currPointerId = widget.heldPointerId.Value();
 		if (params.pointer.id == currPointerId && !params.pointer.pressed && !params.pointer.consumed)
 		{
 			widget.heldPointerId = Std::nullOpt;
 
 			if (pointerInside)
-				widget.Activate();
+				widget.Activate(params.customData);
 		}
-	}
-	else
-	{
+	} else {
 		if (pointerInside && params.pointer.pressed && !params.pointer.consumed)
 			widget.heldPointerId = params.pointer.id;
 	}
@@ -149,15 +139,14 @@ Button::Button()
 	text = "Button";
 }
 
-void Button::Activate()
+void Button::Activate(Std::AnyRef customData)
 {
-	if (type == Type::Toggle)
-	{
+	if (type == Type::Toggle) {
 		toggled = !toggled;
 	}
 
 	if (activateFn)
-		activateFn(*this);
+		activateFn(*this, customData);
 }
 
 void Button::SetToggled(bool toggled)
@@ -212,7 +201,8 @@ bool Button::CursorPress2(
 		*this,
 		widgetRect,
 		visibleRect,
-		pointer };
+		pointer,
+        params.customData };
 
 	return Impl::PointerPress(temp);
 }
@@ -251,10 +241,11 @@ bool Button::TouchPress2(
 	pointer.consumed = consumed;
 
 	impl::PointerPress_Params temp {
-		*this,
-		widgetRect,
-		visibleRect,
-		pointer };
+		.btn = *this,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
+		.pointer = pointer,
+		.customData = params.customData };
 
 	return Impl::PointerPress(temp);
 }
@@ -267,44 +258,64 @@ SizeHint Button::GetSizeHint2(
 	auto& pusher = params.pusher;
 	auto const& window = params.window;
 
-	SizeHint returnValue = {};
-
 	auto pusherIt = pusher.AddEntry(*this);
 
-	auto textScale = ctx.fontScale * window.contentScale;
-
+	auto& customData = pusher.AttachCustomData(pusherIt, Impl::CustomData{ pusher.Alloc() });
 	if (pusher.IncludeRendering()) {
-		auto customData = Impl::CustomData{ pusher.Alloc() };
-		customData.fontFaceId = textMgr.GetFontFaceId(
-			textScale,
-			window.dpiX,
-			window.dpiY);
-
 		customData.glyphRects.Resize(text.size());
-		auto const textOuterExtent = textMgr.GetOuterExtent(
-			{ text.data(), text.size() },
-			textScale,
-			window.dpiX,
-			window.dpiY,
-			customData.glyphRects.Data());
-		customData.titleTextOuterExtent = textOuterExtent;
-		returnValue.minimum = textOuterExtent;
-		pusher.AttachCustomData(pusherIt, Std::Move(customData));
 	}
-	else
+
+	auto normalTextScale = ctx.fontScale * window.contentScale;
+	auto fontSizeId = FontFaceSizeId::Invalid;
+	auto marginAmount = 0;
 	{
-		returnValue.minimum = textMgr.GetOuterExtent(
-			{ text.data(), text.size() },
-			textScale,
-			window.dpiX,
-			window.dpiY);
+		auto normalFontSizeId = textMgr.GetFontFaceSizeId(normalTextScale, window.dpiX, window.dpiY);
+		auto normalHeight = textMgr.GetLineheight(normalFontSizeId, TextHeightType::Alphas);
+		auto normalHeightMargin = (u32)Math::Round((f32)normalHeight * ctx.defaultMarginFactor);
+		auto totalNormalHeight = normalHeight + 2 * normalHeightMargin;
+
+		auto minHeight = CmToPixels(ctx.minimumHeightCm, window.dpiY);
+
+		if (totalNormalHeight > minHeight) {
+			fontSizeId = normalFontSizeId;
+			marginAmount = (i32)normalHeightMargin;
+		} else {
+			// We can't just do minHeight * defaultMarginFactor for this one, because defaultMarginFactor applies to
+			// content, not the outer size. So we set up an equation `height = 2 * marginFactor * content + content`
+			// and we solve for content.
+			auto contentSizeCm = ctx.minimumHeightCm / ((2 * ctx.defaultMarginFactor) + 1.f);
+			auto contentSize = CmToPixels(contentSizeCm, window.dpiY);
+			fontSizeId = textMgr.FontFaceSizeIdForLinePixelHeight(
+				contentSize,
+				TextHeightType::Alphas);
+			marginAmount = CmToPixels((f32)contentSizeCm * ctx.defaultMarginFactor, window.dpiY);
+		}
 	}
+	customData.fontSizeId = fontSizeId;
 
-	auto margin = (u32)Math::Round((f32)returnValue.minimum.height * 0.25f);
-	returnValue.minimum.AddPadding(margin);
+	Std::Span<Rect> glyphRects = {};
+	if (pusher.IncludeRendering())
+		glyphRects = customData.glyphRects.ToSpan();
 
-	pusher.SetSizeHint(pusherIt, returnValue);
-	return returnValue;
+	auto textOuterExtent = textMgr.GetOuterExtent(
+		{ text.data(), text.size() },
+		fontSizeId,
+		TextHeightType::Alphas,
+		glyphRects);
+	customData.textOuterExtent = textOuterExtent;
+
+	SizeHint returnVal = {};
+	returnVal.minimum = textOuterExtent;
+	returnVal.minimum.AddPadding(marginAmount);
+	returnVal.minimum.width = Math::Max(
+		returnVal.minimum.width,
+		(u32)CmToPixels(ctx.minimumHeightCm, window.dpiX));
+	returnVal.minimum.height = Math::Max(
+		returnVal.minimum.height,
+		(u32)CmToPixels(ctx.minimumHeightCm, window.dpiY));
+
+	pusher.SetSizeHint(pusherIt, returnVal);
+	return returnVal;
 }
 
 void Button::BuildChildRects(
@@ -329,67 +340,77 @@ void Button::Render2(
 	Math::Vec4 currColor = {};
 	Math::Vec4 currTextColor = {};
 
-	if (heldPointerId.HasValue())
-	{
+	if (heldPointerId.HasValue()) {
 		// We have a finger pressing on the button atm
 		currColor = colors.pressed;
 		currTextColor = colors.pressedText;
 	}
-	else
-	{
-		if (type == Type::Toggle)
-		{
-			if (toggled)
-			{
+	else {
+		if (type == Type::Toggle) {
+			if (toggled) {
 				currColor = colors.toggled;
 				currTextColor = colors.toggledText;
-			}
-			else
-			{
+			} else {
 				currColor = colors.normal;
 				currTextColor = colors.normalText;
 			}
-		}
-		else if (type == Type::Push)
-		{
+		} else if (type == Type::Push) {
 			currColor = colors.normal;
 			currTextColor = colors.normalText;
 		}
 		else
 			DENGINE_IMPL_UNREACHABLE();
 
-		if (hoveredByCursor)
-		{
-			for (auto i = 0; i < 3; i++)
-				currColor[i] += hoverOverlayColor[i];
+		if (hoveredByCursor) {
+			currColor += hoverOverlayColor.AsVec4(0.f);
 		}
 	}
 
-	for (auto i = 0; i < 4; i++)
-	{
-		currColor[i] = Math::Clamp(currColor[i], 0.f, 1.f);
-		currTextColor[i] = Math::Clamp(currTextColor[i], 0.f, 1.f);
-	}
+	currColor = currColor.ClampAll(0.f, 1.f);
+	currTextColor = currTextColor.ClampAll(0.f, 1.f);
+
+	// Calculate radius
+	auto minDimension = Math::Min(widgetRect.extent.width, widgetRect.extent.height);
+	auto radius = (int)Math::Floor((f32)minDimension * 0.25f);
 
 	drawInfo.PushFilledQuad(
 		widgetRect,
-		currColor);
+		currColor,
+		radius);
 
 	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
 
-	Rect textRect = {};
-	textRect.position =
-		widgetRect.position + impl::BuildTextOffset(widgetRect.extent, customData.titleTextOuterExtent);
-	textRect.extent = customData.titleTextOuterExtent;
+	auto centeringOffset = Extent::CenteringOffset(widgetRect.extent, customData.textOuterExtent);
+	centeringOffset.x = Math::Max(centeringOffset.x, 0);
+	centeringOffset.y = Math::Max(centeringOffset.y, 0);
+
+	auto textRect = Rect{ widgetRect.position + centeringOffset, customData.textOuterExtent };
+
+	// Used for debugging to display the textRect, to see if the bounding box is correct.
+	//drawInfo.PushFilledQuad(textRect, { 1, 0, 0, 0.5f });
 
 	auto scissor = DrawInfo::ScopedScissor(drawInfo, textRect, widgetRect);
-
 	drawInfo.PushText(
-		(u64)customData.fontFaceId,
+		(u64)customData.fontSizeId,
 		{ text.data(), text.size() },
 		customData.glyphRects.Data(),
 		textRect.position,
 		currTextColor);
+}
+
+void Button::AccessibilityTest(
+	AccessibilityTest_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	auto& pusher = params.pusher;
+
+	AccessibilityInfoElement element = {};
+	element.textStart = pusher.PushText({ this->text.data(), this->text.size() });
+	element.textCount = (int)this->text.size();
+	element.rect = Intersection(widgetRect, visibleRect);
+	element.isClickable = true;
+	pusher.PushElement(element);
 }

@@ -2,28 +2,25 @@ package didgy.dengine
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.NativeActivity
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
-import android.graphics.PixelFormat
 import android.os.Bundle
 import android.view.*
 import android.view.View.OnTouchListener
 import android.view.ViewTreeObserver.OnGlobalLayoutListener
-
 class DEngineActivity :
     Activity(),
     SurfaceHolder.Callback2,
     OnGlobalLayoutListener,
-    OnTouchListener
+    OnTouchListener,
+    InputQueue.Callback
 {
     val parentApp get() = application as DEngineApp
 
-    private var mNativeBackendDataPtr: Long = 0
     lateinit var contentView: NativeView
-    val INVALID_WINDOW_ID = -1
-    var mWindowId = INVALID_WINDOW_ID
+    var mWindowId = DEngineApp.INVALID_WINDOW_ID
 
+    var accessilityData = DEngineApp.AccessibilityUpdateData()
     data class NativeTextInputJob(
         val start: Int,
         val count: Int,
@@ -43,7 +40,7 @@ class DEngineActivity :
             temp
         }
         NativeInterface.onTextInput(
-            mNativeBackendDataPtr,
+            parentApp.nativeBackendDataPtr,
             inputJobs.map { it.start }.toIntArray(),
             inputJobs.map { it.count }.toIntArray(),
             textOffsets.toIntArray(),
@@ -52,13 +49,13 @@ class DEngineActivity :
     }
 
     fun nativeSendEventEndTextInputSession() =
-        NativeInterface.sendEventEndTextInputSession(mNativeBackendDataPtr)
+        NativeInterface.sendEventEndTextInputSession(parentApp.nativeBackendDataPtr)
 
     fun nativeOnNewOrientation(newOrientation: Int) =
-        NativeInterface.onNewOrientation(mNativeBackendDataPtr, newOrientation)
+        NativeInterface.onNewOrientation(parentApp.nativeBackendDataPtr, newOrientation)
 
     fun nativeOnFontScale(newScale: Float) =
-        NativeInterface.onFontScale(mNativeBackendDataPtr, mWindowId, newScale)
+        NativeInterface.onFontScale(parentApp.nativeBackendDataPtr, mWindowId, newScale)
 
     fun nativeOnContentRectChanged(
         posX: Int,
@@ -67,36 +64,32 @@ class DEngineActivity :
         height: Int)
     {
         NativeInterface.onContentRectChanged(
-            mNativeBackendDataPtr,
+            parentApp.nativeBackendDataPtr,
             posX, posY,
             width, height)
     }
 
     fun nativeOnNativeWindowCreated(surface: Surface) =
-        NativeInterface.onNativeWindowCreated(mNativeBackendDataPtr, surface)
+        NativeInterface.onNativeWindowCreated(parentApp.nativeBackendDataPtr, surface)
 
     fun nativeOnNativeWindowDestroyed(surface: Surface) =
-        NativeInterface.onNativeWindowDestroyed(mNativeBackendDataPtr, surface)
+        NativeInterface.onNativeWindowDestroyed(parentApp.nativeBackendDataPtr, surface)
 
     override fun onCreate(savedState: Bundle?) {
         super.onCreate(savedState)
-
-        mNativeBackendDataPtr = NativeInterface_InitWrapper(this)
-
-        window.setFormat(PixelFormat.RGBA_8888)
-        window.takeSurface(this)
+        parentApp.tryInit(this)
 
         contentView = NativeView(this)
         setContentView(contentView)
-        contentView.requestFocus()
         contentView.viewTreeObserver.addOnGlobalLayoutListener(this)
         contentView.setOnTouchListener(this)
+        contentView.requestFocus()
 
-        //contentView.viewTreeObserver.addOnGlobalLayoutListener(this)
-        contentView.isFocusable = true
-        contentView.isFocusableInTouchMode = true
+
+        window.takeSurface(this)
 
         currConfig = Configuration(resources.configuration)
+
     }
 
     // This is called from the native main game thread.
@@ -108,21 +101,20 @@ class DEngineActivity :
                 NativeInputFilter.fromNativeEnum(softInputFilter))
         }
     }
-
     @SuppressLint
     fun NativeEvent_HideSoftInput() {
         runOnUiThread(contentView::endInputSession)
     }
-
     override fun surfaceCreated(holder: SurfaceHolder) {
         nativeOnNativeWindowCreated(holder.surface)
     }
-
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
 
     }
-
     override fun surfaceDestroyed(holder: SurfaceHolder) {
+        if (holder.surface != null) {
+            //Log.e("DEngine Activity", "During surface destroyed, expected incoming surface to be null.")
+        }
         nativeOnNativeWindowDestroyed(holder.surface)
     }
 
@@ -180,7 +172,7 @@ class DEngineActivity :
             val y = event.getY(0) + location[1]
 
             NativeInterface.onTouch(
-                mNativeBackendDataPtr,
+                parentApp.nativeBackendDataPtr,
                 event.getPointerId(0),
                 x,
                 y,
@@ -189,12 +181,12 @@ class DEngineActivity :
 
         return true
     }
-}
 
-fun NativeInterface_InitWrapper(activity: DEngineActivity): Long {
-    val config = Configuration(activity.resources.configuration)
-    return NativeInterface.init(
-        activity,
-        activity.parentApp.assets,
-        config.fontScale)
+    override fun onInputQueueCreated(queue: InputQueue?) {
+
+    }
+
+    override fun onInputQueueDestroyed(queue: InputQueue?) {
+
+    }
 }

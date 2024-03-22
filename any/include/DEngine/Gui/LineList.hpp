@@ -3,6 +3,7 @@
 #include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/Std/Containers/Opt.hpp>
+#include <DEngine/Std/Containers/AnyRef.hpp>
 
 #include <functional>
 #include <string>
@@ -10,8 +11,7 @@
 
 namespace DEngine::Gui
 {
-	class LineList : public Widget
-	{
+	class LineList : public Widget {
 	public:
 		static constexpr Math::Vec4 highlightOverlayColor = { 1.f, 1.f, 1.f, 0.5f };
 		static constexpr Math::Vec4 hoverOverlayColor = { 1.f, 1.f, 1.f, 0.25f };
@@ -21,9 +21,8 @@ namespace DEngine::Gui
 		
 		Std::Opt<uSize> selectedLine;
 		std::vector<std::string> lines;
-		u32 textMargin = 10;
 
-		using Callback = std::function<void(LineList&, Context* ctx)>;
+		using Callback = std::function<void(LineList&, Context*)>;
 		Callback selectedLineChangedFn = nullptr;
 
 		virtual SizeHint GetSizeHint2(
@@ -63,8 +62,7 @@ namespace DEngine::Gui
 		struct Impl;
 		friend Impl;
 
-		struct PressedLine_T
-		{
+		struct PressedLine_T {
 			u8 pointerId;
 			// This is null-opt if we pressed an area outside
 			// the possible lines. Meaning it should lead to

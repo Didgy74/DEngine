@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Editor.hpp"
+
 #include <DEngine/Gui/ButtonGroup.hpp>
 #include <DEngine/Gui/Context.hpp>
 #include <DEngine/Gui/DockArea.hpp>
@@ -8,6 +10,7 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Math/Vector.hpp>
+#include <DEngine/Std/Containers/AnyRef.hpp>
 #include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/Box.hpp>
 #include <DEngine/Std/Containers/FnRef.hpp>
@@ -22,73 +25,27 @@
 
 namespace DEngine::Editor
 {
-	enum class GizmoType : u8 { Translate, Rotate, Scale, COUNT };
 	class EntityIdList;
 	class ComponentList;
 	class ViewportWidget;
+    class Context;
 
-	class EditorImpl : public App::EventForwarder, public Gui::WindowHandler
+	class EditorImpl : public Gui::WindowHandler
 	{
 	public:
+        Editor::Context* parent = nullptr;
 		App::Context* appCtx = nullptr;
+		float deltaTime = 0.f;
 		Std::Box<Gui::Context> guiCtx;
 		Std::FrameAlloc guiTransientAlloc = Std::FrameAlloc::PreAllocate(1024 * 1024).Value();
 		Gui::RectCollection guiRectCollection;
 
-		void FlushQueuedEventsToGui();
-
-		// Override app-interface methods
-		virtual void ButtonEvent(
-			App::WindowID windowId,
-			App::Button button,
-			bool state) override;
-		virtual void CursorMove(
-			App::Context& appCtx,
-			App::WindowID windowId,
-			Math::Vec2Int position,
-			Math::Vec2Int positionDelta) override;
-
-		virtual void TextInputEvent(
-			App::Context& ctx,
-			App::WindowID windowId,
-			uSize oldIndex,
-			uSize oldCount,
-			Std::Span<u32 const> newString) override;
-		virtual void EndTextInputSessionEvent(
-			App::Context& ctx,
-			App::WindowID windowId) override;
-
-		virtual void TouchEvent(
-			App::WindowID windowId,
-			u8 id,
-			App::TouchEventType type,
-			Math::Vec2 position) override;
-		virtual bool WindowCloseSignal(
-			App::Context& appCtx,
-			App::WindowID window) override;
-		virtual void WindowCursorEnter(
-			App::WindowID window,
-			bool entered) override;
-		virtual void WindowMinimize(
-			App::WindowID window,
-			bool wasMinimized) override;
-		virtual void WindowMove(
-			App::WindowID window,
-			Math::Vec2Int position) override;
-		virtual void WindowResize(
-			App::Context& appCtx,
-			App::WindowID window,
-			App::Extent extent,
-			Math::Vec2UInt visibleOffset,
-			App::Extent visibleExtent) override;
-
 		std::vector<u32> guiQueuedTextInputData;
-		Std::FnScratchList<EditorImpl&, Gui::Context&> queuedGuiEvents;
+		Std::FnScratchList<Editor::Context&, Gui::Context&> queuedGuiEvents;
 		template<class Callable>
 		void PushQueuedGuiEvent(Callable&& in) requires (!Std::Trait::isRef<Callable>) {
 			queuedGuiEvents.Push(Std::Move(in));
 		}
-
 
 		// Override window-handler methods
 		virtual void CloseWindow(Gui::WindowID) override;
@@ -128,7 +85,7 @@ namespace DEngine::Editor
 		void UnselectEntity();
 		[[nodiscard]] Std::Opt<Entity> const& GetSelectedEntity() const { return selectedEntity; }
 
-		[[nodiscard]] GizmoType GetCurrentGizmoType() const;
+		[[nodiscard]] Editor::GizmoType GetCurrentGizmoType() const;
 	private:
 		Std::Opt<Entity> selectedEntity;
 	};

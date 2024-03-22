@@ -22,8 +22,7 @@ namespace DEngine::Gui
 	class Widget;
 	class Layer;
 
-	struct RectPair
-	{
+	struct RectPair {
 		Rect widgetRect;
 		Rect visibleRect;
 	};
@@ -192,15 +191,17 @@ namespace DEngine::Gui
 			requires (Std::Trait::isMoveConstructible<T> && !Std::Trait::isConst<T>)
 		{
 			DENGINE_IMPL_GUI_ASSERT(it.index < widgets.size());
-			DENGINE_IMPL_GUI_ASSERT(!customData2[it.index].ptr);
+			auto& customDataItem = customData2[it.index];
+
+			DENGINE_IMPL_GUI_ASSERT_MSG(
+				customDataItem.ptr == nullptr,
+				"gui: custom data already added for this item in the rect collection.");
 
 			// Technically this can fail. Should probably handle that...
 			auto* returnPtr = static_cast<T*>(Alloc().Alloc(sizeof(T), alignof(T)));
 			new(returnPtr, Std::placementNewTag) T(static_cast<T&&>(input));
 
-			auto& customDataItem = customData2[it.index];
 			// Assert that we don't already have some data here.
-			DENGINE_IMPL_GUI_ASSERT(!customDataItem.ptr);
 			customDataItem.ptr = returnPtr;
 			customDataItem.destructorFn = [](void* ptr) { static_cast<T*>(ptr)->~T(); };
 
@@ -212,6 +213,10 @@ namespace DEngine::Gui
 		template<class T>
 		[[nodiscard]] T* GetCustomData2(Widget const& widget) { return GetCustomData2<T>(&widget); }
 		template<class T>
+		[[nodiscard]] T const* GetCustomData2(Layer const& in) const { return GetCustomData2<T>(&in); }
+		template<class T>
+		[[nodiscard]] T* GetCustomData2(Layer const& in) { return GetCustomData2<T>(&in); }
+		template<class T>
 		[[nodiscard]] T const* GetCustomData2(It const& it) const
 		{
 			DENGINE_IMPL_GUI_ASSERT(it.index < customData2.size());
@@ -221,8 +226,7 @@ namespace DEngine::Gui
 		[[nodiscard]] bool BuiltForRendering() const { return containsRendering; }
 
 		// Makes it easier when debugging
-		union PointerUnion
-		{
+		union PointerUnion {
 			Widget const* widget;
 			Layer const* layer;
 			void const* voidPtr;
@@ -237,23 +241,21 @@ namespace DEngine::Gui
 		struct CustomData2
 		{
 			void* ptr = nullptr;
+			uSize allocSize = 0;
 			using DestroyFnT = void(*)(void* ptr);
 			DestroyFnT destructorFn = nullptr;
 		};
 		std::vector<CustomData2> customData2;
 
-		void Prepare(bool includeRendering)
-		{
+		void Prepare(bool includeRendering) {
 			widgets.clear();
 			sizeHints.clear();
 			rects.clear();
 
-			for (auto& item : customData2)
-			{
-				if (item.ptr)
-				{
+			for (auto& item : customData2) {
+				if (item.ptr) {
 					item.destructorFn(item.ptr);
-					alloc.Free(item.ptr);
+					alloc.Free(item.ptr, item.allocSize);
 				}
 			}
 			customData2.clear();
@@ -263,22 +265,19 @@ namespace DEngine::Gui
 			alloc.Reset();
 		}
 
-		void Clear()
-		{
+		void Clear() {
 			widgets.clear();
 			sizeHints.clear();
 			rects.clear();
 
-			for (auto& item : customData2)
-			{
+			for (auto& item : customData2) {
 				item.destructorFn(item.ptr);
-				alloc.Free(item.ptr);
+				alloc.Free(item.ptr, item.allocSize);
 			}
 			customData2.clear();
 		}
 
-		~RectCollection()
-		{
+		~RectCollection() {
 			Clear();
 		}
 
@@ -287,8 +286,7 @@ namespace DEngine::Gui
 
 		bool containsRendering = false;
 
-		[[nodiscard]] Std::Opt<uSize> FindIndex(void const* ptr) const noexcept
-		{
+		[[nodiscard]] Std::Opt<uSize> FindIndex(void const* ptr) const noexcept {
 			constexpr auto invalidIndex = static_cast<uSize>(-1);
 			auto index = invalidIndex;
 			auto const widgetCount = widgets.size();
@@ -359,8 +357,7 @@ namespace DEngine::Gui
 		}
 
 		template<class T>
-		[[nodiscard]] T* GetCustomData2(void const* ptr)
-		{
+		[[nodiscard]] T* GetCustomData2(void const* ptr) {
 			auto temp = FindIndex(ptr);
 			if (temp.HasValue())
 				return reinterpret_cast<T*>(customData2[temp.Value()].ptr);
@@ -368,14 +365,12 @@ namespace DEngine::Gui
 				return nullptr;
 		}
 		template<class T>
-		[[nodiscard]] T* GetCustomData2(It const& it)
-		{
+		[[nodiscard]] T* GetCustomData2(It const& it) {
 			DENGINE_IMPL_GUI_ASSERT(it.index < customData2.size());
 			return reinterpret_cast<T*>(customData2[it.index].ptr);
 		}
 		template<class T>
-		[[nodiscard]] T const* GetCustomData2(void const* ptr) const
-		{
+		[[nodiscard]] T const* GetCustomData2(void const* ptr) const {
 			auto temp = FindIndex(ptr);
 			if (temp.HasValue())
 				return reinterpret_cast<T const*>(customData2[temp.Value()].ptr);

@@ -18,13 +18,8 @@ namespace DEngine::Gui
 		static constexpr u32 defaultTextMargin = 10;
 
 		Math::Vec4 boxColor = defaultBoxColor;
-
-		u32 textMargin = defaultTextMargin;
-
 		u32 selectedItem = 0;
-
 		std::vector<std::string> items;
-
 		using SelectionChangedCallback = void(Dropdown&);
 		std::function<SelectionChangedCallback> selectionChangedCallback;
 

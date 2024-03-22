@@ -3,6 +3,8 @@
 #include <DEngine/Gui/DrawInfo.hpp>
 #include <DEngine/Gui/Context.hpp>
 
+#include <DEngine/Gui/ButtonSizeBehavior.hpp>
+
 #include <DEngine/Std/Containers/Vec.hpp>
 
 #include <sstream>
@@ -18,8 +20,7 @@ struct LineFloatEdit::Impl
 			glyphRects{ alloc } {}
 
 		Extent textOuterExtent = {};
-		// Only available when rendering
-		FontFaceId fontFaceId;
+		FontFaceSizeId fontSizeId = FontFaceSizeId::Invalid;
 		Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 	};
 
@@ -49,6 +50,7 @@ struct LineFloatEdit::Impl
 	struct PointerPress_Params
 	{
 		Context& ctx;
+		WindowID windowId = WindowID::Invalid;
 		RectCollection const& rectCollection;
 		LineFloatEdit& widget;
 		Rect const& widgetRect;
@@ -87,9 +89,10 @@ struct LineFloatEdit::Impl
 		}
 	}
 
-	static void BeginInputSession(LineFloatEdit& widget, Context& ctx)
+	static void BeginInputSession(WindowID windowId, LineFloatEdit& widget, Context& ctx)
 	{
 		ctx.TakeInputConnection(
+			windowId,
 			widget,
 			Gui::SoftInputFilter::SignedFloat,
 			{ widget.text.data(), widget.text.length() });
@@ -128,7 +131,7 @@ struct LineFloatEdit::Impl
 				!pointer.pressed &&
 				pointer.type == PointerType::Primary;
 			if (beginInputSession) {
-				BeginInputSession(widget, ctx);
+				BeginInputSession(in.windowId, widget, ctx);
 				eventConsumed = true;
 			}
 		}
@@ -185,8 +188,7 @@ void LineFloatEdit::ClearInputConnection()
 	this->inputConnectionCtx = nullptr;
 }
 
-void LineFloatEdit::SetValue(f64 in)
-{
+void LineFloatEdit::SetValue(f64 in) {
 	std::ostringstream out;
 	out.precision(decimalPoints);
 	out << std::fixed << in;
@@ -200,45 +202,62 @@ SizeHint LineFloatEdit::GetSizeHint2(
 {
 	auto const& ctx = params.ctx;
 	auto const& window = params.window;
-	auto& textManager = params.textManager;
+	auto& textMgr = params.textManager;
 	auto& pusher = params.pusher;
 
-	auto const textScale = ctx.fontScale * window.contentScale;
-
 	auto const pusherIt = pusher.AddEntry(*this);
-
-	SizeHint returnValue = {};
-
+	auto& customData = pusher.AttachCustomData(pusherIt, Impl::CustomData{ pusher.Alloc() });
 	if (pusher.IncludeRendering()) {
-		auto customData = Impl::CustomData{ pusher.Alloc() };
-
-		customData.fontFaceId = textManager.GetFontFaceId(textScale, window.dpiX, window.dpiY);
-
 		customData.glyphRects.Resize(text.size());
-		customData.textOuterExtent = textManager.GetOuterExtent(
-			{ text.data(), text.size() },
-			textScale,
-			window.dpiX,
-			window.dpiY,
-			customData.glyphRects.Data());
-		returnValue.minimum = customData.textOuterExtent;
-
-		pusher.AttachCustomData(pusherIt, Std::Move(customData));
-	}
-	else {
-		returnValue.minimum = textManager.GetOuterExtent(
-			{ text.data(), text.size() },
-			textScale,
-			window.dpiX,
-			window.dpiY);
 	}
 
-	returnValue.minimum.width += margin * 2;
-	returnValue.minimum.height += margin * 2;
-	returnValue.expandX = true;
+	auto normalTextScale = ctx.fontScale * window.contentScale;
+	auto fontSizeId = FontFaceSizeId::Invalid;
+	auto marginAmount = 0;
+	{
+		auto normalHeight = textMgr.GetLineheight(normalTextScale, window.dpiX, window.dpiY);
+		auto normalHeightMargin = (u32)Math::Round((f32)normalHeight * ctx.defaultMarginFactor);
+		normalHeight += 2 * normalHeightMargin;
 
-	pusher.SetSizeHint(pusherIt, returnValue);
-	return returnValue;
+		auto minHeight = CmToPixels(ctx.minimumHeightCm, window.dpiY);
+
+		if (normalHeight > minHeight) {
+			fontSizeId = textMgr.GetFontFaceSizeId(normalTextScale, window.dpiX, window.dpiY);
+			marginAmount = (i32)normalHeightMargin;
+		} else {
+			// We can't just do minHeight * defaultMarginFactor for this one, because defaultMarginFactor applies to
+			// content, not the outer size. So we set up an equation `height = 2 * marginFactor * content + content`
+			// and we solve for content.
+			auto contentSizeCm = ctx.minimumHeightCm / (2 * ctx.defaultMarginFactor + 1.f);
+			auto contentSize = CmToPixels(contentSizeCm, window.dpiY);
+			fontSizeId = textMgr.FontFaceSizeIdForLinePixelHeight(
+					contentSize,
+					TextHeightType::Alphas);
+			marginAmount = (i32)Math::Round((f32)contentSize * ctx.defaultMarginFactor);
+		}
+	}
+	customData.fontSizeId = fontSizeId;
+
+
+	auto textOuterExtent = textMgr.GetOuterExtent(
+		{ this->text.data(), this->text.size() },
+		fontSizeId,
+		TextHeightType::Numerals,
+		customData.glyphRects.ToSpan());
+	customData.textOuterExtent = textOuterExtent;
+
+	SizeHint returnVal = {};
+	returnVal.minimum = textOuterExtent;
+	returnVal.minimum.AddPadding(marginAmount);
+	returnVal.minimum.width = Math::Max(
+		returnVal.minimum.width,
+		(u32)CmToPixels(ctx.minimumHeightCm, window.dpiX));
+	returnVal.minimum.height = Math::Max(
+		returnVal.minimum.height,
+		(u32)CmToPixels(ctx.minimumHeightCm, window.dpiY));
+
+	pusher.SetSizeHint(pusherIt, returnVal);
+	return returnVal;
 }
 
 void LineFloatEdit::BuildChildRects(
@@ -246,23 +265,6 @@ void LineFloatEdit::BuildChildRects(
 	Rect const& widgetRect,
 	Rect const& visibleRect) const
 {
-	auto& pusher = params.pusher;
-
-	if (pusher.IncludeRendering())
-	{
-		auto* customDataPtr = pusher.GetCustomData2<Impl::CustomData>(*this);
-		DENGINE_IMPL_GUI_ASSERT(customDataPtr);
-		auto& customData = *customDataPtr;
-
-		for (auto& glyphRect : customData.glyphRects)
-		{
-			glyphRect.position += widgetRect.position;
-			glyphRect.position.x += (i32)widgetRect.extent.width;
-			glyphRect.position.x -= (i32)customData.textOuterExtent.width;
-			glyphRect.position.x -= (i32)margin;
-			glyphRect.position.y += (i32)margin;
-		}
-	}
 }
 
 void LineFloatEdit::Render2(
@@ -277,26 +279,35 @@ void LineFloatEdit::Render2(
 	auto& drawInfo = params.drawInfo;
 	auto& rectCollection = params.rectCollection;
 
+	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
+	auto& customData = *customDataPtr;
+	DENGINE_IMPL_GUI_ASSERT(customData.glyphRects.Size() == text.size());
+	auto fontSizeId = customData.fontSizeId;
+	auto textOuterExtent = customData.textOuterExtent;
+
 	Math::Vec4 tempBackground = {};
 	if (HasInputSession())
 		tempBackground = { 0.5f, 0.f, 0.f, 1.f };
 	else
 		tempBackground = backgroundColor;
-	drawInfo.PushFilledQuad(widgetRect, tempBackground);
-
-	auto* customDataPtr = rectCollection.GetCustomData2<Impl::CustomData>(*this);
-	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
-	auto& customData = *customDataPtr;
-
-	DENGINE_IMPL_GUI_ASSERT(customData.glyphRects.Size() == text.size());
+	// Calculate radius
+	auto minDimension = Math::Min(widgetRect.extent.width, widgetRect.extent.height);
+	auto radius = (int)Math::Floor((f32)minDimension * 0.25f);
+	drawInfo.PushFilledQuad(widgetRect, tempBackground, radius);
 
 	auto drawScissor = DrawInfo::ScopedScissor(drawInfo, intersection);
 
+	auto centeringOffset = Extent::CenteringOffset(widgetRect.extent, textOuterExtent);
+	centeringOffset.x = Math::Max(centeringOffset.x, 0);
+	centeringOffset.y = Math::Max(centeringOffset.y, 0);
+
+	auto textRect = Rect{ widgetRect.position + centeringOffset, textOuterExtent };
 	drawInfo.PushText(
-		(u64)customData.fontFaceId,
+		(u64)fontSizeId,
 		{ text.data(), text.size() },
 		customData.glyphRects.Data(),
-		{},
+		textRect.position,
 		{ 1.f, 1.f, 1.f, 1.f });
 }
 
@@ -315,6 +326,7 @@ bool LineFloatEdit::CursorPress2(
 
 	Impl::PointerPress_Params temp = {
 		.ctx = params.ctx,
+		.windowId = params.windowId,
 		.rectCollection = params.rectCollection,
 		.widget = *this,
 		.widgetRect = widgetRect,
@@ -339,6 +351,7 @@ bool LineFloatEdit::TouchPress2(
 
 	Impl::PointerPress_Params temp = {
 		.ctx = params.ctx,
+		.windowId = params.windowId,
 		.rectCollection = params.rectCollection,
 		.widget = *this,
 		.widgetRect = widgetRect,

@@ -2,6 +2,7 @@
 
 #include "VulkanIncluder.hpp"
 
+#include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Gfx/impl/Assert.hpp>
 
 #include <limits>
@@ -320,19 +321,27 @@ namespace DEngine::Gfx::Vk
 
 		static void BuildInPlace(
 			DeviceDispatch& dispatcher,
-			vk::Device vkDevice, 
+			vk::Device vkDevice,
+			vk::PhysicalDeviceLimits physDeviceLimits,
 			PFN_vkGetDeviceProcAddr getProcAddr);
 
 		vk::Device handle{};
 		DeviceDispatchRaw raw{};
+		vk::PhysicalDeviceLimits physDeviceLimits{};
+		[[nodiscard]] auto const& PhysDeviceLimits() const { return physDeviceLimits; }
 
 		[[nodiscard]] vk::Result allocateCommandBuffers(
 			vk::CommandBufferAllocateInfo const& allocateInfo,
 			vk::CommandBuffer* pCommandBuffers) const noexcept;
 
-		[[nodiscard]] vk::Result allocateDescriptorSets(
-			vk::DescriptorSetAllocateInfo const& allocInfo,
-			vk::DescriptorSet* pDescriptorSets) const noexcept;
+		[[nodiscard]] vk::Result AllocateDescriptorSets(
+			vk::DescriptorSetAllocateInfo const& info,
+			vk::DescriptorSet* pSets) const noexcept;
+		[[nodiscard]] auto Alloc(
+			vk::DescriptorSetAllocateInfo const& info,
+			vk::DescriptorSet* pSets) const noexcept {
+			return AllocateDescriptorSets(info, pSets);
+		}
 
 		[[nodiscard]] vk::DeviceMemory allocateMemory(
 			vk::MemoryAllocateInfo const& allocInfo,
@@ -451,17 +460,32 @@ namespace DEngine::Gfx::Vk
 			vk::BufferCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		[[nodiscard]] vk::ResultValue<vk::CommandPool> createCommandPool(
-			vk::CommandPoolCreateInfo const& createInfo,
+		[[nodiscard]] vk::ResultValue<vk::CommandPool> CreateCommandPool(
+			vk::CommandPoolCreateInfo const& info,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const noexcept;
+		[[nodiscard]] auto Create(
+			vk::CommandPoolCreateInfo const& info,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const noexcept {
+			return CreateCommandPool(info, allocator);
+		}
 
-		[[nodiscard]] vk::DescriptorPool createDescriptorPool(
-			vk::DescriptorPoolCreateInfo const& createInfo,
+		[[nodiscard]] vk::DescriptorPool CreateDescriptorPool(
+			vk::DescriptorPoolCreateInfo const& info,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		[[nodiscard]] auto Create(
+			vk::DescriptorPoolCreateInfo const& info,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const {
+			return CreateDescriptorPool(info, allocator);
+		}
 
-		[[nodiscard]] vk::DescriptorSetLayout createDescriptorSetLayout(
-			vk::DescriptorSetLayoutCreateInfo const& createInfo,
+		[[nodiscard]] vk::DescriptorSetLayout CreateDescriptorSetLayout(
+			vk::DescriptorSetLayoutCreateInfo const& info,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		[[nodiscard]] auto Create(
+			vk::DescriptorSetLayoutCreateInfo const& info,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const {
+			return CreateDescriptorSetLayout(info, allocator);
+		}
 
 		[[nodiscard]] vk::Fence createFence(
 			vk::FenceCreateInfo const& createInfo,
@@ -471,11 +495,41 @@ namespace DEngine::Gfx::Vk
 			vk::FramebufferCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		[[nodiscard]] vk::Result createGraphicsPipelines(
-			vk::PipelineCache pipelineCache,
-			vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> createInfos,
+		[[nodiscard]] vk::Result CreateGraphicsPipelines(
+			vk::PipelineCache cache,
+			vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> infos,
 			vk::Optional<vk::AllocationCallbacks> allocator,
 			vk::Pipeline* pPipelines) const;
+		[[nodiscard]] auto Create(
+			vk::PipelineCache cache,
+			vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> infos,
+			vk::Optional<vk::AllocationCallbacks> allocator,
+			vk::Pipeline* pPipelines) const {
+			return CreateGraphicsPipelines(
+				cache,
+				infos,
+				allocator,
+				pPipelines);
+		}
+		[[nodiscard]] auto Create(
+			vk::PipelineCache cache,
+			vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> infos,
+			vk::Pipeline* pPipelines) const {
+			return CreateGraphicsPipelines(
+				cache,
+				infos,
+				nullptr,
+				pPipelines);
+		}
+		[[nodiscard]] auto Create(
+			vk::ArrayProxy<vk::GraphicsPipelineCreateInfo const> infos,
+			vk::Pipeline* pPipelines) const {
+			return CreateGraphicsPipelines(
+				{},
+				infos,
+				nullptr,
+				pPipelines);
+		}
 
 		[[nodiscard]] vk::Image createImage(
 			vk::ImageCreateInfo const& createInfo,
@@ -485,17 +539,28 @@ namespace DEngine::Gfx::Vk
 			vk::ImageViewCreateInfo const& createInfo, 
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		[[nodiscard]] vk::PipelineLayout createPipelineLayout(
-			vk::PipelineLayoutCreateInfo const& createInfo,
+		[[nodiscard]] vk::PipelineLayout CreatePipelineLayout(
+			vk::PipelineLayoutCreateInfo const& info,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		[[nodiscard]] auto Create(
+			vk::PipelineLayoutCreateInfo const& info,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const {
+			return CreatePipelineLayout(info, allocator);
+		}
 
 		[[nodiscard]] vk::RenderPass createRenderPass(
 			vk::RenderPassCreateInfo const& createInfo,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
 
-		[[nodiscard]] vk::Sampler createSampler(
-			vk::SamplerCreateInfo const& createInfo,
+
+		[[nodiscard]] vk::Sampler CreateSampler(
+			vk::SamplerCreateInfo const& info,
 			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const;
+		[[nodiscard]] auto Create(
+			vk::SamplerCreateInfo const& info,
+			vk::Optional<vk::AllocationCallbacks> allocator = nullptr) const {
+			return CreateSampler(info, allocator);
+		}
 
 		[[nodiscard]] vk::ResultValue<vk::Semaphore> createSemaphore(
 			vk::SemaphoreCreateInfo const& createInfo,
@@ -536,9 +601,25 @@ namespace DEngine::Gfx::Vk
 
 		void endCommandBuffer(vk::CommandBuffer cmdBuffer) const;
 
-		void freeCommandBuffers(
-			vk::CommandPool commandPool,
-			vk::ArrayProxy<vk::CommandBuffer const> commandBuffers) const;
+		[[nodiscard]] vk::Result FlushMappedMemoryRanges(vk::ArrayProxy<vk::MappedMemoryRange const> const& ranges) const;
+
+		void FreeCommandBuffers(
+			vk::CommandPool pool,
+			vk::ArrayProxy<vk::CommandBuffer const> cmdBuffers) const;
+		void Free(
+			vk::CommandPool pool,
+			vk::ArrayProxy<vk::CommandBuffer const> cmdBuffers) const {
+			FreeCommandBuffers(pool, cmdBuffers);
+		}
+
+		void FreeDescriptorSets(
+			vk::DescriptorPool pool,
+			vk::ArrayProxy<vk::DescriptorSet const> sets) const;
+		void Free(
+			vk::DescriptorPool pool,
+			vk::ArrayProxy<vk::DescriptorSet const> sets) const {
+			FreeDescriptorSets(pool, sets);
+		}
 
 		void freeMemory(
 			vk::DeviceMemory memory,

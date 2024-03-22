@@ -8,20 +8,24 @@ This repository also serves as part of my own portfolio for showing future emplo
 
 ## Highlights
 
- ### Powered by Vulkan
- Rendering is powered by Vulkan only, and supports rendering GUI as well as the 3D scene. Includes support for multiple 3D viewports and rendering separately to multiple OS windows. Rendering is (almost) completely decoupled from the other modules, i.e GUI or any other logic.
+### Powered by Vulkan
 
- ### Custom retained-mode GUI
- The GUI module is built from the ground-up to support touch functionality on the same level as keyboard+mouse functionality. It produces a list of API-agnostic data that can be consumed and translated into actual draw calls by the rendering module. It operates on purely data-driven events and does not use any hooks into OS-specific systems. The GUI module does *not* control execution flow of the app. Font rendering is handled by FreeType2.
+Rendering is powered by Vulkan only, and supports rendering GUI as well as the 3D scene. Includes support for multiple 3D viewports and rendering separately to multiple OS windows. Rendering is (almost) completely decoupled from the other modules, i.e GUI or any other logic.
+
+### Custom retained-mode GUI
+
+The GUI module is built from the ground-up to support touch functionality on the same level as keyboard+mouse functionality. It produces a list of API-agnostic data that can be consumed and translated into actual draw calls by the rendering module. It operates on purely data-driven events and does not use any hooks into OS-specific systems. The GUI module does *not* control execution flow of the app. Font rendering is handled by FreeType2.
 
 ## How to build
+
 See BUILD.md
 
 ## Dependencies
- - GLFW3
- - Texas
- - FreeType2
- - Vulkan Memory Allocator
+
+- GLFW3
+- Texas
+- FreeType2
+- Vulkan Memory Allocator
 
 ## Showcase
 

@@ -2,7 +2,6 @@
 
 #include "GlobUtils.hpp"
 #include "GuiResourceManager.hpp"
-#include "NativeWindowManager.hpp"
 #include "ViewportManager.hpp"
 
 using namespace DEngine;
@@ -11,14 +10,21 @@ using namespace DEngine::Gfx;
 void Gfx::Vk::RecordGuiCmds(
 	RecordGuiCmds_Params const& params)
 {
+	auto const& device = params.globUtils.device;
+	auto const& guiResMgr = params.guiResManager;
 	auto const& cmdBuffer = params.cmdBuffer;
 	auto const& viewportMan = params.viewportManager;
-	DeviceDispatch const& device = params.globUtils.device;
+	auto const& windowId = params.windowUpdate.id;
+	auto inFlightIndex = params.inFlightIndex;
+	auto windowRotation = params.rotation;
+	auto windowExtent = params.windowExtent;
+
+
 	{
 		vk::RenderPassBeginInfo rpBegin{};
 		rpBegin.framebuffer = params.framebuffer;
 		rpBegin.renderPass = params.globUtils.guiRenderPass;
-		rpBegin.renderArea.extent = params.guiData.extent;
+		rpBegin.renderArea.extent = windowExtent;
 		rpBegin.clearValueCount = 1;
 		vk::ClearColorValue clearVal{};
 		for (uSize i = 0; i < 4; i++)
@@ -30,56 +36,74 @@ void Gfx::Vk::RecordGuiCmds(
 
 		{
 			vk::Viewport viewport{};
-			viewport.width = (float)params.guiData.extent.width;
-			viewport.height = (float)params.guiData.extent.height;
+			viewport.width = (float)windowExtent.width;
+			viewport.height = (float)windowExtent.height;
 			device.cmdSetViewport(cmdBuffer, 0, viewport);
 			vk::Rect2D scissor{};
-			scissor.extent = params.guiData.extent;
+			scissor.extent = windowExtent;
 			device.cmdSetScissor(cmdBuffer, 0, scissor);
 		}
 
-		for (auto const& drawCmd : params.guiDrawCmds)
-		{
-			switch (drawCmd.type)
-			{
-				case GuiDrawCmd::Type::Scissor:
-				{
-					vk::Rect2D scissor{};
-					vk::Extent2D rotatedFramebufferExtent = params.guiData.extent;
-					if (params.guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90 ||
-						params.guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)
-						std::swap(rotatedFramebufferExtent.width, rotatedFramebufferExtent.height);
-					scissor.extent.width = u32(Math::Round(drawCmd.rectExtent.x * rotatedFramebufferExtent.width));
-					scissor.extent.height = u32(Math::Round(drawCmd.rectExtent.y * rotatedFramebufferExtent.height));
-					i32 scissorPosX = i32(Math::Round(drawCmd.rectPosition.x * rotatedFramebufferExtent.width));
-					i32 scissorPosY = i32(Math::Round(drawCmd.rectPosition.y * rotatedFramebufferExtent.height));
-					if (params.guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eIdentity)
-					{
-						scissor.offset.x = scissorPosX;
-						scissor.offset.y = scissorPosY;
-					}
-					else if (params.guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90)
-					{
-						scissor.offset.x = rotatedFramebufferExtent.height - scissor.extent.height - scissorPosY;
-						scissor.offset.y = scissorPosX;
-					}
-					else if (params.guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)
-					{
-						scissor.offset.x = scissorPosY;
-						scissor.offset.y = rotatedFramebufferExtent.width - scissor.extent.width - scissorPosX;
-					}
-					else if (params.guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate180)
-					{
-						scissor.offset.x = rotatedFramebufferExtent.width - scissor.extent.width - scissorPosX;
-						scissor.offset.y = rotatedFramebufferExtent.height - scissor.extent.height - scissorPosY;
-					}
-					if (params.guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate90 ||
-						params.guiData.surfaceRotation == vk::SurfaceTransformFlagBitsKHR::eRotate270)
-						std::swap(scissor.extent.width, scissor.extent.height);
-					device.cmdSetScissor(cmdBuffer, 0, scissor);
-				}
-					break;
 
+		// Bind the window-specific GUI descriptorset
+		auto perWindowDescrSet =
+			GuiResourceManager::GetPerWindowDescrSet(guiResMgr, windowId, inFlightIndex);
+
+		for (auto const& drawCmd : params.guiDrawCmds) {
+			switch (drawCmd.type) {
+				case GuiDrawCmd::Type::Scissor: {
+					GuiResourceManager::PerformGuiDrawCmd_Scissor_Params temp = {
+						.rectExtent = drawCmd.rectExtent,
+					  	.rectPos = drawCmd.rectPosition,
+						.rotation = windowRotation,
+						.resolutionX = (int)windowExtent.width,
+						.resolutionY = (int)windowExtent.height, };
+					GuiResourceManager::PerformGuiDrawCmd_Scissor(
+						guiResMgr,
+						device,
+						cmdBuffer,
+						temp);
+					break;
+				}
+
+				case GuiDrawCmd::Type::Rectangle: {
+					GuiResourceManager::RenderRectangle(
+						guiResMgr,
+						device,
+						perWindowDescrSet,
+						cmdBuffer,
+						drawCmd.rectangle);
+					break;
+				}
+
+				case GuiDrawCmd::Type::Text: {
+					GuiResourceManager::PerformGuiDrawCmd_Text(
+						guiResMgr,
+						device,
+						cmdBuffer,
+						perWindowDescrSet,
+						drawCmd.text,
+						params.utfValues,
+						params.glyphRects);
+					break;
+				}
+
+				case GuiDrawCmd::Type::Viewport: {
+
+					GuiResourceManager::PerformGuiDrawCmd_Viewport(
+						guiResMgr,
+						device,
+						cmdBuffer,
+						perWindowDescrSet,
+						viewportMan.GetViewportData(drawCmd.viewport.id).imgDescrSet,
+						windowRotation,
+						drawCmd.rectPosition,
+						drawCmd.rectExtent);
+					break;
+				}
+
+
+				/*
 				case GuiDrawCmd::Type::FilledMesh:
 				{
 					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, params.guiResManager.filledMeshPipeline);
@@ -122,21 +146,12 @@ void Gfx::Vk::RecordGuiCmds(
 				}
 					break;
 
-				case GuiDrawCmd::Type::Text: {
-					GuiResourceManager::RenderText(
-						params.guiResManager,
-						device,
-						params.guiData,
-						cmdBuffer,
-						drawCmd.text,
-						params.utfValues,
-						params.glyphRects);
-					break;
-				}
+
+				 */
 
 
-				case GuiDrawCmd::Type::Viewport:
-				{
+				/*
+				case GuiDrawCmd::Type::Viewport: {
 					device.cmdBindPipeline(cmdBuffer, vk::PipelineBindPoint::eGraphics, params.guiResManager.viewportPipeline);
 					GuiResourceManager::ViewportPushConstant pushConstant = {};
 					pushConstant.orientation = params.guiData.rotation;
@@ -170,6 +185,7 @@ void Gfx::Vk::RecordGuiCmds(
 						0);
 				}
 					break;
+				 */
 			}
 		}
 

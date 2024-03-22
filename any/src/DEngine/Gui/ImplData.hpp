@@ -81,6 +81,7 @@ struct DEngine::Gui::Context::Impl
 	Std::FrameAlloc postEventAlloc = Std::FrameAlloc::PreAllocate(1024).Value();
 	struct PostEventJob {
 		void* ptr = nullptr;
+		uSize allocSize = 0;
 		Context::PostEventJob_InvokeFnT invokeFn = nullptr;
 		Context::PostEventJob_DestroyFnT destroyFn = nullptr;
 	};

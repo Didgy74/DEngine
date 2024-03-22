@@ -24,6 +24,11 @@ Context::Impl const& Context::Internal_ImplData() const
 	return *pImplData;
 }
 
+TextManager& Context::GetTextManager() {
+	auto& implData = Internal_ImplData();
+	return *implData.textManager;
+}
+
 namespace DEngine::Gui::impl
 {
 	[[nodiscard]] auto GetWindowNodeIt(decltype(Context::Impl::windows)& windows, WindowID id)
@@ -68,15 +73,15 @@ namespace DEngine::Gui::impl
 		implData.transientAlloc.Reset();
 	}
 
-	void ImplData_FlushPostEventJobs(Context& ctx) {
+	void ImplData_FlushPostEventJobs(Context& ctx, Std::AnyRef customData) {
 		auto& implData = ctx.Internal_ImplData();
 		for (auto const& job : implData.postEventJobs)
-			job.invokeFn(job.ptr, ctx);
+			job.invokeFn(job.ptr, ctx, customData);
 		auto const length = (int)implData.postEventJobs.size();
 		for (int i = length; i != 0 ; i -= 1) {
 			auto& job = implData.postEventJobs[i - 1];
 			job.destroyFn(job.ptr);
-			implData.postEventAlloc.Free(job.ptr);
+			implData.postEventAlloc.Free(job.ptr, job.allocSize);
 		}
 
 		implData.postEventJobs.clear();
@@ -87,6 +92,7 @@ namespace DEngine::Gui::impl
 		Context const& ctx,
 		Context::Impl const& implData,
 		TextManager& textManager,
+		Std::ConstAnyRef appData,
 		RectCollection& rectCollection,
 		bool includeRendering,
 		Std::FrameAlloc& transientAlloc)
@@ -116,6 +122,7 @@ namespace DEngine::Gui::impl
 				.ctx = ctx,
 				.window = eventWindowInfo,
 				.textManager = textManager,
+				.appData = appData,
 				.transientAlloc = transientAlloc,
 				.pusher = sizeHintPusher, };
 			auto const& widget = *windowNode.data.topLayout;
@@ -215,6 +222,7 @@ Context::Context(Context&& other) noexcept :
 }
 
 void Context::TakeInputConnection(
+	WindowID windowId,
 	Widget& widget,
 	SoftInputFilter softInputFilter,
 	Std::Span<char const> currentText)
@@ -226,9 +234,24 @@ void Context::TakeInputConnection(
 		//implData.inputConnectionWidget->InputConnectionLost();
 	}
 	implData.windowHandler->OpenSoftInput(
-		{ currentText.Data(), currentText.Size() },
+		windowId,
+		currentText,
 		softInputFilter);
 	implData.inputConnectionWidget = &widget;
+}
+
+void Context::UpdateInputConnection(
+	u64 selIndex,
+	u64 selCount,
+	Std::Span<u32 const> newText)
+{
+	auto& implData = Internal_ImplData();
+	if (!implData.inputConnectionWidget)
+	{
+		DENGINE_IMPL_GUI_UNREACHABLE();
+		//implData.inputConnectionWidget->InputConnectionLost();
+	}
+	implData.windowHandler->UpdateTextInputConnection(selIndex, selCount, newText);
 }
 
 void Context::ClearInputConnection(
@@ -261,6 +284,47 @@ void Context::SetFrontmostLayer(
 	windowNode.frontmostLayer = static_cast<Std::Box<Layer>&&>(layer);
 }
 
+void Context::Event_Accessibility(
+	Std::ConstAnyRef appData,
+	Std::BumpAllocator& transientAlloc,
+	RectCollection& rectCollection,
+	Widget::AccessibilityInfoPusher& pusher) const
+{
+	auto& implData = Internal_ImplData();
+
+	impl::BuildRectCollection(
+		*this,
+		implData,
+		*implData.textManager,
+		appData,
+		rectCollection,
+		false,
+		transientAlloc);
+
+	for (auto const& windowNode : implData.windows) {
+		auto const& windowData = windowNode.data;
+		if (windowData.topLayout.Has()) {
+
+			Rect const& windowRect = { {}, windowNode.data.rect.extent };
+			auto const& visibleOffset = windowNode.data.visibleOffset;
+			auto const& visibleExtent = windowNode.data.visibleExtent;
+			auto const visibleRect = Intersection(
+				windowRect,
+				{ { (i32)visibleOffset.x, (i32)visibleOffset.y }, visibleExtent });
+
+			auto const& root = *windowData.topLayout;
+			Widget::AccessibilityTest_Params tempParams = {
+				.ctx = *this,
+				.rectColl = rectCollection,
+				.pusher = pusher, };
+			root.AccessibilityTest(
+				tempParams,
+				visibleRect,
+				visibleRect);
+		}
+	}
+}
+
 void Context::PushEvent(TextInputEvent const& event)
 {
 	auto& implData = Internal_ImplData();
@@ -271,12 +335,45 @@ void Context::PushEvent(TextInputEvent const& event)
 	auto* windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
 	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
 	auto& windowNode = *windowNodePtr;
-	if (windowNode.data.topLayout)
-	{
+	if (windowNode.data.topLayout) {
 		windowNode.data.topLayout->TextInput(
 			*this,
 			transientAlloc,
 			event);
+	}
+}
+
+void Context::PushEvent(TextSelectionEvent const& event) {
+	auto& implData = Internal_ImplData();
+
+	auto& transientAlloc = implData.transientAlloc;
+	Std::Defer _allocCleanup = [&]{ transientAlloc.Reset(); };
+
+	auto* windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+	if (windowNode.data.topLayout) {
+		windowNode.data.topLayout->TextSelection(
+			*this,
+			transientAlloc,
+			event);
+	}
+}
+
+void Context::PushEvent(TextDeleteEvent const& event) {
+	auto& implData = Internal_ImplData();
+
+	auto& transientAlloc = implData.transientAlloc;
+	Std::Defer _allocCleanup = [&]{ transientAlloc.Reset(); };
+
+	auto* windowNodePtr = impl::GetWindowNodePtr(implData, event.windowId);
+	DENGINE_IMPL_GUI_ASSERT(windowNodePtr);
+	auto& windowNode = *windowNodePtr;
+	if (windowNode.data.topLayout) {
+		windowNode.data.topLayout->TextDelete(
+			*this,
+			transientAlloc,
+			event.windowId);
 	}
 }
 
@@ -298,7 +395,7 @@ void Context::PushEvent(EndTextInputSessionEvent const& event)
 	}
 }
 
-void Context::PushEvent(CursorPressEvent const& event)
+void Context::PushEvent(CursorPressEvent const& event, Std::AnyRef appData)
 {
 	auto& implData = Internal_ImplData();
 	auto& textManager = *implData.textManager;
@@ -315,6 +412,7 @@ void Context::PushEvent(CursorPressEvent const& event)
 		*this,
 		implData,
 		textManager,
+		appData.ToConst(),
 		rectCollection,
 		false,
 		transientAlloc);
@@ -364,7 +462,8 @@ void Context::PushEvent(CursorPressEvent const& event)
 			.window = eventWindowInfo,
 			.rectCollection = rectCollection,
 			.textManager = textManager,
-			.transientAlloc =  transientAlloc };
+			.transientAlloc =  transientAlloc,
+            .customData = appData, };
 		widgetParams.windowId = windowNode.id;
 		widgetParams.cursorPos = localCursorPos;
 		widgetParams.event = event;
@@ -378,10 +477,10 @@ void Context::PushEvent(CursorPressEvent const& event)
 			eventConsumed);
 	}
 
-	impl::ImplData_FlushPostEventJobs(*this);
+	impl::ImplData_FlushPostEventJobs(*this, appData);
 }
 
-void Context::PushEvent(TouchMoveEvent const& event)
+void Context::PushEvent(TouchMoveEvent const& event, Std::AnyRef appData)
 {
 	auto& implData = Internal_ImplData();
 	auto& textManager = *implData.textManager;
@@ -397,6 +496,7 @@ void Context::PushEvent(TouchMoveEvent const& event)
 		*this,
 		implData,
 		textManager,
+		appData.ToConst(),
 		rectCollection,
 		false,
 		transientAlloc);
@@ -446,6 +546,7 @@ void Context::PushEvent(TouchMoveEvent const& event)
 			.textManager = textManager,
 			.transientAlloc = transientAlloc,
 			.windowId = windowNode.id,
+			.customData = appData,
 			.event = modifiedEvent };
 
 		widget.TouchMove2(
@@ -454,9 +555,11 @@ void Context::PushEvent(TouchMoveEvent const& event)
 			visibleRect,
 			cursorOccluded);
 	}
+
+	impl::ImplData_FlushPostEventJobs(*this, appData);
 }
 
-void Context::PushEvent(TouchPressEvent const& event)
+void Context::PushEvent(TouchPressEvent const& event, Std::AnyRef appData)
 {
 	auto& implData = Internal_ImplData();
 	auto& textManager = *implData.textManager;
@@ -472,6 +575,7 @@ void Context::PushEvent(TouchPressEvent const& event)
 		*this,
 		implData,
 		textManager,
+		appData.ToConst(),
 		rectCollection,
 		false,
 		transientAlloc);
@@ -519,6 +623,7 @@ void Context::PushEvent(TouchPressEvent const& event)
 			.textManager = textManager,
 			.transientAlloc =  transientAlloc,
 			.windowId = windowNode.id,
+			.customData = appData,
 			.event = event, };
 		auto& widget = *windowNode.data.topLayout;
 		widget.TouchPress2(
@@ -528,10 +633,10 @@ void Context::PushEvent(TouchPressEvent const& event)
 			eventConsumed);
 	}
 
-	impl::ImplData_FlushPostEventJobs(*this);
+	impl::ImplData_FlushPostEventJobs(*this, appData);
 }
 
-void Context::PushEvent(CursorMoveEvent const& event)
+void Context::PushEvent(CursorMoveEvent const& event, Std::AnyRef appData)
 {
 	auto& implData = Internal_ImplData();
 	auto& textManager = *implData.textManager;
@@ -547,6 +652,7 @@ void Context::PushEvent(CursorMoveEvent const& event)
 		*this,
 		implData,
 		textManager,
+		appData.ToConst(),
 		rectCollection,
 		false,
 		transientAlloc);
@@ -582,7 +688,7 @@ void Context::PushEvent(CursorMoveEvent const& event)
 				.window = eventWindowInfo,
 				.rectCollection = rectCollection,
 				.event = modifiedEvent,
-				.transientAlloc = transientAlloc };
+				.transientAlloc = transientAlloc, };
 			layerParams.windowRect = windowRect;
 			layerParams.safeAreaRect = visibleRect;
 
@@ -600,7 +706,8 @@ void Context::PushEvent(CursorMoveEvent const& event)
 			.textManager = textManager,
 			.transientAlloc = transientAlloc,
 			//.windowId = windowNode.id,
-			.event = modifiedEvent };
+			.event = modifiedEvent,
+			.customData = appData };
 
 		widget.CursorMove(
 			widgetParams,
@@ -608,6 +715,8 @@ void Context::PushEvent(CursorMoveEvent const& event)
 			visibleRect,
 			cursorOccluded);
 	}
+
+	impl::ImplData_FlushPostEventJobs(*this, appData);
 }
 
 void Context::PushEvent(WindowContentScaleEvent const& event)
@@ -703,7 +812,7 @@ void Context::PushEvent(WindowResizeEvent const& event)
 	windowNode.data.visibleExtent = event.safeAreaExtent;
 }
 
-void Context::Render2(Render2_Params const& params) const
+void Context::Render2(Render2_Params const& params, Std::ConstAnyRef customData) const
 {
 	auto& implData = Internal_ImplData();
 	auto& textManager = *implData.textManager;
@@ -714,6 +823,7 @@ void Context::Render2(Render2_Params const& params) const
 		*this,
 		implData,
 		textManager,
+		customData,
 		rectCollection,
 		true,
 		transientAlloc);

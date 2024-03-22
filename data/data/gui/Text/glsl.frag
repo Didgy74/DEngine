@@ -1,19 +1,17 @@
 #version 450 core
+#include "Uniforms.glsl"
 
 layout(location = 0) in vec2 fragUv;
 
-layout(set = 0, binding = 0) uniform sampler2D fontGlyph;
-
-layout(push_constant) uniform ColorData
-{
-	layout(offset = 32) vec4 color;
-} color;
+layout(set = 1, binding = 0) uniform sampler2D fontGlyph;
 
 layout(location = 0) out vec4 outColor;
 
 void main()
 {
+	vec4 color = pushConstData.color;
+
 	float alpha = texture(fontGlyph, fragUv).r;
 	
-	outColor = vec4(color.color.r, color.color.g, color.color.b, alpha);
+	outColor = vec4(color.xyz, alpha);
 }

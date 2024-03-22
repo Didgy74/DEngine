@@ -6,6 +6,7 @@
 #include <DEngine/Std/Utility.hpp>
 
 #include <vector>
+#include <stdlib.h>
 
 namespace DEngine::Std {
 	namespace impl {
@@ -19,11 +20,31 @@ namespace DEngine::Std {
 	template<class... ArgsT>
 	class FnScratchList {
 	public:
+		struct FnItem {
+			virtual void Invoke(ArgsT...) const = 0;
+			virtual ~FnItem() = default;
+		};
+
 		FnScratchList() = default;
 		FnScratchList(FnScratchList const&) = delete;
-		FnScratchList(FnScratchList&&) = delete;
+		FnScratchList(FnScratchList&& other) noexcept {
+			this->prevMemBlocks = Std::Move(other.prevMemBlocks);
+			this->currentMemBlock = Std::Move(other.currentMemBlock);
+			other.currentMemBlock = {};
+			this->functions = Std::Move(other.functions);
+		}
 		FnScratchList& operator=(FnScratchList const&) = delete;
-		FnScratchList& operator=(FnScratchList&&) = delete;
+		FnScratchList& operator=(FnScratchList&& other) noexcept {
+			if (this == &other)
+				return *this;
+
+			this->Clear();
+			this->prevMemBlocks = Std::Move(other.prevMemBlocks);
+			this->currentMemBlock = Std::Move(other.currentMemBlock);
+			other.currentMemBlock = {};
+			this->functions = Std::Move(other.functions);
+			return *this;
+		}
 
 		template<class Callable> requires (!Trait::isRef<Callable>)
 		void Push(Callable&& in) noexcept {
@@ -41,32 +62,38 @@ namespace DEngine::Std {
 		void Consume(ArgsT... args) {
 			for (auto const& fn : functions)
 				fn->Invoke(args...);
-			ClearMinimal();
+			Clear();
 		}
 
-		[[nodiscard]] bool IsEmpty() const noexcept { return functions.empty(); }
+		[[nodiscard]] auto const& At(int i) const { return *functions[i]; }
+		[[nodiscard]] auto Size() const noexcept { return (int)functions.size(); }
+		[[nodiscard]] auto IsEmpty() const noexcept { return functions.empty(); }
+
+		void Clear() {
+			ResetFunctions();
+			currentMemBlock.offset = 0;
+			for (auto& block : prevMemBlocks) {
+				DENGINE_IMPL_ASSERT(block.data != nullptr);
+				free(block.data);
+			}
+			prevMemBlocks.clear();
+		}
 
 		~FnScratchList() {
-			ClearMinimal();
+			Clear();
+			// This could be a nullptr if the container has been moved from,
+			// or never used.
+			if (currentMemBlock.data != nullptr)
+				free(currentMemBlock.data);
 		}
 
 	private:
 		static constexpr uSize minimumMemBlockSize = 256;
 
-		void ClearFunctions() {
+		void ResetFunctions() {
 			for (auto const& fn : functions)
 				fn->~FnItem();
 			functions.clear();
-		}
-
-		void ClearMinimal() {
-			ClearFunctions();
-			currentMemBlock.offset = 0;
-			for (auto& block : prevMemBlocks) {
-				if (block.data != nullptr)
-					free(block.data);
-			}
-			prevMemBlocks.clear();
 		}
 
 		static auto GetAlignedOffset(
@@ -87,7 +114,7 @@ namespace DEngine::Std {
 				currentMemBlock.capacity = sizeToMalloc;
 			}
 
-			auto const alignedOffset = GetAlignedOffset(
+			auto alignedOffset = GetAlignedOffset(
 				currentMemBlock.data,
 				currentMemBlock.offset,
 				align);
@@ -95,10 +122,12 @@ namespace DEngine::Std {
 			if (alignedOffset + size >= currentMemBlock.capacity) {
 				prevMemBlocks.push_back(currentMemBlock);
 				// Alloc more space
-				auto sizeToMalloc = Math::Max(size, currentMemBlock.capacity * 2);
+				auto sizeToMalloc = Math::Max(size, currentMemBlock.capacity) * 2;
 				currentMemBlock = {};
 				currentMemBlock.data = malloc(sizeToMalloc);
 				currentMemBlock.capacity = sizeToMalloc;
+
+				alignedOffset = 0;
 			}
 
 			auto returnValue = (void*)((char*)currentMemBlock.data + alignedOffset);
@@ -106,10 +135,6 @@ namespace DEngine::Std {
 			return returnValue;
 		}
 
-		struct FnItem {
-			virtual void Invoke(ArgsT...) const = 0;
-			virtual ~FnItem() {}
-		};
 		template<class Callable> requires (!Trait::isRef<Callable>)
 		struct FnItemImpl : public FnItem {
 			Callable item;

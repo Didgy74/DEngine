@@ -7,7 +7,9 @@
 
 #include <DEngine/Gfx/impl/Assert.hpp>
 #include <DEngine/FixedWidthTypes.hpp>
+#include <DEngine/Std/BumpAllocator.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
+#include <DEngine/Std/Containers/FnScratchList.hpp>
 #include <DEngine/Std/Containers/Pair.hpp>
 #include <DEngine/Std/Containers/Span.hpp>
 #include <DEngine/Std/Trait.hpp>
@@ -27,6 +29,8 @@ namespace DEngine::Gfx::Vk
 		DeletionQueue& operator=(DeletionQueue const&) = delete;
 		DeletionQueue& operator=(DeletionQueue&&) = delete;
 
+		static constexpr auto customDataAlignment = sizeof(u64);
+
 		template<typename T> requires Std::Trait::isTrivial<T>
 		using TestCallback = void(*)(GlobUtils const& globUtils, T const& customData);
 		template<typename T>
@@ -39,7 +43,36 @@ namespace DEngine::Gfx::Vk
 			TestCallback<T> callback, 
 			T const& customData);
 
-		using CallbackPFN = void(*)(GlobUtils const& globUtils, Std::Span<char const> customData);
+		using CallbackPFN = void(*)(GlobUtils const& globUtils, Std::ConstByteSpan customData);
+
+		template<class CallableT>
+		inline auto DestroyInternal(
+			CallableT&& callable,
+			Std::ConstByteSpan data)
+		{
+			auto& currentQueue = this->tempQueue;
+
+			auto inputSize = data.Size();
+			auto offset = (int)Math::CeilToMultiple((u32)currentQueue.customData.size(), (u32)customDataAlignment);
+			auto newCustomDataSize = offset + inputSize;
+			currentQueue.customData.resize(newCustomDataSize);
+
+			std::memcpy(
+				(char*)currentQueue.customData.data() + offset,
+				data.Data(),
+				inputSize);
+
+			Job newJob = {};
+			newJob.dataOffset = offset;
+			newJob.dataSize = inputSize;
+			newJob.id = this->idTracker;
+			currentQueue.jobs.push_back(newJob);
+			currentQueue.fnList.Push(Std::Move(callable));
+
+			this->idTracker++;
+
+			return idTracker;
+		};
 
 		// Do NOT call this, only if you're initializing the entire shit
 		[[nodiscard]] static bool Init(
@@ -58,7 +91,7 @@ namespace DEngine::Gfx::Vk
 		// Custom data is mem-copied.
 		void Destroy(
 			CallbackPFN callback, 
-			Std::Span<char const> customData);
+			Std::ConstByteSpan customData);
 
 		// Waits for a fence to be signalled and then executes
 		// the job, and afterwards destroys the Fence.
@@ -79,8 +112,9 @@ namespace DEngine::Gfx::Vk
 		void Destroy(vk::CommandPool cmdPool, Std::Span<vk::CommandBuffer const> commandBuffers);
 		void Destroy(vk::CommandPool in);
 		void Destroy(vk::Fence fence, vk::CommandPool in);
+		void FreeDescriptorSets(vk::DescriptorPool in, Std::Span<vk::DescriptorSet const> descrSets);
 		void Destroy(vk::DescriptorPool in);
-		void Destroy(vk::Fence fence,vk::DescriptorPool in);
+		void Destroy(vk::Fence fence, vk::DescriptorPool in);
 		void Destroy(vk::Framebuffer in);
 		void Destroy(Std::Span<vk::Framebuffer const> in);
 		void Destroy(vk::Fence fence, vk::Framebuffer in);
@@ -95,29 +129,28 @@ namespace DEngine::Gfx::Vk
 		void Destroy(vk::Fence fence, vk::SwapchainKHR in);
 
 	private:
-		struct Job
-		{
-			CallbackPFN callback = nullptr;
+		u64 idTracker = 0;
+
+		struct Job {
 			// Offset in bytes.
 			uSize dataOffset = 0;
 			// Size in bytes
 			uSize dataSize = 0;
+			u64 id = 0;
 		};
-		struct InFlightQueue
-		{
+		struct InFlightQueue {
 			std::vector<Job> jobs;
 			std::vector<char> customData;
+			Std::FnScratchList<GlobUtils const&, Std::ConstByteSpan> fnList;
 		};
 		Std::StackVec<InFlightQueue, Const::maxInFlightCount> jobQueues;
 		InFlightQueue tempQueue;
 
-		struct FencedJob
-		{
+		struct FencedJob {
 			vk::Fence fence = {};
 			Job job = {};
 		};
-		struct FencedJobQueue
-		{
+		struct FencedJobQueue {
 			std::vector<FencedJob> jobs;
 			std::vector<char> customData;
 		};
@@ -161,8 +194,7 @@ namespace DEngine::Gfx::Vk
 		TestCallback<T> callback, 
 		T const& customData)
 	{
-		struct TempData
-		{
+		struct TempData {
 			TestCallback<T> callback;
 			T customData;
 		};

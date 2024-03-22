@@ -35,6 +35,8 @@ namespace DEngine::Math
 		[[nodiscard]] constexpr f32 MagnitudeSqrd() const noexcept;
 		[[nodiscard]] Vector<4, f32> GetNormalized() const;
 
+		[[nodiscard]] Vector<4, f32> ClampAll(f32 min, f32 max) const noexcept;
+
 		void Normalize();
 
 		[[nodiscard]] constexpr f32* begin() noexcept;

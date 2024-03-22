@@ -28,7 +28,9 @@ namespace DEngine::Gui
 		virtual void SetCursorType(WindowID, CursorType) = 0;
 
 		virtual void HideSoftInput() = 0;
-		virtual void OpenSoftInput(Std::Span<char const> inputText, SoftInputFilter inputFilter) = 0;
+		virtual void OpenSoftInput(WindowID windowId, Std::Span<char const> inputText, SoftInputFilter inputFilter) = 0;
+		virtual void UpdateTextInputConnection(u64 selIndex, u64 selCount, Std::Span<u32 const> inputText) = 0;
+		virtual void UpdateTextInputConnectionSelection(u64 selIndex, u64 selCount) = 0;
 	};
 
 	inline WindowHandler::~WindowHandler() noexcept {}

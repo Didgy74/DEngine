@@ -29,8 +29,7 @@ namespace DEngine::Gfx::Vk
     public:
         static constexpr u32 invalidIndex = static_cast<u32>(-1);
 
-        class SafeQueue
-        {
+        class SafeQueue {
         public:
             [[nodiscard]] u32 FamilyIndex() const { return m_familyIndex; }
             [[nodiscard]] u32 Index() const { return m_queueIndex; }

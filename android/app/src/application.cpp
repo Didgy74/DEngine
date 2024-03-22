@@ -161,19 +161,23 @@ namespace DEngine::Application::impl
 		}
 	}
 
-	JniMethodIds LoadJavaMethodIds(JNIEnv* jniEnv, jobject mainActivity) {
+	JniMethodIds LoadJavaMethodIds(JNIEnv& jniEnv, jclass appClass, jobject mainActivity) {
 		JniMethodIds returnValue = {};
 
-		jclass classObject = jniEnv->GetObjectClass(mainActivity);
+		returnValue.updateAccessibility = jniEnv.GetStaticMethodID(
+			appClass,
+			"NativeEvent_AccessibilityUpdate",
+			"(Ldidgy/dengine/DEngineApp;I[I[B)V");
 
-		returnValue.openSoftInput = jniEnv->GetMethodID(
-				classObject,
-				"NativeEvent_OpenSoftInput",
-				"(Ljava/lang/String;I)V");
-		returnValue.hideSoftInput = jniEnv->GetMethodID(
-				classObject,
-				"NativeEvent_HideSoftInput",
-				"()V");
+		jclass activityClassObject = jniEnv.GetObjectClass(mainActivity);
+		returnValue.openSoftInput = jniEnv.GetMethodID(
+			activityClassObject,
+			"NativeEvent_OpenSoftInput",
+			"(Ljava/lang/String;I)V");
+		returnValue.hideSoftInput = jniEnv.GetMethodID(
+			activityClassObject,
+			"NativeEvent_HideSoftInput",
+			"()V");
 
 		return returnValue;
 	}
@@ -193,15 +197,19 @@ void* Application::impl::Backend::Initialize(
 	jint attachThreadResult = backendData.globalJavaVm->AttachCurrentThread(
 		&jniEnv,
 		nullptr);
-	if (attachThreadResult != JNI_OK)
-	{
+	if (attachThreadResult != JNI_OK) {
 		// Attaching failed. Crash the program. Can't really handle this,
 		// we should probably use a more elegant method of crashing though.
 		std::abort();
 	}
 	backendData.gameThreadJniEnv = jniEnv;
 
-	backendData.jniMethodIds = LoadJavaMethodIds(jniEnv, backendData.mainActivity);
+	// Initialize stuff that depends on this jniEnv.
+	backendData.appClass = jniEnv->GetObjectClass(backendData.appHandle);
+	backendData.jniMethodIds = LoadJavaMethodIds(
+		*jniEnv,
+		backendData.appClass,
+		backendData.mainActivity);
 
 	// Load the ALooper object for this thread.
 	// We don't want to use the ALOOPER_PREPARE_ALLOW_NON_CALLBACKS flag,
@@ -449,4 +457,67 @@ void Application::impl::Backend::StopTextInputSession(
 	backendData.gameThreadJniEnv->CallVoidMethod(
 		backendData.mainActivity,
 		backendData.jniMethodIds.hideSoftInput);
+}
+
+namespace DEngine::Application::impl::Backend {
+	struct AccessibilityUpdateElementJni {
+		int posX;
+		int posY;
+		int width;
+		int height;
+		int textStart;
+		int textCount;
+		int isClickable;
+
+		static constexpr int memberCount = 7;
+
+		void FillArray(int* ptr) const {
+			ptr[0] = posX;
+			ptr[1] = posY;
+			ptr[2] = width;
+			ptr[3] = height;
+			ptr[4] = textStart;
+			ptr[5] = textCount;
+			ptr[6] = isClickable;
+		}
+	};
+}
+
+void Application::impl::Backend::UpdateAccessibility(
+	Context::Impl& implData,
+	void* backendDataIn,
+	WindowID windowId,
+	Std::RangeFnRef<AccessibilityUpdateElement> const& range,
+	Std::ConstByteSpan textData)
+{
+	auto& backendData = *(BackendData*)backendDataIn;
+	auto& jniEnv = *backendData.gameThreadJniEnv;
+	auto rangeCount = range.Size();
+
+	auto byteArray = jniEnv.NewByteArray(textData.Size());
+	auto byteArrayPtr = jniEnv.GetByteArrayElements(byteArray, nullptr);
+	std::memcpy(byteArrayPtr, textData.Data(), textData.Size());
+	jniEnv.ReleaseByteArrayElements(byteArray, byteArrayPtr, 0);
+
+	auto intArray = jniEnv.NewIntArray(rangeCount * AccessibilityUpdateElementJni::memberCount);
+	auto intArrayPtr = jniEnv.GetIntArrayElements(intArray, nullptr);
+	for (int i = 0; i < rangeCount; i++) {
+		auto const& item = range.Invoke(i);
+		AccessibilityUpdateElementJni out = {
+			.posX = item.posX, .posY = item.posY,
+			.width = item.width, .height = item.height,
+			.textStart = item.textStart, .textCount = item.textCount };
+		if (item.isClickable)
+			out.isClickable = 1;
+		out.FillArray(intArrayPtr + i * AccessibilityUpdateElementJni::memberCount);
+	}
+	jniEnv.ReleaseIntArrayElements(intArray, intArrayPtr, 0);
+
+	backendData.gameThreadJniEnv->CallStaticVoidMethod(
+		backendData.appClass,
+		backendData.jniMethodIds.updateAccessibility,
+		backendData.appHandle,
+		(int)windowId,
+		intArray,
+		byteArray);
 }

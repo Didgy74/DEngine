@@ -15,13 +15,15 @@ using LineAny = MenuButton::LineAny;
 using Submenu = MenuButton::Submenu;
 
 
-namespace DEngine::Gui::impl
-{
+namespace DEngine::Gui::impl {
 	class MenuLayer : public Layer {
 	public:
 		struct CustomData {
 			CustomData(RectCollection::AllocRefT alloc) :
 				sizeHintExtents{ alloc } {}
+
+			FontFaceSizeId fontSizeId = FontFaceSizeId::Invalid;
+			u32 marginAmount = 0;
 			Std::Vec<Extent, RectCollection::AllocRefT> sizeHintExtents;
 		};
 
@@ -65,8 +67,7 @@ namespace DEngine::Gui::impl
 
 	static constexpr u8 cursorPointerId = (u8)-1;
 
-	struct PointerPress_Pointer
-	{
+	struct PointerPress_Pointer {
 		u8 id;
 		PointerType type;
 		Math::Vec2 pos;
@@ -74,28 +75,24 @@ namespace DEngine::Gui::impl
 		bool consumed;
 	};
 
-	struct PointerMove_Pointer
-	{
+	struct PointerMove_Pointer {
 		u8 id;
 		Math::Vec2 pos;
 		bool occluded;
 	};
 
-	struct MenuBtnImpl
-	{
+	struct MenuBtnImpl {
 		// This data is only available when rendering.
-		struct CustomData
-		{
+		struct CustomData {
 			explicit CustomData(RectCollection::AllocRefT const& alloc) :
 				glyphRects{ alloc } {}
 
 			Extent textOuterExtent = {};
-			FontFaceId fontFaceId;
+			FontFaceSizeId fontSizeId = FontFaceSizeId::Invalid;
 			Std::Vec<Rect, RectCollection::AllocRefT> glyphRects;
 		};
 
-		struct MenuBtn_PointerMove_Params
-		{
+		struct MenuBtn_PointerMove_Params {
 			MenuButton& widget;
 			Rect widgetRect;
 			Rect visibleRect;
@@ -104,13 +101,12 @@ namespace DEngine::Gui::impl
 		[[nodiscard]] static bool MenuBtn_PointerMove(
 			MenuBtn_PointerMove_Params const& params);
 
-		struct MenuBtn_PointerPress_Params
-		{
+		struct MenuBtn_PointerPress_Params {
 			MenuButton& widget;
 			Context& ctx;
-			WindowID windowId;
-			Rect widgetRect;
-			Rect visibleRect;
+			WindowID const& windowId;
+			Rect const& widgetRect;
+			Rect const& visibleRect;
 			PointerPress_Pointer const& pointer;
 		};
 		[[nodiscard]] static bool MenuBtn_PointerPress(
@@ -123,15 +119,13 @@ namespace DEngine::Gui::impl
 			Rect widgetRect);
 
 
-		struct MenuLayer_PointerPress_Params
-		{
+		struct MenuLayer_PointerPress_Params {
 			MenuLayer& layer;
 			Context& ctx;
 			RectCollection const& rectCollection;
-			TextSizeInfo const& textSize;
+			MenuLayer::CustomData const& layerCustomData;
 			TextManager& textManager;
 			PointerPress_Pointer const& pointer;
-			u32 margin = 0;
 			Rect usableRect = {};
 			Std::FnRef<bool(Widget&, Rect const&, Rect const&, bool)> childDispatch;
 		};
@@ -141,11 +135,9 @@ namespace DEngine::Gui::impl
 			MenuLayer_PointerPress_Params const& params);
 
 
-		struct MenuLayer_PointerMove_Params
-		{
+		struct MenuLayer_PointerMove_Params {
 			MenuLayer& layer;
 			TextManager& textManager;
-			TextSizeInfo const& textSize;
 			RectCollection const& rectCollection;
 			u32 margin = 0;
 			Rect windowRect = {};
@@ -195,7 +187,6 @@ namespace DEngine::Gui::impl
 	{
 		Rect outRect = {};
 		outRect.extent = Extent::StackVertically(extents);
-			//.WithPadding(margin);
 		outRect.position = usableRect.ClampPoint(desiredPos);
 		return outRect;
 	}
@@ -209,7 +200,7 @@ namespace DEngine::Gui::impl
 		MenuButton::Submenu const& submenu;
 		TextManager& textManager;
 		u32 margin {};
-		TextSizeInfo const& textSize;
+		FontFaceSizeId const& fontSizeId;
 		Math::Vec4 bgColor {};
 		Rect submenuRect {};
 		Rect visibleRect {};
@@ -310,8 +301,10 @@ Layer::Press_Return Gui::impl::MenuBtnImpl::MenuLayer_PointerPress(
 	auto const& childDispatch = params.childDispatch;
 	auto const& rectCollection = params.rectCollection;
 	auto const& pointer = params.pointer;
-	auto const& margin = params.margin;
 	auto const& safeArea = params.usableRect;
+	auto const& layerCustomData = params.layerCustomData;
+	auto marginAmount = layerCustomData.marginAmount;
+
 
 	Layer::Press_Return returnValue = {};
 	returnValue.eventConsumed = params.pointer.consumed;
@@ -333,7 +326,7 @@ Layer::Press_Return Gui::impl::MenuBtnImpl::MenuLayer_PointerPress(
 
 	auto submenuRect = Submenu_BuildRectOuter(
 		lineExtents,
-		margin,
+		marginAmount,
 		desiredPos,
 		safeArea);
 	auto pointerInsideSubmenu = submenuRect.PointIsInside(pointer.pos);
@@ -375,7 +368,7 @@ Layer::Press_Return Gui::impl::MenuBtnImpl::MenuLayer_PointerPress(
 				if (line.togglable)
 					line.toggled = !line.toggled;
 				if (line.callback) {
-					line.callback(line, &ctx);
+					line.callback(line, ctx);
 				}
 				returnValue.destroyLayer = true;
 			}
@@ -416,12 +409,9 @@ bool Gui::impl::MenuBtnImpl::MenuLayer_PointerMove(
 	MenuLayer_PointerMove_Params const& params)
 {
 	auto& layer = params.layer;
-	auto& textSize = params.textSize;
 	auto const& rectColl = params.rectCollection;
 	auto const& pointer = params.pointer;
-	auto& textManager = params.textManager;
 	auto const& margin = params.margin;
-	auto const& windowRect = params.windowRect;
 	auto const& safeArea = params.usableRect;
 	auto const& childDispatch = params.childDispatch;
 
@@ -454,7 +444,7 @@ bool Gui::impl::MenuBtnImpl::MenuLayer_PointerMove(
 		auto& tempLine = submenu.lines[it.index];
 
 		if (auto ptr = tempLine.ToPtr<LineAny>()) {
-			params.childDispatch.Invoke(
+			childDispatch.Invoke(
 				*ptr->widget,
 				it.lineRect,
 				safeArea,
@@ -508,8 +498,8 @@ namespace DEngine::Gui::impl {
 		Std::Span<Extent const> lineExtents,
 		Math::Vec2Int position,
 		Rect const& visibleRect,
+		FontFaceSizeId fontSizeId,
 		u32 margin,
-		TextSizeInfo textSize,
 		Widget::Render_Params const& renderParams,
 		TextManager& textManager,
 		DrawInfo& drawInfo)
@@ -523,7 +513,7 @@ namespace DEngine::Gui::impl {
 					{ ptr->title.data(), ptr->title.size() },
 					textColor,
 					it.lineRect.Reduce(margin),
-					textSize,
+					fontSizeId,
 					drawInfo);
 			}
 			if (auto ptr = tempLine.ToPtr<LineAny>()) {
@@ -543,10 +533,10 @@ void Gui::impl::MenuLayer_RenderSubmenu(
 	auto const& submenuRect = params.submenuRect;
 	auto const& visibleRect = params.visibleRect;
 	auto const& margin = params.margin;
-	auto const& textSize = params.textSize;
 	auto const& lineExtents = params.lineExtents;
 	auto& textManager = params.textManager;
 	auto& drawInfo = params.drawInfo;
+	auto fontSizeId = params.fontSizeId;
 
 	auto const intersection = Rect::Intersection(submenuRect, visibleRect);
 	if (intersection.IsNothing())
@@ -566,8 +556,8 @@ void Gui::impl::MenuLayer_RenderSubmenu(
 		lineExtents,
 		submenuRect.position,
 		visibleRect,
+		fontSizeId,
 		margin,
-		textSize,
 		params.widgetParams,
 		textManager,
 		drawInfo);
@@ -578,20 +568,21 @@ namespace DEngine::Gui::impl {
 	auto GetChildSizeHints_GatherExtents(
 		Std::Span<Std::Variant<Line, LineAny> const> const& lines,
 		TextManager& textManager,
-		TextSizeInfo textSizeInfo,
-		u32 textMargin,
+		FontFaceSizeId fontSizeId,
+		u32 marginAmount,
 		Widget::GetSizeHint2_Params const& widgetParams,
 		AllocRef transientAlloc)
 	{
 		auto lineExtents = Std::NewVec<Extent>(transientAlloc);
 		lineExtents.Reserve(lines.Size());
+
 		for (auto const& line : lines) {
 			Extent lineExtent = {};
 			if (auto linePtr = line.ToPtr<Line>()) {
 				lineExtent = textManager.GetOuterExtent(
 					{ linePtr->title.data(), linePtr->title.size() },
-					textSizeInfo);
-				lineExtent = lineExtent.WithPadding(textMargin);
+					fontSizeId);
+				lineExtent.AddPadding(marginAmount);
 			}
 			// else
 			if (auto ptr = line.ToPtr<LineAny>())
@@ -606,49 +597,71 @@ void Gui::impl::MenuLayer::BuildSizeHints(
 	Layer::BuildSizeHints_Params const& params) const
 {
 	auto const& ctx = params.ctx;
-	auto& textManager = params.textManager;
+	auto& textMgr = params.textManager;
 	auto const& window = params.window;
 	auto const& transientAlloc = params.transientAlloc;
 	auto& pusher = params.pusher;
 	auto& menuBtn = GetMenuBtn();
-	auto const& textMargin = menuBtn.margin;
 	auto const& lineSpacing = menuBtn.spacing;
 	auto const& submenu = menuBtn.submenu;
+
+	auto entry = pusher.AddEntry(*this);
+	auto& customData = pusher.AttachCustomData(entry, MenuLayer::CustomData{ pusher.Alloc() });
 
 	Widget::GetSizeHint2_Params widgetParams = {
 		.ctx = ctx,
 		.window = window,
-		.textManager = textManager,
+		.textManager = textMgr,
 		.transientAlloc = transientAlloc,
 		.pusher = pusher,
 	};
 
-	TextSizeInfo textSizeInfo = {
-		.scale = ctx.fontScale * window.contentScale,
-		.dpiX = window.dpiX,
-		.dpiY = window.dpiY, };
+	auto normalTextScale = ctx.fontScale * window.contentScale;
+	auto fontSizeId = FontFaceSizeId::Invalid;
+	auto marginAmount = 0;
+	{
+		auto normalHeight = textMgr.GetLineheight(normalTextScale, window.dpiX, window.dpiY);
+		auto normalHeightMargin = (u32)Math::Round((f32)normalHeight * ctx.defaultMarginFactor);
+		normalHeight += 2 * normalHeightMargin;
+
+		auto minHeight = CmToPixels(ctx.minimumHeightCm, window.dpiY);
+
+		if (normalHeight > minHeight) {
+			fontSizeId = textMgr.GetFontFaceSizeId(normalTextScale, window.dpiX, window.dpiY);
+			marginAmount = (i32)normalHeightMargin;
+		} else {
+			// We can't just do minHeight * defaultMarginFactor for this one, because defaultMarginFactor applies to
+			// content, not the outer size. So we set up an equation `height = 2 * marginFactor * content + content`
+			// and we solve for content.
+			auto contentSizeCm = ctx.minimumHeightCm / ((2 * ctx.defaultMarginFactor) + 1.f);
+			auto contentSize = CmToPixels(contentSizeCm, window.dpiY);
+			fontSizeId = textMgr.FontFaceSizeIdForLinePixelHeight(
+				contentSize,
+				TextHeightType::Alphas);
+			marginAmount = CmToPixels((f32)contentSizeCm * ctx.defaultMarginFactor, window.dpiY);
+		}
+	}
+	customData.fontSizeId = fontSizeId;
+	customData.marginAmount = marginAmount;
 
 	auto lineExtents = GetChildSizeHints_GatherExtents(
 		{ submenu.lines.data(), submenu.lines.size() },
-		textManager,
-		textSizeInfo,
-		textMargin,
+		textMgr,
+		fontSizeId,
+		marginAmount,
 		widgetParams,
 		transientAlloc);
 
 	// Add margin to outside all lines
 	auto extent = Extent::StackVertically(lineExtents.ToSpan());
-		//.WithPadding(textMargin);
 
 	SizeHint returnVal = {};
 	returnVal.minimum = extent;
 
-	auto entry = pusher.AddEntry(*this);
-	auto customData = MenuLayer::CustomData(pusher.Alloc());
+
 	for (auto const& item : lineExtents)
 		customData.sizeHintExtents.PushBack(item);
 
-	pusher.AttachCustomData(entry, Std::Move(customData));
 	pusher.SetSizeHint(entry, returnVal);
 }
 
@@ -660,10 +673,13 @@ void Gui::impl::MenuLayer::BuildRects(
 	auto const& windowRect = params.windowRect;
 	auto const& safeAreaRect = params.visibleRect;
 	auto& menuBtn = GetMenuBtn();
-	auto const& margin = menuBtn.margin;
 
 	auto entry = pusher.GetEntry(*this);
-	auto& customData = *pusher.GetCustomData2<MenuLayer::CustomData>(entry);
+	auto const* customDataPtr = pusher.GetCustomData2<MenuLayer::CustomData>(entry);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr != nullptr);
+	auto const& customData = *customDataPtr;
+	auto marginAmount = customData.marginAmount;
+
 	auto const& lineExtents = customData.sizeHintExtents.ToSpan();
 
 	auto desiredPos = MenuLayer_GetTopSubmenuPos(layer, pusher);
@@ -682,7 +698,7 @@ void Gui::impl::MenuLayer::BuildRects(
 
 	auto outerRect = Submenu_BuildRectOuter(
 		customData.sizeHintExtents.ToSpan(),
-		margin,
+		marginAmount,
 		desiredPos,
 		safeIntersection);
 	pusher.SetRectPair(entry, { outerRect, safeIntersection });
@@ -716,22 +732,20 @@ void Gui::impl::MenuLayer::Render(
 		return;
 
 	auto const entry = rectColl.GetEntry(*this).Get();
-	//auto const& rectPair = rectColl.GetRect(entry);
-	auto const& customData = *rectColl.GetCustomData2<MenuLayer::CustomData>(entry);
+	auto const* customDataPtr = rectColl.GetCustomData2<MenuLayer::CustomData>(entry);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr != nullptr);
+	auto const& customData = *customDataPtr;
+	auto fontSizeId = customData.fontSizeId;
+	auto marginAmount = customData.marginAmount;
 	auto lineExtents = customData.sizeHintExtents.ToSpan();
 
 	auto desiredPos = MenuLayer_GetTopSubmenuPos(layer, rectColl);
 
 	auto const submenuRect = impl::Submenu_BuildRectOuter(
-		{ customData.sizeHintExtents.Data(), customData.sizeHintExtents.Size() },
-		menuBtn.margin,
+		lineExtents,
+		marginAmount,
 		desiredPos,
 		safeAreaRect);
-
-	TextSizeInfo textSize = {
-		.scale = ctx.fontScale * window.contentScale,
-		.dpiX = window.dpiX,
-		.dpiY = window.dpiY };
 
 	Widget::Render_Params widgetParams = {
 		.ctx = ctx,
@@ -746,8 +760,8 @@ void Gui::impl::MenuLayer::Render(
 	impl::MenuLayer_RenderSubmenu_Params tempParams = {
 		.submenu = submenu,
 		.textManager = textManager,
-		.margin = menuBtn.margin,
-		.textSize = textSize,
+		.margin = marginAmount,
+		.fontSizeId = fontSizeId,
 		.bgColor = menuBtn.colors.active,
 		.submenuRect = submenuRect,
 		.visibleRect = safeAreaRect,
@@ -774,11 +788,6 @@ bool Gui::impl::MenuLayer::CursorMove(
 	pointer.pos = { (f32)event.position.x, (f32)event.position.y };
 	pointer.occluded = occluded;
 
-	TextSizeInfo textSize = {
-		.scale = ctx.fontScale * window.contentScale,
-		.dpiX = window.dpiX,
-		.dpiY = window.dpiY };
-
 	Widget::CursorMoveParams widgetParams = {
 		.ctx = ctx,
 		.window = window,
@@ -803,9 +812,7 @@ bool Gui::impl::MenuLayer::CursorMove(
 	impl::MenuBtnImpl::MenuLayer_PointerMove_Params tempParams = {
 		.layer = *this,
 		.textManager = params.textManager,
-		.textSize = textSize,
 		.rectCollection = params.rectCollection,
-		.margin = menuBtn.margin,
 		.windowRect = params.windowRect,
 		.usableRect = params.safeAreaRect,
 		.pointer = pointer,
@@ -829,17 +836,16 @@ Layer::Press_Return Gui::impl::MenuLayer::CursorPress(
 	auto& cursorPos = params.cursorPos;
 	auto& transientAlloc = params.transientAlloc;
 
+	auto const* customDataPtr = rectColl.GetCustomData2<MenuLayer::CustomData>(*this);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr != nullptr);
+	auto const& customData = *customDataPtr;
+
 	impl::PointerPress_Pointer pointer = {};
 	pointer.id = impl::cursorPointerId;
 	pointer.pos = { (f32)cursorPos.x, (f32)cursorPos.y };
 	pointer.type = impl::ToPointerType(event.button);
 	pointer.pressed = event.pressed;
 	pointer.consumed = eventConsumed;
-
-	TextSizeInfo textSize = {
-		.scale = ctx.fontScale * window.contentScale,
-		.dpiX = window.dpiX,
-		.dpiY = window.dpiY };
 
 	Widget::CursorPressParams widgetParams = {
 		.ctx = ctx,
@@ -849,7 +855,6 @@ Layer::Press_Return Gui::impl::MenuLayer::CursorPress(
 		.transientAlloc = transientAlloc,
 		.cursorPos = cursorPos,
 		.event = event, };
-
 	auto childDispatch = [&widgetParams](
 		Widget& widget,
 		Rect const& widgetRect,
@@ -868,10 +873,9 @@ Layer::Press_Return Gui::impl::MenuLayer::CursorPress(
 		.layer = *this,
 		.ctx = ctx,
 		.rectCollection = rectColl,
-		.textSize = textSize,
+		.layerCustomData = customData,
 		.textManager = params.textManager,
 		.pointer = pointer,
-		.margin = menuBtn.margin,
 		.usableRect = params.safeAreaRect,
 		.childDispatch = childDispatch, };
 
@@ -926,9 +930,7 @@ bool Gui::impl::MenuLayer::TouchMove2(
 	impl::MenuBtnImpl::MenuLayer_PointerMove_Params tempParams = {
 		.layer = *this,
 		.textManager = params.textManager,
-		.textSize = textSize,
 		.rectCollection = params.rectCollection,
-		.margin = menuBtn.margin,
 		.windowRect = params.windowRect,
 		.usableRect = params.safeAreaRect,
 		.pointer = pointer,
@@ -951,17 +953,16 @@ Layer::Press_Return Gui::impl::MenuLayer::TouchPress2(
 	auto& textManager = params.textManager;
 	auto& transientAlloc = params.transientAlloc;
 
+	auto const* customDataPtr = rectColl.GetCustomData2<MenuLayer::CustomData>(*this);
+	DENGINE_IMPL_GUI_ASSERT(customDataPtr != nullptr);
+	auto const& customData = *customDataPtr;
+
 	impl::PointerPress_Pointer pointer = {};
 	pointer.id = event.id;
 	pointer.pos = event.position;
 	pointer.type = PointerType::Primary;
 	pointer.pressed = event.pressed;
 	pointer.consumed = consumed;
-
-	TextSizeInfo textSize = {
-		.scale = ctx.fontScale * window.contentScale,
-		.dpiX = window.dpiX,
-		.dpiY = window.dpiY };
 
 	Widget::TouchPressParams widgetParams = {
 		.ctx = ctx,
@@ -988,10 +989,9 @@ Layer::Press_Return Gui::impl::MenuLayer::TouchPress2(
 		.layer = *this,
 		.ctx = ctx,
 		.rectCollection = rectColl,
-		.textSize = textSize,
+		.layerCustomData = customData,
 		.textManager = textManager,
 		.pointer = pointer,
-		.margin = menuBtn.margin,
 		.usableRect = params.safeAreaRect,
 		.childDispatch = childDispatch, };
 
@@ -1059,7 +1059,7 @@ void Gui::impl::MenuBtnImpl::MenuBtn_SpawnSubmenuLayer(
 	WindowID windowId,
 	Rect widgetRect)
 {
-	auto job = [&widget, windowId](Context& ctx) {
+	auto job = [&widget, windowId](Context& ctx, Std::AnyRef customData) {
 		auto* layerPtr = new impl::MenuLayer;
 
 		layerPtr->_menuButton = &widget;
@@ -1075,51 +1075,63 @@ void Gui::impl::MenuBtnImpl::MenuBtn_SpawnSubmenuLayer(
 SizeHint MenuButton::GetSizeHint2(Widget::GetSizeHint2_Params const& params) const
 {
 	auto const& ctx = params.ctx;
-	auto& textManager = params.textManager;
+	auto& textMgr = params.textManager;
 	auto& pusher = params.pusher;
 	auto const& window = params.window;
 
-	SizeHint returnValue = {};
-
 	auto pusherIt = pusher.AddEntry(*this);
-
-	auto textScale = ctx.fontScale * window.contentScale;
-
+	auto& customData = pusher.AttachCustomData(pusherIt, impl::MenuBtnImpl::CustomData{ pusher.Alloc() });
 	if (pusher.IncludeRendering()) {
-		auto customData = impl::MenuBtnImpl::CustomData{ pusher.Alloc() };
-		customData.glyphRects.Resize(title.size());
-
-		customData.fontFaceId = textManager.GetFontFaceId(
-			textScale,
-			window.dpiX,
-			window.dpiY);
-
-		auto const textOuterExtent = textManager.GetOuterExtent(
-			{ title.data(), title.size() },
-			textScale,
-			window.dpiX,
-			window.dpiY,
-			customData.glyphRects.Data());
-
-		customData.textOuterExtent = textOuterExtent;
-
-		returnValue.minimum = textOuterExtent;
-		pusher.AttachCustomData(pusherIt, Std::Move(customData));
-	}
-	else {
-		returnValue.minimum = textManager.GetOuterExtent(
-			{ title.data(), title.size() },
-			textScale,
-			window.dpiX,
-			window.dpiY);
+		customData.glyphRects.Resize(this->title.size());
 	}
 
-	returnValue.minimum.width += margin * 2;
-	returnValue.minimum.height += margin * 2;
+	auto normalTextScale = ctx.fontScale * window.contentScale;
+	auto fontSizeId = FontFaceSizeId::Invalid;
+	auto marginAmount = 0;
+	{
+		auto normalHeight = textMgr.GetLineheight(normalTextScale, window.dpiX, window.dpiY);
+		auto normalHeightMargin = (u32)Math::Round((f32)normalHeight * ctx.defaultMarginFactor);
+		normalHeight += 2 * normalHeightMargin;
 
-	pusher.SetSizeHint(pusherIt, returnValue);
+		auto minHeight = CmToPixels(ctx.minimumHeightCm, window.dpiY);
 
-	return returnValue;
+		if (normalHeight > minHeight) {
+			fontSizeId = textMgr.GetFontFaceSizeId(normalTextScale, window.dpiX, window.dpiY);
+			marginAmount = (i32)normalHeightMargin;
+		} else {
+			// We can't just do minHeight * defaultMarginFactor for this one, because defaultMarginFactor applies to
+			// content, not the outer size. So we set up an equation `height = 2 * marginFactor * content + content`
+			// and we solve for content.
+			auto contentSizeCm = ctx.minimumHeightCm / ((2 * ctx.defaultMarginFactor) + 1.f);
+			auto contentSize = CmToPixels(contentSizeCm, window.dpiY);
+			fontSizeId = textMgr.FontFaceSizeIdForLinePixelHeight(
+				contentSize,
+				TextHeightType::Alphas);
+			marginAmount = CmToPixels((f32)contentSizeCm * ctx.defaultMarginFactor, window.dpiY);
+		}
+	}
+	customData.fontSizeId = fontSizeId;
+
+	auto textOuterExtent = textMgr.GetOuterExtent(
+		{ this->title.data(), this->title.size() },
+		fontSizeId,
+		TextHeightType::Alphas,
+		customData.glyphRects.ToSpan());
+	customData.textOuterExtent = textOuterExtent;
+
+	SizeHint returnVal = {};
+	returnVal.minimum = textOuterExtent;
+	returnVal.minimum.AddPadding(marginAmount);
+	returnVal.minimum.width = Math::Max(
+		returnVal.minimum.width,
+		(u32)CmToPixels(ctx.minimumHeightCm, window.dpiX));
+	returnVal.minimum.height = Math::Max(
+		returnVal.minimum.height,
+		(u32)CmToPixels(ctx.minimumHeightCm, window.dpiY));
+
+	pusher.SetSizeHint(pusherIt, returnVal);
+
+	return returnVal;
 }
 
 void MenuButton::BuildChildRects(
@@ -1146,18 +1158,36 @@ void MenuButton::Render2(
 	auto* customDataPtr = rectCollection.GetCustomData2<impl::MenuBtnImpl::CustomData>(*this);
 	DENGINE_IMPL_GUI_ASSERT(customDataPtr);
 	auto& customData = *customDataPtr;
+	DENGINE_IMPL_GUI_ASSERT(this->title.size() == customData.glyphRects.Size());
+	auto fontSizeId = customData.fontSizeId;
 
-	Rect textRect = {};
-	textRect.position = widgetRect.position + impl::BuildTextOffset(widgetRect.extent, customData.textOuterExtent);
-	textRect.extent = customData.textOuterExtent;
+	auto centeringOffset = Extent::CenteringOffset(widgetRect.extent, customData.textOuterExtent);
+	centeringOffset.x = Math::Max(centeringOffset.x, 0);
+	centeringOffset.y = Math::Max(centeringOffset.y, 0);
+	auto textRect = Rect{ widgetRect.position + centeringOffset, customData.textOuterExtent };
+
 	auto scissor = DrawInfo::ScopedScissor(drawInfo, textRect, widgetRect);
-
 	drawInfo.PushText(
-		(u64)customData.fontFaceId,
+		(u64)fontSizeId,
 		{ title.data(), title.size() },
 		customData.glyphRects.Data(),
 		textRect.position,
 		{ 1.f, 1.f, 1.f, 1.f });
+}
+
+void MenuButton::AccessibilityTest(
+	AccessibilityTest_Params const& params,
+	Rect const& widgetRect,
+	Rect const& visibleRect) const
+{
+	auto& pusher = params.pusher;
+
+	AccessibilityInfoElement element = {};
+	element.textStart = pusher.PushText({ this->title.data(), this->title.size() });
+	element.textCount = (int)this->title.size();
+	element.rect = Intersection(widgetRect, visibleRect);
+	element.isClickable = true;
+	pusher.PushElement(element);
 }
 
 void MenuButton::CursorExit(Context& ctx)
@@ -1201,10 +1231,10 @@ bool MenuButton::CursorPress2(
 	impl::MenuBtnImpl::MenuBtn_PointerPress_Params tempParams {
 		.widget = *this,
 		.ctx = params.ctx,
+		.windowId = params.windowId,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
 		.pointer = pointer };
-	tempParams.windowId = params.windowId;
-	tempParams.widgetRect = widgetRect;
-	tempParams.visibleRect = visibleRect;
 
 	return impl::MenuBtnImpl::MenuBtn_PointerPress(tempParams);
 }
@@ -1245,10 +1275,10 @@ bool MenuButton::TouchPress2(
 	impl::MenuBtnImpl::MenuBtn_PointerPress_Params tempParams {
 		.widget = *this,
 		.ctx = params.ctx,
+		.windowId = params.windowId,
+		.widgetRect = widgetRect,
+		.visibleRect = visibleRect,
 		.pointer = pointer };
-	tempParams.windowId = params.windowId;
-	tempParams.widgetRect = widgetRect;
-	tempParams.visibleRect = visibleRect;
 
 	return impl::MenuBtnImpl::MenuBtn_PointerPress(tempParams);
 }

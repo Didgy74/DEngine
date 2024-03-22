@@ -130,8 +130,8 @@ namespace DEngine::Application::impl {
 	static void PushCustomEvent_NativeWindowDestroyed(BackendData& backendData, ANativeWindow* window)
 	{
 		auto job = [=](Context::Impl& implData, BackendData& backendData) {
-			DENGINE_IMPL_APPLICATION_ASSERT(backendData.nativeWindow == window);
-			ANativeWindow_release(window);
+			//DENGINE_IMPL_APPLICATION_ASSERT(backendData.nativeWindow == window);
+			ANativeWindow_release(backendData.nativeWindow);
 			backendData.nativeWindow = nullptr;
 
 			if (backendData.currWindowId.Has()) {
@@ -432,6 +432,8 @@ namespace DEngine::Application::impl {
 
 	[[nodiscard]] BackendData* InitBackendData(
 		JNIEnv* env,
+        jobject app,
+		jclass appClass,
 		jobject activity,
 		jobject assetManager,
 		float fontScale)
@@ -445,10 +447,8 @@ namespace DEngine::Application::impl {
 			// TODO: Error
 		}
 
-		// We want the object handle of our main activity, so we can load
-		// method-IDs for it later.
-		// We know our Java Activity is the one being used, it just inherits from
-		// ANativeActivity.
+		backendData.appHandle = env->NewGlobalRef(app);
+		backendData.appClass = env->GetObjectClass(app);
 		backendData.mainActivity = env->NewGlobalRef(activity);
 		backendData.assetManager = AAssetManager_fromJava(env, assetManager);
 		backendData.currAConfig = AConfiguration_new();
@@ -527,6 +527,8 @@ JNIEXPORT jlong
 Java_didgy_dengine_NativeInterface_init(
 	JNIEnv* env,
 	jclass clazz,
+	jobject app,
+	jclass appClass,
 	jobject activity,
 	jobject assetManager,
 	jfloat fontScale)
@@ -537,6 +539,8 @@ Java_didgy_dengine_NativeInterface_init(
 
 	auto backendPtr = InitBackendData(
 		env,
+        app,
+		appClass,
 		activity,
 		assetManager,
 		fontScale);

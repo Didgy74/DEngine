@@ -1,5 +1,7 @@
 #pragma once
 
+#include <type_traits>
+
 namespace DEngine::Std::Trait::impl
 {
 	template<unsigned int index, class T, class...Us>
@@ -34,7 +36,7 @@ namespace DEngine::Std::Trait::impl
 	struct Conditional<false, T, U> { using Type = U; };
 
 	template<class T>
-	struct HasVirtualDestructor : public BoolValue<__has_virtual_destructor(T)> {};
+	struct HasVirtualDestructor : public BoolValue<std::has_virtual_destructor_v<T>> {};
 
 	template <class T, class... Ts>
 	struct IndexOf;
@@ -62,7 +64,7 @@ namespace DEngine::Std::Trait::impl
 	struct IsTriviallyConstructible : public BoolValue<__is_trivially_constructible(T)> {};
 
 	template<class T>
-	struct IsTriviallyDestructible : public BoolValue<__has_trivial_destructor(T)> {};
+	struct IsTriviallyDestructible : public BoolValue<std::is_trivially_destructible_v<T>> {};
 
 	template<class T>
 	struct IsCopyAssignable : public BoolValue<__is_assignable(T&, T const&)> {};

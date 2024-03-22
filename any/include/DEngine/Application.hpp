@@ -2,6 +2,7 @@
 
 #include <DEngine/FixedWidthTypes.hpp>
 #include <DEngine/Std/Containers/Array.hpp>
+#include <DEngine/Std/Containers/RangeFnRef.hpp>
 #include <DEngine/Std/Containers/Opt.hpp>
 #include <DEngine/Std/Containers/StackVec.hpp>
 #include <DEngine/Std/Containers/Str.hpp>
@@ -12,14 +13,37 @@
 
 namespace DEngine::Application
 {
-	enum class WindowID : u64;
-	struct Extent
-	{
+	enum class WindowID : u64 {
+		Invalid = (u64)-1,
+	};
+	struct Extent {
 		u32 width;
 		u32 height;
+
+        [[nodiscard]] auto operator==(Extent const& other) const noexcept {
+            return this->width == other.width && this->height == other.height;
+        }
+        [[nodiscard]] auto operator!=(Extent const& other) const noexcept { return !(*this == other); }
 	};
-	struct WindowEvents
-	{
+	enum class WindowEventFlag : u64 {
+		Resize = (1 << 1),
+		Move = (1 << 2),
+		Restore = (1 << 3),
+		Focus = (1 << 4),
+		Orientation = (1 << 5),
+		ContentScale = (1 << 6),
+		Dpi = (1 << 7),
+		CursorMove = (1 << 8),
+		TouchEvent = (1 << 9),
+	};
+	[[nodiscard]] inline WindowEventFlag operator&(WindowEventFlag const& a, WindowEventFlag const& b) {
+		return WindowEventFlag((u64)a & (u64)b);
+	}
+	[[nodiscard]] inline bool Contains(WindowEventFlag const& a, WindowEventFlag const& b) {
+		return ((u64)a & (u64)b) != 0;
+	}
+
+	struct WindowEvents {
 		bool resize;
 		bool move;
 		bool focus;
@@ -30,6 +54,12 @@ namespace DEngine::Application
 		bool restore;
 		bool orientation;
 	};
+
+	struct SelectionRange {
+		u64 index;
+		u64 count;
+	};
+
 	Std::StackVec<char const*, 5> GetRequiredVkInstanceExtensions() noexcept;
 
 	enum class CursorType : u8;
@@ -42,8 +72,7 @@ namespace DEngine::Application
 	enum class Platform : u8;
 
 	enum class Button : u16;
-	enum class KeyEventType : u8
-	{
+	enum class KeyEventType : u8 {
 		Unchanged,
 		Unpressed,
 		Pressed,
@@ -56,8 +85,7 @@ namespace DEngine::Application
 	struct TouchInput;
 	Std::StackVec<TouchInput, maxTouchEventCount> TouchInputs();
 
-	enum class GamepadKey : u8
-	{
+	enum class GamepadKey : u8 {
 		Invalid,
 		A,
 		B,
@@ -93,8 +121,7 @@ namespace DEngine::Application
 		f32 stickDeadzone = 0.1f;
 	};
 
-	enum class LogSeverity
-	{
+	enum class LogSeverity {
 		Debug,
 		Warning,
 		Error,
@@ -102,6 +129,16 @@ namespace DEngine::Application
 	class EventForwarder;
 	enum class SoftInputFilter : u8;
 	class FileInputStream;
+
+	struct AccessibilityUpdateElement {
+		int posX;
+		int posY;
+		int width;
+		int height;
+		int textStart;
+		int textCount;
+		bool isClickable;
+	};
 
 	class Context
 	{
@@ -136,26 +173,27 @@ namespace DEngine::Application
 			Std::Span<char const> title,
 			Extent extent);
 		[[nodiscard]] bool CanCreateNewWindow() const noexcept;
-		// Thread-safe
 		void DestroyWindow(WindowID) noexcept;
-		// Thread-safe
 		[[nodiscard]] u32 GetWindowCount() const noexcept;
 		[[nodiscard]] Extent GetWindowExtent(WindowID) const noexcept;
 		[[nodiscard]] Math::Vec2Int GetWindowPosition(WindowID) const noexcept;
 		[[nodiscard]] Extent GetWindowVisibleExtent(WindowID) const noexcept;
 		[[nodiscard]] Math::Vec2Int GetWindowVisibleOffset(WindowID) const noexcept;
-		// Thread-safe
 		[[nodiscard]] WindowEvents GetWindowEvents(WindowID) const noexcept;
-		// Thread-safe
+		[[nodiscard]] WindowEventFlag GetWindowEventFlags(WindowID) const noexcept;
 		[[nodiscard]] bool IsWindowMinimized(WindowID) const noexcept;
 
-		struct CreateVkSurface_ReturnT
-		{
+		void UpdateAccessibilityData(
+			WindowID windowId,
+			Std::RangeFnRef<AccessibilityUpdateElement> const& range,
+			Std::ConstByteSpan textData) noexcept;
+
+		struct CreateVkSurface_ReturnT {
 			u32 vkResult;
 			u64 vkSurface;
 		};
 		// Thread-safe
-		[[nodiscard]] CreateVkSurface_ReturnT CreateVkSurface(
+		[[nodiscard]] CreateVkSurface_ReturnT CreateVkSurface_ThreadSafe(
 			WindowID window,
 			uSize vkInstance,
 			void const* vkAllocationCallbacks) noexcept;
@@ -170,14 +208,10 @@ namespace DEngine::Application
 
 		void Log(LogSeverity severity, Std::Span<char const> msg);
 
-		void StartTextInputSession(SoftInputFilter inputFilter, Std::Span<char const> text);
-		void UpdateCharInputContext(Std::Span<char const> text);
+		void StartTextInputSession(WindowID windowId, SoftInputFilter inputFilter, Std::Span<char const> text);
+		void UpdateTextInputConnection(u64 selIndex, u64 selCount, Std::Span<u32 const> text);
+		void UpdateTextInputConnectionSelection(u64 selIndex, u64 selCount);
 		void StopTextInputSession();
-
-		// NOT thread safe
-		void InsertEventForwarder(EventForwarder&);
-		// NOT thread safe
-		void RemoveEventForwarder(EventForwarder&);
 
 		// Internal stuff, don't use it.
 		struct Impl;
@@ -195,11 +229,14 @@ namespace DEngine::Application
 
 		Impl* m_implData = nullptr;
 	};
+
+
 }
 
 namespace DEngine
 {
 	namespace App = Application;
+	namespace Platform = App;
 }
 
 enum class DEngine::Application::CursorType : DEngine::u8
@@ -331,9 +368,17 @@ public:
 	virtual void TextInputEvent(
 		Context& ctx,
 		WindowID windowId,
-		uSize oldIndex,
-		uSize oldCount,
+		u64 start,
+		u64 count,
 		Std::Span<u32 const> newString) {}
+	virtual void TextSelectionEvent(
+		Context& ctx,
+		WindowID windowId,
+		u64 start,
+		u64 count) {}
+	virtual void TextDeleteEvent(
+		Context& ctx,
+		WindowID windowId) {}
 	virtual void EndTextInputSessionEvent(
 		Context& ctx,
 		WindowID windowId) {}
@@ -347,6 +392,11 @@ public:
 		Context& appCtx,
 		WindowID window,
 		f32 newScale) {}
+	virtual void WindowDpi(
+		Context& appCtx,
+		WindowID window,
+		f32 dpiX,
+		f32 dpiY) {}
 	// Return true if window should be closed.
 	[[nodiscard]] virtual bool WindowCloseSignal(
 		Context& appCtx,

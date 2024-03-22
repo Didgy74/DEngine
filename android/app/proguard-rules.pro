@@ -25,3 +25,11 @@
     public void nativeEvent_hideSoftInput();
     public void nativeEvent_createWindow(int);
 }
+
+-keep public class didgy.dengine.NativeInterface {
+    static public void NativeEvent_AccessibilityUpdate(int, int[], byte[]);
+}
+
+-keep public class didgy.dengine.DEngineApp {
+    public void NativeEvent_AccessibilityUpdate(int, int[]);
+}

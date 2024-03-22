@@ -70,7 +70,6 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 
 		auto positionLabel = new Gui::Text;
 		outerGrid->SetChild(0, row, Std::Box{ positionLabel });
-		positionLabel->margin = Settings::defaultTextMargin;
 		positionLabel->text = "P:";
 		positionLabel->expandX = false;
 
@@ -105,7 +104,6 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 		auto rotationLabel = new Text;
 		outerGrid->SetChild(0, row, Std::Box{ rotationLabel });
 		rotationLabel->text = "R:";
-		rotationLabel->margin = Settings::defaultTextMargin;
 		rotationLabel->expandX = false;
 
 		rotationInput = new LineFloatEdit;
@@ -130,7 +128,6 @@ TransformWidget::TransformWidget(EditorImpl const& editorImpl)
 		auto scaleText = new Text;
 		outerGrid->SetChild(0, row, Std::Box{ scaleText });
 		scaleText->text = "S:";
-		scaleText->margin = Settings::defaultTextMargin;
 		scaleText->expandX = false;
 
 		// Create the scale input fields
@@ -240,7 +237,6 @@ SpriteRenderer2DWidget::SpriteRenderer2DWidget(EditorImpl const& editorImpl)
 	auto textureIDLabel = new Text;
 	textureIdLayout->AddWidget(Std::Box{ textureIDLabel });
 	textureIDLabel->text = "Texture ID:";
-	textureIDLabel->margin = Editor::Settings::defaultTextMargin;
 	textureIDLabel->expandX = false;
 
 	// Create the integer field
@@ -322,12 +318,10 @@ RigidbodyWidget::RigidbodyWidget(EditorImpl const& editorImpl)
 		auto bodyTypeLabel = new Text;
 		bodyTypeLayout->AddWidget(Std::Box{ bodyTypeLabel });
 		bodyTypeLabel->text = "Type:";
-		bodyTypeLabel->margin = Settings::defaultTextMargin;
 		bodyTypeLabel->expandX = false;
 		
 		bodyTypeDropdown = new Dropdown;
 		bodyTypeLayout->AddWidget(Std::Box{ bodyTypeDropdown });
-		bodyTypeDropdown->textMargin = Settings::defaultTextMargin;
 		bodyTypeDropdown->items.emplace_back("Dynamic"); // Rigidbody2D::Type::Dynamic = 0
 		bodyTypeDropdown->items.emplace_back("Static"); // Rigidbody2D::Type::Static = 0
 		bodyTypeDropdown->selectedItem = (u32)Physics::Rigidbody2D::Type::Dynamic;

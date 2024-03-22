@@ -28,7 +28,7 @@ namespace DEngine::Std
 		// Returns true if the resize was successful.
 		[[nodiscard]] bool Resize(void* ptr, uSize newSize) noexcept;
 		// Passing in a pointer value that was not returned by Alloc is UB.
-		void Free(void* in) noexcept;
+		void Free(void* in, uSize size) noexcept;
 
 		// Reset allocated memory without freeing
 		void Reset(bool safetyOn = true) noexcept;
@@ -40,8 +40,7 @@ namespace DEngine::Std
 		// Describes the offset for the next allocation
 		Std::Opt<uSize> prevAllocOffset;
 
-		struct Block
-		{
+		struct Block {
 			using DataPtrT = char;
 			DataPtrT* data = nullptr;
 			uSize size = 0;
@@ -57,9 +56,8 @@ namespace DEngine::Std
 		Block activeBlock = {};
 
 		// Essentially a simple vector for holding the block pointers.
-		struct BlockList
-		{
-			Block* ptr = nullptr;
+		struct BlockList {
+			Block* ptrElements = nullptr;
 			uSize count = 0;
 			static constexpr uSize minCapacity = 5;
 			uSize capacity = 0;

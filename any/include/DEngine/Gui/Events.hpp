@@ -69,48 +69,43 @@ namespace DEngine::Gui
 		bool pressed;
 	};
 
-	struct TouchPressEvent
-	{
+	struct TouchPressEvent {
 		WindowID windowId;
 		u8 id;
 		Math::Vec2 position;
 		bool pressed;
 	};
 
-	struct TouchMoveEvent
-	{
+	struct TouchMoveEvent {
 		WindowID windowId;
 		u8 id;
 		Math::Vec2 position;
 	};
 
-	struct TextInputEvent
-	{
-		WindowID windowId;
-
-		// The index of the substring that should be replaced
-		// This can be the end of the entire string, in which case
-		// string needs to grow.
-		//
-		// It is not legal for it to be more than 1 past the string-size.
-		uSize oldIndex;
-
-		// The size of the substring that should be replaced.
-		uSize oldCount;
+	struct TextInputEvent {
+		WindowID windowId = WindowID::Invalid;
+		u64 start = 0;
+		u64 count = 0;
 
 		// The new substring to insert.
 		// This may be a nullptr, in which case means the destination
 		// substring should be completely removed and replaced with nothing.
 		//
 		// This substring is NOT null-terminated
-		u32 const* newTextData;
-
-		// Size of the new substring to insert.
-		uSize newTextSize;
+		Std::Span<u32 const> newText;
 	};
 
-	struct EndTextInputSessionEvent
-	{
+	struct TextSelectionEvent {
+		WindowID windowId = WindowID::Invalid;
+		u64 start = 0;
+		u64 count = 0;
+	};
+
+	struct TextDeleteEvent {
+		WindowID windowId = WindowID::Invalid;
+	};
+
+	struct EndTextInputSessionEvent {
 		WindowID windowId;
 	};
 }

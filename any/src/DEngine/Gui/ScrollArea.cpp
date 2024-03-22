@@ -1,5 +1,6 @@
 #include <DEngine/Gui/ScrollArea.hpp>
 #include <DEngine/Gui/DrawInfo.hpp>
+#include <DEngine/Gui/Context.hpp>
 
 #include <DEngine/Std/Containers/FnRef.hpp>
 
@@ -14,12 +15,15 @@ namespace DEngine::Gui::impl
 		SizeHint const& childSizeHint)
 	{
 		Extent childRect = {};
-		childRect.width = contentView.width - scrollbarThickness;
+		childRect.width = contentView.width;
 
 		if (childSizeHint.expandY)
 			childRect.height = Math::Max(childSizeHint.minimum.height, contentView.height);
 		else
 			childRect.height = childSizeHint.minimum.height;
+
+		childRect.width = Math::Max(childRect.width, contentView.width);
+		childRect.height = Math::Max(childRect.height, contentView.height);
 
 		return childRect;
 	}
@@ -31,7 +35,7 @@ namespace DEngine::Gui::impl
 		Rect contentArea = {};
 		contentArea.position = widgetRect.position;
 		contentArea.extent = widgetRect.extent;
-		contentArea.extent.width -= scrollbarThickness;
+		//contentArea.extent.width -= scrollbarThickness;
 		return contentArea;
 	}
 
@@ -87,8 +91,7 @@ namespace DEngine::Gui::impl
 		// means no scrollbar offset needed.
 		if (contentViewHeight >= totalChildheight)
 			return 0;
-		else if (totalChildheight + currScrollbarPos >= contentViewHeight)
-		{
+		else if (totalChildheight + currScrollbarPos >= contentViewHeight) {
 			// The offset makes the content be offset longer that it should be.
 			// Correct it to be maximum offset possible.
 			return Math::Min(currScrollbarPos, totalChildheight);
@@ -115,17 +118,16 @@ namespace DEngine::Gui::impl
 
 namespace DEngine::Gui::impl
 {
-	struct PointerMoveEvent
-	{
+	struct PointerMoveEvent {
 		u8 id;
 		Math::Vec2 pos;
 		bool occluded;
 	};
 
 	using PointerMove_DispatchFnT = Std::FnRef<bool(Widget&, Rect const&, Rect const&, bool)>;
-	struct PointerMove_Params
-	{
+	struct PointerMove_Params {
 		ScrollArea& scrollArea;
+		i32 const& scrollbarThickness;
 		RectCollection const& rectCollection;
 		Rect const& widgetRect;
 		Rect const& visibleRect;
@@ -142,9 +144,9 @@ namespace DEngine::Gui::impl
 	};
 
 	using PointerPress_DispatchFnT = Std::FnRef<bool(Widget&, Rect const&, Rect const&, bool)>;
-	struct PointerPress_Params
-	{
+	struct PointerPress_Params {
 		ScrollArea& scrollArea;
+		i32 const& scrollbarThickness;
 		RectCollection const& rectCollection;
 		Rect const& widgetRect;
 		Rect const& visibleRect;
@@ -164,15 +166,15 @@ public:
 	[[nodiscard]] static bool PointerPress(PointerPress_Params const& params);
 };
 
-bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params const& params)
-{
+bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params const& params) {
 	auto& scrollArea = params.scrollArea;
 	auto& rectCollection = params.rectCollection;
 	auto& widgetRect = params.widgetRect;
 	auto& visibleRect = params.visibleRect;
 	auto& pointer = params.pointer;
+	auto scrollbarThickness = params.scrollbarThickness;
 
-	auto const contentArea = impl::GetContentViewRect(widgetRect, scrollArea.scrollbarThickness);
+	auto const contentArea = impl::GetContentViewRect(widgetRect, scrollbarThickness);
 
 	// First we want to see if we hovered the scrollbar.
 	u32 correctedScrollbarPos = 0;
@@ -211,7 +213,7 @@ bool Gui::impl::SA_Impl::PointerMove(PointerMove_Params const& params)
 				scrollArea.currScrollbarPos);
 
 			auto const scrollbarRect = impl::GetScrollbarRect(
-				scrollArea.scrollbarThickness,
+				scrollbarThickness,
 				correctedScrollbarPos,
 				widgetRect,
 				childRect.extent.height);
@@ -267,19 +269,17 @@ bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params const& params)
 	auto& widgetRect = params.widgetRect;
 	auto& visibleRect = params.visibleRect;
 	auto& pointer = params.pointer;
+	auto scrollbarThickness = params.scrollbarThickness;
 
-	auto const pointerInside =
-		widgetRect.PointIsInside(pointer.pos) &&
-		visibleRect.PointIsInside(pointer.pos);
+	auto const pointerInside = widgetRect.GetIntersect(visibleRect).PointIsInside(pointer.pos);
 
-	bool newConsumed = params.eventConsumed;
+	auto newConsumed = params.eventConsumed;
 
-	auto const contentArea = impl::GetContentViewRect(widgetRect, scrollArea.scrollbarThickness);
+	auto const contentArea = impl::GetContentViewRect(widgetRect, scrollbarThickness);
 
 	// First check if we hit the scrollbar
 	u32 correctedScrollbarPos = 0;
-	if (scrollArea.child)
-	{
+	if (scrollArea.child) {
 		// We only have a scrollbar if we have child.
 		auto& child = *scrollArea.child;
 		auto const* childRectPairPtr = rectCollection.GetRect(child);
@@ -309,7 +309,7 @@ bool Gui::impl::SA_Impl::PointerPress(PointerPress_Params const& params)
 			// hit the scrollbar.
 
 			auto const scrollbarRect = impl::GetScrollbarRect(
-				scrollArea.scrollbarThickness,
+				scrollbarThickness,
 				correctedScrollbarPos,
 				widgetRect,
 				childRect.extent.height);
@@ -365,13 +365,14 @@ SizeHint ScrollArea::GetSizeHint2(Widget::GetSizeHint2_Params const& params) con
 {
 	auto& pusher = params.pusher;
 
-	if (child)
-	{
-		child->GetSizeHint2(params);
+	SizeHint childSizeHint = {};
+	if (child) {
+		childSizeHint = child->GetSizeHint2(params);
 	}
 
-	SizeHint returnVal = {};
+	auto scrollbarThickness = CmToPixels(params.ctx.minimumHeightCm, params.window.dpiX);
 
+	SizeHint returnVal = {};
 	returnVal.minimum.width = 150 + scrollbarThickness;
 	returnVal.minimum.height = 150;
 
@@ -390,8 +391,9 @@ void ScrollArea::BuildChildRects(
 {
 	auto& pusher = params.pusher;
 
-	if (child)
-	{
+	auto scrollbarThickness = CmToPixels(params.ctx.minimumHeightCm, params.window.dpiX);
+
+	if (child) {
 		auto const& childWidget = *child;
 		auto const childEntry = pusher.GetEntry(childWidget);
 		auto const& childSizeHint = pusher.GetSizeHint(childEntry);
@@ -403,7 +405,7 @@ void ScrollArea::BuildChildRects(
 			childSizeHint.minimum.height,
 			currScrollbarPos);
 
-		Rect childRect = impl::GetChildRect(
+		auto childRect = impl::GetChildRect(
 			widgetRect,
 			childSizeHint,
 			correctedScrollbarPos,
@@ -423,6 +425,7 @@ void ScrollArea::Render2(
 {
 	auto& rectCollection = params.rectCollection;
 	auto& drawInfo = params.drawInfo;
+	auto scrollbarThickness = CmToPixels(params.ctx.minimumHeightCm, params.window.dpiX);
 
 
 	if (Rect::Intersection(widgetRect, visibleRect).IsNothing())
@@ -430,8 +433,7 @@ void ScrollArea::Render2(
 
 	RectPair childRectCombo = {};
 
-	if (child)
-	{
+	if (child) {
 		auto const* childRectComboPtr = rectCollection.GetRect(*child);
 		DENGINE_IMPL_GUI_ASSERT(childRectComboPtr);
 		childRectCombo = *childRectComboPtr;
@@ -448,8 +450,7 @@ void ScrollArea::Render2(
 	}
 
 	auto correctedScrollbarPos = currScrollbarPos;
-	if (child)
-	{
+	if (child) {
 		correctedScrollbarPos = impl::GetCorrectedScrollbarPos(
 			widgetRect.extent.height,
 			childRectCombo.widgetRect.extent.height,
@@ -464,32 +465,29 @@ void ScrollArea::Render2(
 		childRectCombo.widgetRect.extent.height);
 
 	Math::Vec4 color = scrollbarInactiveColor;
-	if (scrollbarHoldData.HasValue())
-	{
+	if (scrollbarHoldData.HasValue()) {
 		color = { 1.f, 1.f, 1.f, 1.f };
-	}
-	else
-	{
+	} else {
 		color = scrollbarInactiveColor;
-		if (scrollbarHoveredByCursor)
-		{
-			for (auto i = 0; i < 3; i++)
-				color[i] += scrollbarHoverHighlight[i];
+		if (scrollbarHoveredByCursor) {
+			color.w += 0.1f;
 		}
 	}
 
 	for (auto i = 0; i < 4; i++)
 		color[i] = Math::Clamp(color[i], 0.f, 1.f);
 
-	drawInfo.PushFilledQuad(scrollBarRect, color);
+	// Calculate radius
+	auto minDimension = Math::Min(scrollBarRect.extent.width, scrollBarRect.extent.height);
+	auto radius = (int)Math::Floor((f32)minDimension * 0.5f);
+	drawInfo.PushFilledQuad(scrollBarRect, color, radius);
 }
 
 void ScrollArea::CursorExit(Context& ctx)
 {
 	scrollbarHoveredByCursor = false;
 
-	if (child)
-	{
+	if (child) {
 		child->CursorExit(ctx);
 	}
 }
@@ -519,6 +517,7 @@ bool ScrollArea::CursorMove(
 
 	impl::PointerMove_Params temp {
 		.scrollArea = *this,
+		.scrollbarThickness = CmToPixels(params.ctx.minimumHeightCm, params.window.dpiX),
 		.rectCollection = params.rectCollection,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
@@ -555,6 +554,7 @@ bool ScrollArea::CursorPress2(
 
 	impl::PointerPress_Params temp = {
 		.scrollArea = *this,
+		.scrollbarThickness = CmToPixels(params.ctx.minimumHeightCm, params.window.dpiX),
 		.rectCollection = params.rectCollection,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
@@ -590,6 +590,7 @@ bool ScrollArea::TouchMove2(
 
 	impl::PointerMove_Params temp {
 		.scrollArea = *this,
+		.scrollbarThickness = CmToPixels(params.ctx.minimumHeightCm, params.window.dpiX),
 		.rectCollection = params.rectCollection,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,
@@ -626,6 +627,7 @@ bool ScrollArea::TouchPress2(
 
 	impl::PointerPress_Params temp = {
 		.scrollArea = *this,
+		.scrollbarThickness = CmToPixels(params.ctx.minimumHeightCm, params.window.dpiX),
 		.rectCollection = params.rectCollection,
 		.widgetRect = widgetRect,
 		.visibleRect = visibleRect,

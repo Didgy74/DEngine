@@ -3,6 +3,7 @@
 #include <DEngine/Gui/Widget.hpp>
 
 #include <DEngine/Std/Containers/Opt.hpp>
+#include <DEngine/Std/Containers/AnyRef.hpp>
 
 #include <functional>
 #include <string>
@@ -22,15 +23,13 @@ namespace DEngine::Gui
 		std::string text;
 		u32 textMargin = 10;
 		
-		enum class Type
-		{
+		enum class Type {
 			Push,
 			Toggle
 		};
 		Type type = Type::Push;
 
-		struct Colors
-		{
+		struct Colors {
 			Math::Vec4 normal = { 0.3f, 0.3f, 0.3f, 1.f };
 			Math::Vec4 normalText = Math::Vec4::One();
 			Math::Vec4 toggled = { 0.6f, 0.6f, 0.6f, 1.f };
@@ -40,7 +39,7 @@ namespace DEngine::Gui
 		};
 		Colors colors = {};
 
-		using ActivateCallback = void(Button& btn);
+		using ActivateCallback = void(Button& btn, Std::AnyRef customData);
 		std::function<ActivateCallback> activateFn = nullptr;
 
 		void SetToggled(bool toggled);
@@ -49,14 +48,16 @@ namespace DEngine::Gui
 
 		virtual SizeHint GetSizeHint2(
 			GetSizeHint2_Params const& params) const override;
-
 		virtual void BuildChildRects(
 			BuildChildRects_Params const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect) const override;
-
 		virtual void Render2(
 			Render_Params const& params,
+			Rect const& widgetRect,
+			Rect const& visibleRect) const override;
+		virtual void AccessibilityTest(
+			AccessibilityTest_Params const& params,
 			Rect const& widgetRect,
 			Rect const& visibleRect) const override;
 
@@ -75,8 +76,6 @@ namespace DEngine::Gui
 		virtual void CursorExit(
 			Context& ctx) override;
 
-
-
 		virtual bool TouchMove2(
 			TouchMoveParams const& params,
 			Rect const& widgetRect,
@@ -89,12 +88,14 @@ namespace DEngine::Gui
 			Rect const& visibleRect,
 			bool consumed) override;
 
+
+
 	protected:
 		bool toggled = false;
 		Std::Opt<u8> heldPointerId;
 		bool hoveredByCursor = false;
 		
-		void Activate();
+		void Activate(Std::AnyRef customData);
 
 		class Impl;
 		friend Impl;

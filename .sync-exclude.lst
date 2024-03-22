@@ -1,0 +1,8 @@
+.idea
+.vs
+cmake-build-debug-clang
+cmake-build-release
+cmake-build-relwithdebinfo
+cmake-build-*
+out
+CMakeSettings.json

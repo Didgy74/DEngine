@@ -36,6 +36,7 @@ DEngine_SetCompilerSettings(${DENGINE_ANY_TARGET_NAME})
 include(LinkDependencies.cmake)
 DEngineAny_LinkDependencies(${DENGINE_ANY_TARGET_NAME} ${DENGINE_ENABLE_VERBOSE_CMAKE_OUTPUT})
 
+
 # Setup the assert settings for the different modules.
 set(DENGINE_DEFAULT_ASSERT_SETTING ON)
 include(SetupAssertDefines.cmake)

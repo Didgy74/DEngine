@@ -109,7 +109,7 @@ namespace DEngine::Gfx::Vk::impl
 
 		// Copy vertex data over
 		vk::CommandPoolCreateInfo cmdPoolInfo = {};
-		vk::ResultValue<vk::CommandPool> cmdPoolResult = device.createCommandPool(cmdPoolInfo);
+		auto cmdPoolResult = device.Create(cmdPoolInfo);
 		BoxVkCmdPool cmdPool = {};
 		cmdPool.device = &device;
 		cmdPool.handle = cmdPoolResult.value;
@@ -296,7 +296,7 @@ namespace DEngine::Gfx::Vk::impl
 		pipelineLayoutInfo.pSetLayouts = layouts.Data();
 		pipelineLayoutInfo.pushConstantRangeCount = (u32)pushConstantRanges.Size();
 		pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.Data();
-		manager.pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
+		manager.pipelineLayout = device.Create(pipelineLayoutInfo);
 
 		App::FileInputStream vertFile{ "data/Gizmo/Arrow/vert.spv" };
 		if (!vertFile.IsOpen())
@@ -427,7 +427,7 @@ namespace DEngine::Gfx::Vk::impl
 		pipelineInfo.stageCount = (u32)shaderStages.Size();
 		pipelineInfo.pStages = shaderStages.Data();
 
-		vkResult = apiData.globUtils.device.createGraphicsPipelines(
+		vkResult = apiData.globUtils.device.Create(
 			vk::PipelineCache(),
 			{ 1, &pipelineInfo },
 			nullptr,
@@ -460,7 +460,7 @@ namespace DEngine::Gfx::Vk::impl
 		vertFile.Close();
 		vk::ShaderModuleCreateInfo vertModCreateInfo{};
 		vertModCreateInfo.codeSize = vertCode.Size();
-		vertModCreateInfo.pCode = reinterpret_cast<const u32*>(vertCode.Data());
+		vertModCreateInfo.pCode = reinterpret_cast<u32 const*>(vertCode.Data());
 		vk::ShaderModule vertModule = device.createShaderModule(vertModCreateInfo);
 		vk::PipelineShaderStageCreateInfo vertStageInfo{};
 		vertStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
@@ -564,11 +564,7 @@ namespace DEngine::Gfx::Vk::impl
 		pipelineInfo.stageCount = (u32)shaderStages.Size();
 		pipelineInfo.pStages = shaderStages.Data();
 
-		vkResult = device.createGraphicsPipelines(
-			vk::PipelineCache(),
-			{ 1, &pipelineInfo },
-			nullptr,
-			&manager.quadPipeline);
+		vkResult = device.Create(pipelineInfo, &manager.quadPipeline);
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to make graphics pipeline.");
 
@@ -583,7 +579,7 @@ namespace DEngine::Gfx::Vk::impl
 		DebugUtilsDispatch const* debugUtils,
 		APIData const& apiData)
 	{
-		vk::Result vkResult{};
+		vk::Result vkResult = {};
 
 		App::FileInputStream vertFile{ "data/Gizmo/Line/vert.spv" };
 		if (!vertFile.IsOpen())
@@ -706,11 +702,7 @@ namespace DEngine::Gfx::Vk::impl
 		pipelineInfo.stageCount = (u32)shaderStages.Size();
 		pipelineInfo.pStages = shaderStages.Data();
 
-		vkResult = device.createGraphicsPipelines(
-			vk::PipelineCache(),
-			{ 1, &pipelineInfo },
-			nullptr,
-			&manager.linePipeline);
+		vkResult = device.Create(pipelineInfo, &manager.linePipeline);
 		if (vkResult != vk::Result::eSuccess)
 			throw std::runtime_error("Unable to make graphics pipeline.");
 
