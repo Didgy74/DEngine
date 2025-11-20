@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\np_sk\\\\Nextcloud\\\\Documents\\\\Projects\\\\DEngine\" -Recurse -Depth 2 -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(git show *)",
+      "Bash(cmake --version)",
+      "Bash(cmake --build cmake-build-debug --target DEngine_Gui_Context)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(ninja)",
+      "Bash(cat \"C:\\\\Users\\\\np_sk\\\\.claude\\\\projects\\\\C--Users-np-sk-Nextcloud-Documents-Projects-DEngine\\\\memory\\\\build-and-verify.md\")",
+      "Bash(MSYS2_ARG_CONV_EXCL='*' cmd.exe /c \"C:\\\\Users\\\\np_sk\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-np-sk-Nextcloud-Documents-Projects-DEngine\\\\9c0cce4d-57c4-4641-b19f-38a3851a4877\\\\scratchpad\\\\build.bat\")"
+    ]
+  }
+}

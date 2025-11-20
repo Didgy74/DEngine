@@ -1,0 +1,1084 @@
+#include "Impl.hpp"
+
+#include <DEngine/Std/Containers/Defer.hpp>
+
+using namespace DEngine;
+using namespace DEngine::Gui;
+
+import DEngine.Std.Opt;
+
+namespace DEngine::Gui::impl
+{
+	// At the time of writing, there is no decent container for a function
+	// This is just a simple implementation that fits our needs and works with
+	// the GUIs transient allocator.
+	template<class ReturnT, class... ArgsT>
+	class DA_TransientFn;
+	template<class ReturnT, class... ArgsT>
+	class DA_TransientFn<ReturnT(ArgsT...)>
+	{
+	public:
+		DA_TransientFn(AllocRef allocRef) : allocRef{ allocRef } {}
+		DA_TransientFn(DA_TransientFn const&) = delete;
+		DA_TransientFn(DA_TransientFn&& in) noexcept :
+			allocRef { in.allocRef },
+			actualFn { in.actualFn },
+			wrapperFn { in.wrapperFn },
+			destroyFn { in.destroyFn }
+		{
+			in.Nullify();
+		}
+
+		template<class Callable>
+		void operator=(Callable const& in) {
+			Clear();
+			Set(in);
+		}
+
+		void operator=(DA_TransientFn const&) = delete;
+		void operator=(DA_TransientFn&& in) noexcept {
+			allocRef = in.allocRef;
+			actualFn = in.actualFn;
+			wrapperFn = in.wrapperFn;
+			destroyFn = in.destroyFn;
+			in.Nullify();
+		}
+
+		ReturnT operator()(ArgsT... args) const {
+			return Invoke(args...);
+		}
+
+		template<class Callable>
+		void Set(Callable const& in) {
+			auto* newMem = (Callable*)allocRef.Alloc(sizeof(Callable), alignof(Callable));
+			new(newMem) Callable(in);
+
+			actualFn = newMem;
+			wrapperFn = [](void const* fnIn, ArgsT... args) {
+				auto const& myFn = *reinterpret_cast<Callable const*>(fnIn);
+				return myFn(args...);
+			};
+			destroyFn = [](void* fnIn) {
+				auto& myFn = *reinterpret_cast<Callable*>(fnIn);
+				myFn.~Callable();
+			};
+		}
+
+		[[nodiscard]] bool IsValid() const { return actualFn != nullptr; }
+
+		void Clear() {
+			if (actualFn) {
+				destroyFn(actualFn);
+				allocRef.Free(actualFn, allocSize);
+			}
+			Nullify();
+		}
+
+		ReturnT Invoke(ArgsT... args) const {
+			DENGINE_IMPL_GUI_ASSERT(actualFn);
+			return wrapperFn(actualFn, args...);
+		}
+
+		~DA_TransientFn() {
+			Clear();
+		}
+
+	private:
+		void Nullify() {
+			wrapperFn = nullptr;
+			actualFn = nullptr;
+			destroyFn = nullptr;
+		}
+
+		using WrapperFnT = ReturnT(*)(void const*, ArgsT...);
+		WrapperFnT wrapperFn = nullptr;
+		using FnDestroyT = void(*)(void*);
+		FnDestroyT destroyFn = nullptr;
+		void* actualFn = nullptr;
+		uSize allocSize = 0;
+		AllocRef allocRef;
+	};
+
+	// Returns true if event was consumed
+	struct DA_PointerPress_Result {
+		TouchEventConsumption touchEventConsumption;
+		Std::Opt<DockingJob> dockingJobOpt;
+		Std::Opt<DockArea::Impl::StateDataT> newStateJob;
+		Std::Opt<uSize> pushLayerToFrontJob;
+		DA_TransientFn<void(DockArea&)> job;
+	};
+
+	DA_PointerPress_Result DA_PointerPress_StateNormal(
+		DA_PointerPress_Params const& params,
+		u32 tabTotalHeight,
+		bool eventConsumed)
+	{
+		auto& dockArea = params.dockArea;
+		auto& textManager = params.textManager;
+		auto const& rectColl = params.rectColl;
+		auto const& rectCollIter = params.rectCollIter;
+		auto const& transientAlloc = params.transientAlloc;
+		auto const& pointer = params.pointer;
+		auto const& customData = params.customData;
+		auto fontSizeId = customData.fontSizeId;
+		auto resizeHandleThickness = customData.resizeHandleThickness;
+		auto resizeHandleLength = customData.resizeHandleLength;
+		auto tabTextMarginHoriPx = customData.tabMarginPx;
+		auto const& childDispatchFn = params.childDispatchFn;
+
+		auto rectPairOpt = rectColl.GetRect(dockArea, rectCollIter);
+		DENGINE_IMPL_GUI_ASSERT(rectPairOpt.Has());
+		auto const& absWidgetRect = rectPairOpt.Value().widgetRect;
+		auto const& absVisibleRect = rectPairOpt.Value().visibleRect;
+
+		auto pointerInWidget = absWidgetRect.GetIntersect(absWidgetRect).PointIsInside(pointer.pos);
+
+		DA_PointerPress_Result returnValue = { .job = transientAlloc };
+		returnValue.touchEventConsumption.consumed = eventConsumed;
+
+		for (auto const layerIt : DA_BuildLayerItPairFrontToBack(dockArea)) {
+			auto const& layerRect = layerIt.BuildLayerRect(absWidgetRect);
+			auto const& pointerInLayer =
+				layerRect.PointIsInside(pointer.pos) &&
+				pointerInWidget;
+
+			auto deferPointerInLayer = Std::Defer([&] {
+				returnValue.touchEventConsumption.consumed =
+					returnValue.touchEventConsumption.consumed
+					|| pointerInLayer;
+			});
+
+			// If the event is not consumed and we down-pressed, on a layer that is not the front-most and not the rear-most
+			// then we push this layer to front. AND we have not already found a layer to push to front
+			auto const pushLayerToFront =
+				!returnValue.pushLayerToFrontJob.HasValue()
+				&& !returnValue.touchEventConsumption.consumed
+				&& pointer.pressed
+				&& pointerInLayer
+				&& layerIt.layerIndex != 0
+				&& layerIt.layerIndex != layerIt.layerCount - 1;
+			if (pushLayerToFront) {
+				returnValue.pushLayerToFrontJob = layerIt.layerIndex;
+			}
+
+			// First we check if we hit a resize handle. One layer can have multiple of these,
+			// we search if we hit any of them.
+			if (pointer.pressed && pointerInLayer && !returnValue.touchEventConsumption.consumed) {
+				// Pointer to the node of the resize handle that we hit.
+				auto* resizeHandleHitNodePtr = DA_Layer_CheckHitResizeHandle(
+					resizeHandleThickness,
+					resizeHandleLength,
+					layerIt.node,
+					layerRect,
+					transientAlloc,
+					pointer.pos);
+				if (resizeHandleHitNodePtr != nullptr) {
+					returnValue.touchEventConsumption.consumed = true;
+					returnValue.touchEventConsumption.claimDragPriority = true;
+					DA_State_ResizingSplit newStateJob = {};
+					newStateJob.splitNode = resizeHandleHitNodePtr;
+					newStateJob.pointerId = pointer.id;
+					newStateJob.resizingBack = layerIt.layerIndex == (layerIt.layerCount - 1);
+					returnValue.newStateJob = newStateJob;
+				}
+			}
+
+			// Then iterate over each window. We have hit-logic to do on each of them.
+			// Remember to always dispatch the press to the child.
+			for (auto const& nodeIt : DA_BuildNodeItPair(layerIt.node, layerRect, transientAlloc)) {
+				if (nodeIt.node.GetNodeType() != NodeType::Window) {
+					continue;
+				}
+				auto& windowNode = static_cast<DA_WindowNode&>(nodeIt.node);
+				auto [titlebarRect, contentRect] =
+					DA_WindowNode_BuildPrimaryRects(nodeIt.rect, tabTotalHeight);
+				auto const pointerInsideTitlebar =
+					titlebarRect.PointIsInside(pointer.pos) &&
+					pointerInLayer;
+
+				// Check if we hit any of the tabs.
+				// We only want to enter the holding tab state
+				// If:
+				// The event is not consumed
+				// The point is inside a tabs rect
+				// The pointer was pressed down
+				//
+				// AND:
+				// We have multiple tabs per windownode,
+				// OR the windownode has one tab but also has a parent node. (Always splitnode)
+				//
+				// If this is not the case, then we treat tabs the same as pressing titlebar
+				// (go into moving mode)
+				bool checkForHitTab =
+					!returnValue.touchEventConsumption.consumed
+					&& pointerInsideTitlebar
+					&& pointer.pressed
+					&& (windowNode.tabs.size() > 1
+						|| nodeIt.hasSplitNodeParent);
+				if (checkForHitTab) {
+					auto tabRects = DA_WindowNode_BuildTabRects(
+						titlebarRect,
+						{ windowNode.tabs.data(), windowNode.tabs.size() },
+						fontSizeId,
+						(int)tabTextMarginHoriPx,
+						textManager,
+						transientAlloc);
+					auto hitTabOpt = PointIsInside(pointer.pos, tabRects.ToSpan());
+					if (hitTabOpt.HasValue()) {
+						returnValue.touchEventConsumption.consumed = true;
+						returnValue.touchEventConsumption.claimDragPriority = true;
+
+						// We hit the tab, enter holding-tab-state and change active tab on this
+						// windownode.
+						returnValue.job = [&windowNode, hitTabOpt](DockArea&) { windowNode.activeTabIndex = hitTabOpt.Value(); };
+						DA_State_HoldingTab newState = {};
+						newState.windowBeingHeld = &windowNode;
+						newState.pointerId = pointer.id;
+						newState.tabIndex = hitTabOpt.Value();
+
+						auto const& tabPos = tabRects[hitTabOpt.Value()].position;
+						newState.pointerOffsetFromTab = pointer.pos - Math::Vec2{ (f32)tabPos.x, (f32)tabPos.y };
+
+						returnValue.newStateJob = newState;
+					}
+				}
+
+				auto goToMovingState =
+					!returnValue.touchEventConsumption.consumed &&
+					pointerInsideTitlebar &&
+					pointer.pressed &&
+					layerIt.layerIndex != layerIt.layerCount - 1;
+				if (goToMovingState) {
+					returnValue.touchEventConsumption.consumed = true;
+					returnValue.touchEventConsumption.claimDragPriority = true;
+					DA_State_Moving newState = {};
+					newState.heldPointerId = pointer.id;
+					auto layerPos = Math::Vec2{
+						(f32)layerRect.position.x,
+						(f32)layerRect.position.y };
+					newState.pointerOffset = pointer.pos - layerPos;
+					returnValue.newStateJob = newState;
+				}
+
+				// Select the active tab, and run child dispatch fn.
+				auto& activeTab = windowNode.tabs[windowNode.activeTabIndex];
+				if (activeTab.widget.Has()) {
+					auto childResult = childDispatchFn(
+						*activeTab.widget.Get(),
+						Std::nullOpt,
+						returnValue.touchEventConsumption.consumed);
+
+					returnValue.touchEventConsumption.consumed =
+						childResult.consumed
+						|| returnValue.touchEventConsumption.consumed;
+					returnValue.touchEventConsumption.claimDragPriority =
+						childResult.claimDragPriority
+						|| returnValue.touchEventConsumption.claimDragPriority;
+				}
+			}
+		}
+
+		return returnValue;
+	}
+
+	DA_PointerPress_Result DA_PointerPress_StateMoving(
+		DA_PointerPress_Params const& params,
+		bool eventConsumed)
+	{
+		auto& dockArea = params.dockArea;
+		auto const& rectColl = params.rectColl;
+		auto const& rectCollIter = params.rectCollIter;
+		auto const& transientAlloc = params.transientAlloc;
+		auto const& pointer = params.pointer;
+		auto const& customData = params.customData;
+		auto gizmoExtent = customData.gizmoExtent;
+
+		auto rectPairOpt = rectColl.GetRect(dockArea, rectCollIter);
+		DENGINE_IMPL_GUI_ASSERT(rectPairOpt.Has());
+		auto const& absWidgetRect = rectPairOpt.Value().widgetRect;
+		auto const& absVisibleRect = rectPairOpt.Value().visibleRect;
+
+		bool pointerInsideWidget =
+			absWidgetRect.PointIsInside(pointer.pos) &&
+			absVisibleRect.PointIsInside(pointer.pos);
+
+		// If we only have 0-1 layers, we shouldn't be in the moving state
+		// to begin with. The single layer should just be constantly full-screened.
+		DENGINE_IMPL_GUI_ASSERT(DA_GetLayers(dockArea).size() >= 2);
+		auto& stateData = DA_GetStateData(dockArea).Get<DA_State_Moving>();
+
+		DA_PointerPress_Result returnValue = { .job = transientAlloc };
+		returnValue.touchEventConsumption.consumed = eventConsumed;
+
+		// Check if we hit the outer docking gizmo
+		auto hitOuterGizmo =
+			DA_CheckHitOuterLayoutGizmo(absWidgetRect, gizmoExtent, pointer.pos);
+		bool dockIntoOuterGizmo =
+			!returnValue.dockingJobOpt.HasValue() &&
+			stateData.heldPointerId == pointer.id &&
+			!pointer.pressed &&
+			pointerInsideWidget &&
+			hitOuterGizmo.Has();
+		if (dockIntoOuterGizmo) {
+			DockingJob dockingJob = {};
+			dockingJob.outerGizmo = hitOuterGizmo.Get();
+			dockingJob.dockIntoOuter = true;
+			returnValue.dockingJobOpt = dockingJob;
+		}
+
+		// Check if we hit delete gizmo
+		auto hitDeleteGizmo =
+			DA_CheckHitDeleteGizmo(absWidgetRect, gizmoExtent, pointer.pos);
+		bool deleteFrontLayer =
+			!returnValue.dockingJobOpt.HasValue() &&
+			stateData.heldPointerId == pointer.id &&
+			!pointer.pressed &&
+			pointerInsideWidget &&
+			hitDeleteGizmo;
+		if (deleteFrontLayer) {
+			returnValue.job = [](DockArea& dockArea) {
+				auto& layers = DA_GetLayers(dockArea);
+				layers.erase(layers.begin());
+				DA_State_Normal newState = {};
+				auto& stateData = DA_GetStateData(dockArea);
+				stateData = newState;
+			};
+		}
+
+		for (auto const& layerIt : DA_BuildLayerItPairFrontToBack(dockArea)) {
+			auto layerRect = layerIt.BuildLayerRect(absWidgetRect);
+			auto const pointerInsideLayer =
+				layerRect.PointIsInside(pointer.pos) &&
+				pointerInsideWidget;
+
+			// If we unpressed, then we want to exit this moving state.
+			if (layerIt.layerIndex == 0 && pointer.id == stateData.heldPointerId && !pointer.pressed) {
+				DA_State_Normal newState = {};
+				returnValue.newStateJob = newState;
+			}
+
+			// Check if we hit any of the window docking gizmos
+			bool checkForDockingGizmo =
+				!returnValue.dockingJobOpt.HasValue() &&
+				!pointer.pressed &&
+				layerIt.layerIndex != 0 &&
+				pointerInsideLayer &&
+				stateData.heldPointerId == pointer.id;
+			if (checkForDockingGizmo) {
+				auto hitResult = DA_Layer_CheckHitInnerDockingGizmo(
+					layerIt.node,
+					layerRect,
+					gizmoExtent,
+					pointer.pos,
+					transientAlloc);
+				if (hitResult.node != nullptr) {
+					// We hit something
+					DockingJob dockingJob = {};
+					dockingJob.innerGizmo = hitResult.gizmo;
+					dockingJob.dockIntoOuter = false;
+					dockingJob.targetNode = hitResult.node;
+					returnValue.dockingJobOpt = dockingJob;
+					break;
+				}
+			}
+
+			returnValue.touchEventConsumption.consumed = returnValue.touchEventConsumption.consumed || pointerInsideLayer;
+		}
+
+		return returnValue;
+	}
+
+	DA_PointerPress_Result DA_PointerPress_StateResizingSplit(
+		DA_PointerPress_Params const& params,
+		bool eventConsumed)
+	{
+		auto& dockArea = params.dockArea;
+		auto& transientAlloc = params.transientAlloc;
+		auto& pointer = params.pointer;
+
+		auto& stateData = DA_GetStateData(dockArea).Get<DA_State_ResizingSplit>();
+
+		DA_PointerPress_Result returnValue = { .job = transientAlloc };
+		returnValue.touchEventConsumption.consumed = eventConsumed;
+
+		if (!pointer.pressed && pointer.id == stateData.pointerId) {
+			DA_State_Normal newStateData = {};
+			returnValue.newStateJob = newStateData;
+		}
+
+		return returnValue;
+	}
+
+	DA_PointerPress_Result DA_PointerPress_State_HoldingTab(
+		DA_PointerPress_Params const& params,
+		bool eventConsumed)
+	{
+		auto& dockArea = params.dockArea;
+		auto const& pointer = params.pointer;
+		auto& transientAlloc = params.transientAlloc;
+
+		DENGINE_IMPL_GUI_ASSERT(DA_GetStateData(dockArea).IsA<DA_State_HoldingTab>());
+		auto& stateData = DA_GetStateData(dockArea).Get<DA_State_HoldingTab>();
+
+		DA_PointerPress_Result returnValue = { .job = transientAlloc };
+		returnValue.touchEventConsumption.consumed = eventConsumed;
+
+		// If our pointer that is holding the tab was released, we no longer want
+		// to be in holding state.
+		if (pointer.id == stateData.pointerId && !pointer.pressed) {
+			returnValue.newStateJob = DA_State_Normal{};
+		}
+
+		return returnValue;
+	}
+
+	TouchEventConsumption DA_PointerPress_DispatchChild(
+		DA_PointerPress_Params const& params,
+		u32 tabTotalHeight,
+		bool eventConsumed)
+	{
+		auto& dockArea = params.dockArea;
+		auto& rectColl = params.rectColl;
+		auto& rectCollIter = params.rectCollIter;
+		auto const& pointer = params.pointer;
+		auto& textManager = params.textManager;
+		auto& transientAlloc = params.transientAlloc;
+		auto& childDispatchFn = params.childDispatchFn;
+		auto& customData = params.customData;
+		auto fontSizeId = customData.fontSizeId;
+		auto resizeHandleThickness = customData.resizeHandleThickness;
+		auto resizeHandleLength = customData.resizeHandleLength;
+
+		auto rectPairOpt = rectColl.GetRect(dockArea, rectCollIter);
+		DENGINE_IMPL_GUI_ASSERT(rectPairOpt.Has());
+		auto const& absWidgetRect = rectPairOpt.Value().widgetRect;
+		auto const& absVisibleRect = rectPairOpt.Value().visibleRect;
+
+		TouchEventConsumption returnValue = {};
+		returnValue.consumed = eventConsumed;
+
+		for (auto const& layerIt : DA_BuildLayerItPairFrontToBack(dockArea)) {
+			auto const layerRect = layerIt.BuildLayerRect(absWidgetRect);
+			auto const pointerInsideLayer =
+				layerRect.PointIsInside(pointer.pos) &&
+				absVisibleRect.PointIsInside(pointer.pos);
+
+			// Consume the event if we hit any resize handles on this layer.
+			returnValue.consumed =
+				returnValue.consumed ||
+				(DA_Layer_CheckHitResizeHandle(
+					resizeHandleThickness, resizeHandleLength,
+					layerIt.node,
+					layerRect,
+					transientAlloc,
+					pointer.pos) != nullptr);
+
+			for (auto const nodeIt : DA_BuildNodeItPair(
+				layerIt.node,
+				layerRect,
+				transientAlloc))
+			{
+				if (nodeIt.node.GetNodeType() != NodeType::Window)
+					continue;
+				auto& windowNode = static_cast<DA_WindowNode&>(nodeIt.node);
+				auto [titlebarRect, contentRect] =
+					DA_WindowNode_BuildPrimaryRects(nodeIt.rect, tabTotalHeight);
+				bool titlebarConsumes =
+					titlebarRect.PointIsInside(pointer.pos) &&
+					pointerInsideLayer &&
+					pointer.pressed;
+				returnValue.consumed = returnValue.consumed || titlebarConsumes;
+
+				auto& widget = windowNode.tabs[windowNode.activeTabIndex].widget;
+				if (widget) {
+					auto childResult = childDispatchFn(
+						*widget,
+						Std::nullOpt,
+						returnValue.consumed);
+					returnValue.consumed = childResult.consumed || returnValue.consumed;
+					returnValue.claimDragPriority = childResult.claimDragPriority || returnValue.claimDragPriority;
+				}
+
+				auto pointerInsideContent = contentRect.PointIsInside(pointer.pos);
+				returnValue.consumed = returnValue.consumed || pointerInsideContent;
+			}
+
+			returnValue.consumed = returnValue.consumed || (pointerInsideLayer && pointer.pressed);
+		}
+
+		return returnValue;
+	}
+}
+
+TouchEventConsumption Gui::impl::DA_PointerPress(
+	DA_PointerPress_Params const& params,
+	bool eventConsumed)
+{
+	auto& dockArea = params.dockArea;
+	auto& stateData = DA_GetStateData(dockArea);
+	auto& transientAlloc = params.transientAlloc;
+	auto& customData = params.customData;
+	auto tabTotalHeightPx = customData.tabTotalHeightPx;
+
+	TouchEventConsumption returnValue = {};
+	returnValue.consumed = eventConsumed;
+
+	// TODO: Currently only StateNormal dispatches the event correctly to the child.
+
+
+	DA_PointerPress_Result temp = { .job = transientAlloc, };
+	if (stateData.IsA<DA_State_Normal>()) {
+		temp = DA_PointerPress_StateNormal(
+			params,
+			tabTotalHeightPx,
+			returnValue.consumed);
+	} else if (stateData.IsA<DA_State_Moving>())
+		temp = DA_PointerPress_StateMoving(params, returnValue.consumed);
+	else if (stateData.IsA<DA_State_ResizingSplit>())
+		temp = DA_PointerPress_StateResizingSplit(params, returnValue.consumed);
+	else if (stateData.IsA<DA_State_HoldingTab>())
+		temp = DA_PointerPress_State_HoldingTab(params, returnValue.consumed);
+	else
+		DENGINE_IMPL_GUI_UNREACHABLE();
+
+	returnValue.consumed = returnValue.consumed || temp.touchEventConsumption.consumed;
+	returnValue.claimDragPriority = temp.touchEventConsumption.claimDragPriority;
+
+	//DA_PointerPress_DispatchChild(params, tabTotalHeightPx, returnValue.consumed);
+
+	// TODO: ??
+	//returnValue.consumed = returnValue.touchEventConsumption.consumed;
+
+	if (temp.job.IsValid()) {
+		temp.job(dockArea);
+	}
+
+	if (temp.dockingJobOpt.HasValue()) {
+		DockNode(
+			dockArea,
+			temp.dockingJobOpt.Value(),
+			transientAlloc);
+	}
+
+	if (temp.pushLayerToFrontJob.HasValue()) {
+		DA_PushLayerToFront(dockArea, temp.pushLayerToFrontJob.Value());
+	}
+
+	if (temp.newStateJob.HasValue()) {
+		auto& newState = temp.newStateJob.Value();
+		stateData = Std::Move(newState);
+	}
+
+	return returnValue;
+}
+
+namespace DEngine::Gui::impl
+{
+	struct DA_PointerMove_Return {
+		TouchEventConsumption touchEventConsumption = {};
+		Std::Opt<Math::Vec2Int> frontLayerNewPos;
+		Std::Opt<DA_StateData> newStateJob;
+		DA_TransientFn<void(DockArea&)> job;
+	};
+
+	DA_PointerMove_Return DA_PointerMove_StateNormal(
+		DA_PointerMove_Params const& params,
+		int totalTabHeight,
+		bool pointerOccluded)
+	{
+		auto& dockArea = params.dockArea;
+		auto& rectColl = params.rectColl;
+		auto& rectCollIter = params.rectCollIter;
+		auto& textManager = params.textManager;
+		auto& transientAlloc = params.transientAlloc;
+		auto const& pointer = params.pointer;
+		auto const& customData = params.customData;
+		auto fontSizeId = customData.fontSizeId;
+
+		auto rectPairOpt = rectColl.GetRect(dockArea, rectCollIter);
+		DENGINE_IMPL_GUI_ASSERT(rectPairOpt.Has());
+		auto const& absWidgetRect = rectPairOpt.Value().widgetRect;
+		auto const& absVisibleRect = rectPairOpt.Value().visibleRect;
+
+		DA_PointerMove_Return returnValue = { .job = transientAlloc, };
+		returnValue.touchEventConsumption.consumed = pointerOccluded;
+
+		for (auto const layerIt : DA_BuildLayerItPairFrontToBack(dockArea)) {
+			auto const layerRect = layerIt.BuildLayerRect(absWidgetRect);
+
+			for (auto const& nodeIt : DA_BuildNodeItPair(
+				layerIt.node,
+				layerRect,
+				transientAlloc))
+			{
+				if (nodeIt.node.GetNodeType() != NodeType::Window) {
+					continue;
+				}
+
+				auto& node = static_cast<DA_WindowNode&>(nodeIt.node);
+				auto& activeTab = node.tabs[node.activeTabIndex];
+				auto const& nodeRect = nodeIt.rect;
+				auto const& mainWindowNodeRects =
+					DA_WindowNode_BuildPrimaryRects(nodeRect, totalTabHeight);
+				auto const& titlebarRect = mainWindowNodeRects.titlebarRect;
+				auto const& contentRect = mainWindowNodeRects.contentRect;
+
+				// Check if we are inside the titlebar
+				auto const pointerInsideTitlebar =
+					titlebarRect.PointIsInside(pointer.pos) &&
+					absVisibleRect.PointIsInside(pointer.pos);
+				returnValue.touchEventConsumption.consumed =
+					returnValue.touchEventConsumption.consumed
+					|| pointerInsideTitlebar;
+			}
+
+			auto const pointerInsideLayer =
+				layerRect.PointIsInside(pointer.pos) &&
+				absVisibleRect.PointIsInside(pointer.pos);
+			returnValue.touchEventConsumption.consumed =
+				returnValue.touchEventConsumption.consumed
+				|| pointerInsideLayer;
+		}
+
+		auto const pointerInsideWidget =
+			absWidgetRect.PointIsInside(pointer.pos) &&
+			absVisibleRect.PointIsInside(pointer.pos);
+		returnValue.touchEventConsumption.consumed =
+			returnValue.touchEventConsumption.consumed
+			|| pointerInsideWidget;
+
+		return returnValue;
+	}
+
+	DA_PointerMove_Return DA_PointerMove_StateMoving(
+		DA_PointerMove_Params const& params,
+		bool pointerOccluded)
+	{
+		auto& dockArea = params.dockArea;
+		auto const& transientAlloc = params.transientAlloc;
+		auto const& textManager = params.textManager;
+		auto const& rectColl = params.rectColl;
+		auto const& rectCollIter = params.rectCollIter;
+		auto const& pointer = params.pointer;
+		auto const& customData = params.customData;
+		auto gizmoExtent = customData.gizmoExtent;
+
+		auto rectPairOpt = rectColl.GetRect(dockArea, rectCollIter);
+		DENGINE_IMPL_GUI_ASSERT(rectPairOpt.Has());
+		auto const& absWidgetRect = rectPairOpt.Value().widgetRect;
+		auto const& absVisibleRect = rectPairOpt.Value().visibleRect;
+
+		auto const pointerInWidget =
+			PointIsInAll(pointer.pos, { absWidgetRect, absVisibleRect });
+
+		// If we only have 0-1 layers, we shouldn't be in the moving state
+		// to begin with.
+		DENGINE_IMPL_GUI_ASSERT(DA_GetLayers(dockArea).size() > 1);
+		auto& stateData = DA_GetStateData(dockArea).Get<DA_State_Moving>();
+
+		DA_PointerMove_Return returnValue = { .job = transientAlloc, };
+		returnValue.touchEventConsumption.consumed = pointerOccluded;
+
+		// Reset stuff
+		stateData.hoveredGizmoOpt = Std::nullOpt;
+
+		// Before we do anything, check if we are hovering any of the outer docking gizmos.
+		if (pointerInWidget) {
+			auto hitOuterGizmoOpt = DA_CheckHitOuterLayoutGizmo(
+				absWidgetRect,
+				gizmoExtent,
+				pointer.pos);
+			if (hitOuterGizmoOpt.HasValue()) {
+				DA_State_Moving::HoveredWindow newHoveredGizmo = {};
+				newHoveredGizmo.windowNode = nullptr;
+				newHoveredGizmo.gizmo = (int)hitOuterGizmoOpt.Value();
+				newHoveredGizmo.gizmoIsInner = false;
+				stateData.hoveredGizmoOpt = newHoveredGizmo;
+			}
+		}
+
+		for (auto const& layerIt : DA_BuildLayerItPairFrontToBack(dockArea))
+		{
+			auto const& layerRect = layerIt.BuildLayerRect(absWidgetRect);
+			auto const& pointerInsideLayer =
+				layerRect.PointIsInside(pointer.pos) &&
+				absVisibleRect.PointIsInside(pointer.pos);
+
+			// If we are the first layer, we just want to
+			// move the layer and keep iterating to layers behind
+			// us to see if we hovered over a window and display it's
+			// layout gizmos
+			if (layerIt.layerIndex == 0 && pointer.id == stateData.heldPointerId)
+			{
+				// Move the window
+				auto const temp = pointer.pos - stateData.pointerOffset;
+				Math::Vec2Int a = { (i32)Std::Round(temp.x), (i32)Std::Round(temp.y) };
+				a -= absWidgetRect.position;
+				// Clamp to widget-size.
+				a.x = Std::Max(a.x, 0);
+				a.x = Std::Min(a.x, (i32)(absWidgetRect.extent.width - layerRect.extent.width));
+				a.y = Std::Max(a.y, 0);
+				a.y = Std::Min(a.y, (i32)(absWidgetRect.extent.height - layerRect.extent.height));
+				returnValue.frontLayerNewPos = a;
+				returnValue.touchEventConsumption.consumed = true;
+			}
+
+			// We want to see which window we are hovering, but only
+			// if we are:
+			// Dealing with the pointer that is doing the moving.
+			// We are not the front-most layer.
+			// Haven't already found a window we are hovering during this iteration.
+			// Our pointer is inside this particular layer.
+			bool checkForHoveredWindow =
+				pointer.id == stateData.heldPointerId &&
+				layerIt.layerIndex != 0 &&
+				pointerInsideLayer &&
+				!stateData.hoveredGizmoOpt.HasValue();
+			if (checkForHoveredWindow)
+			{
+				auto hitWindowNode = CheckHitWindowNode(
+					layerIt.node,
+					layerRect,
+					pointer.pos,
+					transientAlloc);
+				if (hitWindowNode.window)
+				{
+					auto const& nodeRect = hitWindowNode.rect;
+					DA_State_Moving::HoveredWindow newHoveredWindow = {};
+					newHoveredWindow.windowNode = hitWindowNode.window;
+					// We hit a window, now check if we hit a docking gizmo inside that window.
+					auto hitGizmoOpt =
+						DA_CheckHitInnerDockingGizmo(
+							nodeRect,
+							gizmoExtent,
+							pointer.pos);
+					if (hitGizmoOpt.HasValue())
+						newHoveredWindow.gizmo = (int)hitGizmoOpt.Value();
+					newHoveredWindow.gizmoIsInner = true;
+					stateData.hoveredGizmoOpt = newHoveredWindow;
+				}
+			}
+
+			returnValue.touchEventConsumption.consumed =
+				returnValue.touchEventConsumption.consumed
+				|| pointerInsideLayer;
+		}
+
+		returnValue.touchEventConsumption.consumed =
+			returnValue.touchEventConsumption.consumed
+			|| pointerInWidget;
+
+		return returnValue;
+	}
+
+	DA_PointerMove_Return DA_PointerMove_StateResizingSplit(
+		DA_PointerMove_Params const& params,
+		bool pointerOccluded)
+	{
+		auto& dockArea = params.dockArea;
+		auto& transientAlloc = params.transientAlloc;
+		auto& textManager = params.textManager;
+		auto& rectColl = params.rectColl;
+		auto& rectCollIter = params.rectCollIter;
+		auto& pointer = params.pointer;
+
+		auto rectPairOpt = rectColl.GetRect(dockArea, rectCollIter);
+		DENGINE_IMPL_GUI_ASSERT(rectPairOpt.Has());
+		auto const& absWidgetRect = rectPairOpt.Value().widgetRect;
+		auto const& absVisibleRect = rectPairOpt.Value().visibleRect;
+
+		// If we only have 0-1 layers, we shouldn't be in the moving state
+		// to begin with.
+		auto& stateData = DA_GetStateData(dockArea).Get<DA_State_ResizingSplit>();
+		auto& targetSplitNode = *static_cast<DA_SplitNode*>(stateData.splitNode);
+
+		DA_PointerMove_Return returnValue = { .job = transientAlloc, };
+		returnValue.touchEventConsumption.consumed = pointerOccluded;
+
+		{
+			// Apply resize
+			auto& layers = DA_GetLayers(dockArea);
+			auto const layerIndex = stateData.resizingBack ? layers.size() - 1 : 0;
+			auto const layerRect = DA_BuildLayerRect(
+				{ layers.data(), layers.size() },
+				layerIndex,
+				absWidgetRect);
+
+			auto nodeRectOpt = FindSplitNodeRect(
+				*layers[layerIndex].root,
+				layerRect,
+				&targetSplitNode,
+				transientAlloc);
+			// It is an error if we can't find the rect for this split node.
+			DENGINE_IMPL_GUI_ASSERT(nodeRectOpt.HasValue());
+			auto const& nodeRect = nodeRectOpt.Value();
+
+			// Apply new split
+			auto const normalizedPointerPos = Math::Vec2{
+				(pointer.pos.x - (f32)nodeRect.position.x) / (f32)nodeRect.extent.width,
+				(pointer.pos.y - (f32)nodeRect.position.y) / (f32)nodeRect.extent.height };
+			targetSplitNode.split =
+				targetSplitNode.dir == DA_SplitNode::Direction::Horizontal ?
+				normalizedPointerPos.x :
+				normalizedPointerPos.y;
+
+			targetSplitNode.split = Std::Clamp(targetSplitNode.split, 0.1f, 0.9f);
+		}
+
+		return returnValue;
+	}
+
+	// Returns the parent of a split node
+	[[nodiscard]] DA_SplitNode* DA_FindWindowNodeParent(
+		DockArea& dockArea,
+		DA_WindowNode* srcWindowNode,
+		AllocRef transientAlloc)
+	{
+		for (auto const layerIt : DA_BuildLayerItPairFrontToBack(dockArea)) {
+			for (auto const nodeIt : DA_BuildNodeItPair(
+				layerIt.ppParentPtrToNode,
+				transientAlloc))
+			{
+				if (nodeIt.node.GetNodeType() != NodeType::Split)
+					continue;
+				auto& splitNode = static_cast<DA_SplitNode&>(nodeIt.node);
+				if (splitNode.a == srcWindowNode || splitNode.b == srcWindowNode)
+					return &splitNode;
+			}
+		}
+		return nullptr;
+	}
+
+	void DA_Untab(
+		DockArea& dockArea,
+		DA_WindowNode* srcWindowNode,
+		Math::Vec2Int newLayerPos,
+		AllocRef transientAlloc)
+	{
+		auto& layers = DA_GetLayers(dockArea);
+
+		auto* newWindowNode = new DA_WindowNode;
+		// Extract the tab
+		newWindowNode->tabs.push_back(Std::Move(srcWindowNode->tabs[srcWindowNode->activeTabIndex]));
+		// Then erase the element that has been moved from
+		srcWindowNode->EraseTab(srcWindowNode->activeTabIndex);
+
+		DA_Layer newLayer = {};
+		newLayer.root = newWindowNode;
+		newLayer.rect.extent = DockArea::defaultLayerExtent;
+		newLayer.rect.position = newLayerPos;
+		layers.insert(layers.begin(), Std::Move(newLayer));
+
+		if (srcWindowNode->tabs.empty())
+		{
+			// The windownode is now empty.
+			// The only way this can happen is if we have a parent split node.
+			// We want to find that parent split node, and replace it such that
+			// it points directly to the windownode that remains under the splitnode.
+			auto* splitNodeParent = DA_FindWindowNodeParent(dockArea, srcWindowNode, transientAlloc);
+			DENGINE_IMPL_GUI_ASSERT(splitNodeParent);
+			auto** ppGrandparentPtr = DA_FindParentsPtrToNode(
+				dockArea,
+				*splitNodeParent,
+				transientAlloc);
+			DENGINE_IMPL_GUI_ASSERT(ppGrandparentPtr);
+
+			// Set our grandparents pointer to point to the window node
+			// that is NOT our recently emptied one.
+			if (splitNodeParent->a == srcWindowNode) {
+				(*ppGrandparentPtr) = splitNodeParent->b;
+				splitNodeParent->b = nullptr;
+			} else {
+				(*ppGrandparentPtr) = splitNodeParent->a;
+				splitNodeParent->a = nullptr;
+			}
+
+			// Now we can destroy the emptied windowNode and our SplitNode
+			delete splitNodeParent;
+		}
+	}
+
+	DA_PointerMove_Return DA_PointerMove_State_HoldingTab(
+		DA_PointerMove_Params const& params,
+		int tabTotalHeight,
+		bool pointerOccluded)
+	{
+		auto& dockArea = params.dockArea;
+		auto const& pointer = params.pointer;
+		auto& rectColl = params.rectColl;
+		auto& rectCollIter = params.rectCollIter;
+		auto& textManager = params.textManager;
+		auto& transientAlloc = params.transientAlloc;
+		auto const& customData = params.customData;
+		auto fontSizeId = customData.fontSizeId;
+
+		auto rectPairOpt = rectColl.GetRect(dockArea, rectCollIter);
+		DENGINE_IMPL_GUI_ASSERT(rectPairOpt.Has());
+		auto const& absWidgetRect = rectPairOpt.Value().widgetRect;
+		auto const& absVisibleRect = rectPairOpt.Value().visibleRect;
+
+		DENGINE_IMPL_GUI_ASSERT(DA_GetStateData(dockArea).IsA<DA_State_HoldingTab>());
+		auto& stateData = DA_GetStateData(dockArea).Get<DA_State_HoldingTab>();
+		auto& layers = DA_GetLayers(dockArea);
+
+		DA_PointerMove_Return returnValue = { .job = transientAlloc, };
+		returnValue.touchEventConsumption.consumed = pointerOccluded;
+
+		// If this event is for a pointer that we are not currently interacting with,
+		// just skip it. It will get dispatched to the children later instead.
+		if (pointer.id != stateData.pointerId)
+			return returnValue;
+
+		auto& windowNode = *stateData.windowBeingHeld;
+
+		// We want to see if we moved our pointer a small distance away from the tab itself, so we know we want
+		// to untab it.
+
+		// Start by finding the windownodes rect, so we can determine where the pointer is in relation to the
+		// tab rect.
+		auto const windowNodeRect = DA_FindNodeRect(
+			dockArea,
+			absWidgetRect,
+			&windowNode,
+			transientAlloc);
+
+		auto [titlebarRect, contentRect] = DA_WindowNode_BuildPrimaryRects(windowNodeRect, tabTotalHeight);
+		auto tabRects = DA_WindowNode_BuildTabRects(
+			titlebarRect,
+			{ windowNode.tabs.data(), windowNode.tabs.size() },
+			fontSizeId,
+			tabTotalHeight,
+			textManager,
+			transientAlloc);
+
+		// If we move up or down by N amount, we undock the tab and turn it into the front layer.
+		// If this windowNode only has one tab, we need to terminate the parent split node.
+		// If the windownode doesn't have a splitnode as parent, we shouldn't even holding a tab
+		// to begin with.
+		// When we undock this tab, we go into the moving-layer state.
+		bool undockTab =
+			pointer.pos.y < (f32)(titlebarRect.position.y - (i32)titlebarRect.extent.height) ||
+			pointer.pos.y > (f32)(titlebarRect.position.y + (i32)titlebarRect.extent.height * 2);
+		if (undockTab)
+		{
+			// Create a new layer that is a window node, with this tab.
+			// Then enter moving state.
+			returnValue.job = [=, &windowNode](DockArea& dockArea) {
+				auto const oldState = stateData;
+
+				auto temp = pointer.pos + oldState.pointerOffsetFromTab;
+				Math::Vec2Int b = { (i32)temp.x, (i32)temp.y };
+				Math::Vec2Int newLayerPos = absWidgetRect.position + b;
+				DA_Untab(dockArea, &windowNode, newLayerPos, transientAlloc);
+
+				auto& state = DA_GetStateData(dockArea);
+				DA_State_Moving newState = {};
+				newState.heldPointerId = params.pointer.id;
+				newState.pointerOffset = oldState.pointerOffsetFromTab;
+				state = newState;
+			};
+		}
+
+		return returnValue;
+	}
+
+	void DA_PointerMove_DispatchChild(
+		DA_PointerMove_Params const& params,
+		int totalTabHeight,
+		bool pointerOccluded,
+		DA_ChildDispatchFnT const& childDispatchFn)
+	{
+		auto& dockArea = params.dockArea;
+		auto const& rectColl = params.rectColl;
+		auto const& rectCollIter = params.rectCollIter;
+		auto const& pointer = params.pointer;
+		auto const& transientAlloc = params.transientAlloc;
+		auto const& textManager = params.textManager;
+		auto const& customData = params.customData;
+		auto fontSizeId = customData.fontSizeId;
+
+		auto rectPairOpt = rectColl.GetRect(dockArea, rectCollIter);
+		DENGINE_IMPL_GUI_ASSERT(rectPairOpt.Has());
+		auto const& absWidgetRect = rectPairOpt.Value().widgetRect;
+		auto const& absVisibleRect = rectPairOpt.Value().visibleRect;
+
+		bool newPointerOccluded = pointerOccluded;
+		for (auto const& layerIt : DA_BuildLayerItPairFrontToBack(dockArea))
+		{
+			auto const& layerRect = layerIt.BuildLayerRect(absWidgetRect);
+			auto pointerInsideLayer = layerRect.GetIntersect(absVisibleRect).PointIsInside(pointer.pos);
+
+			for (auto const& nodeIt : DA_BuildNodeItPair(
+                layerIt.ppParentPtrToNode,
+                layerRect,
+                transientAlloc))
+			{
+				if (nodeIt.node.GetNodeType() != NodeType::Window)
+					continue;
+				auto& windowNode = static_cast<DA_WindowNode&>(nodeIt.node);
+				auto [titlebarRect, contentRect] = DA_WindowNode_BuildPrimaryRects(nodeIt.rect, totalTabHeight);
+				bool const pointerInsideTitlebar =
+					pointerInsideLayer &&
+					titlebarRect.PointIsInside(pointer.pos);
+
+				newPointerOccluded = newPointerOccluded || pointerInsideTitlebar;
+
+				auto& widgetBox = windowNode.tabs[windowNode.activeTabIndex].widget;
+				if (widgetBox) {
+					childDispatchFn(
+						*widgetBox,
+						Std::nullOpt,
+						newPointerOccluded);
+				}
+			}
+
+			newPointerOccluded = newPointerOccluded || pointerInsideLayer;
+		}
+	}
+}
+
+TouchEventConsumption Gui::impl::DA_PointerMove(
+	DA_PointerMove_Params const& params,
+	bool pointerOccluded,
+	DA_ChildDispatchFnT const& childDispatchFn)
+{
+	auto& dockArea = params.dockArea;
+	auto const& transientAlloc = params.transientAlloc;
+	auto& stateData = DA_GetStateData(dockArea);
+	auto const& customData = params.customData;
+	auto totalTabHeightPx = customData.tabTotalHeightPx;
+
+	DA_PointerMove_DispatchChild(
+		params,
+		totalTabHeightPx,
+		pointerOccluded,
+		childDispatchFn);
+
+	DA_PointerMove_Return temp = { .job = transientAlloc, };
+
+	if (stateData.IsA<DA_State_Normal>()) {
+		temp = DA_PointerMove_StateNormal(
+			params,
+			totalTabHeightPx,
+			pointerOccluded);
+	} else if (stateData.IsA<DA_State_Moving>())
+		temp = DA_PointerMove_StateMoving(params, pointerOccluded);
+	else if (stateData.IsA<DA_State_ResizingSplit>())
+		temp = DA_PointerMove_StateResizingSplit(params, pointerOccluded);
+	else if (stateData.IsA<DA_State_HoldingTab>()) {
+		temp = DA_PointerMove_State_HoldingTab(params, totalTabHeightPx, pointerOccluded);
+	} else
+		DENGINE_IMPL_GUI_UNREACHABLE();
+
+	if (temp.job.IsValid()) {
+		temp.job.Invoke(dockArea);
+	}
+
+	if (temp.frontLayerNewPos.HasValue()) {
+		auto const& newFrontPos = temp.frontLayerNewPos.Value();
+		auto& frontLayerRect = DA_GetLayers(dockArea).front().rect;
+		frontLayerRect.position = newFrontPos;
+	}
+
+	return temp.touchEventConsumption;
+}

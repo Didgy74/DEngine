@@ -1,0 +1,7 @@
+#pragma once
+
+namespace DEngine::Platform::impl::Backend {
+	inline constexpr char const gamepadMappings[] = R"GAMEPADDB(
+@GAMECONTROLLERDB_CONTENTS@
+)GAMEPADDB";
+}

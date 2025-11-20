@@ -1,0 +1,6 @@
+function(DEngineAny_SetupAssertDefines TARGET VALUE)
+	option(DENGINE_GFX_ENABLE_ASSERT "Asserts inside the rendering code" ${VALUE})
+	if (${DENGINE_GFX_ENABLE_ASSERT})
+		target_compile_definitions(${TARGET} PUBLIC DENGINE_GFX_ENABLE_ASSERT)
+	endif()
+endfunction()

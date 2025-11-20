@@ -1,0 +1,48 @@
+module;
+
+#include <DEngine/Std/Containers/impl/Assert.hpp>
+
+export module DEngine.Std.FnRef;
+
+import DEngine.Std.Trait;
+
+export namespace DEngine::Std
+{
+	template<class ReturnT, class ...ArgsT>
+	class FnRef;
+
+	template<class ReturnT, class ...ArgsT>
+	class FnRef<ReturnT(ArgsT...)>
+	{
+	public:
+		template<class Callable> requires Std::Trait::IsInvocable<ReturnT, Callable const&, ArgsT...>
+		FnRef(Callable const& in) {
+			actualFn = &in;
+			wrapperFn = [](void const* actualFnIn, ArgsT... argsIn) {
+				auto const& fn = *static_cast<Callable const*>(actualFnIn);
+				return fn(argsIn...);
+			};
+		}
+
+		// TODO: It's not legal to assign this to a temporary.
+		//template<class Callable>
+		//FnRef(Callable&& in) = delete;
+
+		ReturnT Invoke(ArgsT... args) const
+		{
+			DENGINE_IMPL_CONTAINERS_ASSERT(wrapperFn);
+			DENGINE_IMPL_CONTAINERS_ASSERT(actualFn);
+			return wrapperFn(actualFn, args...);
+		}
+
+		ReturnT operator()(ArgsT... args) const {
+			return Invoke(args...);
+		}
+
+	private:
+		void const* actualFn = nullptr;
+		using WrapperFnT = ReturnT(*)(void const*, ArgsT...);
+		WrapperFnT wrapperFn = nullptr;
+	};
+
+}
