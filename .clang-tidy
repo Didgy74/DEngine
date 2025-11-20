@@ -1,0 +1,14 @@
+Checks: >
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  readability-*,
+  modernize-*,
+  -llvm-libc-implementation-in-namespace,
+  -modernize-use-designated-initializers,
+  -modernize-use-integer-sign-comparison,
+  -modernize-use-override,
+  -modernize-use-trailing-return-type,
+  -readability-casting,
+  -readability-magic-numbers,
+  -readability-uppercase-literal-suffix

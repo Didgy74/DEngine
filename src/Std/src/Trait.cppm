@@ -1,0 +1,228 @@
+module;
+
+#include <DEngine/Std/Defines.hpp>
+
+export module DEngine.Std.Trait;
+
+namespace DEngine::Std::Trait::impl {
+	template<unsigned int index, class T, class...Us>
+	struct At_Impl;
+	template<class T, class... Us>
+	struct At_Impl<0, T, Us...> { using Type = T; };
+	template<unsigned int index, class T, class... Us>
+	struct At_Impl { using Type = At_Impl<index - 1, Us...>::Type; };
+	// This is just a wrapper to add the static_assert of the index against the parameter pack length.
+	template<unsigned int index, class... Ts>
+	struct At {
+		static_assert(index < sizeof...(Ts), "Tried to index further than the parameter pack.");
+		using Type = At_Impl<index, Ts...>::Type;
+	};
+
+	template<unsigned int index, unsigned int missingTypeCount, class Or, class... Ts>
+	struct AtOr;
+	template<unsigned int index, class Or, class... Ts>
+	struct AtOr<index, 0, Or, Ts...> { using Type = At<index, Ts...>::Type; };
+	template<unsigned int index, unsigned int missingTypeCount, class Or, class... Ts>
+	struct AtOr { using Type = AtOr<index, missingTypeCount - 1, Or, Ts..., Or>::Type; };
+
+	template<bool valueIn>
+	struct BoolValue { static constexpr bool value = valueIn; };
+
+	template<bool expr, class T, class U>
+	struct Conditional;
+	template<class T, class U>
+	struct Conditional<true, T, U> { using Type = T; };
+	template<class T, class U>
+	struct Conditional<false, T, U> { using Type = U; };
+
+	template<class From, class To>
+	concept ConvertibleTo =
+#if DENGINE_STD_COMPILER == DENGINE_STD_COMPILER_MSVC_VALUE
+		__is_convertible_to(From, To);
+#else
+		__is_convertible(From, To);
+#endif
+
+	template<class T>
+	struct HasVirtualDestructor : public BoolValue<__has_virtual_destructor(T)> {};
+
+	template <class T, class... Ts>
+	struct IndexOf;
+	template <class T, class... Ts>
+	struct IndexOf<T, T, Ts...> { static constexpr unsigned int value = 0; };
+	template <class T, class U, class... Ts>
+	struct IndexOf<T, U, Ts...> { static constexpr unsigned int value = 1 + IndexOf<T, Ts...>::value; };
+	
+	template<class T>
+	struct IsConst : public BoolValue<false> {};
+	template<class T>
+	struct IsConst<T const> : public BoolValue<true> {};
+
+	template<class T>
+	struct IsCopyConstructible : public BoolValue<__is_constructible(T, T const&)> {};
+	template<class T>
+	struct IsDefaultConstructible : public BoolValue<__is_constructible(T)> {};
+	template<class T>
+	struct IsMoveConstructible : public BoolValue<__is_constructible(T, T&&)> {};
+	template<class T>
+	struct IsTriviallyDefaultConstructible : public BoolValue<__is_trivially_constructible(T)> {};
+	template<class T>
+	struct IsTriviallyCopyable : public BoolValue<__is_trivially_copyable(T)> {};
+	template<class T>
+	struct IsTriviallyConstructible : public BoolValue<__is_trivially_constructible(T)> {};
+
+	template<class T>
+	struct IsTriviallyDestructible : public BoolValue<
+#if DENGINE_STD_COMPILER == DENGINE_STD_COMPILER_MSVC_VALUE || DENGINE_STD_COMPILER == DENGINE_STD_COMPILER_CLANG_VALUE
+		__is_trivially_destructible(T)
+#else
+		__has_trivial_destructor(T)
+#endif
+	>{};
+
+	template<class T>
+	struct IsCopyAssignable : public BoolValue<__is_assignable(T&, T const&)> {};
+	template<class T>
+	struct IsMoveAssignable : public BoolValue<__is_assignable(T&, T&&)> {};
+
+	template<class T>
+	struct IsRef : public BoolValue<false> {};
+	template<class T>
+	struct IsRef<T&> : public BoolValue<true> {};
+	template<class T>
+	struct IsRef<T&&> : public BoolValue<true> {};
+
+	template<class T>
+	struct IsRValueRef : public BoolValue<false> {};
+	template<class T>
+	struct IsRValueRef<T&&> : public BoolValue<true> {};
+
+	template<class T, class U>
+	struct IsSame : public BoolValue<false> {};
+	template<class T>
+	struct IsSame<T, T> : public BoolValue<true> {};
+
+	template <int a, int... values>
+	struct Max;
+	template <int arg>
+	struct Max<arg> { static constexpr int value = arg; };
+	template <int a, int b, int... values>
+	struct Max<a, b, values...> { static constexpr int value = a > b ? Max<a, values...>::value : Max<b, values...>::value; };
+	template <int a, int... values>
+	struct Min;
+	template <int arg>
+	struct Min<arg> { static constexpr int value = arg; };
+	template <int a, int b, int... values>
+	struct Min<a, b, values...> { static constexpr int value = a < b ? Min<a, values...>::value : Min<b, values...>::value; };
+
+	template<class T>
+	struct RemoveConst { using Type = T; };
+	template<class T>
+	struct RemoveConst<T const> { using Type = T; };
+
+	template<class T>
+	struct RemoveRef { using Type = T; };
+	template<class T>
+	struct RemoveRef<T&> { using Type = T; };
+	template<class T>
+	struct RemoveRef<T&&> { using Type = T; };
+
+	template<class T>
+	struct RemoveCVRef { using Type = RemoveConst<typename RemoveRef<T>::Type>::Type; };
+
+	template<class T, class U = T&&>
+	U Declval(int) noexcept;
+	template<class T>
+	T Declval(long) noexcept;
+}
+
+export namespace DEngine::Std::Trait {
+	template<unsigned int index, class... Ts>
+	using At = impl::At<index, Ts...>::Type;
+	// Returns the type at the index, or returs Or if the index is out of bounds.
+	template<unsigned int index, class Or, class... Ts>
+	using AtOr = impl::AtOr<index, impl::Max<0, (int)index - (int)sizeof...(Ts) + 1>::value, Or, Ts...>::Type;
+
+	template<bool expr, class T, class U>
+	using Conditional = typename impl::Conditional<expr, T, U>::Type;
+	template<bool expr, class T, class U>
+	using Cond = Conditional<expr, T, U>;
+
+	template<class T, class ...Ts>
+	constexpr bool existsInPack = (impl::IsSame<T, Ts>::value || ...);
+
+	template<class T, class... Ts> requires (impl::IsSame<T, Ts>::value || ...)
+	constexpr unsigned int indexOf = impl::IndexOf<T, Ts...>::value;
+
+	template<class T>
+	constexpr bool hasVirtualDestructor = impl::HasVirtualDestructor<T>::value;
+
+	template<class Base, class Derived>
+	constexpr bool isBaseOf = __is_base_of(Base, Derived);
+
+	template<class T>
+	constexpr bool isConst = impl::IsConst<T>::value;
+
+	template<class T>
+	constexpr bool isFloatingPoint = impl::IsSame<T, float>::value || impl::IsSame<T, double>::value;
+
+	template<class T>
+	constexpr bool isCopyConstructible = impl::IsCopyConstructible<T>::value;
+	template<class T>
+	constexpr bool isDefaultConstructible = impl::IsDefaultConstructible<T>::value;
+	template<class T>
+	constexpr bool isTriviallyDefaultConstructible = impl::IsTriviallyDefaultConstructible<T>::value;
+	template<class T>
+	constexpr bool isMoveConstructible = impl::IsMoveConstructible<T>::value;
+	template<class T>
+	constexpr bool isTriviallyDestructible = impl::IsTriviallyDestructible<T>::value;
+
+	template<class T>
+	constexpr bool isTrivial = impl::IsTriviallyConstructible<T>::value && impl::IsTriviallyCopyable<T>::value;
+
+	template<class T>
+	constexpr bool isCopyAssignable = impl::IsCopyAssignable<T>::value;
+	template<class T>
+	constexpr bool isMoveAssignable = impl::IsMoveAssignable<T>::value;
+
+	template<class T>
+	constexpr bool isRef = impl::IsRef<T>::value;
+
+	template<class T>
+	constexpr bool isRValueRef = impl::IsRValueRef<T>::value;
+
+	template<class T, class U>
+	constexpr bool isSame = impl::IsSame<T, U>::value;
+
+	template<int... values>
+	constexpr int max = impl::Max<values...>::value;
+	template<int... values>
+	constexpr int min = impl::Min<values...>::value;
+	
+	template<class T>
+	using RemoveConst = impl::RemoveConst<T>::Type;
+	
+	template<class T>
+	using RemoveCVRef = impl::RemoveCVRef<T>::Type;
+
+	template<class T>
+	using RemoveRef = impl::RemoveRef<T>::Type;
+
+	// Produces a value of type T in an unevaluated context (e.g. decltype). Never
+	// defined, so it must never be called at runtime. T&& for non-void T, otherwise T.
+	template<class T>
+	auto Declval() noexcept -> decltype(impl::Declval<T>(0));
+
+	template<class From, class To>
+	concept ConvertibleTo = impl::ConvertibleTo<From, To>;
+
+	template<typename T>
+	concept EqualityComparable = requires(T const& a, T const& b) { { a == b } -> ConvertibleTo<bool>; };
+
+	// True if Fn can be invoked with Args..., and the result of that invocation is
+	// convertible to R. Mirrors std::is_invocable_r_v<R, Fn, Args...>.
+	template<class R, class Fn, class... Args>
+	concept IsInvocable = requires {
+		{ Declval<Fn>()(Declval<Args>()...) } -> ConvertibleTo<R>;
+	};
+}

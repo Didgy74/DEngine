@@ -1,0 +1,4 @@
+{
+    "slang.searchInAllWorkspaceDirectories": true,
+    "slang.additionalSearchPaths": ["assets/lib/"]
+}

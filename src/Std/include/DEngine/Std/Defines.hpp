@@ -1,0 +1,27 @@
+#pragma once
+
+#define DENGINE_STD_OS_WINDOWS_VALUE 0
+#define DENGINE_STD_OS_LINUX_VALUE 1
+#define DENGINE_STD_OS_ANDROID_VALUE 2
+#define DENGINE_STD_OS_MACS_VALUE 3
+
+#if defined(_WIN32) || defined(_WIN64)
+#	define DENGINE_STD_OS DENGINE_STD_OS_WINDOWS_VALUE
+#elif defined(__ANDROID__)
+#	define DENGINE_OS_ANDROID
+#elif defined(__GNUC__)
+#	define DENGINE_OS_LINUX
+#else
+#	error Error. DEngine does not support this platform/compiler
+#endif
+
+#define DENGINE_STD_COMPILER_MSVC_VALUE 0
+#define DENGINE_STD_COMPILER_GCC_VALUE 1
+#define DENGINE_STD_COMPILER_CLANG_VALUE 2
+#ifdef _MSC_VER
+#   define DENGINE_STD_COMPILER DENGINE_STD_COMPILER_MSVC_VALUE
+#elifdef __clang__
+#   define DENGINE_STD_COMPILER DENGINE_STD_COMPILER_CLANG_VALUE
+#else
+#   define DENGINE_STD_COMPILER DENGINE_STD_COMPILER_GCC_VALUE
+#endif

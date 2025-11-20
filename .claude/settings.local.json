@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\np_sk\\\\Nextcloud\\\\Documents\\\\Projects\\\\DEngine\" -Recurse -Depth 2 -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(git show *)",
+      "Bash(cmake --version)",
+      "Bash(cmake --build cmake-build-debug --target DEngine_Gui_Context)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(ninja)"
+    ]
+  }
+}
